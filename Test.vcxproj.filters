@@ -1,0 +1,77 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{da33e577-6214-473f-bd17-eed0af3e439f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="math.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3ds.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="image.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tga.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="dds.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="engine.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="font.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="3ds.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="math.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="image.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="font.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fontdata.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="font_v.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="lighting_f.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="lighting_v.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="font_f.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="build.ninja" />
+  </ItemGroup>
+</Project>

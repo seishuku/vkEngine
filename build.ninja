@@ -1,0 +1,12 @@
+builddir = ./
+
+rule compile_glsl_vs
+    command = cmd /c %VULKAN_SDK%\Bin32\glslangValidator -S vert -V $in -o $out
+
+rule compile_glsl_fs
+    command = cmd /c %VULKAN_SDK%\Bin32\glslangValidator -S frag -V $in -o $out
+
+build lighting_v.spv: compile_glsl_vs lighting_v.glsl
+build lighting_f.spv: compile_glsl_fs lighting_f.glsl
+build font_v.spv: compile_glsl_vs font_v.glsl
+build font_f.spv: compile_glsl_fs font_f.glsl
