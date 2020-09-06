@@ -1,7 +1,7 @@
-#include <vulkan/vulkan.h>
 #include <malloc.h>
 #include <stdio.h>
 #include <string.h>
+#include "vulkan.h"
 #include "math.h"
 #include "image.h"
 
@@ -16,8 +16,6 @@
 #ifndef max
 #define max(a, b) ((a)>(b)?(a):(b))
 #endif
-
-extern uint32_t memory_type_from_properties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask);
 
 extern VkDevice device;
 extern VkPhysicalDeviceMemoryProperties deviceMemProperties;
@@ -818,7 +816,7 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		// Set memory allocation size to required memory size
         .allocationSize=memoryRequirements.size,
 		// Get memory type that can be mapped to host memory
-		.memoryTypeIndex=memory_type_from_properties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
+		.memoryTypeIndex=vkuMemoryTypeFromProperties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
     }, NULL, &Image->deviceMemory);
 
 	vkBindImageMemory(device, Image->image, Image->deviceMemory, 0);

@@ -1,17 +1,22 @@
 #include <Windows.h>
-#include <vulkan/vulkan.h>
 #include <sys/types.h>
 #include <stdio.h>
+#include "vulkan.h"
 #include "math.h"
 #include "3ds.h"
 #include "image.h"
 #include "font.h"
 
+#ifndef FREE
+#define FREE(p) { if(p) { free(p); p=NULL; } }
+#endif
+
 HWND hWnd=NULL;
 
 char szAppName[]="Vulkan";
 
-int Width=1280, Height=720;
+int Width=1024, Height=576;
+//int Width=1280, Height=720;
 int Done=0, Key[256];
 
 float RotateX=0.0f, RotateY=0.0f, PanX=0.0f, PanY=0.0f, Zoom=-200.0f;
@@ -22,19 +27,37 @@ int Frames=0;
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-Model3DS_t Model[4];
+enum
+{
+	MODEL_HELLKNIGHT,
+	MODEL_PINKY,
+	MODEL_FATTY,
+	MODEL_LEVEL,
+	NUM_MODELS
+};
 
-Image_t Textures[8];
+Model3DS_t Model[NUM_MODELS];
+
+enum
+{
+	TEXTURE_HELLKNIGHT,
+	TEXTURE_HELLKNIGHT_NORMAL,
+	TEXTURE_PINKY,
+	TEXTURE_PINKY_NORMAL,
+	TEXTURE_FATTY,
+	TEXTURE_FATTY_NORMAL,
+	TEXTURE_LEVEL,
+	TEXTURE_LEVEL_NORMAL,
+	NUM_TEXTURES
+};
+
+Image_t Textures[NUM_TEXTURES];
 
 enum
 {
 	MAX_DEVICE_COUNT=8,
 	MAX_QUEUE_COUNT=4,
-	MAX_PRESENT_MODE_COUNT=6,
-	MAX_SWAPCHAIN_IMAGES=3,
 	FRAME_COUNT=2,
-	PRESENT_MODE_MAILBOX_IMAGE_COUNT=3,
-	PRESENT_MODE_DEFAULT_IMAGE_COUNT=2,
 };
 
  _inline uint32_t clamp_u32(uint32_t value, uint32_t min, uint32_t max)
@@ -70,27 +93,28 @@ VkSurfaceKHR surface=VK_NULL_HANDLE;
 uint32_t queueFamilyIndex;
 VkQueue queue=VK_NULL_HANDLE;
 
+// Swapchain
 VkSwapchainKHR swapchain;
-uint32_t swapchainImageCount;
-VkImage swapchainImages[MAX_SWAPCHAIN_IMAGES];
+VkImage swapchainImages[FRAME_COUNT];
 VkExtent2D swapchainExtent;
 VkSurfaceFormatKHR surfaceFormat;
 
-VkRenderPass renderPass;
+VkImageView swapchainImageViews[FRAME_COUNT];
+VkFramebuffer frameBuffers[FRAME_COUNT];
 
-VkImageView swapchainImageViews[MAX_SWAPCHAIN_IMAGES];
-VkFramebuffer framebuffers[MAX_SWAPCHAIN_IMAGES];
-
+// Depth buffer handles
 VkImage depthImage;
 VkDeviceMemory depthMemory;
 VkImageView depthImageView;
 
-VkDescriptorPool descriptorPool=VK_NULL_HANDLE;
-VkDescriptorSet descriptorSet[4]={ VK_NULL_HANDLE, };
-VkDescriptorSetLayout descriptorSetLayout=VK_NULL_HANDLE;
+VkRenderPass renderPass;
 
 VkPipelineLayout pipelineLayout;
 VkPipeline pipeline;
+
+VkDescriptorPool descriptorPool=VK_NULL_HANDLE;
+VkDescriptorSet descriptorSet[4]={ VK_NULL_HANDLE, };
+VkDescriptorSetLayout descriptorSetLayout=VK_NULL_HANDLE;
 
 uint32_t frameIndex=0;
 
@@ -98,34 +122,11 @@ VkCommandPool commandPool;
 VkCommandBuffer commandBuffers[FRAME_COUNT];
 
 VkFence frameFences[FRAME_COUNT];
-
-VkSemaphore presentCompleteSemaphore;
-VkSemaphore renderCompleteSemaphore;
+VkSemaphore presentCompleteSemaphores[FRAME_COUNT];
 
 VkBuffer uniformBuffer;
-VkDeviceMemory uniformMemory;
+VkDeviceMemory uniformBufferMemory;
 void *uniformBufferPtr;
-
-uint32_t memory_type_from_properties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask)
-{
-	uint32_t i;
-
-	// Search memtypes to find first index with those properties
-	for(i=0;i<memory_properties.memoryTypeCount;i++)
-	{
-		if((typeBits&1)==1)
-		{
-			// Type is available, does it match user properties?
-			if((memory_properties.memoryTypes[i].propertyFlags&requirements_mask)==requirements_mask)
-				return i;
-		}
-
-		typeBits>>=1;
-	}
-
-	// No memory types matched, return failure
-	return 0;
-}
 
 int createRenderPass()
 {
@@ -210,7 +211,7 @@ int createFramebuffers()
 		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.pNext=NULL,
 		.allocationSize=memoryRequirements.size,
-		.memoryTypeIndex=memory_type_from_properties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
+		.memoryTypeIndex=vkuMemoryTypeFromProperties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
 	}, NULL, &depthMemory);
 
 	vkBindImageMemory(device, depthImage, depthMemory, 0);
@@ -234,7 +235,7 @@ int createFramebuffers()
 		.flags=0,
 	}, NULL, &depthImageView);
 
-	for(i=0;i<swapchainImageCount;i++)
+	for(i=0;i<FRAME_COUNT;i++)
 	{
 		vkCreateImageView(device, &(VkImageViewCreateInfo)
 		{
@@ -261,54 +262,16 @@ int createFramebuffers()
 			.width=swapchainExtent.width,
 			.height=swapchainExtent.height,
 			.layers=1,
-		}, 0, &framebuffers[i]);
+		}, 0, &frameBuffers[i]);
 	}
 
 	return 1;
 }
 
-VkShaderModule createShaderModule(const char *shaderFile)
-{
-	VkShaderModule shaderModule=VK_NULL_HANDLE;
-
-	HANDLE hFile=CreateFile(shaderFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-
-	if(hFile==INVALID_HANDLE_VALUE)
-		return VK_NULL_HANDLE;
-
-	LARGE_INTEGER size;
-
-	GetFileSizeEx(hFile, &size);
-
-	HANDLE hMapping=CreateFileMapping(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
-
-	CloseHandle(hFile);
-
-	if(!hMapping)
-		return VK_NULL_HANDLE;
-
-	const uint32_t *data=(const uint32_t *)MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, 0);
-
-	if(data==NULL)
-		return VK_NULL_HANDLE;
-
-	vkCreateShaderModule(device, &(VkShaderModuleCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-		.codeSize=size.LowPart,
-		.pCode=data,
-	}, 0, &shaderModule);
-
-	UnmapViewOfFile(data);
-	CloseHandle(hMapping);
-
-	return shaderModule;
-}
-
 int createPipeline()
 {
-	VkShaderModule vertexShader=createShaderModule("lighting_v.spv");
-	VkShaderModule fragmentShader=createShaderModule("lighting_f.spv");
+	VkShaderModule vertexShader=vkuCreateShaderModule(device, "lighting_v.spv");
+	VkShaderModule fragmentShader=vkuCreateShaderModule(device, "lighting_f.spv");
 
 	vkCreateDescriptorPool(device, &(VkDescriptorPoolCreateInfo)
 	{
@@ -539,35 +502,28 @@ int createPipeline()
 
 void BuildMemoryBuffers(Model3DS_t *Model)
 {
-	VkMemoryRequirements memoryRequirements;
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
 	void *Data=NULL;
 	int i, j;
 
 	for(i=0;i<Model->NumMesh;i++)
 	{
-		// Vertex data
-		vkCreateBuffer(device, &(VkBufferCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-			.size=(sizeof(float)*14)*Model->Mesh[i].NumVertex,
-			.usage=VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
-			.queueFamilyIndexCount=1,
-			.pQueueFamilyIndices=&queueFamilyIndex,
-		}, NULL, &Model->Mesh[i].Buffer);
+		// Vertex data on device memory
+		vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
+			&Model->Mesh[i].Buffer, &Model->Mesh[i].BufferMemory,
+			sizeof(float)*14*Model->Mesh[i].NumVertex,
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-		vkGetBufferMemoryRequirements(device, Model->Mesh[i].Buffer, &memoryRequirements);
+		// Create staging buffer to transfer from host memory to device memory
+		vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
+			&stagingBuffer, &stagingBufferMemory,
+			sizeof(float)*14*Model->Mesh[i].NumVertex,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-		vkAllocateMemory(device, &(VkMemoryAllocateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-			.allocationSize=memoryRequirements.size,
-			.memoryTypeIndex=memory_type_from_properties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT),
-		}, NULL, &Model->Mesh[i].BufferMemory);
-
-		vkBindBufferMemory(device, Model->Mesh[i].Buffer, Model->Mesh[i].BufferMemory, 0);
-
-		vkMapMemory(device, Model->Mesh[i].BufferMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+		vkMapMemory(device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &Data);
 
 		for(j=0;j<Model->Mesh[i].NumVertex;j++)
 		{
@@ -591,31 +547,30 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 			*((float *)Data)++=Model->Mesh[i].Normal[3*j+2];
 		}
 
-		vkUnmapMemory(device, Model->Mesh[i].BufferMemory);
+		vkUnmapMemory(device, stagingBufferMemory);
+
+		// Copy to device memory
+		vkuCopyBuffer(device, queue, commandPool, stagingBuffer, Model->Mesh[i].Buffer, sizeof(float)*14*Model->Mesh[i].NumVertex);
+
+		// Delete staging data
+		vkFreeMemory(device, stagingBufferMemory, VK_NULL_HANDLE);
+		vkDestroyBuffer(device, stagingBuffer, VK_NULL_HANDLE);
 
 		// Index data
-		vkCreateBuffer(device, &(VkBufferCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-			.size=sizeof(uint16_t)*Model->Mesh[i].NumFace*3,
-			.usage=VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
-			.queueFamilyIndexCount=1,
-			.pQueueFamilyIndices=&queueFamilyIndex,
-		}, NULL, &Model->Mesh[i].IndexBuffer);
+		vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
+			&Model->Mesh[i].IndexBuffer, &Model->Mesh[i].IndexBufferMemory,
+			sizeof(uint16_t)*Model->Mesh[i].NumFace*3,
+			VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-		vkGetBufferMemoryRequirements(device, Model->Mesh[i].IndexBuffer, &memoryRequirements);
+		// Staging buffer
+		vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
+			&stagingBuffer, &stagingBufferMemory,
+			sizeof(uint16_t)*Model->Mesh[i].NumFace*3,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-		vkAllocateMemory(device, &(VkMemoryAllocateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-			.allocationSize=memoryRequirements.size,
-			.memoryTypeIndex=memory_type_from_properties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT),
-		}, NULL, &Model->Mesh[i].IndexBufferMemory);
-
-		vkBindBufferMemory(device, Model->Mesh[i].IndexBuffer, Model->Mesh[i].IndexBufferMemory, 0);
-
-		vkMapMemory(device, Model->Mesh[i].IndexBufferMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+		vkMapMemory(device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &Data);
 
 		for(j=0;j<Model->Mesh[i].NumFace;j++)
 		{
@@ -624,63 +579,53 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 			*((uint16_t *)Data)++=Model->Mesh[i].Face[3*j+0];
 		}
 
-		vkUnmapMemory(device, Model->Mesh[i].IndexBufferMemory);
+		vkUnmapMemory(device, stagingBufferMemory);
+
+		vkuCopyBuffer(device, queue, commandPool, stagingBuffer, Model->Mesh[i].IndexBuffer, sizeof(uint16_t)*Model->Mesh[i].NumFace*3);
+
+		// Delete staging data
+		vkFreeMemory(device, stagingBufferMemory, VK_NULL_HANDLE);
+		vkDestroyBuffer(device, stagingBuffer, VK_NULL_HANDLE);
 	}
 }
 
 int createUploadBuffer()
 {
-	VkMemoryRequirements memoryRequirements;
 	uint32_t i;
 
 	// Load models
-	if(Load3DS(&Model[0], "hellknight.3ds"))
-		BuildMemoryBuffers(&Model[0]);
+	if(Load3DS(&Model[MODEL_HELLKNIGHT], "hellknight.3ds"))
+		BuildMemoryBuffers(&Model[MODEL_HELLKNIGHT]);
 
-	if(Load3DS(&Model[1], "pinky.3ds"))
-		BuildMemoryBuffers(&Model[1]);
+	if(Load3DS(&Model[MODEL_PINKY], "pinky.3ds"))
+		BuildMemoryBuffers(&Model[MODEL_PINKY]);
 
-	if(Load3DS(&Model[2], "fatty.3ds"))
-		BuildMemoryBuffers(&Model[2]);
+	if(Load3DS(&Model[MODEL_FATTY], "fatty.3ds"))
+		BuildMemoryBuffers(&Model[MODEL_FATTY]);
 
-	if(Load3DS(&Model[3], "level.3ds"))
-		BuildMemoryBuffers(&Model[3]);
+	if(Load3DS(&Model[MODEL_LEVEL], "level.3ds"))
+		BuildMemoryBuffers(&Model[MODEL_LEVEL]);
 
 	// Load textures
-	Image_Upload(&Textures[0], "hellknight.tga", IMAGE_NONE);
-	Image_Upload(&Textures[1], "hellknight_n.tga", IMAGE_NORMALIZE);
-	Image_Upload(&Textures[2], "pinky.tga", IMAGE_NONE);
-	Image_Upload(&Textures[3], "pinky_n.tga", IMAGE_NORMALIZE);
-	Image_Upload(&Textures[4], "fatty.tga", IMAGE_NONE);
-	Image_Upload(&Textures[5], "fatty_n.tga", IMAGE_NORMALIZE);
-	Image_Upload(&Textures[6], "tile.tga", IMAGE_NONE);
-	Image_Upload(&Textures[7], "tile_b.tga", IMAGE_NORMALMAP|IMAGE_NORMALIZE);
+	Image_Upload(&Textures[TEXTURE_HELLKNIGHT], "hellknight.tga", IMAGE_NONE);
+	Image_Upload(&Textures[TEXTURE_HELLKNIGHT_NORMAL], "hellknight_n.tga", IMAGE_NORMALIZE);
+	Image_Upload(&Textures[TEXTURE_PINKY], "pinky.tga", IMAGE_NONE);
+	Image_Upload(&Textures[TEXTURE_PINKY_NORMAL], "pinky_n.tga", IMAGE_NORMALIZE);
+	Image_Upload(&Textures[TEXTURE_FATTY], "fatty.tga", IMAGE_NONE);
+	Image_Upload(&Textures[TEXTURE_FATTY_NORMAL], "fatty_n.tga", IMAGE_NORMALIZE);
+	Image_Upload(&Textures[TEXTURE_LEVEL], "tile.tga", IMAGE_NONE);
+	Image_Upload(&Textures[TEXTURE_LEVEL_NORMAL], "tile_b.tga", IMAGE_NORMALMAP|IMAGE_NORMALIZE);
 
 	vkDeviceWaitIdle(device);
 
 	// Uniform data
-	vkCreateBuffer(device, &(VkBufferCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.size=sizeof(ubo),
-		.usage=VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
-		.queueFamilyIndexCount=1,
-		.pQueueFamilyIndices=&queueFamilyIndex,
-	}, NULL, &uniformBuffer);
+	vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
+		&uniformBuffer, &uniformBufferMemory,
+		sizeof(ubo),
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-	vkGetBufferMemoryRequirements(device, uniformBuffer, &memoryRequirements);
-
-	vkAllocateMemory(device, &(VkMemoryAllocateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.allocationSize=memoryRequirements.size,
-		.memoryTypeIndex=memory_type_from_properties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
-	}, NULL, &uniformMemory);
-
-	vkBindBufferMemory(device, uniformBuffer, uniformMemory, 0);
-
-	vkMapMemory(device, uniformMemory, 0, VK_WHOLE_SIZE, 0, &uniformBufferPtr);
+	vkMapMemory(device, uniformBufferMemory, 0, VK_WHOLE_SIZE, 0, &uniformBufferPtr);
 
 	for(i=0;i<4;i++)
 	{
@@ -800,7 +745,7 @@ void draw_frame()
 	vkWaitForFences(device, 1, &frameFences[index], VK_TRUE, UINT64_MAX);
 	vkResetFences(device, 1, &frameFences[index]);
 
-	vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, presentCompleteSemaphore, VK_NULL_HANDLE, &imageIndex);
+	vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, presentCompleteSemaphores[index], VK_NULL_HANDLE, &imageIndex);
 
 	// Start recording the commands
 	vkBeginCommandBuffer(commandBuffers[index], &(VkCommandBufferBeginInfo)
@@ -814,7 +759,7 @@ void draw_frame()
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=renderPass,
-		.framebuffer=framebuffers[imageIndex],
+		.framebuffer=frameBuffers[imageIndex],
 		.clearValueCount=2,
 		.pClearValues=(VkClearValue[]) { { 0.0f, 0.0f, 0.0f, 1.0f }, { 1.0f, 0 } },
 		.renderArea.offset=(VkOffset2D) { 0, 0 },
@@ -857,9 +802,7 @@ void draw_frame()
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.pWaitDstStageMask=&(VkPipelineStageFlags) { VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT },
 		.waitSemaphoreCount=1,
-		.pWaitSemaphores=&presentCompleteSemaphore,
-		.signalSemaphoreCount=1,
-		.pSignalSemaphores=&renderCompleteSemaphore,
+		.pWaitSemaphores=&presentCompleteSemaphores[index],
 		.commandBufferCount=1,
 		.pCommandBuffers=&commandBuffers[index],
 	}, frameFences[index]);
@@ -871,8 +814,6 @@ void draw_frame()
 		.swapchainCount=1,
 		.pSwapchains=&swapchain,
 		.pImageIndices=&imageIndex,
-		.waitSemaphoreCount=1,
-		.pWaitSemaphores=&renderCompleteSemaphore,
 	});
 
 	frameIndex++;
@@ -883,10 +824,10 @@ int CreateVulkan(void)
 	uint32_t physicalDeviceCount;
 	VkPhysicalDevice deviceHandles[MAX_DEVICE_COUNT];
 	VkQueueFamilyProperties queueFamilyProperties[MAX_QUEUE_COUNT];
-	uint32_t formatCount=1, presentModeCount=0, i, j;
-	VkPresentModeKHR presentModes[MAX_PRESENT_MODE_COUNT];
+	uint32_t formatCount=1, presentModeCount=1, i, j;
 	VkPresentModeKHR presentMode=VK_PRESENT_MODE_FIFO_KHR;
 	VkSurfaceCapabilitiesKHR surfaceCapabilities;
+	uint32_t swapchainImageCount=FRAME_COUNT;
 
 	if(vkCreateInstance(&(VkInstanceCreateInfo)
 	{
@@ -962,29 +903,21 @@ int CreateVulkan(void)
 	}, VK_NULL_HANDLE, &device)!=VK_SUCCESS)
 		return 1;
 
-	vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
-
+	// Get device physical memory properties
 	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &deviceMemProperties);
 
-	vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, VK_NULL_HANDLE);
+	// Get device queue
+	vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
+
+	// Calling this by it's self will give a validation warning, I don't care.
+	// Get supported surface formats (formatCount already == 1, so this will only return one format)
 	vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, &surfaceFormat);
 
-	surfaceFormat.format=surfaceFormat.format==VK_FORMAT_UNDEFINED?VK_FORMAT_B8G8R8A8_UNORM:surfaceFormat.format;
+	// If no format is specified, set it
+	if(surfaceFormat.format==VK_FORMAT_UNDEFINED)
+		surfaceFormat.format=VK_FORMAT_B8G8R8A8_UNORM;
 
-	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, VK_NULL_HANDLE);
-	presentModeCount=presentModeCount>MAX_PRESENT_MODE_COUNT?MAX_PRESENT_MODE_COUNT:presentModeCount;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, presentModes);
-
-	for(i=0;i<presentModeCount;i++)
-	{
-		if(presentModes[i]==VK_PRESENT_MODE_MAILBOX_KHR)
-		{
-			presentMode=VK_PRESENT_MODE_MAILBOX_KHR;
-			break;
-		}
-	}
-
-	swapchainImageCount=presentMode==VK_PRESENT_MODE_MAILBOX_KHR?PRESENT_MODE_MAILBOX_IMAGE_COUNT:PRESENT_MODE_DEFAULT_IMAGE_COUNT;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, &presentMode);
 
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities);
 
@@ -1000,7 +933,7 @@ int CreateVulkan(void)
 	{
 		.sType=VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
 		.surface=surface,
-		.minImageCount=swapchainImageCount,
+		.minImageCount=FRAME_COUNT,
 		.imageFormat=surfaceFormat.format,
 		.imageColorSpace=surfaceFormat.colorSpace,
 		.imageExtent=swapchainExtent,
@@ -1033,13 +966,13 @@ int CreateVulkan(void)
 	}, commandBuffers);
 
 	for(i=0;i<FRAME_COUNT;i++)
+	{
+		// Wait fence for command queue, to signal when we can submit commands again
 		vkCreateFence(device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &frameFences[i]);
 
-	// Semaphore used to ensures that image presentation is complete before starting to submit again
-	vkCreateSemaphore(device, &(VkSemaphoreCreateInfo) { .sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &presentCompleteSemaphore);
-
-	// Semaphore used to ensures that all commands submitted have been finished before submitting the image to the queue
-	vkCreateSemaphore(device, &(VkSemaphoreCreateInfo) { .sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &renderCompleteSemaphore);
+		// Semaphore for image presentation, to signal when we can present again
+		vkCreateSemaphore(device, &(VkSemaphoreCreateInfo) { .sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &presentCompleteSemaphores[i]);
+	}
 
 	createRenderPass();
 	createFramebuffers();
@@ -1078,7 +1011,7 @@ void DestroyVulkan(void)
 	}
 
 	vkDestroyBuffer(device, uniformBuffer, VK_NULL_HANDLE);
-	vkFreeMemory(device, uniformMemory, VK_NULL_HANDLE);
+	vkFreeMemory(device, uniformBufferMemory, VK_NULL_HANDLE);
 
 	vkDestroyDescriptorSetLayout(device, descriptorSetLayout, VK_NULL_HANDLE);
 	vkDestroyDescriptorPool(device, descriptorPool, VK_NULL_HANDLE);
@@ -1090,19 +1023,17 @@ void DestroyVulkan(void)
 	vkDestroyImage(device, depthImage, VK_NULL_HANDLE);
 	vkFreeMemory(device, depthMemory, VK_NULL_HANDLE);
 
-	for(i=0;i<swapchainImageCount;i++)
+	for(i=0;i<FRAME_COUNT;i++)
 	{
-		vkDestroyFramebuffer(device, framebuffers[i], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(device, frameBuffers[i], VK_NULL_HANDLE);
 		vkDestroyImageView(device, swapchainImageViews[i], VK_NULL_HANDLE);
+
+		vkDestroyFence(device, frameFences[i], VK_NULL_HANDLE);
+
+		vkDestroySemaphore(device, presentCompleteSemaphores[i], VK_NULL_HANDLE);
 	}
 
 	vkDestroyRenderPass(device, renderPass, VK_NULL_HANDLE);
-
-	vkDestroySemaphore(device, presentCompleteSemaphore, VK_NULL_HANDLE);
-	vkDestroySemaphore(device, renderCompleteSemaphore, VK_NULL_HANDLE);
-
-	vkDestroyFence(device, frameFences[0], VK_NULL_HANDLE);
-	vkDestroyFence(device, frameFences[1], VK_NULL_HANDLE);
 
 	vkDestroyCommandPool(device, commandPool, VK_NULL_HANDLE);
 
@@ -1237,25 +1168,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			// Kinda feels like jank, but WM_SIZE pops up on window creation, before Vulkan is initialized.
 			if(device)
 			{
-				// If vkAcquireNextImageKHR doesn't return SUCCESS, it's likely needing the swapchain recreated, so let's do that here:
-				uint32_t formatCount=1, presentModeCount=0, i;
 				VkPresentModeKHR presentMode=VK_PRESENT_MODE_FIFO_KHR;
+				uint32_t presentModeCount=1, i;
 				VkSurfaceCapabilitiesKHR surfaceCapabilities;
+				uint32_t swapchainImageCount=FRAME_COUNT;
+
 				vkDeviceWaitIdle(device);
 
 				vkDestroyImage(device, depthImage, VK_NULL_HANDLE);
 				vkFreeMemory(device, depthMemory, VK_NULL_HANDLE);
 				vkDestroyImageView(device, depthImageView, VK_NULL_HANDLE);
 
-				for(i=0;i<swapchainImageCount;i++)
+				for(i=0;i<FRAME_COUNT;i++)
 				{
-					vkDestroyFramebuffer(device, framebuffers[i], NULL);
+					vkDestroyFramebuffer(device, frameBuffers[i], NULL);
 					vkDestroyImageView(device, swapchainImageViews[i], NULL);
 				}
 
 				vkDestroySwapchainKHR(device, swapchain, 0);
 
-				swapchainImageCount=presentMode==VK_PRESENT_MODE_MAILBOX_KHR?PRESENT_MODE_MAILBOX_IMAGE_COUNT:PRESENT_MODE_DEFAULT_IMAGE_COUNT;
+				vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, &presentMode);
 
 				vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities);
 
@@ -1271,7 +1203,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				{
 					.sType=VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
 					.surface=surface,
-					.minImageCount=swapchainImageCount,
+					.minImageCount=FRAME_COUNT,
 					.imageFormat=surfaceFormat.format,
 					.imageColorSpace=surfaceFormat.colorSpace,
 					.imageExtent=swapchainExtent,
@@ -1285,7 +1217,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				}, 0, &swapchain)!=VK_SUCCESS)
 					return 0;
 
-				vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, NULL);
+				vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, VK_NULL_HANDLE);
 				vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, swapchainImages);
 
 				createFramebuffers();

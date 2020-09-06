@@ -14,8 +14,6 @@ layout (location=1) out vec4 Color;			// Output color
 
 void main()
 {
-//	ivec2 Viewport=ivec2(1024, 768);
-
 	// Transform vertex from window coords to NDC
 	gl_Position=vec4(((vVert.xy+InstancePos.xy)/(Viewport*0.5)-1.0)*vec2(1.0, -1.0), 0.0, 1.0);
 

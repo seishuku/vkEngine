@@ -39,6 +39,9 @@
     <ClCompile Include="font.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="vulkan.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="3ds.h">
@@ -56,22 +59,22 @@
     <ClInclude Include="fontdata.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="vulkan.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="font_v.glsl">
+    <CustomBuild Include="font_f.glsl">
       <Filter>Shaders</Filter>
-    </None>
-    <None Include="lighting_f.glsl">
+    </CustomBuild>
+    <CustomBuild Include="lighting_f.glsl">
       <Filter>Shaders</Filter>
-    </None>
-    <None Include="lighting_v.glsl">
+    </CustomBuild>
+    <CustomBuild Include="font_v.glsl">
       <Filter>Shaders</Filter>
-    </None>
-    <None Include="font_f.glsl">
+    </CustomBuild>
+    <CustomBuild Include="lighting_v.glsl">
       <Filter>Shaders</Filter>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="build.ninja" />
+    </CustomBuild>
   </ItemGroup>
 </Project>

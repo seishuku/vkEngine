@@ -160,6 +160,7 @@
     <ClCompile Include="image.c" />
     <ClCompile Include="math.c" />
     <ClCompile Include="tga.c" />
+    <ClCompile Include="vulkan.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="3ds.h" />
@@ -167,23 +168,46 @@
     <ClInclude Include="fontdata.h" />
     <ClInclude Include="image.h" />
     <ClInclude Include="math.h" />
+    <ClInclude Include="vulkan.h" />
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="build.ninja">
+    <CustomBuild Include="font_f.glsl">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ninja</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">lighting_v.spv;lighting_f.spv;font_v.spv;font_f.spv</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ninja</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">lighting_v.spv;lighting_f.spv;font_v.spv;font_f.spv</Outputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">lighting_v.glsl;lighting_f.glsl;font_v.glsl;font_f.glsl</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">lighting_v.glsl;lighting_f.glsl;font_v.glsl;font_f.glsl</AdditionalInputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin32\glslangValidator -S frag -V %(Identity) -o  %(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">font_f.spv</Outputs>
+      <TreatOutputAsContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</TreatOutputAsContent>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin32\glslangValidator -S frag -V %(Identity) -o  %(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).spv</Outputs>
     </CustomBuild>
-    <None Include="font_f.glsl">
+    <CustomBuild Include="font_v.glsl">
       <FileType>Document</FileType>
-    </None>
-    <None Include="font_v.glsl" />
-    <None Include="lighting_f.glsl" />
-    <None Include="lighting_v.glsl" />
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin32\glslangValidator -S vert -V %(Identity) -o  %(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).spv</Outputs>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin32\glslangValidator -S vert -V %(Identity) -o  %(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).spv</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="lighting_f.glsl">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin32\glslangValidator -S frag -V %(Identity) -o  %(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).spv</Outputs>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin32\glslangValidator -S frag -V %(Identity) -o  %(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).spv</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="lighting_v.glsl">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin32\glslangValidator -S vert -V %(Identity) -o  %(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).spv</Outputs>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin32\glslangValidator -S vert -V %(Identity) -o  %(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).spv</Outputs>
+    </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,15 +1,15 @@
 /*
 	Copyright 2016 Matt Williams/NitroGL
-	Simple (?) OpenGL 3.3+ (CORE) Font/Text printing function
-	Uses two VBOs, one for a single triangle strip making up
+	Simple (?) Vulakn Font/Text printing function
+	Uses two vertex buffers, one for a single triangle strip making up
 	a quad, the other contains instancing data for character
 	position, texture altas lookup and color.
 */
-#include <vulkan/vulkan.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include "vulkan.h"
 #include "math.h"
 #include "font.h"
 
@@ -25,12 +25,8 @@ extern uint32_t queueFamilyIndex;
 extern VkQueue queue;
 extern VkRenderPass renderPass;
 
-extern VkShaderModule createShaderModule(const char *shaderFile);
-extern uint32_t memory_type_from_properties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask);
-
 extern int Width, Height;	// Window width/height from main app.
 // ---
-
 
 // Vulkan context data unique to this module:
 
@@ -75,8 +71,8 @@ void _Font_Init(void)
 	VkCommandBuffer copyCmd=VK_NULL_HANDLE;
 	VkFence fence=VK_NULL_HANDLE;
 	VkMemoryRequirements memoryRequirements;
-	VkShaderModule vertexShader=createShaderModule("font_v.spv");
-	VkShaderModule fragmentShader=createShaderModule("font_f.spv");
+	VkShaderModule vertexShader=vkuCreateShaderModule(device, "font_v.spv");
+	VkShaderModule fragmentShader=vkuCreateShaderModule(device, "font_f.spv");
 	void *data=NULL;
 
 	// Create new descriptor sets and pipeline
@@ -318,7 +314,7 @@ void _Font_Init(void)
 		// Set memory allocation size to required memory size
         .allocationSize=memoryRequirements.size,
 		// Get memory type that can be mapped to host memory
-		.memoryTypeIndex=memory_type_from_properties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
+		.memoryTypeIndex=vkuMemoryTypeFromProperties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
     }, NULL, &fontDeviceMemory);
 
 	vkBindImageMemory(device, fontImage, fontDeviceMemory, 0);
@@ -422,26 +418,11 @@ void _Font_Init(void)
 	// ---
 
 	// Uniform data
-	vkCreateBuffer(device, &(VkBufferCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.size=sizeof(uint32_t)*2,
-		.usage=VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
-		.queueFamilyIndexCount=1,
-		.pQueueFamilyIndices=&queueFamilyIndex,
-	}, NULL, &fontUniformBuffer);
-
-	vkGetBufferMemoryRequirements(device, fontUniformBuffer, &memoryRequirements);
-
-	vkAllocateMemory(device, &(VkMemoryAllocateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.allocationSize=memoryRequirements.size,
-		.memoryTypeIndex=memory_type_from_properties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
-	}, NULL, &fontUniformBufferMemory);
-
-	vkBindBufferMemory(device, fontUniformBuffer, fontUniformBufferMemory, 0);
+	vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
+		&fontUniformBuffer, &fontUniformBufferMemory,
+		sizeof(uint32_t)*2,
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	vkMapMemory(device, fontUniformBufferMemory, 0, VK_WHOLE_SIZE, 0, &fontUniformBufferPtr);
 	// ---
@@ -487,54 +468,18 @@ void _Font_Init(void)
 	}, 0, VK_NULL_HANDLE);
 
 	// Create static vertex data buffer
-	vkCreateBuffer(device, &(VkBufferCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.size=sizeof(float)*4*4,
-		.usage=VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
-		.queueFamilyIndexCount=1,
-		.pQueueFamilyIndices=&queueFamilyIndex,
-	}, NULL, &fontVertexBuffer);
-
-	// Query GPU for memory required for buffer
-	vkGetBufferMemoryRequirements(device, fontVertexBuffer, &memoryRequirements);
-
-	// Allocate the memory, on device only
-	vkAllocateMemory(device, &(VkMemoryAllocateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.allocationSize=memoryRequirements.size,
-		.memoryTypeIndex=memory_type_from_properties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
-	}, NULL, &fontVertexBufferMemory);
-
-	// Bind the physical memory buffer to the buffer handle
-	vkBindBufferMemory(device, fontVertexBuffer, fontVertexBufferMemory, 0);
+	vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
+		&fontVertexBuffer, &fontVertexBufferMemory,
+		sizeof(float)*4*4,
+		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	// Create staging buffer, map it, and copy vertex data to it
-	vkCreateBuffer(device, &(VkBufferCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.size=sizeof(float)*4*4,
-		.usage=VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
-		.queueFamilyIndexCount=1,
-		.pQueueFamilyIndices=&queueFamilyIndex,
-	}, NULL, &stagingBuffer);
-
-	// Query GPU for memory required for buffer
-	vkGetBufferMemoryRequirements(device, stagingBuffer, &memoryRequirements);
-
-	// Allocate the memory, this time on the host
-	vkAllocateMemory(device, &(VkMemoryAllocateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.allocationSize=memoryRequirements.size,
-		.memoryTypeIndex=memory_type_from_properties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
-	}, NULL, &stagingBufferMemory);
-
-	// Bind the physical memory buffer to the buffer handle
-	vkBindBufferMemory(device, stagingBuffer, stagingBufferMemory, 0);
+	vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
+		&stagingBuffer, &stagingBufferMemory,
+		sizeof(float)*4*4,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	// Map it
 	vkMapMemory(device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &data);
@@ -561,35 +506,7 @@ void _Font_Init(void)
 
 	vkUnmapMemory(device, stagingBufferMemory);
 
-	// Create a command buffer to submit a copy command from the staging buffer into the static vertex buffer
-	vkAllocateCommandBuffers(device, &(VkCommandBufferAllocateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=commandPool,
-		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount=1,
-	}, &copyCmd);
-	vkBeginCommandBuffer(copyCmd, &(VkCommandBufferBeginInfo) { .sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO });
-
-	// Copy command
-	vkCmdCopyBuffer(copyCmd, stagingBuffer, fontVertexBuffer, 1, &(VkBufferCopy) { .size=memoryRequirements.size });
-
-	// End command buffer and submit
-	vkEndCommandBuffer(copyCmd);
-		
-	vkCreateFence(device, &(VkFenceCreateInfo) { .sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &fence);
-
-	vkQueueSubmit(queue, 1, &(VkSubmitInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.commandBufferCount=1,
-		.pCommandBuffers=&copyCmd,
-	}, fence);
-
-	// Wait for it to finish
-	vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
-	vkDestroyFence(device, fence, VK_NULL_HANDLE);
-	vkFreeCommandBuffers(device, commandPool, 1, &copyCmd);
+	vkuCopyBuffer(device, queue, commandPool, stagingBuffer, fontVertexBuffer, sizeof(float)*4*4);
 
 	// Delete staging data
 	vkFreeMemory(device, stagingBufferMemory, VK_NULL_HANDLE);
@@ -597,26 +514,11 @@ void _Font_Init(void)
 	// ---
 
 	// Create instance buffer and map it
-	vkCreateBuffer(device, &(VkBufferCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.size=sizeof(float)*7*255,
-		.usage=VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
-		.queueFamilyIndexCount=1,
-		.pQueueFamilyIndices=&queueFamilyIndex,
-	}, NULL, &fontInstanceBuffer);
-
-	vkGetBufferMemoryRequirements(device, fontInstanceBuffer, &memoryRequirements);
-
-	vkAllocateMemory(device, &(VkMemoryAllocateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.allocationSize=memoryRequirements.size,
-		.memoryTypeIndex=memory_type_from_properties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT),
-	}, NULL, &fontInstanceBufferMemory);
-
-	vkBindBufferMemory(device, fontInstanceBuffer, fontInstanceBufferMemory, 0);
+	vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
+		&fontInstanceBuffer, &fontInstanceBufferMemory,
+		sizeof(float)*7*255,
+		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
 	vkMapMemory(device, fontInstanceBufferMemory, 0, VK_WHOLE_SIZE, 0, (void *)&fontInstanceBufferPtr);
 	// ---
