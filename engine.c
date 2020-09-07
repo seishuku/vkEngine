@@ -57,7 +57,7 @@ enum
 {
 	MAX_DEVICE_COUNT=8,
 	MAX_QUEUE_COUNT=4,
-	FRAME_COUNT=2,
+	MAX_FRAME_COUNT=3,
 };
 
  _inline uint32_t clamp_u32(uint32_t value, uint32_t min, uint32_t max)
@@ -71,7 +71,7 @@ float QuatX[4], QuatY[4], Quat[4];
 struct
 {
 	float mvp[16];
-	float mvinv[16];
+	float eye[4];
 
 	float Light0_Pos[4];
 	float Light0_Kd[4];
@@ -94,23 +94,27 @@ uint32_t queueFamilyIndex;
 VkQueue queue=VK_NULL_HANDLE;
 
 // Swapchain
-VkSwapchainKHR swapchain;
-VkImage swapchainImages[FRAME_COUNT];
+VkSwapchainKHR swapchain=VK_NULL_HANDLE;
+
 VkExtent2D swapchainExtent;
 VkSurfaceFormatKHR surfaceFormat;
 
-VkImageView swapchainImageViews[FRAME_COUNT];
-VkFramebuffer frameBuffers[FRAME_COUNT];
+uint32_t imageCount;
+
+VkImage swapchainImage[MAX_FRAME_COUNT]={ VK_NULL_HANDLE, };
+VkImageView swapchainImageView[MAX_FRAME_COUNT]={ VK_NULL_HANDLE, };
+
+VkFramebuffer frameBuffers[MAX_FRAME_COUNT]={ VK_NULL_HANDLE, };
 
 // Depth buffer handles
-VkImage depthImage;
-VkDeviceMemory depthMemory;
-VkImageView depthImageView;
+VkImage depthImage=VK_NULL_HANDLE;
+VkDeviceMemory depthMemory=VK_NULL_HANDLE;
+VkImageView depthImageView=VK_NULL_HANDLE;
 
-VkRenderPass renderPass;
+VkRenderPass renderPass=VK_NULL_HANDLE;
 
-VkPipelineLayout pipelineLayout;
-VkPipeline pipeline;
+VkPipelineLayout pipelineLayout=VK_NULL_HANDLE;
+VkPipeline pipeline=VK_NULL_HANDLE;
 
 VkDescriptorPool descriptorPool=VK_NULL_HANDLE;
 VkDescriptorSet descriptorSet[4]={ VK_NULL_HANDLE, };
@@ -118,11 +122,12 @@ VkDescriptorSetLayout descriptorSetLayout=VK_NULL_HANDLE;
 
 uint32_t frameIndex=0;
 
-VkCommandPool commandPool;
-VkCommandBuffer commandBuffers[FRAME_COUNT];
+VkCommandPool commandPool=VK_NULL_HANDLE;
+VkCommandBuffer commandBuffers[MAX_FRAME_COUNT]={ VK_NULL_HANDLE, };
 
-VkFence frameFences[FRAME_COUNT];
-VkSemaphore presentCompleteSemaphores[FRAME_COUNT];
+VkFence frameFences[MAX_FRAME_COUNT]={ VK_NULL_HANDLE, };
+VkSemaphore presentCompleteSemaphores[MAX_FRAME_COUNT]={ VK_NULL_HANDLE, };
+VkSemaphore renderCompleteSemaphores[MAX_FRAME_COUNT]={ VK_NULL_HANDLE, };
 
 VkBuffer uniformBuffer;
 VkDeviceMemory uniformBufferMemory;
@@ -235,30 +240,14 @@ int createFramebuffers()
 		.flags=0,
 	}, NULL, &depthImageView);
 
-	for(i=0;i<FRAME_COUNT;i++)
+	for(i=0;i<imageCount;i++)
 	{
-		vkCreateImageView(device, &(VkImageViewCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-			.image=swapchainImages[i],
-			.viewType=VK_IMAGE_VIEW_TYPE_2D,
-			.format=surfaceFormat.format,
-			.subresourceRange=
-			{
-				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel=0,
-				.levelCount=1,
-				.baseArrayLayer=0,
-				.layerCount=1,
-			},
-		}, 0, &swapchainImageViews[i]);
-
 		vkCreateFramebuffer(device, &(VkFramebufferCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 			.renderPass=renderPass,
 			.attachmentCount=2,
-			.pAttachments=(VkImageView[]) { swapchainImageViews[i], depthImageView },
+			.pAttachments=(VkImageView[]) { swapchainImageView[i], depthImageView },
 			.width=swapchainExtent.width,
 			.height=swapchainExtent.height,
 			.layers=1,
@@ -616,8 +605,6 @@ int createUploadBuffer()
 	Image_Upload(&Textures[TEXTURE_LEVEL], "tile.tga", IMAGE_NONE);
 	Image_Upload(&Textures[TEXTURE_LEVEL_NORMAL], "tile_b.tga", IMAGE_NORMALMAP|IMAGE_NORMALIZE);
 
-	vkDeviceWaitIdle(device);
-
 	// Uniform data
 	vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
 		&uniformBuffer, &uniformBufferMemory,
@@ -687,13 +674,13 @@ int createUploadBuffer()
 
 void draw_frame()
 {
-	uint32_t index=frameIndex%FRAME_COUNT;
+	uint32_t index=frameIndex%imageCount;
 	uint32_t imageIndex;
 	int i, j;
 
 	// Generate the projection matrix
 	MatrixIdentity(Projection);
-	InfPerspective(60.0f, (float)Width/Height, 0.01f, Projection);
+	InfPerspective(90.0f, (float)Width/Height, 0.01f, Projection);
 	Projection[1*4+1]*=-1.0f;   // Tweak for Vulkan coordnates
 
 	// Set up the modelview matrix
@@ -706,7 +693,10 @@ void draw_frame()
 	QuatMatrix(Quat, ModelView);
 
 	// Generate an inverse modelview matrix
-	MatrixInverse(ModelView, ubo.mvinv);
+//	MatrixInverse(ModelView, ubo.mvinv);
+	ubo.eye[0]=-(ModelView[12]*ModelView[ 0])-(ModelView[13]*ModelView[ 1])-(ModelView[14]*ModelView[ 2]);
+	ubo.eye[1]=-(ModelView[12]*ModelView[ 4])-(ModelView[13]*ModelView[ 5])-(ModelView[14]*ModelView[ 6]);
+	ubo.eye[2]=-(ModelView[12]*ModelView[ 8])-(ModelView[13]*ModelView[ 9])-(ModelView[14]*ModelView[10]);
 
 	// Generate a modelview+projection matrix
 	MatrixMult(ModelView, Projection, ubo.mvp);
@@ -742,10 +732,10 @@ void draw_frame()
 	// Copy uniform data to GPU
 	memcpy(uniformBufferPtr, &ubo, sizeof(ubo));
 
+	vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, presentCompleteSemaphores[index], VK_NULL_HANDLE, &imageIndex);
+
 	vkWaitForFences(device, 1, &frameFences[index], VK_TRUE, UINT64_MAX);
 	vkResetFences(device, 1, &frameFences[index]);
-
-	vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, presentCompleteSemaphores[index], VK_NULL_HANDLE, &imageIndex);
 
 	// Start recording the commands
 	vkBeginCommandBuffer(commandBuffers[index], &(VkCommandBufferBeginInfo)
@@ -781,15 +771,15 @@ void draw_frame()
 		// Bind model data buffers and draw the triangles
 		for(j=0;j<Model[i].NumMesh;j++)
 		{
-			vkCmdBindVertexBuffers(commandBuffers[index], 0, 1, (VkBuffer[]) { Model[i].Mesh[j].Buffer }, &(VkDeviceSize) { 0 });
+			vkCmdBindVertexBuffers(commandBuffers[index], 0, 1, &Model[i].Mesh[j].Buffer, &(VkDeviceSize) { 0 });
 			vkCmdBindIndexBuffer(commandBuffers[index], Model[i].Mesh[j].IndexBuffer, 0, VK_INDEX_TYPE_UINT16);
 			vkCmdDrawIndexed(commandBuffers[index], Model[i].Mesh[j].NumFace*3, 1, 0, 0, 0);
 		}
 	}
 	// ---
 
-	// UI overlay stuff really should have it's own render pass
-	// to keep it independent from the main "renderer", but this works for now.
+	// Should UI overlay stuff have it's own render pass?
+	// Maybe even separate thread?
 	Font_Print(commandBuffers[index], 0, 0, "FPS: %0.1f", fps);
 
 	vkCmdEndRenderPass(commandBuffers[index]);
@@ -800,9 +790,11 @@ void draw_frame()
 	vkQueueSubmit(queue, 1, &(VkSubmitInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.pWaitDstStageMask=&(VkPipelineStageFlags) { VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT },
+		.pWaitDstStageMask=&(VkPipelineStageFlags) { VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT },
 		.waitSemaphoreCount=1,
 		.pWaitSemaphores=&presentCompleteSemaphores[index],
+		.signalSemaphoreCount=1,
+		.pSignalSemaphores=&renderCompleteSemaphores[index],
 		.commandBufferCount=1,
 		.pCommandBuffers=&commandBuffers[index],
 	}, frameFences[index]);
@@ -811,12 +803,186 @@ void draw_frame()
 	vkQueuePresentKHR(queue, &(VkPresentInfoKHR)
 	{
 		.sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+		.waitSemaphoreCount=1,
+		.pWaitSemaphores=&renderCompleteSemaphores[index],
 		.swapchainCount=1,
 		.pSwapchains=&swapchain,
 		.pImageIndices=&imageIndex,
 	});
 
 	frameIndex++;
+}
+
+void createSwapchain(uint32_t *width, uint32_t *height, int vsync)
+{
+	uint32_t i, formatCount;
+	VkSwapchainKHR oldSwapchain=swapchain;
+
+	vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, VK_NULL_HANDLE);
+	formatCount=1;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, &surfaceFormat);
+
+	// If no format is specified, set it
+	if(surfaceFormat.format==VK_FORMAT_UNDEFINED)
+		surfaceFormat.format=VK_FORMAT_B8G8R8A8_UNORM;
+
+	// Get physical device surface properties and formats
+	VkSurfaceCapabilitiesKHR surfCaps;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfCaps);
+
+	// Get available present modes
+	uint32_t presentModeCount;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, NULL);
+
+	VkPresentModeKHR *presentModes=(VkPresentModeKHR *)malloc(sizeof(VkPresentModeKHR)*presentModeCount);
+
+	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, presentModes);
+
+	// If width (and height) equals the special value 0xFFFFFFFF, the size of the surface will be set by the swapchain
+	if(surfCaps.currentExtent.width==(uint32_t)-1)
+	{
+		// If the surface size is undefined, the size is set to
+		// the size of the images requested.
+		swapchainExtent.width=*width;
+		swapchainExtent.height=*height;
+	}
+	else
+	{
+		// If the surface size is defined, the swap chain size must match
+		swapchainExtent=surfCaps.currentExtent;
+		*width=surfCaps.currentExtent.width;
+		*height=surfCaps.currentExtent.height;
+	}
+
+	// Select a present mode for the swapchain
+
+	// The VK_PRESENT_MODE_FIFO_KHR mode must always be present as per spec
+	// This mode waits for the vertical blank ("v-sync")
+	VkPresentModeKHR swapchainPresentMode=VK_PRESENT_MODE_FIFO_KHR;
+
+	// If v-sync is not requested, try to find a mailbox mode
+	// It's the lowest latency non-tearing present mode available
+	if(!vsync)
+	{
+		for(i=0;i<presentModeCount;i++)
+		{
+			if(presentModes[i]==VK_PRESENT_MODE_MAILBOX_KHR)
+			{
+				swapchainPresentMode=VK_PRESENT_MODE_MAILBOX_KHR;
+				break;
+			}
+
+			if((swapchainPresentMode!=VK_PRESENT_MODE_MAILBOX_KHR)&&(presentModes[i]==VK_PRESENT_MODE_IMMEDIATE_KHR))
+				swapchainPresentMode=VK_PRESENT_MODE_IMMEDIATE_KHR;
+		}
+	}
+
+	FREE(presentModes);
+
+	// Determine the number of images
+	uint32_t desiredNumberOfSwapchainImages=surfCaps.minImageCount+1;
+
+	if((surfCaps.maxImageCount>0)&&(desiredNumberOfSwapchainImages>surfCaps.maxImageCount))
+		desiredNumberOfSwapchainImages=surfCaps.maxImageCount;
+
+	// Find the transformation of the surface
+	VkSurfaceTransformFlagsKHR preTransform;
+
+	if(surfCaps.supportedTransforms&VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)
+		// We prefer a non-rotated transform
+		preTransform=VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	else
+		preTransform=surfCaps.currentTransform;
+
+	// Find a supported composite alpha format (not all devices support alpha opaque)
+	VkCompositeAlphaFlagBitsKHR compositeAlpha=VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	// Simply select the first composite alpha format available
+	VkCompositeAlphaFlagBitsKHR compositeAlphaFlags[]=
+	{
+		VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+		VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
+		VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR,
+		VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
+	};
+
+	for(i=0;i<4;i++)
+	{
+		if(surfCaps.supportedCompositeAlpha&compositeAlphaFlags[i])
+		{
+			compositeAlpha=compositeAlphaFlags[i];
+			break;
+		}
+	}
+
+	VkSwapchainCreateInfoKHR swapchainCI=
+	{
+		.sType=VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+		.pNext=NULL,
+		.surface=surface,
+		.minImageCount=desiredNumberOfSwapchainImages,
+		.imageFormat=surfaceFormat.format,
+		.imageColorSpace=surfaceFormat.colorSpace,
+		.imageExtent={ swapchainExtent.width, swapchainExtent.height },
+		.imageUsage=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+		.preTransform=(VkSurfaceTransformFlagBitsKHR)preTransform,
+		.imageArrayLayers=1,
+		.imageSharingMode=VK_SHARING_MODE_EXCLUSIVE,
+		.queueFamilyIndexCount=0,
+		.pQueueFamilyIndices=NULL,
+		.presentMode=swapchainPresentMode,
+		.oldSwapchain=oldSwapchain,
+		// Setting clipped to VK_TRUE allows the implementation to discard rendering outside of the surface area
+		.clipped=VK_TRUE,
+		.compositeAlpha=compositeAlpha,
+	};
+
+	// Enable transfer source on swap chain images if supported
+	if(surfCaps.supportedUsageFlags&VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
+		swapchainCI.imageUsage|=VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+
+	// Enable transfer destination on swap chain images if supported
+	if(surfCaps.supportedUsageFlags&VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+		swapchainCI.imageUsage|=VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+	vkCreateSwapchainKHR(device, &swapchainCI, VK_NULL_HANDLE, &swapchain);
+
+	// If an existing swap chain is re-created, destroy the old swap chain
+	// This also cleans up all the presentable images
+
+	if(oldSwapchain!=VK_NULL_HANDLE)
+	{
+		for(i=0;i<imageCount;i++)
+		{
+			vkDestroyImageView(device, swapchainImageView[i], VK_NULL_HANDLE);
+		}
+
+		vkDestroySwapchainKHR(device, oldSwapchain, VK_NULL_HANDLE);
+	}
+
+	vkGetSwapchainImagesKHR(device, swapchain, &imageCount, NULL);
+
+	// Get the swap chain images
+	vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImage);
+
+	// Get the swap chain buffers containing the image and imageview
+	for(i=0;i<imageCount;i++)
+	{
+		vkCreateImageView(device, &(VkImageViewCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.pNext=NULL,
+			.image=swapchainImage[i],
+			.format=surfaceFormat.format,
+			.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseMipLevel=0,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.baseArrayLayer=0,
+			.subresourceRange.layerCount=1,
+			.viewType=VK_IMAGE_VIEW_TYPE_2D,
+			.flags=0,
+		}, VK_NULL_HANDLE, &swapchainImageView[i]);
+	}
 }
 
 int CreateVulkan(void)
@@ -826,8 +992,6 @@ int CreateVulkan(void)
 	VkQueueFamilyProperties queueFamilyProperties[MAX_QUEUE_COUNT];
 	uint32_t formatCount=1, presentModeCount=1, i, j;
 	VkPresentModeKHR presentMode=VK_PRESENT_MODE_FIFO_KHR;
-	VkSurfaceCapabilitiesKHR surfaceCapabilities;
-	uint32_t swapchainImageCount=FRAME_COUNT;
 
 	if(vkCreateInstance(&(VkInstanceCreateInfo)
 	{
@@ -909,46 +1073,7 @@ int CreateVulkan(void)
 	// Get device queue
 	vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
 
-	// Calling this by it's self will give a validation warning, I don't care.
-	// Get supported surface formats (formatCount already == 1, so this will only return one format)
-	vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, &surfaceFormat);
-
-	// If no format is specified, set it
-	if(surfaceFormat.format==VK_FORMAT_UNDEFINED)
-		surfaceFormat.format=VK_FORMAT_B8G8R8A8_UNORM;
-
-	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, &presentMode);
-
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities);
-
-	swapchainExtent=surfaceCapabilities.currentExtent;
-
-	if(swapchainExtent.width==UINT32_MAX)
-	{
-		swapchainExtent.width=clamp_u32(Width, surfaceCapabilities.minImageExtent.width, surfaceCapabilities.maxImageExtent.width);
-		swapchainExtent.height=clamp_u32(Height, surfaceCapabilities.minImageExtent.height, surfaceCapabilities.maxImageExtent.height);
-	}
-
-	if(vkCreateSwapchainKHR(device, &(VkSwapchainCreateInfoKHR)
-	{
-		.sType=VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-		.surface=surface,
-		.minImageCount=FRAME_COUNT,
-		.imageFormat=surfaceFormat.format,
-		.imageColorSpace=surfaceFormat.colorSpace,
-		.imageExtent=swapchainExtent,
-		.imageArrayLayers=1,
-		.imageUsage=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-		.imageSharingMode=VK_SHARING_MODE_EXCLUSIVE,
-		.preTransform=surfaceCapabilities.currentTransform,
-		.compositeAlpha=VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-		.presentMode=presentMode,
-		.clipped=VK_TRUE,
-	}, 0, &swapchain)!=VK_SUCCESS)
-		return 1;
-
-	vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, VK_NULL_HANDLE);
-	vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, swapchainImages);
+	createSwapchain(&Width, &Height, VK_FALSE);
 
 	vkCreateCommandPool(device, &(VkCommandPoolCreateInfo)
 	{
@@ -962,16 +1087,19 @@ int CreateVulkan(void)
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 		.commandPool=commandPool,
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount=FRAME_COUNT,
+		.commandBufferCount=imageCount,
 	}, commandBuffers);
 
-	for(i=0;i<FRAME_COUNT;i++)
+	for(i=0;i<imageCount;i++)
 	{
 		// Wait fence for command queue, to signal when we can submit commands again
-		vkCreateFence(device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &frameFences[i]);
+		vkCreateFence(device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=VK_FENCE_CREATE_SIGNALED_BIT }, VK_NULL_HANDLE, &frameFences[i]);
 
 		// Semaphore for image presentation, to signal when we can present again
 		vkCreateSemaphore(device, &(VkSemaphoreCreateInfo) { .sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &presentCompleteSemaphores[i]);
+
+		// Semaphore for render complete, to signal when we can render again
+		vkCreateSemaphore(device, &(VkSemaphoreCreateInfo) { .sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &renderCompleteSemaphores[i]);
 	}
 
 	createRenderPass();
@@ -990,28 +1118,28 @@ void DestroyVulkan(void)
 
 	Font_Destroy();
 
-	for(i=0;i<8;i++)
+	for(i=0;i<NUM_TEXTURES;i++)
 	{
 		vkDestroySampler(device, Textures[i].sampler, VK_NULL_HANDLE);
 		vkDestroyImageView(device, Textures[i].view, VK_NULL_HANDLE);
-		vkDestroyImage(device, Textures[i].image, VK_NULL_HANDLE);
 		vkFreeMemory(device, Textures[i].deviceMemory, VK_NULL_HANDLE);
+		vkDestroyImage(device, Textures[i].image, VK_NULL_HANDLE);
 	}
 
-	for(i=0;i<4;i++)
+	for(i=0;i<NUM_MODELS;i++)
 	{
 		for(j=0;j<(uint32_t)Model[i].NumMesh;j++)
 		{
-			vkDestroyBuffer(device, Model[i].Mesh[j].Buffer, VK_NULL_HANDLE);
 			vkFreeMemory(device, Model[i].Mesh[j].BufferMemory, VK_NULL_HANDLE);
+			vkDestroyBuffer(device, Model[i].Mesh[j].Buffer, VK_NULL_HANDLE);
 
-			vkDestroyBuffer(device, Model[i].Mesh[j].IndexBuffer, VK_NULL_HANDLE);
 			vkFreeMemory(device, Model[i].Mesh[j].IndexBufferMemory, VK_NULL_HANDLE);
+			vkDestroyBuffer(device, Model[i].Mesh[j].IndexBuffer, VK_NULL_HANDLE);
 		}
 	}
 
-	vkDestroyBuffer(device, uniformBuffer, VK_NULL_HANDLE);
 	vkFreeMemory(device, uniformBufferMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(device, uniformBuffer, VK_NULL_HANDLE);
 
 	vkDestroyDescriptorSetLayout(device, descriptorSetLayout, VK_NULL_HANDLE);
 	vkDestroyDescriptorPool(device, descriptorPool, VK_NULL_HANDLE);
@@ -1020,17 +1148,19 @@ void DestroyVulkan(void)
 	vkDestroyPipelineLayout(device, pipelineLayout, VK_NULL_HANDLE);
 
 	vkDestroyImageView(device, depthImageView, VK_NULL_HANDLE);
-	vkDestroyImage(device, depthImage, VK_NULL_HANDLE);
 	vkFreeMemory(device, depthMemory, VK_NULL_HANDLE);
+	vkDestroyImage(device, depthImage, VK_NULL_HANDLE);
 
-	for(i=0;i<FRAME_COUNT;i++)
+	for(i=0;i<imageCount+1;i++)
 	{
 		vkDestroyFramebuffer(device, frameBuffers[i], VK_NULL_HANDLE);
-		vkDestroyImageView(device, swapchainImageViews[i], VK_NULL_HANDLE);
+
+		vkDestroyImageView(device, swapchainImageView[i], VK_NULL_HANDLE);
 
 		vkDestroyFence(device, frameFences[i], VK_NULL_HANDLE);
 
 		vkDestroySemaphore(device, presentCompleteSemaphores[i], VK_NULL_HANDLE);
+		vkDestroySemaphore(device, renderCompleteSemaphores[i], VK_NULL_HANDLE);
 	}
 
 	vkDestroyRenderPass(device, renderPass, VK_NULL_HANDLE);
@@ -1038,6 +1168,7 @@ void DestroyVulkan(void)
 	vkDestroyCommandPool(device, commandPool, VK_NULL_HANDLE);
 
 	vkDestroySwapchainKHR(device, swapchain, VK_NULL_HANDLE);
+
 	vkDestroyDevice(device, VK_NULL_HANDLE);
 	vkDestroySurfaceKHR(instance, surface, VK_NULL_HANDLE);
 	vkDestroyInstance(instance, VK_NULL_HANDLE);
@@ -1165,60 +1296,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			Width=LOWORD(lParam);
 			Height=HIWORD(lParam);
 
-			// Kinda feels like jank, but WM_SIZE pops up on window creation, before Vulkan is initialized.
-			if(device)
+			if(device!=VK_NULL_HANDLE)
 			{
-				VkPresentModeKHR presentMode=VK_PRESENT_MODE_FIFO_KHR;
-				uint32_t presentModeCount=1, i;
-				VkSurfaceCapabilitiesKHR surfaceCapabilities;
-				uint32_t swapchainImageCount=FRAME_COUNT;
+				uint32_t i;
 
 				vkDeviceWaitIdle(device);
 
-				vkDestroyImage(device, depthImage, VK_NULL_HANDLE);
-				vkFreeMemory(device, depthMemory, VK_NULL_HANDLE);
-				vkDestroyImageView(device, depthImageView, VK_NULL_HANDLE);
+				createSwapchain(&Width, &Height, VK_FALSE);
 
-				for(i=0;i<FRAME_COUNT;i++)
-				{
-					vkDestroyFramebuffer(device, frameBuffers[i], NULL);
-					vkDestroyImageView(device, swapchainImageViews[i], NULL);
-				}
-
-				vkDestroySwapchainKHR(device, swapchain, 0);
-
-				vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, &presentMode);
-
-				vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities);
-
-				swapchainExtent=surfaceCapabilities.currentExtent;
-
-				if(swapchainExtent.width==UINT32_MAX)
-				{
-					swapchainExtent.width=clamp_u32(Width, surfaceCapabilities.minImageExtent.width, surfaceCapabilities.maxImageExtent.width);
-					swapchainExtent.height=clamp_u32(Height, surfaceCapabilities.minImageExtent.height, surfaceCapabilities.maxImageExtent.height);
-				}
-
-				if(vkCreateSwapchainKHR(device, &(VkSwapchainCreateInfoKHR)
-				{
-					.sType=VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-					.surface=surface,
-					.minImageCount=FRAME_COUNT,
-					.imageFormat=surfaceFormat.format,
-					.imageColorSpace=surfaceFormat.colorSpace,
-					.imageExtent=swapchainExtent,
-					.imageArrayLayers=1,
-					.imageUsage=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-					.imageSharingMode=VK_SHARING_MODE_EXCLUSIVE,
-					.preTransform=surfaceCapabilities.currentTransform,
-					.compositeAlpha=VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-					.presentMode=presentMode,
-					.clipped=VK_TRUE,
-				}, 0, &swapchain)!=VK_SUCCESS)
-					return 0;
-
-				vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, VK_NULL_HANDLE);
-				vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, swapchainImages);
+				for(i=0;i<imageCount+1;i++)
+					vkDestroyFramebuffer(device, frameBuffers[i], VK_NULL_HANDLE);
 
 				createFramebuffers();
 			}

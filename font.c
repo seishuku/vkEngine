@@ -288,6 +288,16 @@ void _Font_Init(void)
 	// ---
 
 	// Create sampler and load texture data
+	vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
+		&stagingBuffer, &stagingBufferMemory,
+		256*256,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	// Map image memory and copy data
+	vkMapMemory(device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &data);
+	memcpy(data, _FontData, 256*256);
+	vkUnmapMemory(device, stagingBufferMemory);
 
 	// Load mip map level 0 to linear tiling image
 	vkCreateImage(device, &(VkImageCreateInfo)
@@ -298,10 +308,10 @@ void _Font_Init(void)
 		.mipLevels=1,
 		.arrayLayers=1,
 		.samples=VK_SAMPLE_COUNT_1_BIT,
-		.tiling=VK_IMAGE_TILING_LINEAR,
-		.usage=VK_IMAGE_USAGE_SAMPLED_BIT,
+		.tiling=VK_IMAGE_TILING_OPTIMAL,
+		.usage=VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
-		.initialLayout=VK_IMAGE_LAYOUT_PREINITIALIZED,
+		.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
 		.extent={ 256, 256, 1 },
 	}, NULL, &fontImage);
 
@@ -314,15 +324,10 @@ void _Font_Init(void)
 		// Set memory allocation size to required memory size
         .allocationSize=memoryRequirements.size,
 		// Get memory type that can be mapped to host memory
-		.memoryTypeIndex=vkuMemoryTypeFromProperties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
+		.memoryTypeIndex=vkuMemoryTypeFromProperties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
     }, NULL, &fontDeviceMemory);
 
 	vkBindImageMemory(device, fontImage, fontDeviceMemory, 0);
-
-	// Map image memory and copy data
-	vkMapMemory(device, fontDeviceMemory, 0, memoryRequirements.size, 0, &data);
-	memcpy(data, _FontData, memoryRequirements.size);
-	vkUnmapMemory(device, fontDeviceMemory);
 
 	// Linear tiled images don't need to be staged and can be directly used as textures
 	fontImageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -336,6 +341,38 @@ void _Font_Init(void)
 		.commandBufferCount=1,
 	}, &copyCmd);
 	vkBeginCommandBuffer(copyCmd, &(VkCommandBufferBeginInfo) { .sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO });
+
+	vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=fontImage,
+		.subresourceRange=(VkImageSubresourceRange)
+		{
+			.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.baseMipLevel=0,
+			.levelCount=1,
+			.layerCount=1,
+		},
+		.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
+		.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+		.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+	});
+
+	// Copy from staging buffer to the texture buffer
+	vkCmdCopyBufferToImage(copyCmd, stagingBuffer, fontImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkBufferImageCopy)
+	{
+		.imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+		.imageSubresource.mipLevel=0,
+		.imageSubresource.baseArrayLayer=0,
+		.imageSubresource.layerCount=1,
+		.imageExtent.width=256,
+		.imageExtent.height=256,
+		.imageExtent.depth=1,
+		.bufferOffset=0,
+	});
 
 	// Insert a memory dependency at the proper pipeline stages that will execute the image layout transition
 	// Source pipeline stage is host write/read execution (VK_PIPELINE_STAGE_HOST_BIT)
@@ -355,27 +392,26 @@ void _Font_Init(void)
 		},
 		.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
 		.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-		.oldLayout=VK_IMAGE_LAYOUT_PREINITIALIZED,
+		.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 	});
 
 	vkEndCommandBuffer(copyCmd);
 		
-	// Create fence to ensure that the command buffer has finished executing
-	vkCreateFence(device, &(VkFenceCreateInfo) { .sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &fence);
-
 	// Submit to the queue
 	vkQueueSubmit(queue, 1, &(VkSubmitInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.commandBufferCount=1,
 		.pCommandBuffers=&copyCmd,
-	}, fence);
+	}, VK_NULL_HANDLE);
 
 	// Wait for the fence to signal that command buffer has finished executing
-	vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
-	vkDestroyFence(device, fence, VK_NULL_HANDLE);
+	vkQueueWaitIdle(queue);
 	vkFreeCommandBuffers(device, commandPool, 1, &copyCmd);
+
+	vkFreeMemory(device, stagingBufferMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(device, stagingBuffer, VK_NULL_HANDLE);
 
 	vkCreateSampler(device, &(VkSamplerCreateInfo)
 	{
@@ -644,23 +680,23 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 void Font_Destroy(void)
 {
 	vkUnmapMemory(device, fontUniformBufferMemory);
-	vkDestroyBuffer(device, fontUniformBuffer, VK_NULL_HANDLE);
 	vkFreeMemory(device, fontUniformBufferMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(device, fontUniformBuffer, VK_NULL_HANDLE);
 
 	// Instance buffer handles
 	vkUnmapMemory(device, fontInstanceBufferMemory);
-	vkDestroyBuffer(device, fontInstanceBuffer, VK_NULL_HANDLE);
 	vkFreeMemory(device, fontInstanceBufferMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(device, fontInstanceBuffer, VK_NULL_HANDLE);
 
 	// Vertex data handles
-	vkDestroyBuffer(device, fontVertexBuffer, VK_NULL_HANDLE);
 	vkFreeMemory(device, fontVertexBufferMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(device, fontVertexBuffer, VK_NULL_HANDLE);
 
 	// Texture handles
 	vkDestroySampler(device, fontSampler, VK_NULL_HANDLE);
+	vkFreeMemory(device, fontDeviceMemory, VK_NULL_HANDLE);
 	vkDestroyImageView(device, fontImageView, VK_NULL_HANDLE);
 	vkDestroyImage(device, fontImage, VK_NULL_HANDLE);
-	vkFreeMemory(device, fontDeviceMemory, VK_NULL_HANDLE);
 
 	// Pipeline
 	vkDestroyPipelineLayout(device, fontPipelineLayout, VK_NULL_HANDLE);

@@ -18,8 +18,12 @@
 #endif
 
 extern VkDevice device;
+
 extern VkPhysicalDeviceMemoryProperties deviceMemProperties;
+
 extern VkCommandPool commandPool;
+
+extern uint32_t queueFamilyIndex;
 extern VkQueue queue;
 
 void _MakeNormalMap(Image_t *Image)
@@ -656,7 +660,10 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 	VkFence fence=VK_NULL_HANDLE;
 	VkMemoryRequirements memoryRequirements;
 	VkFormat Format=VK_FORMAT_UNDEFINED;
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
 	void *data=NULL;
+	uint32_t size=0;
 
 	if(Extension!=NULL)
 	{
@@ -791,7 +798,22 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 			return 0;
 	}
 
-	// Load mip map level 0 to linear tiling image
+	// Byte size of image data
+	size=Image->Width*Image->Height*(Image->Depth>>3);
+
+	// Create staging buffer
+	vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
+		&stagingBuffer, &stagingBufferMemory,
+		size,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	// Map image memory and copy data
+	vkMapMemory(device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &data);
+	memcpy(data, Image->Data, Image->Width*Image->Height*(Image->Depth>>3));
+	vkUnmapMemory(device, stagingBufferMemory);
+
+	// Create the actual texture buffers and memory on device
 	vkCreateImage(device, &(VkImageCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -800,11 +822,13 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		.mipLevels=1,
 		.arrayLayers=1,
 		.samples=VK_SAMPLE_COUNT_1_BIT,
-		.tiling=VK_IMAGE_TILING_LINEAR,
-		.usage=VK_IMAGE_USAGE_SAMPLED_BIT,
+		.tiling=VK_IMAGE_TILING_OPTIMAL,
+		.usage=VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
-		.initialLayout=VK_IMAGE_LAYOUT_PREINITIALIZED,
-		.extent={ Image->Width, Image->Height, 1 },
+		.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+		.extent.width=Image->Width,
+		.extent.height=Image->Height,
+		.extent.depth=1,
 	}, NULL, &Image->image);
 
 	// Get memory requirements for this image like size and alignment
@@ -816,20 +840,15 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		// Set memory allocation size to required memory size
         .allocationSize=memoryRequirements.size,
 		// Get memory type that can be mapped to host memory
-		.memoryTypeIndex=vkuMemoryTypeFromProperties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
+		.memoryTypeIndex=vkuMemoryTypeFromProperties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
     }, NULL, &Image->deviceMemory);
 
 	vkBindImageMemory(device, Image->image, Image->deviceMemory, 0);
 
-	// Map image memory
-	vkMapMemory(device, Image->deviceMemory, 0, memoryRequirements.size, 0, &data);
-	memcpy(data, Image->Data, memoryRequirements.size);
-	vkUnmapMemory(device, Image->deviceMemory);
-
 	// Linear tiled images don't need to be staged and can be directly used as textures
 	Image->imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-	// Setup image memory barrier transfer image to shader read layout
+	// Setup a command buffer to transfer image to device and change shader read layout
 	vkAllocateCommandBuffers(device, &(VkCommandBufferAllocateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -837,11 +856,14 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount=1,
 	}, &copyCmd);
-	vkBeginCommandBuffer(copyCmd, &(VkCommandBufferBeginInfo) { .sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO });
 
-	// Insert a memory dependency at the proper pipeline stages that will execute the image layout transition
-	// Source pipeline stage is host write/read execution (VK_PIPELINE_STAGE_HOST_BIT)
-	// Destination pipeline stage fragment shader access (VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+	// Start recording commands
+	vkBeginCommandBuffer(copyCmd, &(VkCommandBufferBeginInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+	});
+
 	vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -857,27 +879,61 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		},
 		.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
 		.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-		.oldLayout=VK_IMAGE_LAYOUT_PREINITIALIZED,
+		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+		.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+	});
+
+	// Copy from staging buffer to the texture buffer
+	vkCmdCopyBufferToImage(copyCmd, stagingBuffer, Image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkBufferImageCopy)
+	{
+		.imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+		.imageSubresource.mipLevel=0,
+		.imageSubresource.baseArrayLayer=0,
+		.imageSubresource.layerCount=1,
+		.imageExtent.width=Image->Width,
+		.imageExtent.height=Image->Height,
+		.imageExtent.depth=1,
+		.bufferOffset=0,
+	});
+
+	vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=Image->image,
+		.subresourceRange=(VkImageSubresourceRange)
+		{
+			.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.baseMipLevel=0,
+			.levelCount=1,
+			.layerCount=1,
+		},
+		.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
+		.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+		.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 	});
 
 	vkEndCommandBuffer(copyCmd);
 		
-	// Create fence to ensure that the command buffer has finished executing
-	vkCreateFence(device, &(VkFenceCreateInfo) { .sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &fence);
-
 	// Submit to the queue
 	vkQueueSubmit(queue, 1, &(VkSubmitInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.commandBufferCount=1,
 		.pCommandBuffers=&copyCmd,
-	}, fence);
+	}, VK_NULL_HANDLE);
 
-	// Wait for the fence to signal that command buffer has finished executing
-	vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
-	vkDestroyFence(device, fence, VK_NULL_HANDLE);
+	// Wait for the queue to idle (finished commands)
+	vkQueueWaitIdle(queue);
+
+	// Free the command buffer
 	vkFreeCommandBuffers(device, commandPool, 1, &copyCmd);
+
+	// Delete staging buffers
+	vkFreeMemory(device, stagingBufferMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(device, stagingBuffer, VK_NULL_HANDLE);
 
 	FREE(Image->Data);
 
