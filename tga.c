@@ -7,34 +7,34 @@
 #define FREE(p) { if(p) { free(p); p=NULL; } }
 #endif
 
-void rle_read(unsigned char *row, int width, int bpp, FILE *stream)
+void rle_read(uint8_t *row, uint32_t width, uint32_t bpp, FILE *stream)
 {
-	int pos=0, len, i;
-	unsigned char header;
+	uint32_t pos=0, len, i;
+	uint8_t header;
 
 	while(pos<width)
 	{
-		fread(&header, sizeof(unsigned char), 1, stream);
+		fread(&header, sizeof(uint8_t), 1, stream);
 
 		len=(header&0x7F)+1;
 
 		if(header&0x80)
 		{
-			unsigned long buffer;
+			uint32_t buffer;
 
-			fread(&buffer, sizeof(unsigned char), bpp, stream);
+			fread(&buffer, sizeof(uint8_t), bpp, stream);
 
 			for(i=0;i<len*bpp;i+=bpp)
 				memcpy(&row[bpp*pos+i], &buffer, bpp);
 		}
 		else
-			fread(&row[bpp*pos], sizeof(unsigned char), len*bpp, stream);
+			fread(&row[bpp*pos], sizeof(uint8_t), len*bpp, stream);
 
 		pos+=len;
 	}
 }
 
-int rle_type(unsigned char *data, unsigned short pos, unsigned short width, unsigned char bpp)
+uint8_t rle_type(uint8_t *data, uint16_t pos, uint16_t width, uint8_t bpp)
 {
 	if(!memcmp(data+bpp*pos, data+bpp*(pos+1), bpp))
 	{
@@ -45,13 +45,13 @@ int rle_type(unsigned char *data, unsigned short pos, unsigned short width, unsi
 	return 0;
 }
 
-void rle_write(unsigned char *row, int width, int bpp, FILE *stream)
+void rle_write(uint8_t *row, uint32_t width, uint32_t bpp, FILE *stream)
 {
-    unsigned short pos=0;
+    uint16_t pos=0;
 
 	while(pos<width)
 	{
-		unsigned char header, len=2;
+		uint8_t header, len=2;
 
 		if(rle_type(row, pos, width, bpp))
 		{
@@ -59,7 +59,7 @@ void rle_write(unsigned char *row, int width, int bpp, FILE *stream)
 				len=1;
 			else
 			{
-				while(pos+len<width)
+				while(pos+len<(signed)width)
 				{
 					if(memcmp(row+bpp*pos, row+bpp*(pos+len), bpp))
 						break;
@@ -82,7 +82,7 @@ void rle_write(unsigned char *row, int width, int bpp, FILE *stream)
 				len=1;
 			else
 			{
-				while(pos+len<width)
+				while(pos+len<(signed)width)
 				{
 					if(rle_type(row, pos+len, width, bpp))
 						break;
@@ -107,10 +107,10 @@ void rle_write(unsigned char *row, int width, int bpp, FILE *stream)
 int TGA_Write(char *filename, Image_t *Image, int rle)
 {
 	FILE *stream;
-	unsigned char IDLength=0;
-	unsigned char ColorMapType=0, ColorMapStart=0, ColorMapLength=0, ColorMapDepth=0;
-	unsigned short XOffset=0, YOffset=0, Width=Image->Width, Height=Image->Height;
-	unsigned char Depth=(unsigned char)Image->Depth, ImageDescriptor=0, ImageType;
+	uint8_t IDLength=0;
+	uint8_t ColorMapType=0, ColorMapStart=0, ColorMapLength=0, ColorMapDepth=0;
+	uint16_t XOffset=0, YOffset=0, Width=Image->Width, Height=Image->Height;
+	uint8_t Depth=(unsigned char)Image->Depth, ImageDescriptor=0, ImageType;
 
 	switch(Image->Depth)
 	{
@@ -131,29 +131,29 @@ int TGA_Write(char *filename, Image_t *Image, int rle)
 	if((stream=fopen(filename, "wb"))==NULL)
 		return 0;
 
-	fwrite(&IDLength, sizeof(unsigned char), 1, stream);
-	fwrite(&ColorMapType, sizeof(unsigned char), 1, stream);
-	fwrite(&ImageType, sizeof(unsigned char), 1, stream);
-	fwrite(&ColorMapStart, sizeof(unsigned short), 1, stream);
-	fwrite(&ColorMapLength, sizeof(unsigned short), 1, stream);
-	fwrite(&ColorMapDepth, sizeof(unsigned char), 1, stream);
-	fwrite(&XOffset, sizeof(unsigned short), 1, stream);
-	fwrite(&XOffset, sizeof(unsigned short), 1, stream);
-	fwrite(&Width, sizeof(unsigned short), 1, stream);
-	fwrite(&Height, sizeof(unsigned short), 1, stream);
-	fwrite(&Depth, sizeof(unsigned char), 1, stream);
-	fwrite(&ImageDescriptor, sizeof(unsigned char), 1, stream);
+	fwrite(&IDLength, sizeof(uint8_t), 1, stream);
+	fwrite(&ColorMapType, sizeof(uint8_t), 1, stream);
+	fwrite(&ImageType, sizeof(uint8_t), 1, stream);
+	fwrite(&ColorMapStart, sizeof(uint16_t), 1, stream);
+	fwrite(&ColorMapLength, sizeof(uint16_t), 1, stream);
+	fwrite(&ColorMapDepth, sizeof(uint8_t), 1, stream);
+	fwrite(&XOffset, sizeof(uint16_t), 1, stream);
+	fwrite(&XOffset, sizeof(uint16_t), 1, stream);
+	fwrite(&Width, sizeof(uint16_t), 1, stream);
+	fwrite(&Height, sizeof(uint16_t), 1, stream);
+	fwrite(&Depth, sizeof(uint8_t), 1, stream);
+	fwrite(&ImageDescriptor, sizeof(uint8_t), 1, stream);
 
 	if(rle)
 	{
-		unsigned char *ptr;
-		int i, bpp=Depth>>3;
+		uint8_t *ptr;
+		uint32_t i, bpp=Depth>>3;
 
 		for(i=0, ptr=Image->Data;i<Height;i++, ptr+=Width*bpp)
 			rle_write(ptr, Width, bpp, stream);
 	}
 	else
-		fwrite(Image->Data, sizeof(unsigned char), Image->Width*Image->Height*(Image->Depth>>3), stream);
+		fwrite(Image->Data, sizeof(uint8_t), Image->Width*Image->Height*(Image->Depth>>3), stream);
 
 	fclose(stream);
 
@@ -163,32 +163,32 @@ int TGA_Write(char *filename, Image_t *Image, int rle)
 int TGA_Load(char *Filename, Image_t *Image)
 {
 	FILE *stream=NULL;
-	unsigned char *ptr;
-	unsigned char IDLength;
-	unsigned char ColorMapType, ImageType;
-	unsigned short ColorMapStart, ColorMapLength;
-	unsigned char ColorMapDepth;
-	unsigned short XOffset, YOffset;
-	unsigned short Width, Height;
-	unsigned char Depth;
-	unsigned char ImageDescriptor;
-	int i, bpp;
+	uint8_t *ptr;
+	uint8_t IDLength;
+	uint8_t ColorMapType, ImageType;
+	uint16_t ColorMapStart, ColorMapLength;
+	uint8_t ColorMapDepth;
+	uint16_t XOffset, YOffset;
+	uint16_t Width, Height;
+	uint8_t Depth;
+	uint8_t ImageDescriptor;
+	uint32_t i, bpp;
 
 	if((stream=fopen(Filename, "rb"))==NULL)
 		return 0;
 
-	fread(&IDLength, sizeof(unsigned char), 1, stream);
-	fread(&ColorMapType, sizeof(unsigned char), 1, stream);
-	fread(&ImageType, sizeof(unsigned char), 1, stream);
-	fread(&ColorMapStart, sizeof(unsigned short), 1, stream);
-	fread(&ColorMapLength, sizeof(unsigned short), 1, stream);
-	fread(&ColorMapDepth, sizeof(unsigned char), 1, stream);
-	fread(&XOffset, sizeof(unsigned short), 1, stream);
-	fread(&YOffset, sizeof(unsigned short), 1, stream);
-	fread(&Width, sizeof(unsigned short), 1, stream);
-	fread(&Height, sizeof(unsigned short), 1, stream);
-	fread(&Depth, sizeof(unsigned char), 1, stream);
-	fread(&ImageDescriptor, sizeof(unsigned char), 1, stream);
+	fread(&IDLength, sizeof(uint8_t), 1, stream);
+	fread(&ColorMapType, sizeof(uint8_t), 1, stream);
+	fread(&ImageType, sizeof(uint8_t), 1, stream);
+	fread(&ColorMapStart, sizeof(uint16_t), 1, stream);
+	fread(&ColorMapLength, sizeof(uint16_t), 1, stream);
+	fread(&ColorMapDepth, sizeof(uint8_t), 1, stream);
+	fread(&XOffset, sizeof(uint16_t), 1, stream);
+	fread(&YOffset, sizeof(uint16_t), 1, stream);
+	fread(&Width, sizeof(uint16_t), 1, stream);
+	fread(&Height, sizeof(uint16_t), 1, stream);
+	fread(&Depth, sizeof(uint8_t), 1, stream);
+	fread(&ImageDescriptor, sizeof(uint8_t), 1, stream);
 	fseek(stream, IDLength, SEEK_CUR);
 
 	switch(ImageType)
@@ -212,18 +212,18 @@ int TGA_Load(char *Filename, Image_t *Image)
 		case 8:
 			bpp=Depth>>3;
 
-			Image->Data=(unsigned char *)malloc(Width*Height*bpp);
+			Image->Data=(uint8_t *)malloc(Width*Height*bpp);
 
 			if(Image->Data==NULL)
 				return 0;
 
 			if(ImageType==10||ImageType==11)
 			{
-				for(i=0, ptr=(unsigned char *)Image->Data;i<Height;i++, ptr+=Width*bpp)
+				for(i=0, ptr=(uint8_t *)Image->Data;i<Height;i++, ptr+=Width*bpp)
 					rle_read(ptr, Width, bpp, stream);
 			}
 			else
-				fread(Image->Data, sizeof(unsigned char), Width*Height*bpp, stream);
+				fread(Image->Data, sizeof(uint8_t), Width*Height*bpp, stream);
 			break;
 
 		default:
@@ -235,8 +235,8 @@ int TGA_Load(char *Filename, Image_t *Image)
 
 	if(ImageDescriptor&0x20)
 	{
-		int Scanline=Width*bpp, Size=Scanline*Height;
-		unsigned char *Buffer=(unsigned char *)malloc(Size);
+		uint32_t Scanline=Width*bpp, Size=Scanline*Height;
+		uint8_t *Buffer=(uint8_t *)malloc(Size);
 
 		if(Buffer==NULL)
 		{

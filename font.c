@@ -1,5 +1,5 @@
 /*
-	Copyright 2016 Matt Williams/NitroGL
+	Copyright 2020 Matt Williams/NitroGL
 	Simple (?) Vulakn Font/Text printing function
 	Uses two vertex buffers, one for a single triangle strip making up
 	a quad, the other contains instancing data for character
@@ -70,7 +70,6 @@ void _Font_Init(void)
 	VkDeviceMemory stagingBufferMemory=VK_NULL_HANDLE;
 	VkCommandBuffer copyCmd=VK_NULL_HANDLE;
 	VkFence fence=VK_NULL_HANDLE;
-	VkMemoryRequirements memoryRequirements;
 	VkShaderModule vertexShader=vkuCreateShaderModule(device, "font_v.spv");
 	VkShaderModule fragmentShader=vkuCreateShaderModule(device, "font_f.spv");
 	void *data=NULL;
@@ -299,35 +298,12 @@ void _Font_Init(void)
 	memcpy(data, _FontData, 256*256);
 	vkUnmapMemory(device, stagingBufferMemory);
 
-	// Load mip map level 0 to linear tiling image
-	vkCreateImage(device, &(VkImageCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-		.imageType=VK_IMAGE_TYPE_2D,
-		.format=VK_FORMAT_R8_UNORM,
-		.mipLevels=1,
-		.arrayLayers=1,
-		.samples=VK_SAMPLE_COUNT_1_BIT,
-		.tiling=VK_IMAGE_TILING_OPTIMAL,
-		.usage=VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
-		.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-		.extent={ 256, 256, 1 },
-	}, NULL, &fontImage);
-
-	// Get memory requirements for this image like size and alignment
-    vkGetImageMemoryRequirements(device, fontImage, &memoryRequirements);
-
-    vkAllocateMemory(device, &(VkMemoryAllocateInfo)
-    {
-        .sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		// Set memory allocation size to required memory size
-        .allocationSize=memoryRequirements.size,
-		// Get memory type that can be mapped to host memory
-		.memoryTypeIndex=vkuMemoryTypeFromProperties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
-    }, NULL, &fontDeviceMemory);
-
-	vkBindImageMemory(device, fontImage, fontDeviceMemory, 0);
+	vkuCreateImageBuffer(device, &queueFamilyIndex, deviceMemProperties,
+		VK_IMAGE_TYPE_2D, VK_FORMAT_R8_UNORM, 1, 1, 256, 256,
+		&fontImage, &fontDeviceMemory,
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
 
 	// Linear tiled images don't need to be staged and can be directly used as textures
 	fontImageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

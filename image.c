@@ -1,3 +1,16 @@
+/*
+	Copyright 2020 Matt Williams/NitroGL
+	Image texture loading for Vulkan, based on my OpenGL code.
+
+	DDS compressed textures are untested.
+
+	TODO:
+		mipmaps
+		cubemaps
+		comments
+		modular Vulkan contexts
+*/
+
 #include <malloc.h>
 #include <stdio.h>
 #include <string.h>
@@ -28,8 +41,8 @@ extern VkQueue queue;
 
 void _MakeNormalMap(Image_t *Image)
 {
-	int x, y, xx, yy;
-	int Channels=Image->Depth>>3;
+	uint32_t x, y, xx, yy;
+	uint32_t Channels=Image->Depth>>3;
 	unsigned short *Buffer=NULL;
 	const float OneOver255=1.0f/255.0f;
 	float KernelX[9]={ 1.0f, 0.0f, -1.0f, 2.0f, 0.0f, -2.0f, 1.0f, 0.0f, -1.0f };
@@ -86,8 +99,8 @@ void _MakeNormalMap(Image_t *Image)
 
 void _Normalize(Image_t *Image)
 {
-	int i, Channels=Image->Depth>>3;
-	unsigned short *Buffer=NULL;
+	uint32_t i, Channels=Image->Depth>>3;
+	uint16_t *Buffer=NULL;
 	const float OneOver255=1.0f/255.0f;
 
 	if(!((Image->Depth==32)||(Image->Depth==24)))
@@ -129,7 +142,7 @@ void _Normalize(Image_t *Image)
 
 void _RGBE2Float(Image_t *Image)
 {
-	int i;
+	uint32_t i;
 	float *Buffer=NULL;
 
 	Buffer=(float *)malloc(sizeof(float)*Image->Width*Image->Height*3);
@@ -163,7 +176,7 @@ void _RGBE2Float(Image_t *Image)
 			rgb[2]=((float)rgbe[2]+0.5f)*f;
 		}
 		else
-			rgb[0]=rgb[1]=rgb[2]=0.0f;
+			rgb[0]=rgb[1]=rgb[2]=0;
 	}
 
 	Image->Depth=96;
@@ -177,7 +190,7 @@ void _Resample(Image_t *Src, Image_t *Dst)
 	float fx, fy, hx, hy, lx, ly, sx, sy;
 	float xPercent, yPercent, Percent;
 	float Total[4], Sum;
-	int x, y, iy, ix, Index;
+	uint32_t x, y, iy, ix, Index;
 
 	if(Dst->Data==NULL)
 		return;
@@ -425,8 +438,8 @@ void _BuildMipmaps(Image_t *Image, unsigned int Target)
 
 void _GetPixelBilinear(Image_t *Image, float x, float y, unsigned char *Out)
 {
-	int ix=(int)x, iy=(int)y;
-	int ox=ix+1, oy=iy+1;
+	uint32_t ix=(int)x, iy=(int)y;
+	uint32_t ox=ix+1, oy=iy+1;
 	float fx=x-ix, fy=y-iy;
 	float w00, w01, w10, w11;
 
@@ -575,95 +588,162 @@ void _GetXYZFace(float uv[2], float *xyz, int face)
 	}
 }
 
-void _AngularMapFace(Image_t *In, int Face, int Mipmap)
+void _AngularMapFace(Image_t *In, int Face, Image_t *Out)
 {
-	Image_t Out;
-	int x, y;
-	VkFormat Format;
+	uint32_t x, y;
 
-	switch(In->Depth)
+	memset(Out, 0, sizeof(Image_t));
+	Out->Depth=In->Depth;
+	Out->Width=NextPower2(In->Width>>1);
+	Out->Height=NextPower2(In->Height>>1);
+	Out->Data=(uint8_t *)malloc(Out->Width*Out->Height*(Out->Depth>>3));
+
+	if(Out->Data==NULL)
+		return;
+
+	for(y=0;y<Out->Height;y++)
 	{
-		case 128:
-			Format=VK_FORMAT_R32G32B32A32_SFLOAT;
-			break;
+		float fy=(float)y/(Out->Height-1);
 
-		case 96:
-			Format=VK_FORMAT_R32G32B32_SFLOAT;
-			break;
-
-		case 64:
-			Format=VK_FORMAT_R16G16B16A16_SFLOAT;
-			break;
-
-		case 48:
-			Format=VK_FORMAT_R16G16B16_SFLOAT;
-			break;
-
-		case 32:
-			Format=VK_FORMAT_R8G8B8A8_UNORM;
-			break;
-
-		case 24:
-			Format=VK_FORMAT_R8G8B8_UNORM;
-			break;
-
- 		case 16:
-			Format=VK_FORMAT_A1R5G5B5_UNORM_PACK16;
-			break;
-
-		case 8:
-			Format=VK_FORMAT_R8_UNORM;
-			break;
-
-		default:
-			return;
-	}
-
-	Out.Depth=In->Depth;
-	Out.Width=NextPower2(In->Width>>1);
-	Out.Height=NextPower2(In->Height>>1);
-	Out.Data=(unsigned char *)malloc(Out.Width*Out.Height*(Out.Depth>>3));
-
-	for(y=0;y<Out.Height;y++)
-	{
-		float fy=(float)y/(Out.Height-1);
-
-		for(x=0;x<Out.Width;x++)
+		for(x=0;x<Out->Width;x++)
 		{
-			float fx=(float)x/(Out.Width-1);
+			float fx=(float)x/(Out->Width-1);
 			float uv[2]={ fx, fy }, xyz[3];
 
 			_GetXYZFace(uv, xyz, Face);
 			_GetUVAngularMap(xyz, uv);
 
-			_GetPixelBilinear(In, uv[0]*In->Width, uv[1]*In->Height, &Out.Data[(Out.Depth>>3)*(y*Out.Width+x)]);
+			_GetPixelBilinear(In, uv[0]*In->Width, uv[1]*In->Height, &Out->Data[(Out->Depth>>3)*(y*Out->Width+x)]);
 		}
 	}
+}
 
-//	if(Mipmap)
-//		_BuildMipmaps(&Out, GL_TEXTURE_CUBE_MAP_POSITIVE_X+Face);
-//	else
-//		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+Face, 0, Internal, Out.Width, Out.Height, 0, External, Type, Out.Data);
+void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels)
+{
+	VkCommandBuffer commandBuffer=VK_NULL_HANDLE;
 
-	FREE(Out.Data);
+	vkAllocateCommandBuffers(device, &(VkCommandBufferAllocateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool=commandPool,
+		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount=1,
+	}, &commandBuffer);
+
+
+	vkBeginCommandBuffer(commandBuffer, &(VkCommandBufferBeginInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+	});
+
+	int32_t mipWidth = texWidth;
+	int32_t mipHeight = texHeight;
+
+	for (uint32_t i = 1; i < mipLevels; i++)
+	{
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.image=image,
+			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseArrayLayer=0,
+			.subresourceRange.layerCount=1,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.baseMipLevel=i-1,
+			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			.newLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
+			.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+		});
+
+		vkCmdBlitImage(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
+		{
+			.srcOffsets[0]={ 0, 0, 0 },
+			.srcOffsets[1]={ mipWidth, mipHeight, 1 },
+			.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.srcSubresource.mipLevel=i-1,
+			.srcSubresource.baseArrayLayer=0,
+			.srcSubresource.layerCount=1,
+			.dstOffsets[0]={ 0, 0, 0 },
+			.dstOffsets[1]={ mipWidth>1?mipWidth/2:1, mipHeight>1?mipHeight/2:1, 1 },
+			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.dstSubresource.mipLevel=i,
+			.dstSubresource.baseArrayLayer=0,
+			.dstSubresource.layerCount=1,
+		}, VK_FILTER_LINEAR);
+
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.image=image,
+			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseArrayLayer=0,
+			.subresourceRange.layerCount=1,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.baseMipLevel=i-1,
+			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
+			.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+		});
+
+		if(mipWidth>1)
+			mipWidth/=2;
+
+		if(mipHeight>1)
+			mipHeight/=2;
+	}
+
+	vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.image=image,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+		.subresourceRange.baseArrayLayer=0,
+		.subresourceRange.layerCount=1,
+		.subresourceRange.levelCount=1,
+		.subresourceRange.baseMipLevel=mipLevels-1,
+		.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
+		.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+	});
+
+	vkEndCommandBuffer(commandBuffer);
+		
+	vkQueueSubmit(queue, 1, &(VkSubmitInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.commandBufferCount=1,
+		.pCommandBuffers=&commandBuffer,
+	}, VK_NULL_HANDLE);
+
+	vkQueueWaitIdle(queue);
+
+	vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
 }
 
 unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 {
 	char *Extension=strrchr(Filename, '.');
+	VkCommandBuffer copyCmd=VK_NULL_HANDLE;
 	VkFilter minFilter=VK_FILTER_LINEAR;
 	VkFilter magFilter=VK_FILTER_LINEAR;
 	VkSamplerMipmapMode mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
 	VkSamplerAddressMode wrapModeU=VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	VkSamplerAddressMode wrapModeV=VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	VkCommandBuffer copyCmd=VK_NULL_HANDLE;
-	VkFence fence=VK_NULL_HANDLE;
-	VkMemoryRequirements memoryRequirements;
 	VkFormat Format=VK_FORMAT_UNDEFINED;
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
 	void *data=NULL;
-	uint32_t size=0;
+	uint32_t size=0, i;
 
 	if(Extension!=NULL)
 	{
@@ -692,27 +772,15 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 	if(Flags&IMAGE_BILINEAR)
 	{
 		magFilter=VK_FILTER_LINEAR;
-
-		if(Flags&IMAGE_MIPMAP)
-		{
-			mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
-			minFilter=VK_FILTER_LINEAR;
-		}
-		else
-			minFilter=VK_FILTER_LINEAR;
+		mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		minFilter=VK_FILTER_LINEAR;
 	}
 
 	if(Flags&IMAGE_TRILINEAR)
 	{
 		magFilter=VK_FILTER_LINEAR;
-
-		if(Flags&IMAGE_MIPMAP)
-		{
-			mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR;
-			minFilter=VK_FILTER_LINEAR;
-		}
-		else
-			minFilter=VK_FILTER_LINEAR;
+		mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		minFilter=VK_FILTER_LINEAR;
 	}
 
 	if(Flags&IMAGE_CLAMP_U)
@@ -736,37 +804,32 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 	if(Flags&IMAGE_NORMALIZE)
 		_Normalize(Image);
 
-	if(Flags&IMAGE_CUBEMAP_ANGULAR)
-	{
-		_AngularMapFace(Image, 0, Flags&IMAGE_MIPMAP);
-		_AngularMapFace(Image, 1, Flags&IMAGE_MIPMAP);
-		_AngularMapFace(Image, 2, Flags&IMAGE_MIPMAP);
-		_AngularMapFace(Image, 3, Flags&IMAGE_MIPMAP);
-		_AngularMapFace(Image, 4, Flags&IMAGE_MIPMAP);
-		_AngularMapFace(Image, 5, Flags&IMAGE_MIPMAP);
-
-		FREE(Image->Data);
-
-		return 1;
-	}
-
 	switch(Image->Depth)
 	{
 		case IMAGE_DXT5:
+			Format=VK_FORMAT_BC5_UNORM_BLOCK;
 			break;
 
 		case IMAGE_DXT3:
+			Format=VK_FORMAT_BC3_UNORM_BLOCK;
 			break;
 
 		case IMAGE_DXT1:
+			Format=VK_FORMAT_BC1_RGB_UNORM_BLOCK;
 			break;
 
 		case 128:
-			Format=VK_FORMAT_R32G32B32A32_UINT;
+			magFilter=VK_FILTER_NEAREST;
+			mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			minFilter=VK_FILTER_NEAREST;
+			Format=VK_FORMAT_R32G32B32A32_SFLOAT;
 			break;
 
 		case 96:
-			Format=VK_FORMAT_R32G32B32_UINT;
+			magFilter=VK_FILTER_NEAREST;
+			mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			minFilter=VK_FILTER_NEAREST;
+			Format=VK_FORMAT_R32G32B32_SFLOAT;
 			break;
 
 		case 64:
@@ -798,6 +861,191 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 			return 0;
 	}
 
+	if(Flags&IMAGE_CUBEMAP_ANGULAR)
+	{
+		Image_t Out;
+		void *data=NULL;
+
+		// Precalculate each cube face iamge size in bytes
+		size=(NextPower2(Image->Width>>1)*NextPower2(Image->Height>>1)*(Image->Depth>>3));
+
+		// Create staging buffer
+		vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
+			&stagingBuffer, &stagingBufferMemory,
+			size*6,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		// Map image memory and copy data for each cube face
+		vkMapMemory(device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &data);
+		for(i=0;i<6;i++)
+		{
+			_AngularMapFace(Image, i, &Out);
+
+			if(Out.Data==NULL)
+				return 0;
+
+			memcpy((uint8_t *)data+(size*i), Out.Data, size);
+			FREE(Out.Data);
+		}
+		vkUnmapMemory(device, stagingBufferMemory);
+
+		FREE(Image->Data);
+
+		vkuCreateImageBuffer(device, &queueFamilyIndex, deviceMemProperties,
+			VK_IMAGE_TYPE_2D, Format, 1, 6, Out.Width, Out.Height,
+			&Image->image, &Image->deviceMemory,
+			(Format==VK_FORMAT_R32G32B32_SFLOAT||Format==VK_FORMAT_R32G32B32A32_SFLOAT)?VK_IMAGE_TILING_LINEAR:VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
+
+		Image->imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		// Setup a command buffer to transfer image to device and change shader read layout
+		vkAllocateCommandBuffers(device, &(VkCommandBufferAllocateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.commandPool=commandPool,
+			.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+			.commandBufferCount=1,
+		}, &copyCmd);
+
+		// Start recording commands
+		vkBeginCommandBuffer(copyCmd, &(VkCommandBufferBeginInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+			.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+		});
+
+		// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
+		vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.image=Image->image,
+			.subresourceRange=(VkImageSubresourceRange)
+			{
+				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.baseMipLevel=0,
+				.levelCount=1,
+				.layerCount=6,
+			},
+			.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
+			.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+			.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+			.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		});
+
+		// Setup buffer copy regions for each face including all of its miplevels
+		VkBufferImageCopy bufferCopyRegions[6];
+
+		for(i=0;i<6;i++)
+		{
+			bufferCopyRegions[i].bufferOffset=size*i;
+			bufferCopyRegions[i].bufferRowLength=0;
+			bufferCopyRegions[i].bufferImageHeight=0;
+			bufferCopyRegions[i].imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT;
+			bufferCopyRegions[i].imageSubresource.mipLevel=0;
+			bufferCopyRegions[i].imageSubresource.baseArrayLayer=i;
+			bufferCopyRegions[i].imageSubresource.layerCount=1;
+			bufferCopyRegions[i].imageOffset.x=0;
+			bufferCopyRegions[i].imageOffset.y=0;
+			bufferCopyRegions[i].imageOffset.z=0;
+			bufferCopyRegions[i].imageExtent.width=Out.Width;
+			bufferCopyRegions[i].imageExtent.height=Out.Height;
+			bufferCopyRegions[i].imageExtent.depth=1;
+		}
+
+		// Copy from staging buffer to the texture buffer.
+		vkCmdCopyBufferToImage(copyCmd, stagingBuffer, Image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, bufferCopyRegions);
+
+		// Now change the image layout from destination optimal to be optimal reading only by shader.
+		vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.image=Image->image,
+			.subresourceRange=(VkImageSubresourceRange)
+			{
+				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.baseMipLevel=0,
+				.levelCount=1,
+				.layerCount=6,
+			},
+			.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
+			.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		});
+
+		// Stop recording
+		vkEndCommandBuffer(copyCmd);
+		
+		// Submit to the queue
+		vkQueueSubmit(queue, 1, &(VkSubmitInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
+			.commandBufferCount=1,
+			.pCommandBuffers=&copyCmd,
+		}, VK_NULL_HANDLE);
+
+		// Wait for the queue to idle (finished commands)
+		vkQueueWaitIdle(queue);
+
+		// Free the command buffer
+		vkFreeCommandBuffers(device, commandPool, 1, &copyCmd);
+
+		// Delete staging buffers
+		vkFreeMemory(device, stagingBufferMemory, VK_NULL_HANDLE);
+		vkDestroyBuffer(device, stagingBuffer, VK_NULL_HANDLE);
+
+		// Create texture sampler object
+		vkCreateSampler(device, &(VkSamplerCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+			.maxAnisotropy=1.0f,
+			.magFilter=magFilter,
+			.minFilter=minFilter,
+			.mipmapMode=mipmapMode,
+			.addressModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			.mipLodBias=0.0f,
+			.compareOp=VK_COMPARE_OP_NEVER,
+			.minLod=0.0f,
+			.maxLod=0.0f,
+			.maxAnisotropy=1.0,
+			.anisotropyEnable=VK_FALSE,
+			.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+		}, VK_NULL_HANDLE, &Image->sampler);
+
+		// Create texture image view object
+		vkCreateImageView(device, &(VkImageViewCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.viewType=VK_IMAGE_VIEW_TYPE_CUBE,
+			.format=Format,
+			.components=
+			{
+				VK_COMPONENT_SWIZZLE_R,
+				VK_COMPONENT_SWIZZLE_G,
+				VK_COMPONENT_SWIZZLE_B,
+				VK_COMPONENT_SWIZZLE_A
+			},
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseMipLevel=0,
+			.subresourceRange.baseArrayLayer=0,
+			.subresourceRange.layerCount=6,
+			.subresourceRange.levelCount=1,
+			.image=Image->image,
+		}, VK_NULL_HANDLE, &Image->view);
+
+		return 1;
+	}
+
 	// Byte size of image data
 	size=Image->Width*Image->Height*(Image->Depth>>3);
 
@@ -810,40 +1058,20 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 
 	// Map image memory and copy data
 	vkMapMemory(device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &data);
-	memcpy(data, Image->Data, Image->Width*Image->Height*(Image->Depth>>3));
+	memcpy(data, Image->Data, size);
 	vkUnmapMemory(device, stagingBufferMemory);
 
-	// Create the actual texture buffers and memory on device
-	vkCreateImage(device, &(VkImageCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-		.imageType=VK_IMAGE_TYPE_2D,
-		.format=Format,
-		.mipLevels=1,
-		.arrayLayers=1,
-		.samples=VK_SAMPLE_COUNT_1_BIT,
-		.tiling=VK_IMAGE_TILING_OPTIMAL,
-		.usage=VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
-		.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-		.extent.width=Image->Width,
-		.extent.height=Image->Height,
-		.extent.depth=1,
-	}, NULL, &Image->image);
+	// Original image data is now in a Vulkan memory object, so no longer need the original data.
+	FREE(Image->Data);
+ 
+	uint32_t mipLevels=(uint32_t)(floor(log2(max(Image->Width, Image->Height))))+1;
 
-	// Get memory requirements for this image like size and alignment
-    vkGetImageMemoryRequirements(device, Image->image, &memoryRequirements);
-
-    vkAllocateMemory(device, &(VkMemoryAllocateInfo)
-    {
-        .sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		// Set memory allocation size to required memory size
-        .allocationSize=memoryRequirements.size,
-		// Get memory type that can be mapped to host memory
-		.memoryTypeIndex=vkuMemoryTypeFromProperties(deviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
-    }, NULL, &Image->deviceMemory);
-
-	vkBindImageMemory(device, Image->image, Image->deviceMemory, 0);
+	vkuCreateImageBuffer(device, &queueFamilyIndex, deviceMemProperties,
+		VK_IMAGE_TYPE_2D, Format, mipLevels, 1, Image->Width, Image->Height,
+		&Image->image, &Image->deviceMemory,
+		VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
 
 	// Linear tiled images don't need to be staged and can be directly used as textures
 	Image->imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -864,6 +1092,7 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 	});
 
+	// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
 	vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -874,7 +1103,7 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		{
 			.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.baseMipLevel=0,
-			.levelCount=1,
+			.levelCount=mipLevels,
 			.layerCount=1,
 		},
 		.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
@@ -883,7 +1112,7 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 	});
 
-	// Copy from staging buffer to the texture buffer
+	// Copy from staging buffer to the texture buffer.
 	vkCmdCopyBufferToImage(copyCmd, stagingBuffer, Image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkBufferImageCopy)
 	{
 		.imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
@@ -895,7 +1124,8 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		.imageExtent.depth=1,
 		.bufferOffset=0,
 	});
-
+/*
+	// Now change the image layout from destination optimal to be optimal reading only by shader.
 	vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -914,7 +1144,8 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 	});
-
+*/
+	// Stop recording
 	vkEndCommandBuffer(copyCmd);
 		
 	// Submit to the queue
@@ -935,8 +1166,9 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 	vkFreeMemory(device, stagingBufferMemory, VK_NULL_HANDLE);
 	vkDestroyBuffer(device, stagingBuffer, VK_NULL_HANDLE);
 
-	FREE(Image->Data);
+	generateMipmaps(Image->image, Format, Image->Width, Image->Height, mipLevels);
 
+	// Create texture sampler object
 	vkCreateSampler(device, &(VkSamplerCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -950,12 +1182,13 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		.mipLodBias=0.0f,
 		.compareOp=VK_COMPARE_OP_NEVER,
 		.minLod=0.0f,
-		.maxLod=0.0f,
+		.maxLod=(float)mipLevels,
 		.maxAnisotropy=1.0,
 		.anisotropyEnable=VK_FALSE,
 		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
 	}, VK_NULL_HANDLE, &Image->sampler);
 
+	// Create texture image view object
 	vkCreateImageView(device, &(VkImageViewCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -972,7 +1205,7 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		.subresourceRange.baseMipLevel=0,
 		.subresourceRange.baseArrayLayer=0,
 		.subresourceRange.layerCount=1,
-		.subresourceRange.levelCount=1,
+		.subresourceRange.levelCount=mipLevels,
 		.image=Image->image,
 	}, VK_NULL_HANDLE, &Image->view);
 

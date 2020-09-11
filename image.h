@@ -24,13 +24,13 @@
 #define IMAGE_REPEAT									(IMAGE_REPEAT_U|IMAGE_REPEAT_V)
 
 #include <vulkan/vulkan.h>
+#include <sys/types.h>
 
 typedef struct
 {
-	int Width, Height;
-	unsigned long Depth;
-	unsigned char *Data;
-	int mipLevels;
+	uint32_t Width, Height, Depth;
+	uint8_t *Data;
+	uint32_t mipLevels;
 
 	VkSampler sampler;
 	VkImage image;

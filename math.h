@@ -30,8 +30,8 @@ void Matrix4x4MultVec4(float in[4], float m[16], float *out);
 void Matrix4x4MultVec3(float in[3], float m[16], float *out);
 void Matrix3x3MultVec3(float in[3], float m[16], float *out);
 
-void InfPerspective(float fovy, float aspect, float zNear, float *out);
-void Perspective(float fovy, float aspect, float zNear, float zFar, float *out);
+void InfPerspective(float fovy, float aspect, float zNear, int flip, float *out);
+void Perspective(float fovy, float aspect, float zNear, float zFar, int flip, float *out);
 void Ortho(float left, float right, float bottom, float top, float zNear, float zFar, float *out);
 
 #endif

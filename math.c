@@ -384,7 +384,7 @@ void Matrix3x3MultVec3(float in[3], float m[16], float *out)
 }
 
 // Projection matrix functions
-void InfPerspective(float fovy, float aspect, float zNear, float *out)
+void InfPerspective(float fovy, float aspect, float zNear, int flip, float *out)
 {
 	float y=tanf((fovy/2.0f)*3.14159f/180.0f)*zNear, x=aspect*y;
 	float nudge=1.0f-(1.0f/(1<<16));
@@ -398,7 +398,7 @@ void InfPerspective(float fovy, float aspect, float zNear, float *out)
 	m[2]=0.0f;
 	m[3]=0.0f;
 	m[4]=0.0f;
-	m[5]=zNear/y;
+	m[5]=flip?-zNear/y:zNear/y;
 	m[6]=0.0f;
 	m[7]=0.0f;
 	m[8]=0.0f;
@@ -413,40 +413,30 @@ void InfPerspective(float fovy, float aspect, float zNear, float *out)
 	MatrixMult(m, out, out);
 }
 
-void Perspective(float fovy, float aspect, float zNear, float zFar, float *out)
+void Perspective(float fovy, float aspect, float zNear, float zFar, int flip, float *out)
 {
-//	float y=tanf((fovy/2.0f)*3.14159f/180.0f)*zNear, x=aspect*y;
+	float y=tanf((fovy/2.0f)*3.14159f/180.0f)*zNear, x=aspect*y;
 	float m[16];
 
 	if(!out)
 		return;
 
-//	m[0]=zNear/x;
+	m[0]=zNear/x;
 	m[1]=0.0f;
 	m[2]=0.0f;
 	m[3]=0.0f;
 	m[4]=0.0f;
-//	m[5]=zNear/y;
+	m[5]=flip?-zNear/y:zNear/y;
 	m[6]=0.0f;
 	m[7]=0.0f;
 	m[8]=0.0f;
 	m[9]=0.0f;
-//	m[10]=-(zFar+zNear)/(zFar-zNear);
-//	m[11]=-1.0f;
+	m[10]=-(zFar+zNear)/(zFar-zNear);
+	m[11]=-1.0f;
 	m[12]=0.0f;
 	m[13]=0.0f;
-//	m[14]=-(2.0f*zNear*zFar)/(zFar-zNear);
+	m[14]=-(2.0f*zNear*zFar)/(zFar-zNear);
 	m[15]=0.0f;
-
-	float rad=fovy*3.1415926f/180.0f;
-	float h=cosf(0.5f*rad)/sinf(0.5f*rad);
-	float w=h*aspect;
-
-	m[0]=w;
-	m[5]=h;
-	m[10]=zFar/(zFar-zNear);
-	m[11]=1.0f;
-	m[14]=-(zFar*zNear)/(zFar-zNear);
 
 	MatrixMult(m, out, out);
 }
@@ -457,12 +447,12 @@ void Ortho(float left, float right, float bottom, float top, float zNear, float 
 
 	MatrixIdentity(m);
 
-	m[0*4+0]=2/(right-left);
-	m[1*4+1]=2/(top-bottom);	
-	m[2*4+2]=-2/(zFar-zNear);
-	m[3*4+0]=-(right+left)/(right-left);
-	m[3*4+1]=-(top+bottom)/(top-bottom);
-	m[3*4+2]=-(zFar+zNear)/(zFar-zNear);
+	m[0]=2/(right-left);
+	m[5]=2/(top-bottom);	
+	m[10]=-2/(zFar-zNear);
+	m[12]=-(right+left)/(right-left);
+	m[13]=-(top+bottom)/(top-bottom);
+	m[14]=-(zFar+zNear)/(zFar-zNear);
 
 	MatrixMult(m, out, out);
 }

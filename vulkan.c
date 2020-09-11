@@ -62,6 +62,44 @@ uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_pro
 	return 0;
 }
 
+int vkuCreateImageBuffer(VkDevice Device, const uint32_t *QueueFamilyIndices, VkPhysicalDeviceMemoryProperties MemoryProperties,
+	VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height,
+	VkImage *Image, VkDeviceMemory *Memory,  VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags)
+{
+	VkMemoryRequirements memoryRequirements;
+
+	vkCreateImage(Device, &(VkImageCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+		.imageType=ImageType,
+		.format=Format,
+		.mipLevels=MipLevels,
+		.arrayLayers=Layers,
+		.samples=VK_SAMPLE_COUNT_1_BIT,
+		.tiling=Tiling,
+		.usage=Flags,
+		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
+		.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+		.extent.width=Width,
+		.extent.height=Height,
+		.extent.depth=1,
+		.flags=CreateFlags,
+	}, NULL, Image);
+
+    vkGetImageMemoryRequirements(Device, *Image, &memoryRequirements);
+
+    vkAllocateMemory(Device, &(VkMemoryAllocateInfo)
+    {
+        .sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize=memoryRequirements.size,
+		.memoryTypeIndex=vkuMemoryTypeFromProperties(MemoryProperties, memoryRequirements.memoryTypeBits, RequirementsMask),
+    }, NULL, Memory);
+
+	vkBindImageMemory(Device, *Image, *Memory, 0);
+
+	return 1;
+}
+
 int vkuCreateBuffer(VkDevice Device, const uint32_t *QueueFamilyIndices, VkPhysicalDeviceMemoryProperties MemoryProperties, VkBuffer *Buffer, VkDeviceMemory *Memory, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask)
 {
 	VkMemoryRequirements memoryRequirements;

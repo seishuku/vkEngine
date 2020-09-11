@@ -27,8 +27,9 @@ layout (location=0) out vec4 Output;
 
 void main()
 {
-	vec3 temp=2.0*texture(TexNormal, UV).xyz-1.0;
+#if 1
 	vec4 Base=texture(TexBase, UV);
+	vec3 temp=2.0*texture(TexNormal, UV).xyz-1.0;
 	vec3 n=normalize(vec3(dot(TangentX, temp), dot(TangentY, temp), dot(TangentZ, temp)));
 	vec3 e=eye.xyz-Position, r;
 
@@ -78,4 +79,13 @@ void main()
 	temp+=(Base.rgb*l2_diffuse+l2_specular)*l2_atten*(1.0-l2_volume.w)+(l2_volume.w*Light2_Kd.rgb);
 
 	Output=vec4(temp, 1.0);
+#else
+	vec3 temp=vec3(0.0, 0.0, 1.0);
+	vec3 n=normalize(vec3(dot(TangentX, temp), dot(TangentY, temp), dot(TangentZ, temp)));
+	vec3 e=eye.xyz-Position, r;
+
+	r=normalize((2.0*dot(e, n))*n-e);
+
+	Output=texture(TexBase, r)*exp2(5);
+#endif
 }
