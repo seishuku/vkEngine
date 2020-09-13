@@ -76,5 +76,11 @@
     <CustomBuild Include="lighting_v.glsl">
       <Filter>Shaders</Filter>
     </CustomBuild>
+    <CustomBuild Include="distance_v.glsl">
+      <Filter>Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="distance_f.glsl">
+      <Filter>Shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

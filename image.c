@@ -621,6 +621,7 @@ void _AngularMapFace(Image_t *In, int Face, Image_t *Out)
 void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels)
 {
 	VkCommandBuffer commandBuffer=VK_NULL_HANDLE;
+	uint32_t i;
 
 	vkAllocateCommandBuffers(device, &(VkCommandBufferAllocateInfo)
 	{
@@ -637,10 +638,7 @@ void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int3
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 	});
 
-	int32_t mipWidth = texWidth;
-	int32_t mipHeight = texHeight;
-
-	for (uint32_t i = 1; i < mipLevels; i++)
+	for(i=1;i<mipLevels;i++)
 	{
 		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 		{
@@ -656,19 +654,19 @@ void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int3
 			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			.newLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 			.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
-			.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+			.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
 		});
 
 		vkCmdBlitImage(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
 		{
 			.srcOffsets[0]={ 0, 0, 0 },
-			.srcOffsets[1]={ mipWidth, mipHeight, 1 },
+			.srcOffsets[1]={ texWidth, texHeight, 1 },
 			.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.srcSubresource.mipLevel=i-1,
 			.srcSubresource.baseArrayLayer=0,
 			.srcSubresource.layerCount=1,
 			.dstOffsets[0]={ 0, 0, 0 },
-			.dstOffsets[1]={ mipWidth>1?mipWidth/2:1, mipHeight>1?mipHeight/2:1, 1 },
+			.dstOffsets[1]={ texWidth>1?texWidth/2:1, texHeight>1?texHeight/2:1, 1 },
 			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.dstSubresource.mipLevel=i,
 			.dstSubresource.baseArrayLayer=0,
@@ -692,11 +690,11 @@ void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int3
 			.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
 		});
 
-		if(mipWidth>1)
-			mipWidth/=2;
+		if(texWidth>1)
+			texWidth/=2;
 
-		if(mipHeight>1)
-			mipHeight/=2;
+		if(texHeight>1)
+			texHeight/=2;
 	}
 
 	vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
