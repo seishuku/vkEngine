@@ -63,7 +63,7 @@ uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_pro
 }
 
 int vkuCreateImageBuffer(VkDevice Device, const uint32_t *QueueFamilyIndices, VkPhysicalDeviceMemoryProperties MemoryProperties,
-	VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height,
+	VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth,
 	VkImage *Image, VkDeviceMemory *Memory,  VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags)
 {
 	VkMemoryRequirements memoryRequirements;
@@ -82,7 +82,7 @@ int vkuCreateImageBuffer(VkDevice Device, const uint32_t *QueueFamilyIndices, Vk
 		.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
 		.extent.width=Width,
 		.extent.height=Height,
-		.extent.depth=1,
+		.extent.depth=Depth,
 		.flags=CreateFlags,
 	}, NULL, Image);
 

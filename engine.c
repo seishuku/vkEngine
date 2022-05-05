@@ -18,7 +18,7 @@ char szAppName[]="Vulkan";
 int Width=1280, Height=720;
  int Done=0, Key[256];
 
-float RotateX=0.0f, RotateY=0.0f, PanX=0.0f, PanY=0.0f, Zoom=-200.0f;
+float RotateX=0.0f, RotateY=0.0f, PanX=0.0f, PanY=0.0f, Zoom=-100.0f;
 
 unsigned __int64 Frequency, StartTime, EndTime;
 float avgfps=0.0f, fps=0.0f, fTimeStep, fTime=0.0f;
@@ -54,9 +54,7 @@ Image_t Textures[NUM_TEXTURES];
 
 enum
 {
-	MAX_DEVICE_COUNT=8,
-	MAX_QUEUE_COUNT=4,
-	MAX_FRAME_COUNT=3,
+	MAX_FRAME_COUNT=3
 };
 
 float ModelView[16], Projection[16];
@@ -166,15 +164,13 @@ struct
 	float Light_Pos[4];
 } shadow_ubo;
 
-VkFence shadowFence=VK_NULL_HANDLE;
-
 void initShadowCubeMap(VkSampler *sampler, VkImage *image, VkDeviceMemory *memory, VkImageView *imageView)
 {
 	VkFormat Format=VK_FORMAT_R32_SFLOAT;
 	VkCommandBuffer layoutCmd;
 
 	vkuCreateImageBuffer(device, &queueFamilyIndex, deviceMemProperties,
-		VK_IMAGE_TYPE_2D, Format, 1, 6, shadowCubeSize, shadowCubeSize,
+		VK_IMAGE_TYPE_2D, Format, 1, 6, shadowCubeSize, shadowCubeSize, 1,
 		image, memory,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -209,7 +205,7 @@ void initShadowCubeMap(VkSampler *sampler, VkImage *image, VkDeviceMemory *memor
 			.layerCount=6,
 		},
 		.srcAccessMask=0,
-		.dstAccessMask=VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+		.dstAccessMask=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
 		.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 	});
@@ -268,7 +264,7 @@ void initShadowFramebuffer(void)
 
 	//Color
 	vkuCreateImageBuffer(device, &queueFamilyIndex, deviceMemProperties,
-		VK_IMAGE_TYPE_2D, Format, 1, 1, shadowCubeSize, shadowCubeSize,
+		VK_IMAGE_TYPE_2D, Format, 1, 1, shadowCubeSize, shadowCubeSize, 1,
 		&shadowColorImage, &shadowColorMemory,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
@@ -341,7 +337,7 @@ void initShadowFramebuffer(void)
 
 	// Depth
 	vkuCreateImageBuffer(device, &queueFamilyIndex, deviceMemProperties,
-		VK_IMAGE_TYPE_2D, depthFormat, 1, 1, shadowCubeSize, shadowCubeSize,
+		VK_IMAGE_TYPE_2D, depthFormat, 1, 1, shadowCubeSize, shadowCubeSize, 1,
 		&shadowDepthImage, &shadowDepthMemory,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
@@ -618,6 +614,202 @@ int initShadowPipeline(void)
 
 	return 1;
 }
+
+void shadowUpdateCubemap(VkCommandBuffer commandBuffer, ShadowBuffer_t shadow, float Light_Pos[4])
+{
+	int i, j, face;
+
+	MatrixIdentity(Projection);
+	InfPerspective(90.0f, 1.0f, 0.01f, 1, Projection);
+
+	for(face=0;face<6;face++)
+	{
+		MatrixIdentity(ModelView);
+
+		QuatX[0]=0.0f; QuatX[1]=0.0f; QuatX[2]=0.0f; QuatX[3]=1.0f;
+		QuatY[0]=0.0f; QuatY[1]=0.0f; QuatY[2]=0.0f; QuatY[3]=1.0f;
+
+		switch(face)
+		{
+			case 0:
+				QuatAngle(90.0f, 0.0f, 1.0f, 0.0f, QuatX);
+				QuatAngle(180.0f, 1.0f, 0.0f, 0.0f, QuatY);
+				break;
+
+			case 1:
+				QuatAngle(-90.0f, 0.0f, 1.0f, 0.0f, QuatX);
+				QuatAngle(180.0f, 1.0f, 0.0f, 0.0f, QuatY);
+				break;
+
+			case 2:
+				QuatAngle(90.0f, 1.0f, 0.0f, 0.0f, QuatX);
+				break;
+
+			case 3:
+				QuatAngle(-90.0f, 1.0f, 0.0f, 0.0f, QuatX); 
+				break;
+
+			case 4:
+				QuatAngle(0.0f, 1.0f, 0.0f, 0.0f, QuatX);
+				break;
+
+			case 5:
+				QuatAngle(180.0f, 0.0f, 1.0f, 0.0f, QuatX);
+				break;
+		}
+
+		QuatMultiply(QuatX, QuatY, Quat);
+		QuatMatrix(Quat, ModelView);
+
+		MatrixTranslate(-Light_Pos[0], -Light_Pos[1], -Light_Pos[2], ModelView);
+
+		MatrixMult(ModelView, Projection, shadow_ubo.mvp);
+
+		shadow_ubo.Light_Pos[0]=Light_Pos[0];
+		shadow_ubo.Light_Pos[1]=Light_Pos[1];
+		shadow_ubo.Light_Pos[2]=Light_Pos[2];
+		shadow_ubo.Light_Pos[3]=Light_Pos[3];
+
+		vkCmdBeginRenderPass(commandBuffer, &(VkRenderPassBeginInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+			.renderPass=shadowRenderPass,
+			.framebuffer=shadowFrameBuffer,
+			.clearValueCount=2,
+			.pClearValues=(VkClearValue[])
+			{
+				{ .color.float32[0]=0.0f, .color.float32[1]=0.0f, .color.float32[2]=0.0f, .color.float32[3]=1.0f },
+				{ .depthStencil.depth=1.0f, .depthStencil.stencil=0 }
+			},
+			.renderArea.offset=(VkOffset2D) { .x=0, .y=0 },
+			.renderArea.extent=(VkExtent2D)	{ .width=shadowCubeSize, .height=shadowCubeSize },
+		}, VK_SUBPASS_CONTENTS_INLINE);
+
+		vkCmdPushConstants(commandBuffer, shadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*(16+4), &shadow_ubo);
+
+		// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline);
+
+		vkCmdSetViewport(commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)shadowCubeSize, (float)shadowCubeSize, 0.0f, 1.0f });
+		vkCmdSetScissor(commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { shadowCubeSize, shadowCubeSize } });
+
+		// Draw the models
+		for(i=0;i<NUM_MODELS;i++)
+		{
+			// Bind model data buffers and draw the triangles
+			for(j=0;j<Model[i].NumMesh;j++)
+			{
+				vkCmdBindVertexBuffers(commandBuffer, 0, 1, &Model[i].Mesh[j].Buffer, &(VkDeviceSize) { 0 });
+				vkCmdBindIndexBuffer(commandBuffer, Model[i].Mesh[j].IndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+				vkCmdDrawIndexed(commandBuffer, Model[i].Mesh[j].NumFace*3, 1, 0, 0, 0);
+			}
+		}
+
+		vkCmdEndRenderPass(commandBuffer);
+
+		// Change frame buffer image layout to source transfer
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.image=shadowColorImage,
+			.subresourceRange=(VkImageSubresourceRange)
+			{
+				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.baseMipLevel=0,
+				.baseArrayLayer=0,
+				.levelCount=1,
+				.layerCount=1,
+			},
+			.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
+			.oldLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			.newLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		});
+
+		// Change cubemap texture image face to transfer destination
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.image=shadow.shadowImage,
+			.subresourceRange=(VkImageSubresourceRange)
+			{
+				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.baseMipLevel=0,
+				.baseArrayLayer=face,
+				.levelCount=1,
+				.layerCount=1,
+			},
+			.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
+			.dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
+			.oldLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		});
+
+		// Copy image from framebuffer to cube face
+		vkCmdCopyImage(commandBuffer, shadowColorImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, shadow.shadowImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageCopy)
+		{
+			.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.srcSubresource.baseArrayLayer=0,
+			.srcSubresource.mipLevel=0,
+			.srcSubresource.layerCount=1,
+			.srcOffset={ 0, 0, 0 },
+			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.dstSubresource.baseArrayLayer=face,
+			.dstSubresource.mipLevel=0,
+			.dstSubresource.layerCount=1,
+			.dstOffset={ 0, 0, 0 },
+			.extent.width=shadowCubeSize,
+			.extent.height=shadowCubeSize,
+			.extent.depth=1,
+		});
+
+		// Change frame buffer image layout back to color arrachment
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.image=shadowColorImage,
+			.subresourceRange=(VkImageSubresourceRange)
+			{
+				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.baseMipLevel=0,
+				.baseArrayLayer=0,
+				.levelCount=1,
+				.layerCount=1,
+			},
+			.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
+			.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			.newLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		});
+
+		// Change cubemap texture image face back to shader read-only (for use in the main render shader)
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.image=shadow.shadowImage,
+			.subresourceRange=(VkImageSubresourceRange)
+			{
+				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.baseMipLevel=0,
+				.baseArrayLayer=face,
+				.levelCount=1,
+				.layerCount=1,
+			},
+			.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
+			.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		});
+	}
+}
 //
 // ---
 
@@ -671,7 +863,7 @@ int createFramebuffers(void)
 	}, 0, &renderPass);
 
 	vkuCreateImageBuffer(device, &queueFamilyIndex, deviceMemProperties,
-		VK_IMAGE_TYPE_2D, depthFormat, 1, 1, Width, Height,
+		VK_IMAGE_TYPE_2D, depthFormat, 1, 1, Width, Height, 1,
 		&depthImage, &depthMemory,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
@@ -1057,13 +1249,30 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 	}
 }
 
+VkCommandPool shadowCommandPool=VK_NULL_HANDLE;
 VkCommandBuffer shadowCmd=VK_NULL_HANDLE;
+VkFence shadowFence=VK_NULL_HANDLE;
 HANDLE shadowThread=NULL;
-
-void shadowUpdateCubemap(VkCommandBuffer commandBuffer, ShadowBuffer_t shadow, float Light_Pos[4]);
 
 DWORD WINAPI RenderShadows(void *arg)
 {
+	vkCreateFence(device, &(VkFenceCreateInfo) { .sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=VK_FENCE_CREATE_SIGNALED_BIT }, VK_NULL_HANDLE, &shadowFence);
+
+	vkCreateCommandPool(device, &(VkCommandPoolCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+		.queueFamilyIndex=queueFamilyIndex,
+	}, 0, &shadowCommandPool);
+
+	vkAllocateCommandBuffers(device, &(VkCommandBufferAllocateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool=shadowCommandPool,
+		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount=1,
+	}, &shadowCmd);
+
 	while(!Done)
 	{
 		vkWaitForFences(device, 1, &shadowFence, VK_TRUE, UINT64_MAX);
@@ -1080,14 +1289,21 @@ DWORD WINAPI RenderShadows(void *arg)
 		shadowUpdateCubemap(shadowCmd, shadowbuf[2], ubo.Light2_Pos);
 
 		vkEndCommandBuffer(shadowCmd);
-		
+
 		vkQueueSubmit(queue, 1, &(VkSubmitInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
+			.pWaitDstStageMask=&(VkPipelineStageFlags) { VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT },
 			.commandBufferCount=1,
 			.pCommandBuffers=&shadowCmd,
 		}, shadowFence);
 	}
+
+	vkDeviceWaitIdle(device);
+
+	vkFreeCommandBuffers(device, shadowCommandPool, 1, &shadowCmd);
+	vkDestroyCommandPool(device, shadowCommandPool, VK_NULL_HANDLE);
+	vkDestroyFence(device, shadowFence, VK_NULL_HANDLE);
 
 	return 0;
 }
@@ -1236,215 +1452,9 @@ int Init(void)
 		}, 0, VK_NULL_HANDLE);
 	}
 
-	vkAllocateCommandBuffers(device, &(VkCommandBufferAllocateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=commandPool,
-		.level=VK_COMMAND_BUFFER_LEVEL_SECONDARY,
-		.commandBufferCount=1,
-	}, &shadowCmd);
-
-	vkCreateFence(device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=VK_FENCE_CREATE_SIGNALED_BIT }, VK_NULL_HANDLE, &shadowFence);
-
-	shadowThread=CreateThread(NULL, 0, RenderShadows, NULL, 0, NULL);
+//	shadowThread=CreateThread(NULL, 0, RenderShadows, NULL, 0, NULL);
  
 	return TRUE;
-}
-
-void shadowUpdateCubemap(VkCommandBuffer commandBuffer, ShadowBuffer_t shadow, float Light_Pos[4])
-{
-	int i, j, face;
-
-	MatrixIdentity(Projection);
-	InfPerspective(90.0f, 1.0f, 0.01f, 1, Projection);
-
-	for(face=0;face<6;face++)
-	{
-		MatrixIdentity(ModelView);
-
-		QuatX[0]=0.0f; QuatX[1]=0.0f; QuatX[2]=0.0f; QuatX[3]=1.0f;
-		QuatY[0]=0.0f; QuatY[1]=0.0f; QuatY[2]=0.0f; QuatY[3]=1.0f;
-
-		switch(face)
-		{
-			case 0:
-				QuatAngle(90.0f, 0.0f, 1.0f, 0.0f, QuatX);
-				QuatAngle(180.0f, 1.0f, 0.0f, 0.0f, QuatY);
-				break;
-
-			case 1:
-				QuatAngle(-90.0f, 0.0f, 1.0f, 0.0f, QuatX);
-				QuatAngle(180.0f, 1.0f, 0.0f, 0.0f, QuatY);
-				break;
-
-			case 2:
-				QuatAngle(90.0f, 1.0f, 0.0f, 0.0f, QuatX);
-				break;
-
-			case 3:
-				QuatAngle(-90.0f, 1.0f, 0.0f, 0.0f, QuatX); 
-				break;
-
-			case 4:
-				QuatAngle(0.0f, 1.0f, 0.0f, 0.0f, QuatX);
-				break;
-
-			case 5:
-				QuatAngle(180.0f, 0.0f, 1.0f, 0.0f, QuatX);
-				break;
-		}
-
-		QuatMultiply(QuatX, QuatY, Quat);
-		QuatMatrix(Quat, ModelView);
-
-		MatrixTranslate(-Light_Pos[0], -Light_Pos[1], -Light_Pos[2], ModelView);
-
-		MatrixMult(ModelView, Projection, shadow_ubo.mvp);
-
-		shadow_ubo.Light_Pos[0]=Light_Pos[0];
-		shadow_ubo.Light_Pos[1]=Light_Pos[1];
-		shadow_ubo.Light_Pos[2]=Light_Pos[2];
-		shadow_ubo.Light_Pos[3]=Light_Pos[3];
-
-		vkCmdBeginRenderPass(commandBuffer, &(VkRenderPassBeginInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-			.renderPass=shadowRenderPass,
-			.framebuffer=shadowFrameBuffer,
-			.clearValueCount=2,
-			.pClearValues=(VkClearValue[])
-			{
-				{ .color.float32[0]=0.0f, .color.float32[1]=0.0f, .color.float32[2]=0.0f, .color.float32[3]=1.0f },
-				{ .depthStencil.depth=1.0f, .depthStencil.stencil=0 }
-			},
-			.renderArea.offset=(VkOffset2D) { .x=0, .y=0 },
-			.renderArea.extent=(VkExtent2D)	{ .width=shadowCubeSize, .height=shadowCubeSize },
-		}, VK_SUBPASS_CONTENTS_INLINE);
-
-		vkCmdPushConstants(commandBuffer, shadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*(16+4), &shadow_ubo);
-
-		// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
-		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline);
-
-		vkCmdSetViewport(commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)shadowCubeSize, (float)shadowCubeSize, 0.0f, 1.0f });
-		vkCmdSetScissor(commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { shadowCubeSize, shadowCubeSize } });
-
-		// Draw the models
-		for(i=0;i<NUM_MODELS;i++)
-		{
-			// Bind model data buffers and draw the triangles
-			for(j=0;j<Model[i].NumMesh;j++)
-			{
-				vkCmdBindVertexBuffers(commandBuffer, 0, 1, &Model[i].Mesh[j].Buffer, &(VkDeviceSize) { 0 });
-				vkCmdBindIndexBuffer(commandBuffer, Model[i].Mesh[j].IndexBuffer, 0, VK_INDEX_TYPE_UINT16);
-				vkCmdDrawIndexed(commandBuffer, Model[i].Mesh[j].NumFace*3, 1, 0, 0, 0);
-			}
-		}
-
-		vkCmdEndRenderPass(commandBuffer);
-
-		// Change frame buffer image layout to source transfer
-		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=shadowColorImage,
-			.subresourceRange=(VkImageSubresourceRange)
-			{
-				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel=0,
-				.baseArrayLayer=0,
-				.levelCount=1,
-				.layerCount=1,
-			},
-			.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-			.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			.newLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		});
-
-		// Change cubemap texture image face to transfer destination
-		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=shadow.shadowImage,
-			.subresourceRange=(VkImageSubresourceRange)
-			{
-				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel=0,
-				.baseArrayLayer=face,
-				.levelCount=1,
-				.layerCount=1,
-			},
-			.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
-			.dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		});
-
-		// Copy image from framebuffer to cube face
-		vkCmdCopyImage(commandBuffer, shadowColorImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, shadow.shadowImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageCopy)
-		{
-			.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.srcSubresource.baseArrayLayer=0,
-			.srcSubresource.mipLevel=0,
-			.srcSubresource.layerCount=1,
-			.srcOffset={ 0, 0, 0 },
-			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.dstSubresource.baseArrayLayer=face,
-			.dstSubresource.mipLevel=0,
-			.dstSubresource.layerCount=1,
-			.dstOffset={ 0, 0, 0 },
-			.extent.width=shadowCubeSize,
-			.extent.height=shadowCubeSize,
-			.extent.depth=1,
-		});
-
-		// Change frame buffer image layout back to color arrachment
-		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=shadowColorImage,
-			.subresourceRange=(VkImageSubresourceRange)
-			{
-				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel=0,
-				.baseArrayLayer=0,
-				.levelCount=1,
-				.layerCount=1,
-			},
-			.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-			.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-			.newLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		});
-
-		// Change cubemap texture image face back to shader read-only (for use in the main render shader)
-		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=shadow.shadowImage,
-			.subresourceRange=(VkImageSubresourceRange)
-			{
-				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel=0,
-				.baseArrayLayer=face,
-				.levelCount=1,
-				.layerCount=1,
-			},
-			.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
-			.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		});
-	}
 }
 
 void Render(void)
@@ -1518,6 +1528,10 @@ void Render(void)
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 	});
 
+	shadowUpdateCubemap(commandBuffers[index], shadowbuf[0], ubo.Light0_Pos);
+	shadowUpdateCubemap(commandBuffers[index], shadowbuf[1], ubo.Light1_Pos);
+	shadowUpdateCubemap(commandBuffers[index], shadowbuf[2], ubo.Light2_Pos);
+
 	// Start a render pass and clear the frame/depth buffer
 	vkCmdBeginRenderPass(commandBuffers[index], &(VkRenderPassBeginInfo)
 	{
@@ -1571,7 +1585,7 @@ void Render(void)
 
 	// Should UI overlay stuff have it's own render pass?
 	// Maybe even separate thread?
-	Font_Print(commandBuffers[index], 0, 0, "FPS: %0.1f", fps);
+	Font_Print(commandBuffers[index], 0.0f, 0.0f, "FPS: %0.1f", fps);
 
 	vkCmdEndRenderPass(commandBuffers[index]);
 
@@ -1581,7 +1595,7 @@ void Render(void)
 	vkQueueSubmit(queue, 1, &(VkSubmitInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.pWaitDstStageMask=&(VkPipelineStageFlags) { VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT },
+		.pWaitDstStageMask=&(VkPipelineStageFlags) { VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT },
 		.waitSemaphoreCount=1,
 		.pWaitSemaphores=&presentCompleteSemaphores[index],
 		.signalSemaphoreCount=1,
@@ -1911,11 +1925,9 @@ void DestroyVulkan(void)
 {
 	uint32_t i, j;
 
-	vkDeviceWaitIdle(device);
+	TerminateThread(shadowThread, 0);
 
-	CloseHandle(shadowThread);
-	vkWaitForFences(device, 1, &shadowFence, VK_TRUE, UINT64_MAX);
-	vkDestroyFence(device, shadowFence, VK_NULL_HANDLE);
+	vkDeviceWaitIdle(device);
 
 	// Shadow stuff
 	vkDestroyPipeline(device, shadowPipeline, VK_NULL_HANDLE);
@@ -1987,7 +1999,7 @@ void DestroyVulkan(void)
 	vkFreeMemory(device, depthMemory, VK_NULL_HANDLE);
 	vkDestroyImage(device, depthImage, VK_NULL_HANDLE);
 
-	for(i=0;i<imageCount+1;i++)
+	for(i=0;i<imageCount;i++)
 	{
 		vkDestroyFramebuffer(device, frameBuffers[i], VK_NULL_HANDLE);
 

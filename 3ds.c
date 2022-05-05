@@ -105,7 +105,7 @@ int Load3DS(Model3DS_t *Model, char *Filename)
 	unsigned char RGB[3];
 	float *ColorPtr=NULL;
 
-	if((Stream=fopen(Filename, "rb"))==NULL)
+	if(fopen_s(&Stream, Filename, "rb"))
 		return 0;
 
 	fseek(Stream, 0, SEEK_END);

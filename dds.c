@@ -233,7 +233,7 @@ int DDS_Load(char *Filename, Image_t *Image)
 	FILE *stream;
 	int size;
 
-	if((stream=fopen(Filename, "rb"))==NULL)
+	if(fopen_s(&stream, Filename, "rb"))
 		return 0;
 
 	fread(&magic, sizeof(unsigned long), 1, stream);

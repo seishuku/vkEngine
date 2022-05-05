@@ -99,16 +99,15 @@ void main()
 	r=normalize((2.0*dot(e, n))*n-e);
 
 	// Diffuse = Kd*(N.L)
-	vec3 l0_diffuse=Light0_Kd.rgb*max(0.0, dot(l0, n));
-
 	// Specular = Ks*((R.L)^n)*(N.L)*Gloss
-	vec3 l0_specular=vec3(1.0, 1.0, 1.0)*max(0.0, pow(dot(l0, r), 16.0)*dot(l0, n)*Base.a);
+	vec3 l0_diffuse=Light0_Kd.rgb*max(0.0, dot(l0, n));
+	vec3 l0_specular=Light0_Kd.rgb*max(0.0, pow(dot(l0, r), 16.0)*dot(l0, n)*Base.a);
 
 	vec3 l1_diffuse=Light1_Kd.rgb*max(0.0, dot(l1, n));
-	vec3 l1_specular=vec3(1.0, 1.0, 1.0)*max(0.0, pow(dot(l1, r), 16.0)*dot(l1, n)*Base.a);
+	vec3 l1_specular=Light0_Kd.rgb*max(0.0, pow(dot(l1, r), 16.0)*dot(l1, n)*Base.a);
 
 	vec3 l2_diffuse=Light2_Kd.rgb*max(0.0, dot(l2, n));
-	vec3 l2_specular=vec3(1.0, 1.0, 1.0)*max(0.0, pow(dot(l2, r), 16.0)*dot(l2, n)*Base.a);
+	vec3 l2_specular=Light0_Kd.rgb*max(0.0, pow(dot(l2, r), 16.0)*dot(l2, n)*Base.a);
 
 	// I=(base*diffuse+specular)*shadow*attenuation+volumelight
 	temp.xyz =(Base.xyz*l0_diffuse+l0_specular)*Shadow0*l0_atten*(1.0-l0_volume.w)+(l0_volume.w*Light0_Kd.xyz);

@@ -891,7 +891,7 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		FREE(Image->Data);
 
 		vkuCreateImageBuffer(device, &queueFamilyIndex, deviceMemProperties,
-			VK_IMAGE_TYPE_2D, Format, 1, 6, Out.Width, Out.Height,
+			VK_IMAGE_TYPE_2D, Format, 1, 6, Out.Width, Out.Height, 1,
 			&Image->image, &Image->deviceMemory,
 			(Format==VK_FORMAT_R32G32B32_SFLOAT||Format==VK_FORMAT_R32G32B32A32_SFLOAT)?VK_IMAGE_TILING_LINEAR:VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
@@ -1065,7 +1065,7 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 	uint32_t mipLevels=(uint32_t)(floor(log2(max(Image->Width, Image->Height))))+1;
 
 	vkuCreateImageBuffer(device, &queueFamilyIndex, deviceMemProperties,
-		VK_IMAGE_TYPE_2D, Format, mipLevels, 1, Image->Width, Image->Height,
+		VK_IMAGE_TYPE_2D, Format, mipLevels, 1, Image->Width, Image->Height, 1,
 		&Image->image, &Image->deviceMemory,
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,

@@ -128,7 +128,7 @@ int TGA_Write(char *filename, Image_t *Image, int rle)
 			return 0;
 	}
 
-	if((stream=fopen(filename, "wb"))==NULL)
+	if(fopen_s(&stream, filename, "wb"))
 		return 0;
 
 	fwrite(&IDLength, sizeof(uint8_t), 1, stream);
@@ -174,7 +174,7 @@ int TGA_Load(char *Filename, Image_t *Image)
 	uint8_t ImageDescriptor;
 	uint32_t i, bpp;
 
-	if((stream=fopen(Filename, "rb"))==NULL)
+	if(fopen_s(&stream, Filename, "rb"))
 		return 0;
 
 	fread(&IDLength, sizeof(uint8_t), 1, stream);

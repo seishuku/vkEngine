@@ -15,7 +15,7 @@
 
 // Font texture data, this does bloat the EXE quite a bit.
 // This can also be external data.
-#include "fontdata.h"
+//#include "fontdata.h"
 
 // external Vulkan context data/functions for this module:
 extern VkDevice device;
@@ -289,17 +289,47 @@ void _Font_Init(void)
 	// Create sampler and load texture data
 	vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
 		&stagingBuffer, &stagingBufferMemory,
-		256*256,
+		16*16*223,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-	// Map image memory and copy data
-	vkMapMemory(device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &data);
-	memcpy(data, _FontData, 256*256);
-	vkUnmapMemory(device, stagingBufferMemory);
+	{
+		HANDLE hFile=CreateFile("font.bin", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+
+		if(hFile==INVALID_HANDLE_VALUE)
+			return;
+
+		LARGE_INTEGER size;
+
+		GetFileSizeEx(hFile, &size);
+
+		HANDLE hMapping=CreateFileMapping(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
+
+		CloseHandle(hFile);
+
+		if(!hMapping)
+			return;
+
+		const uint32_t *_FontData=(const uint32_t *)MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, 0);
+
+		if(_FontData==NULL)
+			return;
+
+		// Map image memory and copy data
+		vkMapMemory(device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &data);
+		uint8_t *ptr=(uint8_t *)data;
+		uint8_t *FontPtr=(uint8_t *)_FontData;
+
+		for(uint32_t i=0;i<16*16*223;i++)
+			*ptr++=*FontPtr++;
+		vkUnmapMemory(device, stagingBufferMemory);
+
+		UnmapViewOfFile(_FontData);
+		CloseHandle(hMapping);
+	}
 
 	vkuCreateImageBuffer(device, &queueFamilyIndex, deviceMemProperties,
-		VK_IMAGE_TYPE_2D, VK_FORMAT_R8_UNORM, 1, 1, 256, 256,
+		VK_IMAGE_TYPE_3D, VK_FORMAT_R8_UNORM, 1, 1, 16, 16, 223,
 		&fontImage, &fontDeviceMemory,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
@@ -344,9 +374,9 @@ void _Font_Init(void)
 		.imageSubresource.mipLevel=0,
 		.imageSubresource.baseArrayLayer=0,
 		.imageSubresource.layerCount=1,
-		.imageExtent.width=256,
-		.imageExtent.height=256,
-		.imageExtent.depth=1,
+		.imageExtent.width=16,
+		.imageExtent.height=16,
+		.imageExtent.depth=223,
 		.bufferOffset=0,
 	});
 
@@ -411,15 +441,9 @@ void _Font_Init(void)
 	vkCreateImageView(device, &(VkImageViewCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.viewType=VK_IMAGE_VIEW_TYPE_2D,
+		.viewType=VK_IMAGE_VIEW_TYPE_3D,
 		.format=VK_FORMAT_R8_UNORM,
-		.components=
-		{
-			VK_COMPONENT_SWIZZLE_R,
-			VK_COMPONENT_SWIZZLE_G,
-			VK_COMPONENT_SWIZZLE_B,
-			VK_COMPONENT_SWIZZLE_A
-		},
+		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
 		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 		.subresourceRange.baseMipLevel=0,
 		.subresourceRange.baseArrayLayer=0,
@@ -496,25 +520,25 @@ void _Font_Init(void)
 	// Map it
 	vkMapMemory(device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &data);
 
-	*((float *)data)++=4.0f;	// X
+	*((float *)data)++=0.0f;	// X
 	*((float *)data)++=16.0f;	// Y
-	*((float *)data)++=0.0125f;	// U
+	*((float *)data)++=0.0f;
+	*((float *)data)++=1.0f;
+
+	*((float *)data)++=0.0f;
+	*((float *)data)++=0.0f;
+	*((float *)data)++=0.0f;	// U
 	*((float *)data)++=0.0f;	// V
 
-	*((float *)data)++=4.0f;
-	*((float *)data)++=0.0f;
-	*((float *)data)++=0.0125f;
-	*((float *)data)++=-0.0625f;
-
-	*((float *)data)++=12.0f;
 	*((float *)data)++=16.0f;
-	*((float *)data)++=0.05f;
-	*((float *)data)++=0.0f;
+	*((float *)data)++=16.0f;
+	*((float *)data)++=1.0f;
+	*((float *)data)++=1.0f;
 
-	*((float *)data)++=12.0f;
+	*((float *)data)++=16.0f;
 	*((float *)data)++=0.0f;
-	*((float *)data)++=0.05f;
-	*((float *)data)++=-0.0625f;
+	*((float *)data)++=1.0f;
+	*((float *)data)++=0.0f;
 
 	vkUnmapMemory(device, stagingBufferMemory);
 
@@ -541,7 +565,7 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 	// float pointer for VBO mappings (both vertex and instance data)
 	float *verts=NULL;
 	// pointer and buffer for formatted text
-	char *ptr, text[4096];
+	char *ptr, text[255];
 	// variable arguments list
 	va_list	ap;
 	// some misc variables
@@ -555,7 +579,7 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 
 	// Format string, including variable arguments
 	va_start(ap, string);
-	vsprintf(text, string, ap);
+	vsprintf_s(text, 255, string, ap);
 	va_end(ap);
 
 	// Find how many characters were need to deal with
@@ -588,14 +612,14 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 		if(*ptr=='\n')
 		{
 			x=(float)sx;
-			y-=12;
+			y-=4;
 			continue;
 		}
 
 		// Just advance spaces instead of rendering empty quads
 		if(*ptr==' ')
 		{
-			x+=8;
+			x+=9;
 			numchar--;
 			continue;
 		}
@@ -626,16 +650,16 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 		}
 
 		// Emit position, atlas offset, and color for this character
-		*verts++=x;
-		*verts++=y;
-		*verts++=     (float)(*ptr%16)*0.0625f;
-		*verts++=1.0f-(float)(*ptr/16)*0.0625f;
-		*verts++=r;
-		*verts++=g;
-		*verts++=b;
+		*verts++=x;									// InstancePos.x
+		*verts++=y;									// InstancePos.y
+		*verts++=((float)(*ptr-33)/223.0f)+0.0023f;	// InstancePos.z
+		*verts++=0.0f;								// InstancePos.w
+		*verts++=r;									// InstanceColor.r
+		*verts++=g;									// InstanceColor.g
+		*verts++=b;									// InstanceColor.b
 
 		// Advance one character
-		x+=8;
+		x+=9;
 	}
 	// ---
 
