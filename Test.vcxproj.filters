@@ -30,9 +30,6 @@
     <ClCompile Include="tga.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dds.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="engine.c">
       <Filter>Source Files</Filter>
     </ClCompile>

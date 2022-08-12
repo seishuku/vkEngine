@@ -2,6 +2,7 @@
 
 #include "vulkan.h"
 #include <stdio.h>
+#include "math.h"
 
 #ifndef FREE
 #define FREE(p) { if(p) { free(p); p=NULL; } }
@@ -11,16 +12,16 @@ VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile)
 {
 	VkShaderModule shaderModule=VK_NULL_HANDLE;
 	FILE *stream=NULL;
-	uint32_t size=0;
 
 	if(fopen_s(&stream, shaderFile, "rb"))
 		return VK_NULL_HANDLE;
 
+	// Seek to end of file to get file size, rescaling to align to 32 bit
 	fseek(stream, 0, SEEK_END);
-	size=ftell(stream);
+	uint32_t size=(uint32_t)(ceilf((float)ftell(stream)/sizeof(uint32_t))*sizeof(uint32_t));
 	fseek(stream, 0, SEEK_SET);
 
-	uint8_t *data=(uint8_t *)malloc(size);
+	uint32_t *data=(uint32_t *)malloc(size);
 
 	if(data==NULL)
 		return VK_NULL_HANDLE;
@@ -29,24 +30,21 @@ VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile)
 
 	fclose(stream);
 
-	vkCreateShaderModule(Device, &(VkShaderModuleCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-		.codeSize=size,
-		.pCode=(const uint32_t *)data,
-	}, VK_NULL_HANDLE, &shaderModule);
+	VkShaderModuleCreateInfo CreateInfo={ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, NULL, 0, size, data };
+	VkResult Result=vkCreateShaderModule(Device, &CreateInfo, VK_NULL_HANDLE, &shaderModule);
 
 	FREE(data);
 
-	return shaderModule;
+	if(Result==VK_SUCCESS)
+		return shaderModule;
+
+	return VK_NULL_HANDLE;
 }
 
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask)
 {
-	uint32_t i;
-
 	// Search memtypes to find first index with those properties
-	for(i=0;i<memory_properties.memoryTypeCount;i++)
+	for(uint32_t i=0;i<memory_properties.memoryTypeCount;i++)
 	{
 		if((typeBits&1)==1)
 		{
@@ -66,9 +64,7 @@ VkBool32 vkuCreateImageBuffer(VkDevice Device, const uint32_t *QueueFamilyIndice
 	VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth,
 	VkImage *Image, VkDeviceMemory *Memory,  VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags)
 {
-	VkMemoryRequirements memoryRequirements;
-
-	vkCreateImage(Device, &(VkImageCreateInfo)
+	VkImageCreateInfo ImageInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
 		.imageType=ImageType,
@@ -84,16 +80,22 @@ VkBool32 vkuCreateImageBuffer(VkDevice Device, const uint32_t *QueueFamilyIndice
 		.extent.height=Height,
 		.extent.depth=Depth,
 		.flags=CreateFlags,
-	}, NULL, Image);
+	};
 
-    vkGetImageMemoryRequirements(Device, *Image, &memoryRequirements);
+	if(vkCreateImage(Device, &ImageInfo, NULL, Image)!=VK_SUCCESS)
+		return VK_FALSE;
 
-    vkAllocateMemory(Device, &(VkMemoryAllocateInfo)
-    {
-        .sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .allocationSize=memoryRequirements.size,
+	VkMemoryRequirements memoryRequirements;
+	vkGetImageMemoryRequirements(Device, *Image, &memoryRequirements);
+
+	VkMemoryAllocateInfo AllocateInfo=
+	{
+		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+		.allocationSize=memoryRequirements.size,
 		.memoryTypeIndex=vkuMemoryTypeFromProperties(MemoryProperties, memoryRequirements.memoryTypeBits, RequirementsMask),
-    }, NULL, Memory);
+	};
+	if(vkAllocateMemory(Device, &AllocateInfo, NULL, Memory)!=VK_SUCCESS)
+		return VK_FALSE;
 
 	vkBindImageMemory(Device, *Image, *Memory, 0);
 
@@ -104,7 +106,7 @@ VkBool32 vkuCreateBuffer(VkDevice Device, const uint32_t *QueueFamilyIndices, Vk
 {
 	VkMemoryRequirements memoryRequirements;
 
-	vkCreateBuffer(Device, &(VkBufferCreateInfo)
+	VkBufferCreateInfo BufferInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
 		.size=Size,
@@ -112,18 +114,25 @@ VkBool32 vkuCreateBuffer(VkDevice Device, const uint32_t *QueueFamilyIndices, Vk
 		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount=1,
 		.pQueueFamilyIndices=QueueFamilyIndices,
-	}, NULL, Buffer);
+	};
+
+	if(vkCreateBuffer(Device, &BufferInfo, NULL, Buffer)!=VK_SUCCESS)
+		return VK_FALSE;
 
 	vkGetBufferMemoryRequirements(Device, *Buffer, &memoryRequirements);
 
-	vkAllocateMemory(Device, &(VkMemoryAllocateInfo)
+	VkMemoryAllocateInfo AllocateInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.allocationSize=memoryRequirements.size,
 		.memoryTypeIndex=vkuMemoryTypeFromProperties(MemoryProperties, memoryRequirements.memoryTypeBits, RequirementsMask),
-	}, NULL, Memory);
+	};
 
-	vkBindBufferMemory(Device, *Buffer, *Memory, 0);
+	if(vkAllocateMemory(Device, &AllocateInfo, NULL, Memory)!=VK_SUCCESS)
+		return VK_FALSE;
+
+	if(vkBindBufferMemory(Device, *Buffer, *Memory, 0)!=VK_SUCCESS)
+		return VK_FALSE;
 
 	return VK_TRUE;
 }
@@ -240,9 +249,6 @@ VkBool32 vkuPipeline_AddStage(VkuPipeline_t *Pipeline, const char *ShaderFilenam
 	// Assign the slot
 	Pipeline->Stages[Pipeline->NumStages]=ShaderStage;
 	Pipeline->NumStages++;
-
-	// Is this really safe to do here and now?
-	vkDestroyShaderModule(Pipeline->Device, ShaderModule, 0);
 
 	return VK_TRUE;
 }
@@ -448,6 +454,10 @@ VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline)
 		.layout=Pipeline->PipelineLayout,
 		.renderPass=Pipeline->RenderPass,
 	}, 0, &Pipeline->Pipeline);
+
+	// Done with pipeline creation, delete shader modules
+	for(uint32_t i=0;i<Pipeline->NumStages;i++)
+		vkDestroyShaderModule(Pipeline->Device, Pipeline->Stages[i].module, 0);
 
 	return Result==VK_SUCCESS?VK_TRUE:VK_FALSE;
 }

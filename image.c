@@ -2,8 +2,6 @@
 	Copyright 2020 Matt Williams/NitroGL
 	Image texture loading for Vulkan, based on my OpenGL code.
 
-	DDS compressed textures are untested.
-
 	TODO:
 		mipmaps
 		cubemaps
@@ -747,12 +745,6 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 
 	if(Extension!=NULL)
 	{
-		if(!strcmp(Extension, ".dds"))
-		{
-			if(!DDS_Load(Filename, Image))
-				return 0;
-		}
-		else
 		if(!strcmp(Extension, ".tga"))
 		{
 			if(!TGA_Load(Filename, Image))
@@ -812,46 +804,22 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 
 	switch(Image->Depth)
 	{
-		case IMAGE_DXT5:
-			Format=VK_FORMAT_BC5_UNORM_BLOCK;
-			break;
-
-		case IMAGE_DXT3:
-			Format=VK_FORMAT_BC3_UNORM_BLOCK;
-			break;
-
-		case IMAGE_DXT1:
-			Format=VK_FORMAT_BC1_RGB_UNORM_BLOCK;
-			break;
-
 		case 128:
+		case 96:
 			magFilter=VK_FILTER_NEAREST;
 			mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
 			minFilter=VK_FILTER_NEAREST;
 			Format=VK_FORMAT_R32G32B32A32_SFLOAT;
 			break;
 
-		case 96:
-			magFilter=VK_FILTER_NEAREST;
-			mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
-			minFilter=VK_FILTER_NEAREST;
-			Format=VK_FORMAT_R32G32B32_SFLOAT;
-			break;
-
 		case 64:
+		case 48:
 			Format=VK_FORMAT_R16G16B16A16_UNORM;
 			break;
 
-		case 48:
-			Format=VK_FORMAT_R16G16B16_UNORM;
-			break;
-
 		case 32:
-			Format=VK_FORMAT_B8G8R8A8_UNORM;
-			break;
-
 		case 24:
-			Format=VK_FORMAT_B8G8R8_UNORM;
+			Format=VK_FORMAT_B8G8R8A8_UNORM;
 			break;
 
 		case 16:
@@ -1034,13 +1002,7 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 			.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 			.viewType=VK_IMAGE_VIEW_TYPE_CUBE,
 			.format=Format,
-			.components=
-			{
-				VK_COMPONENT_SWIZZLE_R,
-				VK_COMPONENT_SWIZZLE_G,
-				VK_COMPONENT_SWIZZLE_B,
-				VK_COMPONENT_SWIZZLE_A
-			},
+			.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
 			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.subresourceRange.baseMipLevel=0,
 			.subresourceRange.baseArrayLayer=0,
@@ -1072,12 +1034,13 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
  
 	uint32_t mipLevels=(uint32_t)(floor(log2(max(Image->Width, Image->Height))))+1;
 
-	vkuCreateImageBuffer(device, &queueFamilyIndex, deviceMemProperties,
+	if(!vkuCreateImageBuffer(device, &queueFamilyIndex, deviceMemProperties,
 		VK_IMAGE_TYPE_2D, Format, mipLevels, 1, Image->Width, Image->Height, 1,
 		&Image->image, &Image->deviceMemory,
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
+		return false;
 
 	// Linear tiled images don't need to be staged and can be directly used as textures
 	Image->imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1130,7 +1093,7 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		.imageExtent.depth=1,
 		.bufferOffset=0,
 	});
-/*
+
 	// Now change the image layout from destination optimal to be optimal reading only by shader.
 	vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 	{
@@ -1150,7 +1113,7 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 	});
-*/
+
 	// Stop recording
 	vkEndCommandBuffer(copyCmd);
 		

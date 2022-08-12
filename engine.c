@@ -1060,7 +1060,7 @@ int Init(void)
 		BuildMemoryBuffers(&Model[MODEL_LEVEL]);
 
 	// Load textures
-	Image_Upload(&Textures[TEXTURE_HELLKNIGHT], "hellknight.tga", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Textures[TEXTURE_HELLKNIGHT], "hellknight.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Textures[TEXTURE_HELLKNIGHT_NORMAL], "hellknight_n.tga", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 	Image_Upload(&Textures[TEXTURE_PINKY], "pinky.tga", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Textures[TEXTURE_PINKY_NORMAL], "pinky_n.tga", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
@@ -1219,25 +1219,25 @@ void Render(void)
 	ubo.Light0_Pos[2]=cosf(fTime)*150.0f;
 	ubo.Light0_Pos[3]=1.0f/256.0f;
 	ubo.Light0_Kd[0]=1.0f;
-	ubo.Light0_Kd[1]=0.0f;
-	ubo.Light0_Kd[2]=0.0f;
+	ubo.Light0_Kd[1]=1.0f;
+	ubo.Light0_Kd[2]=1.0f;
 	ubo.Light0_Kd[3]=1.0f;
 
 	ubo.Light1_Pos[0]=cosf(fTime)*100.0f;
 	ubo.Light1_Pos[1]=50.0f;
 	ubo.Light1_Pos[2]=sinf(fTime)*100.0f;
 	ubo.Light1_Pos[3]=1.0f/256.0f;
-	ubo.Light1_Kd[0]=0.0f;
+	ubo.Light1_Kd[0]=1.0f;
 	ubo.Light1_Kd[1]=1.0f;
-	ubo.Light1_Kd[2]=0.0f;
+	ubo.Light1_Kd[2]=1.0f;
 	ubo.Light1_Kd[3]=1.0f;
 
 	ubo.Light2_Pos[0]=cosf(fTime)*100.0f;
 	ubo.Light2_Pos[1]=-80.0f;
 	ubo.Light2_Pos[2]=-15.0f;
 	ubo.Light2_Pos[3]=1.0f/256.0f;
-	ubo.Light2_Kd[0]=0.0f;
-	ubo.Light2_Kd[1]=0.0f;
+	ubo.Light2_Kd[0]=1.0f;
+	ubo.Light2_Kd[1]=1.0f;
 	ubo.Light2_Kd[2]=1.0f;
 	ubo.Light2_Kd[3]=1.0f;
 
@@ -1615,7 +1615,7 @@ int CreateVulkan(void)
 	vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
 
 	// Create swapchain
-	createSwapchain(Width, Height, VK_FALSE);
+	createSwapchain(Width, Height, VK_TRUE);
 
 	// Create command pool
 	vkCreateCommandPool(device, &(VkCommandPoolCreateInfo)
@@ -1901,7 +1901,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				vkDestroySwapchainKHR(device, swapchain, VK_NULL_HANDLE);
 
 				// Recreate the swapchain and frame buffers
-				createSwapchain(Width, Height, VK_FALSE);
+				createSwapchain(Width, Height, VK_TRUE);
 				createFramebuffers();
 
 				// Does the render pass need to be recreated as well?

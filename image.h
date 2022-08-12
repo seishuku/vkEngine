@@ -1,11 +1,6 @@
 #ifndef __IMAGE_H__
 #define __IMAGE_H__
 
-// Special image format 'fourcc'
-#define IMAGE_DXT1										('D'|('X'<<8)|('T'<<16)|('1'<<24))
-#define IMAGE_DXT3										('D'|('X'<<8)|('T'<<16)|('3'<<24))
-#define IMAGE_DXT5										('D'|('X'<<8)|('T'<<16)|('5'<<24))
-
 // Image flags
 #define IMAGE_NONE										0x00000000
 #define IMAGE_MIPMAP									0x00000002
@@ -39,10 +34,10 @@ typedef struct
 	VkImageView view;
 } Image_t;
 
-bool DDS_Load(const char *Filename, Image_t *Image);
 bool TGA_Load(const char *Filename, Image_t *Image);
 bool TGA_Write(const char *filename, Image_t *Image, bool rle);
 bool QOI_Load(const char *Filename, Image_t *Image);
+bool QOI_Write(const char *filename, Image_t *Image);
 
 unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags);
 

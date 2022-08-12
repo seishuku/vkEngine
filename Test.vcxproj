@@ -96,7 +96,6 @@
       <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Level3</WarningLevel>
       <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Level3</WarningLevel>
     </ClCompile>
-    <ClCompile Include="dds.c" />
     <ClCompile Include="engine.c" />
     <ClCompile Include="font.c" />
     <ClCompile Include="image.c" />
