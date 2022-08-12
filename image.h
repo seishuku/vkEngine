@@ -39,9 +39,10 @@ typedef struct
 	VkImageView view;
 } Image_t;
 
-int DDS_Load(char *Filename, Image_t *Image);
-int TGA_Load(char *Filename, Image_t *Image);
-int TGA_Write(char *filename, Image_t *Image, int rle);
+bool DDS_Load(const char *Filename, Image_t *Image);
+bool TGA_Load(const char *Filename, Image_t *Image);
+bool TGA_Write(const char *filename, Image_t *Image, bool rle);
+bool QOI_Load(const char *Filename, Image_t *Image);
 
 unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags);
 

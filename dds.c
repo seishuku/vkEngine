@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 #include <malloc.h>
 #include "image.h"
@@ -17,47 +19,47 @@
 
 typedef struct
 {
-	unsigned short col0, col1;
-	unsigned char row[4];
+	uint16_t col0, col1;
+	uint8_t row[4];
 } DXTColorBlock_t;
 
 typedef struct
 {
-	unsigned short row[4];
+	uint16_t row[4];
 } DXT3AlphaBlock_t;
 
 typedef struct
 {
-	unsigned char alpha0, alpha1;
-	unsigned char row[6];
+	uint8_t alpha0, alpha1;
+	uint8_t row[6];
 } DXT5AlphaBlock_t;
 
 typedef struct
 {
-	unsigned long Size;
-	unsigned long Flags;
-	unsigned long Height;
-	unsigned long Width;
-	unsigned long PitchLinearSize;
-	unsigned long Depth;
-	unsigned long MipMapCount;
-	unsigned long Reserved1[11];
-	unsigned long pfSize;
-	unsigned long pfFlags;
-	unsigned long pfFourCC;
-	unsigned long pfRGBBitCount;
-	unsigned long pfRMask;
-	unsigned long pfGMask;
-	unsigned long pfBMask;
-	unsigned long pfAMask;
-	unsigned long Caps1;
-	unsigned long Caps2;
-	unsigned long Reserved2[3];
+	uint32_t Size;
+	uint32_t Flags;
+	uint32_t Height;
+	uint32_t Width;
+	uint32_t PitchLinearSize;
+	uint32_t Depth;
+	uint32_t MipMapCount;
+	uint32_t Reserved1[11];
+	uint32_t pfSize;
+	uint32_t pfFlags;
+	uint32_t pfFourCC;
+	uint32_t pfRGBBitCount;
+	uint32_t pfRMask;
+	uint32_t pfGMask;
+	uint32_t pfBMask;
+	uint32_t pfAMask;
+	uint32_t Caps1;
+	uint32_t Caps2;
+	uint32_t Reserved2[3];
 } DDS_Header_t;
 
-void Swap(void *byte1, void *byte2, int size)
+void Swap(void *byte1, void *byte2, int32_t size)
 {
-	unsigned char *tmp=(unsigned char *)malloc(sizeof(unsigned char)*size);
+	uint8_t *tmp=(uint8_t *)malloc(sizeof(uint8_t)*size);
 
 	memcpy(tmp, byte1, size);
 	memcpy(byte1, byte2, size);
@@ -66,22 +68,22 @@ void Swap(void *byte1, void *byte2, int size)
 	FREE(tmp);
 }
 
-void FlipDXT1Blocks(DXTColorBlock_t *Block, int NumBlocks)
+void FlipDXT1Blocks(DXTColorBlock_t *Block, int32_t NumBlocks)
 {
-	int i;
+	int32_t i;
 	DXTColorBlock_t *ColorBlock=Block;
 
 	for(i=0;i<NumBlocks;i++)
 	{
-		Swap(&ColorBlock->row[0], &ColorBlock->row[3], sizeof(unsigned char));
-		Swap(&ColorBlock->row[1], &ColorBlock->row[2], sizeof(unsigned char));
+		Swap(&ColorBlock->row[0], &ColorBlock->row[3], sizeof(uint8_t));
+		Swap(&ColorBlock->row[1], &ColorBlock->row[2], sizeof(uint8_t));
 		ColorBlock++;
 	}
 }
 
-void FlipDXT3Blocks(DXTColorBlock_t *Block, int NumBlocks)
+void FlipDXT3Blocks(DXTColorBlock_t *Block, int32_t NumBlocks)
 {
-	int i;
+	int32_t i;
 	DXTColorBlock_t *ColorBlock=Block;
 	DXT3AlphaBlock_t *AlphaBlock;
 
@@ -89,51 +91,51 @@ void FlipDXT3Blocks(DXTColorBlock_t *Block, int NumBlocks)
 	{
 		AlphaBlock=(DXT3AlphaBlock_t *)ColorBlock;
 
-		Swap(&AlphaBlock->row[0], &AlphaBlock->row[3], sizeof(unsigned short));
-		Swap(&AlphaBlock->row[1], &AlphaBlock->row[2], sizeof(unsigned short));
+		Swap(&AlphaBlock->row[0], &AlphaBlock->row[3], sizeof(uint16_t));
+		Swap(&AlphaBlock->row[1], &AlphaBlock->row[2], sizeof(uint16_t));
 		ColorBlock++;
 
-		Swap(&ColorBlock->row[0], &ColorBlock->row[3], sizeof(unsigned char));
-		Swap(&ColorBlock->row[1], &ColorBlock->row[2], sizeof(unsigned char));
+		Swap(&ColorBlock->row[0], &ColorBlock->row[3], sizeof(uint8_t));
+		Swap(&ColorBlock->row[1], &ColorBlock->row[2], sizeof(uint8_t));
 		ColorBlock++;
 	}
 }
 
 void FlipDXT5Alpha(DXT5AlphaBlock_t *Block)
 {
-	unsigned long *Bits, Bits0=0, Bits1=0;
+	uint32_t *Bits, Bits0=0, Bits1=0;
 
-	memcpy(&Bits0, &Block->row[0], sizeof(unsigned char)*3);
-	memcpy(&Bits1, &Block->row[3], sizeof(unsigned char)*3);
+	memcpy(&Bits0, &Block->row[0], sizeof(uint8_t)*3);
+	memcpy(&Bits1, &Block->row[3], sizeof(uint8_t)*3);
 
-	Bits=((unsigned long *)&(Block->row[0]));
+	Bits=((uint32_t *)&(Block->row[0]));
 	*Bits&=0xff000000;
-	*Bits|=(unsigned char)(Bits1>>12)&0x00000007;
-	*Bits|=(unsigned char)((Bits1>>15)&0x00000007)<<3;
-	*Bits|=(unsigned char)((Bits1>>18)&0x00000007)<<6;
-	*Bits|=(unsigned char)((Bits1>>21)&0x00000007)<<9;
-	*Bits|=(unsigned char)(Bits1&0x00000007)<<12;
-	*Bits|=(unsigned char)((Bits1>>3)&0x00000007)<<15;
-	*Bits|=(unsigned char)((Bits1>>6)&0x00000007)<<18;
-	*Bits|=(unsigned char)((Bits1>>9)&0x00000007)<<21;
+	*Bits|=(uint8_t)(Bits1>>12)&0x00000007;
+	*Bits|=(uint8_t)((Bits1>>15)&0x00000007)<<3;
+	*Bits|=(uint8_t)((Bits1>>18)&0x00000007)<<6;
+	*Bits|=(uint8_t)((Bits1>>21)&0x00000007)<<9;
+	*Bits|=(uint8_t)(Bits1&0x00000007)<<12;
+	*Bits|=(uint8_t)((Bits1>>3)&0x00000007)<<15;
+	*Bits|=(uint8_t)((Bits1>>6)&0x00000007)<<18;
+	*Bits|=(uint8_t)((Bits1>>9)&0x00000007)<<21;
 
-	Bits=((unsigned long *)&(Block->row[3]));
+	Bits=((uint32_t *)&(Block->row[3]));
 	*Bits&=0xff000000;
-	*Bits|=(unsigned char)(Bits0>>12)&0x00000007;
-	*Bits|=(unsigned char)((Bits0>>15)&0x00000007)<<3;
-	*Bits|=(unsigned char)((Bits0>>18)&0x00000007)<<6;
-	*Bits|=(unsigned char)((Bits0>>21)&0x00000007)<<9;
-	*Bits|=(unsigned char)(Bits0&0x00000007)<<12;
-	*Bits|=(unsigned char)((Bits0>>3)&0x00000007)<<15;
-	*Bits|=(unsigned char)((Bits0>>6)&0x00000007)<<18;
-	*Bits|=(unsigned char)((Bits0>>9)&0x00000007)<<21;
+	*Bits|=(uint8_t)(Bits0>>12)&0x00000007;
+	*Bits|=(uint8_t)((Bits0>>15)&0x00000007)<<3;
+	*Bits|=(uint8_t)((Bits0>>18)&0x00000007)<<6;
+	*Bits|=(uint8_t)((Bits0>>21)&0x00000007)<<9;
+	*Bits|=(uint8_t)(Bits0&0x00000007)<<12;
+	*Bits|=(uint8_t)((Bits0>>3)&0x00000007)<<15;
+	*Bits|=(uint8_t)((Bits0>>6)&0x00000007)<<18;
+	*Bits|=(uint8_t)((Bits0>>9)&0x00000007)<<21;
 }
 
-void FlipDXT5Blocks(DXTColorBlock_t *Block, int NumBlocks)
+void FlipDXT5Blocks(DXTColorBlock_t *Block, int32_t NumBlocks)
 {
 	DXTColorBlock_t *ColorBlock=Block;
 	DXT5AlphaBlock_t *AlphaBlock;
-	int i;
+	int32_t i;
 
 	for(i=0;i<NumBlocks;i++)
 	{
@@ -142,19 +144,19 @@ void FlipDXT5Blocks(DXTColorBlock_t *Block, int NumBlocks)
 		FlipDXT5Alpha(AlphaBlock);
 		ColorBlock++;
 
-		Swap(&ColorBlock->row[0], &ColorBlock->row[3], sizeof(unsigned char));
-		Swap(&ColorBlock->row[1], &ColorBlock->row[2], sizeof(unsigned char));
+		Swap(&ColorBlock->row[0], &ColorBlock->row[3], sizeof(uint8_t));
+		Swap(&ColorBlock->row[1], &ColorBlock->row[2], sizeof(uint8_t));
 		ColorBlock++;
 	}
 }
 
-void Flip(unsigned char *image, int width, int height, int size, int format)
+void Flip(uint8_t *image, int32_t width, int32_t height, int32_t size, int32_t format)
 {
-	int linesize, i, j;
+	int32_t linesize, i, j;
 
 	if((format==32)||(format==24))
 	{
-		unsigned char *top, *bottom;
+		uint8_t *top, *bottom;
 
 		linesize=size/height;
 
@@ -173,8 +175,8 @@ void Flip(unsigned char *image, int width, int height, int size, int format)
 	{
 		DXTColorBlock_t *top;
 		DXTColorBlock_t *bottom;
-		int xblocks=width/4;
-		int yblocks=height/4;
+		int32_t xblocks=width/4;
+		int32_t yblocks=height/4;
 
 		switch(format)
 		{
@@ -226,22 +228,22 @@ void Flip(unsigned char *image, int width, int height, int size, int format)
 	}
 }
 
-int DDS_Load(char *Filename, Image_t *Image)
+bool DDS_Load(const char *Filename, Image_t *Image)
 {
 	DDS_Header_t dds;
-	unsigned long magic;
+	uint32_t magic;
 	FILE *stream;
-	int size;
+	int32_t size;
 
-	if(fopen_s(&stream, Filename, "rb"))
-		return 0;
+	if((stream=fopen(Filename, "rb"))==NULL)
+		return false;
 
-	fread(&magic, sizeof(unsigned long), 1, stream);
+	fread(&magic, sizeof(uint32_t), 1, stream);
 
 	if(magic!=DDS_MAGIC)
 	{
 		fclose(stream);
-		return 0;
+		return false;
 	}
 
 	fread(&dds, sizeof(DDS_Header_t), 1, stream);
@@ -264,7 +266,7 @@ int DDS_Load(char *Filename, Image_t *Image)
 
 			default:
 				fclose(stream);
-				return 0;
+				return false;
 		}
 	}
 	else
@@ -278,7 +280,7 @@ int DDS_Load(char *Filename, Image_t *Image)
 			else
 			{
 				fclose(stream);
-				return 0;
+				return false;
 			}
 		}
 	}
@@ -296,15 +298,15 @@ int DDS_Load(char *Filename, Image_t *Image)
 			size=((Image->Width+3)>>2)*((Image->Height+3)>>2)*16;
 	}
 
-	Image->Data=(unsigned char *)malloc(sizeof(unsigned char)*size);
+	Image->Data=(uint8_t *)malloc(sizeof(uint8_t)*size);
 
 	if(Image->Data==NULL)
-		return 0;
+		return false;
 
-	fread(Image->Data, sizeof(unsigned char), size, stream);
+	fread(Image->Data, sizeof(uint8_t), size, stream);
 	fclose(stream);
 
 	Flip(Image->Data, Image->Width, Image->Height, size, Image->Depth);
 
-	return 1;
+	return true;
 }

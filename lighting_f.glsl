@@ -1,5 +1,4 @@
 #version 450
-#extension GL_ARB_separate_shader_objects : enable
 
 layout (location=0) in vec3 Position;
 layout (location=1) in vec2 UV;
@@ -71,7 +70,7 @@ void main()
 	float Radius0=length(l0)*Light0_Pos.w;
 	for(int i=0;i<samples;i++)
 	{
-		if((texture(TexDistance0, vec3(l0.x, l0.y, l0.z)+sampleOffsetDirections[i]*Radius0).x+0.01)>=length(l0*Light0_Pos.w))
+		if((texture(TexDistance0, vec3(l0.x, l0.y, l0.z)+sampleOffsetDirections[i]*Radius0).x+0.01)>=Radius0)
 			Shadow0+=1.0/samples;
 	}
 
@@ -79,7 +78,7 @@ void main()
 	float Radius1=length(l1)*Light1_Pos.w;
 	for(int i=0;i<samples;i++)
 	{
-		if((texture(TexDistance1, vec3(l1.x, l1.y, l1.z)+sampleOffsetDirections[i]*Radius1).x+0.01)>=length(l1*Light1_Pos.w))
+		if((texture(TexDistance1, vec3(l1.x, l1.y, l1.z)+sampleOffsetDirections[i]*Radius1).x+0.01)>=Radius1)
 			Shadow1+=1.0/samples;
 	}
 
@@ -87,7 +86,7 @@ void main()
 	float Radius2=length(l2)*Light2_Pos.w;
 	for(int i=0;i<samples;i++)
 	{
-		if((texture(TexDistance2, vec3(l2.x, l2.y, l2.z)+sampleOffsetDirections[i]*Radius2).x+0.01)>=length(l2*Light2_Pos.w))
+		if((texture(TexDistance2, vec3(l2.x, l2.y, l2.z)+sampleOffsetDirections[i]*Radius2).x+0.01)>=Radius2)
 			Shadow2+=1.0/samples;
 	}
 

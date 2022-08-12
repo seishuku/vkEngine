@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <malloc.h>
 #include <string.h>
 #include "image.h"
@@ -7,9 +9,9 @@
 #define FREE(p) { if(p) { free(p); p=NULL; } }
 #endif
 
-void rle_read(uint8_t *row, uint32_t width, uint32_t bpp, FILE *stream)
+void rle_read(uint8_t *row, int32_t width, int32_t bpp, FILE *stream)
 {
-	uint32_t pos=0, len, i;
+	int32_t pos=0, len, i;
 	uint8_t header;
 
 	while(pos<width)
@@ -34,18 +36,18 @@ void rle_read(uint8_t *row, uint32_t width, uint32_t bpp, FILE *stream)
 	}
 }
 
-uint8_t rle_type(uint8_t *data, uint16_t pos, uint16_t width, uint8_t bpp)
+bool rle_type(uint8_t *data, uint16_t pos, uint16_t width, uint8_t bpp)
 {
 	if(!memcmp(data+bpp*pos, data+bpp*(pos+1), bpp))
 	{
 		if(!memcmp(data+bpp*(pos+1), data+bpp*(pos+2), bpp))
-			return 1;
+			return true;
 	}
 
-	return 0;
+	return false;
 }
 
-void rle_write(uint8_t *row, uint32_t width, uint32_t bpp, FILE *stream)
+void rle_write(uint8_t *row, int32_t width, int32_t bpp, FILE *stream)
 {
     uint16_t pos=0;
 
@@ -59,7 +61,7 @@ void rle_write(uint8_t *row, uint32_t width, uint32_t bpp, FILE *stream)
 				len=1;
 			else
 			{
-				while(pos+len<(signed)width)
+				while(pos+len<width)
 				{
 					if(memcmp(row+bpp*pos, row+bpp*(pos+len), bpp))
 						break;
@@ -82,7 +84,7 @@ void rle_write(uint8_t *row, uint32_t width, uint32_t bpp, FILE *stream)
 				len=1;
 			else
 			{
-				while(pos+len<(signed)width)
+				while(pos+len<width)
 				{
 					if(rle_type(row, pos+len, width, bpp))
 						break;
@@ -104,13 +106,13 @@ void rle_write(uint8_t *row, uint32_t width, uint32_t bpp, FILE *stream)
 	}
 }
 
-int TGA_Write(char *filename, Image_t *Image, int rle)
+bool TGA_Write(const char *filename, Image_t *Image, bool rle)
 {
 	FILE *stream;
 	uint8_t IDLength=0;
 	uint8_t ColorMapType=0, ColorMapStart=0, ColorMapLength=0, ColorMapDepth=0;
 	uint16_t XOffset=0, YOffset=0, Width=Image->Width, Height=Image->Height;
-	uint8_t Depth=(unsigned char)Image->Depth, ImageDescriptor=0, ImageType;
+	uint8_t Depth=(uint8_t)Image->Depth, ImageDescriptor=0, ImageType;
 
 	switch(Image->Depth)
 	{
@@ -128,7 +130,7 @@ int TGA_Write(char *filename, Image_t *Image, int rle)
 			return 0;
 	}
 
-	if(fopen_s(&stream, filename, "wb"))
+	if((stream=fopen(filename, "wb"))==NULL)
 		return 0;
 
 	fwrite(&IDLength, sizeof(uint8_t), 1, stream);
@@ -147,7 +149,7 @@ int TGA_Write(char *filename, Image_t *Image, int rle)
 	if(rle)
 	{
 		uint8_t *ptr;
-		uint32_t i, bpp=Depth>>3;
+		int32_t i, bpp=Depth>>3;
 
 		for(i=0, ptr=Image->Data;i<Height;i++, ptr+=Width*bpp)
 			rle_write(ptr, Width, bpp, stream);
@@ -157,10 +159,10 @@ int TGA_Write(char *filename, Image_t *Image, int rle)
 
 	fclose(stream);
 
-	return 1;
+	return true;
 }
 
-int TGA_Load(char *Filename, Image_t *Image)
+bool TGA_Load(const char *Filename, Image_t *Image)
 {
 	FILE *stream=NULL;
 	uint8_t *ptr;
@@ -172,10 +174,10 @@ int TGA_Load(char *Filename, Image_t *Image)
 	uint16_t Width, Height;
 	uint8_t Depth;
 	uint8_t ImageDescriptor;
-	uint32_t i, bpp;
+	int32_t i, bpp;
 
-	if(fopen_s(&stream, Filename, "rb"))
-		return 0;
+	if((stream=fopen(Filename, "rb"))==NULL)
+		return false;
 
 	fread(&IDLength, sizeof(uint8_t), 1, stream);
 	fread(&ColorMapType, sizeof(uint8_t), 1, stream);
@@ -201,7 +203,7 @@ int TGA_Load(char *Filename, Image_t *Image)
 
 		default:
 			fclose(stream);
-			return 0;
+			return false;
 	}
 
 	switch(Depth)
@@ -215,7 +217,7 @@ int TGA_Load(char *Filename, Image_t *Image)
 			Image->Data=(uint8_t *)malloc(Width*Height*bpp);
 
 			if(Image->Data==NULL)
-				return 0;
+				return false;
 
 			if(ImageType==10||ImageType==11)
 			{
@@ -228,20 +230,20 @@ int TGA_Load(char *Filename, Image_t *Image)
 
 		default:
 			fclose(stream);
-			return 0;
+			return false;
 	}
 
 	fclose(stream);
 
-	if(ImageDescriptor&0x20)
+	if(!(ImageDescriptor&0x20))
 	{
-		uint32_t Scanline=Width*bpp, Size=Scanline*Height;
+		int32_t Scanline=Width*bpp, Size=Scanline*Height;
 		uint8_t *Buffer=(uint8_t *)malloc(Size);
 
 		if(Buffer==NULL)
 		{
 			FREE(Image->Data);
-			return 0;
+			return false;
 		}
 
 		for(i=0;i<Height;i++)
@@ -256,5 +258,5 @@ int TGA_Load(char *Filename, Image_t *Image)
 	Image->Height=Height;
 	Image->Depth=Depth;
 
-	return 1;
+	return true;
 }

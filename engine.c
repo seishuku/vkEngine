@@ -1,6 +1,8 @@
 #include <Windows.h>
 #include <sys/types.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include "vulkan.h"
 #include "math.h"
 #include "3ds.h"
@@ -109,9 +111,8 @@ VkDeviceMemory depthMemory=VK_NULL_HANDLE;
 VkImageView depthImageView=VK_NULL_HANDLE;
 
 VkRenderPass renderPass=VK_NULL_HANDLE;
-
 VkPipelineLayout pipelineLayout=VK_NULL_HANDLE;
-VkPipeline pipeline=VK_NULL_HANDLE;
+VkuPipeline_t pipeline;
 
 VkDescriptorPool descriptorPool=VK_NULL_HANDLE;
 VkDescriptorSet descriptorSet[4]={ VK_NULL_HANDLE, };
@@ -142,9 +143,8 @@ VkImage shadowDepthImage;
 VkDeviceMemory shadowDepthMemory;
 VkImageView shadowDepthImageView;
 
-VkPipeline shadowPipeline;
+VkuPipeline_t shadowPipeline;
 VkPipelineLayout shadowPipelineLayout;
-
 VkRenderPass shadowRenderPass;
 
 // Shadow depth cubemap texture
@@ -452,11 +452,8 @@ void initShadowFramebuffer(void)
 	}, 0, &shadowFrameBuffer);
 }
 
-int initShadowPipeline(void)
+bool initShadowPipeline(void)
 {
-	VkShaderModule vertexShader=vkuCreateShaderModule(device, "distance_v.spv");
-	VkShaderModule fragmentShader=vkuCreateShaderModule(device, "distance_f.spv");
-
 	vkCreatePipelineLayout(device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -469,150 +466,29 @@ int initShadowPipeline(void)
 		},		
 	}, 0, &shadowPipelineLayout);
 
-	vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &(VkGraphicsPipelineCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-		.stageCount=2,
-		.pStages=(VkPipelineShaderStageCreateInfo[])
-		{
-			{
-				.sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-				.stage=VK_SHADER_STAGE_VERTEX_BIT,
-				.module=vertexShader,
-				.pName="main",
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-				.stage=VK_SHADER_STAGE_FRAGMENT_BIT,
-				.module=fragmentShader,
-				.pName="main",
-			},
-		},
-		.pVertexInputState=&(VkPipelineVertexInputStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-			.vertexBindingDescriptionCount=1,
-			.pVertexBindingDescriptions=(VkVertexInputBindingDescription[])
-			{
-				{
-					.binding=0,
-					.stride=sizeof(float)*14,
-					.inputRate=VK_VERTEX_INPUT_RATE_VERTEX
-				}
-			},
-			.vertexAttributeDescriptionCount=1,
-			.pVertexAttributeDescriptions=(VkVertexInputAttributeDescription[])
-			{
-				{
-					.location=0,
-					.binding=0,
-					.format=VK_FORMAT_R32G32B32_SFLOAT,
-					.offset=0
-				},
-			},
-		},
-		.pInputAssemblyState=&(VkPipelineInputAssemblyStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-			.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-			.primitiveRestartEnable=VK_FALSE,
-		},
-		.pViewportState=&(VkPipelineViewportStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-			.viewportCount=1,
-			.pViewports=0,
-			.scissorCount=1,
-			.pScissors=0,
-		},
-		.pRasterizationState=&(VkPipelineRasterizationStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-			.depthClampEnable=VK_FALSE,
-			.rasterizerDiscardEnable=VK_FALSE,
-			.polygonMode=VK_POLYGON_MODE_FILL,
-			.cullMode=VK_CULL_MODE_BACK_BIT,
-			.frontFace=VK_FRONT_FACE_COUNTER_CLOCKWISE,
-			.depthBiasEnable=VK_FALSE,
-			.depthBiasConstantFactor=0.0f,
-			.depthBiasClamp=0.0f,
-			.depthBiasSlopeFactor=0.0f,
-			.lineWidth=1.0f,
-		},
-		.pDepthStencilState=&(VkPipelineDepthStencilStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-			.depthTestEnable=VK_TRUE,
-			.depthWriteEnable=VK_TRUE,
-			.depthCompareOp=VK_COMPARE_OP_LESS_OR_EQUAL,
-			.depthBoundsTestEnable=VK_FALSE,
-			.stencilTestEnable=VK_FALSE,
-			.minDepthBounds=0.0f,
-			.maxDepthBounds=0.0f,
-			.front=(VkStencilOpState)
-			{
-				.failOp=VK_STENCIL_OP_KEEP,
-				.passOp=VK_STENCIL_OP_KEEP,
-				.depthFailOp=VK_STENCIL_OP_KEEP,
-				.compareOp=VK_COMPARE_OP_ALWAYS,
-				.compareMask=0,
-				.writeMask=0,
-				.reference=0,
-			},
-			.back=(VkStencilOpState)
-			{
-				.failOp=VK_STENCIL_OP_KEEP,
-				.passOp=VK_STENCIL_OP_KEEP,
-				.depthFailOp=VK_STENCIL_OP_KEEP,
-				.compareOp=VK_COMPARE_OP_ALWAYS,
-				.compareMask=0,
-				.writeMask=0,
-				.reference=0,
-			},
-		},
-		.pMultisampleState=&(VkPipelineMultisampleStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-			.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT,
-			.sampleShadingEnable=VK_FALSE,
-			.minSampleShading=1.0f,
-			.pSampleMask=0,
-			.alphaToCoverageEnable=VK_FALSE,
-			.alphaToOneEnable=VK_FALSE,
-		},
-		.pColorBlendState=&(VkPipelineColorBlendStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-			.logicOpEnable=VK_FALSE,
-			.attachmentCount=1,
-			.pAttachments=(VkPipelineColorBlendAttachmentState[])
-			{
-				{
-					.blendEnable=VK_FALSE,
-					.srcColorBlendFactor=VK_BLEND_FACTOR_ONE,
-					.dstColorBlendFactor=VK_BLEND_FACTOR_ZERO,
-					.colorBlendOp=VK_BLEND_OP_ADD,
-					.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE,
-					.dstAlphaBlendFactor=VK_BLEND_FACTOR_ZERO,
-					.alphaBlendOp=VK_BLEND_OP_ADD,
-					.colorWriteMask=VK_COLOR_COMPONENT_R_BIT|VK_COLOR_COMPONENT_G_BIT|VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT,
-				},
-			},
-		},
-		.pDynamicState=&(VkPipelineDynamicStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-			.dynamicStateCount=2,
-			.pDynamicStates=(VkDynamicState[]) { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR },
-		},
-		.layout=shadowPipelineLayout,
-		.renderPass=shadowRenderPass,
-	}, 0, &shadowPipeline);
+	vkuInitPipeline(&shadowPipeline, device, shadowPipelineLayout, shadowRenderPass);
 
-	vkDestroyShaderModule(device, vertexShader, 0);
-	vkDestroyShaderModule(device, fragmentShader, 0);
+	// Add in vertex shader
+	if(!vkuPipeline_AddStage(&shadowPipeline, "distance_v.spv", VK_SHADER_STAGE_VERTEX_BIT))
+		return false;
 
-	return 1;
+	// Add in fragment shader
+	if(!vkuPipeline_AddStage(&shadowPipeline, "distance_f.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+		return false;
+
+	// Set states that are different than defaults
+	shadowPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+	shadowPipeline.DepthTest=VK_TRUE;
+
+	// Add vertex binding and attrib parameters
+	vkuPipeline_AddVertexBinding(&shadowPipeline, 0, sizeof(float)*14, VK_VERTEX_INPUT_RATE_VERTEX);
+	vkuPipeline_AddVertexAttribute(&shadowPipeline, 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0);
+
+	// Assemble the pipeline
+	if(!vkuAssemblePipeline(&shadowPipeline))
+		return false;
+
+	return true;
 }
 
 void shadowUpdateCubemap(VkCommandBuffer commandBuffer, ShadowBuffer_t shadow, float Light_Pos[4])
@@ -688,7 +564,7 @@ void shadowUpdateCubemap(VkCommandBuffer commandBuffer, ShadowBuffer_t shadow, f
 		vkCmdPushConstants(commandBuffer, shadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*(16+4), &shadow_ubo);
 
 		// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
-		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline);
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline.Pipeline);
 
 		vkCmdSetViewport(commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)shadowCubeSize, (float)shadowCubeSize, 0.0f, 1.0f });
 		vkCmdSetScissor(commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { shadowCubeSize, shadowCubeSize } });
@@ -906,11 +782,8 @@ int createFramebuffers(void)
 	return 1;
 }
 
-int createPipeline(void)
+bool createPipeline(void)
 {
-	VkShaderModule vertexShader=vkuCreateShaderModule(device, "lighting_v.spv");
-	VkShaderModule fragmentShader=vkuCreateShaderModule(device, "lighting_f.spv");
-
 	vkCreateDescriptorPool(device, &(VkDescriptorPoolCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -990,174 +863,29 @@ int createPipeline(void)
 		.pSetLayouts=&descriptorSetLayout,
 	}, 0, &pipelineLayout);
 
-	vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &(VkGraphicsPipelineCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-		.stageCount=2,
-		.pStages=(VkPipelineShaderStageCreateInfo[])
-		{
-			{
-				.sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-				.stage=VK_SHADER_STAGE_VERTEX_BIT,
-				.module=vertexShader,
-				.pName="main",
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-				.stage=VK_SHADER_STAGE_FRAGMENT_BIT,
-				.module=fragmentShader,
-				.pName="main",
-			},
-		},
-		.pVertexInputState=&(VkPipelineVertexInputStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-			.vertexBindingDescriptionCount=1,
-			.pVertexBindingDescriptions=(VkVertexInputBindingDescription[])
-			{
-				{
-					.binding=0,
-					.stride=sizeof(float)*14,
-					.inputRate=VK_VERTEX_INPUT_RATE_VERTEX
-				}
-			},
-			.vertexAttributeDescriptionCount=5,
-			.pVertexAttributeDescriptions=(VkVertexInputAttributeDescription[])
-			{
-				{
-					.location=0,
-					.binding=0,
-					.format=VK_FORMAT_R32G32B32_SFLOAT,
-					.offset=0
-				},
-				{
-					.location=1,
-					.binding=0,
-					.format=VK_FORMAT_R32G32_SFLOAT,
-					.offset=sizeof(float)*3
-				},
-				{
-					.location=2,
-					.binding=0,
-					.format=VK_FORMAT_R32G32B32_SFLOAT,
-					.offset=sizeof(float)*5
-				},
-				{
-					.location=3,
-					.binding=0,
-					.format=VK_FORMAT_R32G32B32_SFLOAT,
-					.offset=sizeof(float)*8
-				},
-				{
-					.location=4,
-					.binding=0,
-					.format=VK_FORMAT_R32G32B32_SFLOAT,
-					.offset=sizeof(float)*11
-				},
-			},
-		},
-		.pInputAssemblyState=&(VkPipelineInputAssemblyStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-			.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-			.primitiveRestartEnable=VK_FALSE,
-		},
-		.pViewportState=&(VkPipelineViewportStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-				.viewportCount=1,
-				.pViewports=0,
-				.scissorCount=1,
-				.pScissors=0,
-		},
-		.pRasterizationState=&(VkPipelineRasterizationStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-				.depthClampEnable=VK_FALSE,
-				.rasterizerDiscardEnable=VK_FALSE,
-				.polygonMode=VK_POLYGON_MODE_FILL,
-				.cullMode=VK_CULL_MODE_BACK_BIT,
-				.frontFace=VK_FRONT_FACE_COUNTER_CLOCKWISE,
-				.depthBiasEnable=VK_FALSE,
-				.depthBiasConstantFactor=0.0f,
-				.depthBiasClamp=0.0f,
-				.depthBiasSlopeFactor=0.0f,
-				.lineWidth=1.0f,
-		},
-		.pDepthStencilState=&(VkPipelineDepthStencilStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-			.depthTestEnable=VK_TRUE,
-			.depthWriteEnable=VK_TRUE,
-			.depthCompareOp=VK_COMPARE_OP_LESS_OR_EQUAL,
-			.depthBoundsTestEnable=VK_FALSE,
-			.stencilTestEnable=VK_FALSE,
-			.minDepthBounds=0.0f,
-			.maxDepthBounds=0.0f,
-			.front=(VkStencilOpState)
-			{
-				.failOp=VK_STENCIL_OP_KEEP,
-				.passOp=VK_STENCIL_OP_KEEP,
-				.depthFailOp=VK_STENCIL_OP_KEEP,
-				.compareOp=VK_COMPARE_OP_ALWAYS,
-				.compareMask=0,
-				.writeMask=0,
-				.reference=0,
-			},
-			.back=(VkStencilOpState)
-			{
-				.failOp=VK_STENCIL_OP_KEEP,
-				.passOp=VK_STENCIL_OP_KEEP,
-				.depthFailOp=VK_STENCIL_OP_KEEP,
-				.compareOp=VK_COMPARE_OP_ALWAYS,
-				.compareMask=0,
-				.writeMask=0,
-				.reference=0,
-			},
-		},
-		.pMultisampleState=&(VkPipelineMultisampleStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-			.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT,
-			.sampleShadingEnable=VK_FALSE,
-			.minSampleShading=1.0f,
-			.pSampleMask=0,
-			.alphaToCoverageEnable=VK_FALSE,
-			.alphaToOneEnable=VK_FALSE,
-		},
-		.pColorBlendState=&(VkPipelineColorBlendStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-			.logicOpEnable=VK_FALSE,
-			.attachmentCount=1,
-			.pAttachments=(VkPipelineColorBlendAttachmentState[])
-			{
-				{
-					.blendEnable=VK_FALSE,
-					.srcColorBlendFactor=VK_BLEND_FACTOR_ONE,
-					.dstColorBlendFactor=VK_BLEND_FACTOR_ZERO,
-					.colorBlendOp=VK_BLEND_OP_ADD,
-					.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE,
-					.dstAlphaBlendFactor=VK_BLEND_FACTOR_ZERO,
-					.alphaBlendOp=VK_BLEND_OP_ADD,
-					.colorWriteMask=VK_COLOR_COMPONENT_R_BIT|VK_COLOR_COMPONENT_G_BIT|VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT,
-				},
-			},
-		},
-		.pDynamicState=&(VkPipelineDynamicStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-			.dynamicStateCount=2,
-			.pDynamicStates=(VkDynamicState[]) { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR },
-		},
-		.layout=pipelineLayout,
-		.renderPass=renderPass,
-	}, 0, &pipeline);
+	vkuInitPipeline(&pipeline, device, pipelineLayout, renderPass);
 
-	vkDestroyShaderModule(device, vertexShader, 0);
-	vkDestroyShaderModule(device, fragmentShader, 0);
+	pipeline.DepthTest=VK_TRUE;
+	pipeline.CullMode=VK_CULL_MODE_BACK_BIT;
 
-	return pipeline!=0;
+	if(!vkuPipeline_AddStage(&pipeline, "lighting_v.spv", VK_SHADER_STAGE_VERTEX_BIT))
+		return false;
+
+	if(!vkuPipeline_AddStage(&pipeline, "lighting_f.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+		return false;
+
+	vkuPipeline_AddVertexBinding(&pipeline, 0, sizeof(float)*14, VK_VERTEX_INPUT_RATE_VERTEX);
+
+	vkuPipeline_AddVertexAttribute(&pipeline, 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0);
+	vkuPipeline_AddVertexAttribute(&pipeline, 1, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float)*3);
+	vkuPipeline_AddVertexAttribute(&pipeline, 2, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float)*5);
+	vkuPipeline_AddVertexAttribute(&pipeline, 3, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float)*8);
+	vkuPipeline_AddVertexAttribute(&pipeline, 4, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float)*11);
+
+	if(!vkuAssemblePipeline(&pipeline))
+		return false;
+
+	return true;
 }
 
 void BuildMemoryBuffers(Model3DS_t *Model)
@@ -1192,7 +920,7 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 			*((float *)Data)++=Model->Mesh[i].Vertex[3*j+2];
 
 			*((float *)Data)++=Model->Mesh[i].UV[2*j+0];
-			*((float *)Data)++=Model->Mesh[i].UV[2*j+1];
+			*((float *)Data)++=1.0f-Model->Mesh[i].UV[2*j+1];
 
 			*((float *)Data)++=Model->Mesh[i].Tangent[3*j+0];
 			*((float *)Data)++=Model->Mesh[i].Tangent[3*j+1];
@@ -1338,7 +1066,7 @@ int Init(void)
 	Image_Upload(&Textures[TEXTURE_PINKY_NORMAL], "pinky_n.tga", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 	Image_Upload(&Textures[TEXTURE_FATTY], "fatty.tga", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Textures[TEXTURE_FATTY_NORMAL], "fatty_n.tga", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	Image_Upload(&Textures[TEXTURE_LEVEL], "tile.tga", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Textures[TEXTURE_LEVEL], "tile.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Textures[TEXTURE_LEVEL_NORMAL], "tile_b.tga", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALMAP);
 
 	// Uniform data buffer and pointer mapping
@@ -1561,7 +1289,7 @@ void Render(void)
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
 	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
-	vkCmdBindPipeline(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+	vkCmdBindPipeline(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Pipeline);
 
 	vkCmdSetViewport(commandBuffers[index], 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)swapchainExtent.width, (float)swapchainExtent.height, 0.0f, 1.0f });
 	vkCmdSetScissor(commandBuffers[index], 0, 1, &(VkRect2D) { { 0, 0 }, swapchainExtent});
@@ -1930,7 +1658,7 @@ void DestroyVulkan(void)
 	vkDeviceWaitIdle(device);
 
 	// Shadow stuff
-	vkDestroyPipeline(device, shadowPipeline, VK_NULL_HANDLE);
+	vkDestroyPipeline(device, shadowPipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(device, shadowPipelineLayout, VK_NULL_HANDLE);
 
 	vkDestroyFramebuffer(device, shadowFrameBuffer, VK_NULL_HANDLE);
@@ -1992,7 +1720,7 @@ void DestroyVulkan(void)
 	vkDestroyDescriptorSetLayout(device, descriptorSetLayout, VK_NULL_HANDLE);
 	vkDestroyDescriptorPool(device, descriptorPool, VK_NULL_HANDLE);
 
-	vkDestroyPipeline(device, pipeline, VK_NULL_HANDLE);
+	vkDestroyPipeline(device, pipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(device, pipelineLayout, VK_NULL_HANDLE);
 
 	vkDestroyImageView(device, depthImageView, VK_NULL_HANDLE);

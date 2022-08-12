@@ -13,6 +13,8 @@
 
 #include <malloc.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 #include "vulkan.h"
 #include "math.h"
@@ -754,6 +756,12 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		if(!strcmp(Extension, ".tga"))
 		{
 			if(!TGA_Load(Filename, Image))
+				return 0;
+		}
+		else
+		if(!strcmp(Extension, ".qoi"))
+		{
+			if(!QOI_Load(Filename, Image))
 				return 0;
 		}
 		else

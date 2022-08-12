@@ -42,6 +42,9 @@
     <ClCompile Include="vulkan.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="qoi.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="3ds.h">
