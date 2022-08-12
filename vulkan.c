@@ -4,10 +4,6 @@
 #include <stdio.h>
 #include "math.h"
 
-#ifndef FREE
-#define FREE(p) { if(p) { free(p); p=NULL; } }
-#endif
-
 VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile)
 {
 	VkShaderModule shaderModule=VK_NULL_HANDLE;
@@ -33,7 +29,7 @@ VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile)
 	VkShaderModuleCreateInfo CreateInfo={ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, NULL, 0, size, data };
 	VkResult Result=vkCreateShaderModule(Device, &CreateInfo, VK_NULL_HANDLE, &shaderModule);
 
-	FREE(data);
+	free(data);
 
 	if(Result==VK_SUCCESS)
 		return shaderModule;
