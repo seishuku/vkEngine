@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
+#include "vulkan.h"
 #include "image.h"
 
 #define QOI_MAGIC			(((uint32_t)'q')<<24|((uint32_t)'o')<<16|((uint32_t)'i')<<8|((uint32_t)'f'))
