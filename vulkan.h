@@ -3,6 +3,26 @@
 
 #include <vulkan/vulkan.h>
 
+#ifdef WIN32
+#include <Windows.h>
+#endif
+
+typedef struct
+{
+	HWND hWnd;
+	VkSurfaceKHR Surface;
+
+	uint32_t QueueFamilyIndex;
+	VkPhysicalDevice PhysicalDevice;
+	VkPhysicalDeviceMemoryProperties DeviceMemProperties;
+
+	VkDevice Device;
+	VkQueue Queue;
+	VkCommandPool CommandPool;
+} VkContext_t;
+
+#include "image.h"
+
 typedef struct
 {
 	// Handles to dependencies
@@ -95,16 +115,20 @@ VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile);
 
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask);
 
-VkBool32 vkuCreateImageBuffer(VkDevice Device, const uint32_t *QueueFamilyIndices, VkPhysicalDeviceMemoryProperties MemoryProperties,
+VkBool32 vkuCreateImageBuffer(VkContext_t *Context, Image_t *Image,
 	VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth,
-	VkImage *Image, VkDeviceMemory *Memory,  VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags);
-VkBool32 vkuCreateBuffer(VkDevice Device, const uint32_t *QueueFamilyIndices, VkPhysicalDeviceMemoryProperties MemoryProperties, VkBuffer *Buffer, VkDeviceMemory *Memory, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask);
-VkBool32 vkuCopyBuffer(VkDevice Device, VkQueue Queue, VkCommandPool CommandPool, VkBuffer Src, VkBuffer Dest, uint32_t Size);
+	VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags);
+VkBool32 vkuCreateBuffer(VkContext_t *Context, VkBuffer *Buffer, VkDeviceMemory *Memory, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask);
+VkBool32 vkuCopyBuffer(VkContext_t *Context, VkBuffer Src, VkBuffer Dest, uint32_t Size);
 
 VkBool32 vkuPipeline_AddVertexBinding(VkuPipeline_t *Pipeline, uint32_t Binding, uint32_t Stride, VkVertexInputRate InputRate);
 VkBool32 vkuPipeline_AddVertexAttribute(VkuPipeline_t *Pipeline, uint32_t Location, uint32_t Binding, VkFormat Format, uint32_t Offset);
 VkBool32 vkuPipeline_AddStage(VkuPipeline_t *Pipeline, const char *ShaderFilename, VkShaderStageFlagBits Stage);
 VkBool32 vkuInitPipeline(VkuPipeline_t *Pipeline, VkDevice Device, VkPipelineLayout PipelineLayout, VkRenderPass RenderPass);
 VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline);
+
+VkBool32 CreateVulkanInstance(VkInstance *Instance);
+VkBool32 CreateVulkanContext(VkInstance Instance, VkContext_t *Context);
+void DestroyVulkan(VkInstance Instance, VkContext_t *Context);
 
 #endif

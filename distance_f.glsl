@@ -10,5 +10,5 @@ layout (push_constant) uniform PushConsts
 
 void main()
 {
-	gl_FragDepth=length(Light_Pos.xyz-Position)*Light_Pos.w;
+	gl_FragDepth=length(Position-Light_Pos.xyz)*Light_Pos.w;
 }

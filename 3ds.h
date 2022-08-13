@@ -4,26 +4,26 @@
 typedef struct
 {
 	char Name[32];
-	float Ambient[3];
-	float Diffuse[3];
-	float Specular[3];
-	float Emission[3];
+	vec3 Ambient;
+	vec3 Diffuse;
+	vec3 Specular;
+	vec3 Emission;
 	float Shininess;
 	char Texture[32];
+	uint32_t TexBaseID, TexNormalID, TexSpecularID;
 } Material3DS_t;
-
-#include <vulkan/vulkan.h>
 
 typedef struct
 {
 	char Name[32];
 	char MaterialName[32];
+	int32_t MaterialNumber;
 
-	unsigned short NumVertex;
+	uint16_t NumVertex;
 	float *Vertex, *UV, *Normal, *Tangent, *Binormal;
 
-	unsigned short NumFace;
-	unsigned short *Face;
+	uint16_t NumFace;
+	uint16_t *Face;
 
 	VkBuffer Buffer;
 	VkDeviceMemory BufferMemory;
@@ -34,14 +34,14 @@ typedef struct
 
 typedef struct
 {
-	int NumMaterial;
+	int32_t NumMaterial;
 	Material3DS_t *Material;
 
-	int NumMesh;
+	int32_t NumMesh;
 	Mesh3DS_t *Mesh;
 } Model3DS_t;
 
-int Load3DS(Model3DS_t *Model, char *Filename);
+bool Load3DS(Model3DS_t *Model, char *Filename);
 void Free3DS(Model3DS_t *Model);
 
 #endif

@@ -1,7 +1,11 @@
 // Vulkan helper functions
-
-#include "vulkan.h"
+#include <windows.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include "system.h"
+#include "vulkan.h"
+#include "image.h"
 #include "math.h"
 
 VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile)
@@ -56,9 +60,9 @@ uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_pro
 	return 0;
 }
 
-VkBool32 vkuCreateImageBuffer(VkDevice Device, const uint32_t *QueueFamilyIndices, VkPhysicalDeviceMemoryProperties MemoryProperties,
+VkBool32 vkuCreateImageBuffer(VkContext_t *Context, Image_t *Image,
 	VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth,
-	VkImage *Image, VkDeviceMemory *Memory,  VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags)
+	VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags)
 {
 	VkImageCreateInfo ImageInfo=
 	{
@@ -78,27 +82,27 @@ VkBool32 vkuCreateImageBuffer(VkDevice Device, const uint32_t *QueueFamilyIndice
 		.flags=CreateFlags,
 	};
 
-	if(vkCreateImage(Device, &ImageInfo, NULL, Image)!=VK_SUCCESS)
+	if(vkCreateImage(Context->Device, &ImageInfo, NULL, &Image->Image)!=VK_SUCCESS)
 		return VK_FALSE;
 
 	VkMemoryRequirements memoryRequirements;
-	vkGetImageMemoryRequirements(Device, *Image, &memoryRequirements);
+	vkGetImageMemoryRequirements(Context->Device, Image->Image, &memoryRequirements);
 
 	VkMemoryAllocateInfo AllocateInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.allocationSize=memoryRequirements.size,
-		.memoryTypeIndex=vkuMemoryTypeFromProperties(MemoryProperties, memoryRequirements.memoryTypeBits, RequirementsMask),
+		.memoryTypeIndex=vkuMemoryTypeFromProperties(Context->DeviceMemProperties, memoryRequirements.memoryTypeBits, RequirementsMask),
 	};
-	if(vkAllocateMemory(Device, &AllocateInfo, NULL, Memory)!=VK_SUCCESS)
+	if(vkAllocateMemory(Context->Device, &AllocateInfo, NULL, &Image->DeviceMemory)!=VK_SUCCESS)
 		return VK_FALSE;
 
-	vkBindImageMemory(Device, *Image, *Memory, 0);
+	vkBindImageMemory(Context->Device, Image->Image, Image->DeviceMemory, 0);
 
 	return VK_TRUE;
 }
 
-VkBool32 vkuCreateBuffer(VkDevice Device, const uint32_t *QueueFamilyIndices, VkPhysicalDeviceMemoryProperties MemoryProperties, VkBuffer *Buffer, VkDeviceMemory *Memory, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask)
+VkBool32 vkuCreateBuffer(VkContext_t *Context, VkBuffer *Buffer, VkDeviceMemory *Memory, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask)
 {
 	VkMemoryRequirements memoryRequirements;
 
@@ -109,65 +113,66 @@ VkBool32 vkuCreateBuffer(VkDevice Device, const uint32_t *QueueFamilyIndices, Vk
 		.usage=Flags,
 		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount=1,
-		.pQueueFamilyIndices=QueueFamilyIndices,
+		.pQueueFamilyIndices=&Context->QueueFamilyIndex,
 	};
 
-	if(vkCreateBuffer(Device, &BufferInfo, NULL, Buffer)!=VK_SUCCESS)
+	if(vkCreateBuffer(Context->Device, &BufferInfo, NULL, Buffer)!=VK_SUCCESS)
 		return VK_FALSE;
 
-	vkGetBufferMemoryRequirements(Device, *Buffer, &memoryRequirements);
+	vkGetBufferMemoryRequirements(Context->Device, *Buffer, &memoryRequirements);
 
 	VkMemoryAllocateInfo AllocateInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.allocationSize=memoryRequirements.size,
-		.memoryTypeIndex=vkuMemoryTypeFromProperties(MemoryProperties, memoryRequirements.memoryTypeBits, RequirementsMask),
+		.memoryTypeIndex=vkuMemoryTypeFromProperties(Context->DeviceMemProperties, memoryRequirements.memoryTypeBits, RequirementsMask),
 	};
 
-	if(vkAllocateMemory(Device, &AllocateInfo, NULL, Memory)!=VK_SUCCESS)
+	if(vkAllocateMemory(Context->Device, &AllocateInfo, NULL, Memory)!=VK_SUCCESS)
 		return VK_FALSE;
 
-	if(vkBindBufferMemory(Device, *Buffer, *Memory, 0)!=VK_SUCCESS)
+	if(vkBindBufferMemory(Context->Device, *Buffer, *Memory, 0)!=VK_SUCCESS)
 		return VK_FALSE;
 
 	return VK_TRUE;
 }
 
 // Copy from one buffer to another
-VkBool32 vkuCopyBuffer(VkDevice Device, VkQueue Queue, VkCommandPool CommandPool, VkBuffer Src, VkBuffer Dest, uint32_t Size)
+VkBool32 vkuCopyBuffer(VkContext_t *Context, VkBuffer Src, VkBuffer Dest, uint32_t Size)
 {
-	VkCommandBuffer copyCmd=VK_NULL_HANDLE;
-	VkFence fence=VK_NULL_HANDLE;
+	VkCommandBuffer CopyCmd=VK_NULL_HANDLE;
+	VkFence Fence=VK_NULL_HANDLE;
 
 	// Create a command buffer to submit a copy command from the staging buffer into the static vertex buffer
-	vkAllocateCommandBuffers(Device, &(VkCommandBufferAllocateInfo)
+	vkAllocateCommandBuffers(Context->Device, &(VkCommandBufferAllocateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=CommandPool,
+		.commandPool=Context->CommandPool,
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount=1,
-	}, &copyCmd);
-	vkBeginCommandBuffer(copyCmd, &(VkCommandBufferBeginInfo) { .sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO });
+	}, &CopyCmd);
+
+	vkBeginCommandBuffer(CopyCmd, &(VkCommandBufferBeginInfo) { .sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO });
 
 	// Copy command
-	vkCmdCopyBuffer(copyCmd, Src, Dest, 1, &(VkBufferCopy) { .srcOffset=0, .dstOffset=0, .size=Size });
+	vkCmdCopyBuffer(CopyCmd, Src, Dest, 1, &(VkBufferCopy) { .srcOffset=0, .dstOffset=0, .size=Size });
 
 	// End command buffer and submit
-	vkEndCommandBuffer(copyCmd);
+	vkEndCommandBuffer(CopyCmd);
 		
-	vkCreateFence(Device, &(VkFenceCreateInfo) { .sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &fence);
+	vkCreateFence(Context->Device, &(VkFenceCreateInfo) { .sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &Fence);
 
-	vkQueueSubmit(Queue, 1, &(VkSubmitInfo)
+	vkQueueSubmit(Context->Queue, 1, &(VkSubmitInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.commandBufferCount=1,
-		.pCommandBuffers=&copyCmd,
-	}, fence);
+		.pCommandBuffers=&CopyCmd,
+	}, Fence);
 
 	// Wait for it to finish
-	vkWaitForFences(Device, 1, &fence, VK_TRUE, UINT64_MAX);
-	vkDestroyFence(Device, fence, VK_NULL_HANDLE);
-	vkFreeCommandBuffers(Device, CommandPool, 1, &copyCmd);
+	vkWaitForFences(Context->Device, 1, &Fence, VK_TRUE, UINT64_MAX);
+	vkDestroyFence(Context->Device, Fence, VK_NULL_HANDLE);
+	vkFreeCommandBuffers(Context->Device, Context->CommandPool, 1, &CopyCmd);
 
 	return VK_TRUE;
 }
@@ -456,5 +461,158 @@ VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline)
 		vkDestroyShaderModule(Pipeline->Device, Pipeline->Stages[i].module, 0);
 
 	return Result==VK_SUCCESS?VK_TRUE:VK_FALSE;
+}
+/////
+
+///// Vulkan context stuff
+
+// Create Vulkan Instance
+VkBool32 CreateVulkanInstance(VkInstance *Instance)
+{
+	VkApplicationInfo AppInfo=
+	{
+		.sType=VK_STRUCTURE_TYPE_APPLICATION_INFO,
+		.pApplicationName="Engine",
+		.applicationVersion=VK_MAKE_VERSION(1, 0, 0),
+		.pEngineName="Engine",
+		.engineVersion=VK_MAKE_VERSION(1, 0, 0),
+		.apiVersion=VK_API_VERSION_1_0
+	};
+	const char *Extensions[]=
+	{
+		VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+		VK_KHR_SURFACE_EXTENSION_NAME,
+		VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+	};
+	VkInstanceCreateInfo InstanceInfo=
+	{
+		.sType=VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+		.pApplicationInfo=&AppInfo,
+		.enabledExtensionCount=3,
+		.ppEnabledExtensionNames=Extensions
+	};
+
+	if(vkCreateInstance(&InstanceInfo, 0, Instance)!=VK_SUCCESS)
+		return VK_FALSE;
+
+	return VK_TRUE;
+}
+
+// Create Vulkan Context
+VkBool32 CreateVulkanContext(VkInstance Instance, VkContext_t *Context)
+{
+	VkPresentModeKHR presentMode=VK_PRESENT_MODE_FIFO_KHR;
+			
+	if(vkCreateWin32SurfaceKHR(Instance, &(VkWin32SurfaceCreateInfoKHR)
+	{
+		.sType=VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+		.hinstance=GetModuleHandle(0),
+		.hwnd=Context->hWnd,
+	}, VK_NULL_HANDLE, &Context->Surface)!=VK_SUCCESS)
+		return VK_FALSE;
+
+	// Get the number of physical devices in the system
+	uint32_t PhysicalDeviceCount=0;
+	vkEnumeratePhysicalDevices(Instance, &PhysicalDeviceCount, VK_NULL_HANDLE);
+
+	// Allocate an array of handles
+	VkPhysicalDevice *DeviceHandles=(VkPhysicalDevice *)malloc(sizeof(VkPhysicalDevice)*PhysicalDeviceCount);
+
+	if(DeviceHandles==NULL)
+		return VK_FALSE;
+
+	// Get the handles to the devices
+	vkEnumeratePhysicalDevices(Instance, &PhysicalDeviceCount, DeviceHandles);
+
+	for(uint32_t i=0;i<PhysicalDeviceCount;i++)
+	{
+		uint32_t QueueFamilyCount=0;
+
+		// Get the number of queue families for this device
+		vkGetPhysicalDeviceQueueFamilyProperties(DeviceHandles[i], &QueueFamilyCount, VK_NULL_HANDLE);
+
+		// Allocate the memory for the structs 
+		VkQueueFamilyProperties *QueueFamilyProperties=(VkQueueFamilyProperties *)malloc(sizeof(VkQueueFamilyProperties)*QueueFamilyCount);
+
+		if(QueueFamilyProperties==NULL)
+		{
+			FREE(DeviceHandles);
+			return VK_FALSE;
+		}
+
+		// Get the queue family properties
+		vkGetPhysicalDeviceQueueFamilyProperties(DeviceHandles[i], &QueueFamilyCount, QueueFamilyProperties);
+
+		// Find a queue index on a device that supports both graphics rendering and present support
+		for(uint32_t j=0;j<QueueFamilyCount;j++)
+		{
+			VkBool32 SupportsPresent=VK_FALSE;
+
+			vkGetPhysicalDeviceSurfaceSupportKHR(DeviceHandles[i], j, Context->Surface, &SupportsPresent);
+
+			if(SupportsPresent&&(QueueFamilyProperties[j].queueFlags&VK_QUEUE_GRAPHICS_BIT))
+			{
+				Context->QueueFamilyIndex=j;
+				Context->PhysicalDevice=DeviceHandles[i];
+
+				break;
+			}
+		}
+
+		// Done with queue family properties
+		FREE(QueueFamilyProperties);
+
+		// Found device?
+		if(Context->PhysicalDevice)
+			break;
+	}
+
+	// Free allocated handles
+	FREE(DeviceHandles);
+
+	// Get device physical memory properties
+	vkGetPhysicalDeviceMemoryProperties(Context->PhysicalDevice, &Context->DeviceMemProperties);
+
+	// Create the logical device from the physical device and queue index from above
+	if(vkCreateDevice(Context->PhysicalDevice, &(VkDeviceCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+		.enabledExtensionCount=1,
+		.ppEnabledExtensionNames=(const char *const []) { VK_KHR_SWAPCHAIN_EXTENSION_NAME },
+		.queueCreateInfoCount=1,
+		.pQueueCreateInfos=(VkDeviceQueueCreateInfo[])
+		{
+			{
+				.sType=VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+				.queueFamilyIndex=Context->QueueFamilyIndex,
+				.queueCount=1,
+				.pQueuePriorities=(const float[]) { 1.0f }
+			}
+		}
+	}, VK_NULL_HANDLE, &Context->Device)!=VK_SUCCESS)
+		return VK_FALSE;
+
+	// Get device queue
+	vkGetDeviceQueue(Context->Device, Context->QueueFamilyIndex, 0, &Context->Queue);
+
+	// Create command pool
+	vkCreateCommandPool(Context->Device, &(VkCommandPoolCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+		.flags=VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+		.queueFamilyIndex=Context->QueueFamilyIndex,
+	}, 0, &Context->CommandPool);
+
+	return VK_TRUE;
+}
+
+// Destroy Vulkan context
+void DestroyVulkan(VkInstance Instance, VkContext_t *Context)
+{
+	// Take down Vulkan context
+	vkDestroyCommandPool(Context->Device, Context->CommandPool, VK_NULL_HANDLE);
+
+	vkDestroyDevice(Context->Device, VK_NULL_HANDLE);
+	vkDestroySurfaceKHR(Instance, Context->Surface, VK_NULL_HANDLE);
 }
 /////

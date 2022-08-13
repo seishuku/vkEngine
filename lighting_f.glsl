@@ -67,26 +67,23 @@ void main()
 	float l2_atten=max(0.0, 1.0-length(l2*Light2_Pos.w));
 
 	float Shadow0=0.0;
-	float Radius0=length(l0)*Light0_Pos.w;
 	for(int i=0;i<samples;i++)
 	{
-		if((texture(TexDistance0, vec3(l0.x, l0.y, l0.z)+sampleOffsetDirections[i]*Radius0).x+0.01)>=Radius0)
+		if((texture(TexDistance0, -l0+sampleOffsetDirections[i]).x+0.01)>=length(l0)*Light0_Pos.w)
 			Shadow0+=1.0/samples;
 	}
 
 	float Shadow1=0.0;
-	float Radius1=length(l1)*Light1_Pos.w;
 	for(int i=0;i<samples;i++)
 	{
-		if((texture(TexDistance1, vec3(l1.x, l1.y, l1.z)+sampleOffsetDirections[i]*Radius1).x+0.01)>=Radius1)
+		if((texture(TexDistance1, -l1+sampleOffsetDirections[i]).x+0.01)>=length(l1)*Light1_Pos.w)
 			Shadow1+=1.0/samples;
 	}
 
 	float Shadow2=0.0;
-	float Radius2=length(l2)*Light2_Pos.w;
 	for(int i=0;i<samples;i++)
 	{
-		if((texture(TexDistance2, vec3(l2.x, l2.y, l2.z)+sampleOffsetDirections[i]*Radius2).x+0.01)>=Radius2)
+		if((texture(TexDistance2, -l2+sampleOffsetDirections[i]).x+0.01)>=length(l2)*Light2_Pos.w)
 			Shadow2+=1.0/samples;
 	}
 

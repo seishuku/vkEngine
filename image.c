@@ -14,8 +14,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include "vulkan.h"
+#include <vulkan/vulkan.h>
 #include "math.h"
+#include "vulkan.h"
 #include "image.h"
 
 #ifndef FREE
@@ -29,15 +30,6 @@
 #ifndef max
 #define max(a, b) ((a)>(b)?(a):(b))
 #endif
-
-extern VkDevice device;
-
-extern VkPhysicalDeviceMemoryProperties deviceMemProperties;
-
-extern VkCommandPool commandPool;
-
-extern uint32_t queueFamilyIndex;
-extern VkQueue queue;
 
 void _MakeNormalMap(Image_t *Image)
 {
@@ -681,70 +673,78 @@ void generateMipmaps(VkCommandBuffer commandBuffer, Image_t *Image, uint32_t mip
 	vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &MemoryBarrier);
 }
 
-unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
+VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename, uint32_t Flags)
 {
 	char *Extension=strrchr(Filename, '.');
-	VkCommandBuffer copyCmd=VK_NULL_HANDLE;
-	VkFilter minFilter=VK_FILTER_LINEAR;
-	VkFilter magFilter=VK_FILTER_LINEAR;
-	VkSamplerMipmapMode mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
-	VkSamplerAddressMode wrapModeU=VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	VkSamplerAddressMode wrapModeV=VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	VkFence Fence=VK_NULL_HANDLE;
+	VkCommandBuffer CopyCmd=VK_NULL_HANDLE;
+	VkFilter MinFilter=VK_FILTER_LINEAR;
+	VkFilter MagFilter=VK_FILTER_LINEAR;
+	VkSamplerMipmapMode MipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
+	VkSamplerAddressMode WrapModeU=VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	VkSamplerAddressMode WrapModeV=VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	VkSamplerAddressMode WrapModeW=VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	VkFormat Format=VK_FORMAT_UNDEFINED;
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-	void *data=NULL;
-	uint32_t size=0, i;
+	VkBuffer StagingBuffer;
+	VkDeviceMemory StagingBufferMemory;
+	void *Data=NULL;
+	uint32_t Size=0;
 
 	if(Extension!=NULL)
 	{
 		if(!strcmp(Extension, ".tga"))
 		{
 			if(!TGA_Load(Filename, Image))
-				return 0;
+				return VK_FALSE;
 		}
 		else
 		if(!strcmp(Extension, ".qoi"))
 		{
 			if(!QOI_Load(Filename, Image))
-				return 0;
+				return VK_FALSE;
 		}
 		else
-			return 0;
+			return VK_FALSE;
 	}
 
 	if(Flags&IMAGE_NEAREST)
 	{
-		magFilter=VK_FILTER_NEAREST;
-		mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		minFilter=VK_FILTER_NEAREST;
+		MagFilter=VK_FILTER_NEAREST;
+		MipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		MinFilter=VK_FILTER_NEAREST;
 	}
 
 	if(Flags&IMAGE_BILINEAR)
 	{
-		magFilter=VK_FILTER_LINEAR;
-		mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		minFilter=VK_FILTER_LINEAR;
+		MagFilter=VK_FILTER_LINEAR;
+		MipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		MinFilter=VK_FILTER_LINEAR;
 	}
 
 	if(Flags&IMAGE_TRILINEAR)
 	{
-		magFilter=VK_FILTER_LINEAR;
-		mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		minFilter=VK_FILTER_LINEAR;
+		MagFilter=VK_FILTER_LINEAR;
+		MipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		MinFilter=VK_FILTER_LINEAR;
 	}
 
 	if(Flags&IMAGE_CLAMP_U)
-		wrapModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		WrapModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 
 	if(Flags&IMAGE_CLAMP_V)
-		wrapModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		WrapModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+
+	if(Flags&IMAGE_CLAMP_W)
+		WrapModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 
 	if(Flags&IMAGE_REPEAT_U)
-		wrapModeU=VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		WrapModeU=VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
 	if(Flags&IMAGE_REPEAT_V)
-		wrapModeV=VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		WrapModeV=VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+	if(Flags&IMAGE_REPEAT_W)
+		WrapModeW=VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
 	if(Flags&IMAGE_RGBE)
 		_RGBE2Float(Image);
@@ -759,9 +759,9 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 	{
 		case 128:
 		case 96:
-			magFilter=VK_FILTER_NEAREST;
-			mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
-			minFilter=VK_FILTER_NEAREST;
+			MagFilter=VK_FILTER_NEAREST;
+			MipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			MinFilter=VK_FILTER_NEAREST;
 			Format=VK_FORMAT_R32G32B32A32_SFLOAT;
 			break;
 
@@ -785,43 +785,42 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 
 		default:
 			FREE(Image->Data);
-			return 0;
+			return VK_FALSE;
 	}
 
 	if(Flags&IMAGE_CUBEMAP_ANGULAR)
 	{
 		Image_t Out;
-		void *data=NULL;
+		void *Data=NULL;
 
 		// Precalculate each cube face iamge size in bytes
-		size=(NextPower2(Image->Width>>1)*NextPower2(Image->Height>>1)*(Image->Depth>>3));
+		Size=(NextPower2(Image->Width>>1)*NextPower2(Image->Height>>1)*(Image->Depth>>3));
 
 		// Create staging buffer
-		vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
-			&stagingBuffer, &stagingBufferMemory,
-			size*6,
+		vkuCreateBuffer(Context,
+			&StagingBuffer, &StagingBufferMemory,
+			Size*6,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 		// Map image memory and copy data for each cube face
-		vkMapMemory(device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &data);
-		for(i=0;i<6;i++)
+		vkMapMemory(Context->Device, StagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+		for(uint32_t i=0;i<6;i++)
 		{
 			_AngularMapFace(Image, i, &Out);
 
 			if(Out.Data==NULL)
-				return 0;
+				return VK_FALSE;
 
-			memcpy((uint8_t *)data+(size*i), Out.Data, size);
+			memcpy((uint8_t *)Data+(Size*i), Out.Data, Size);
 			FREE(Out.Data);
 		}
-		vkUnmapMemory(device, stagingBufferMemory);
+		vkUnmapMemory(Context->Device, StagingBufferMemory);
 
 		FREE(Image->Data);
 
-		vkuCreateImageBuffer(device, &queueFamilyIndex, deviceMemProperties,
+		vkuCreateImageBuffer(Context, Image,
 			VK_IMAGE_TYPE_2D, Format, 1, 6, Out.Width, Out.Height, 1,
-			&Image->Image, &Image->DeviceMemory,
 			(Format==VK_FORMAT_R32G32B32_SFLOAT||Format==VK_FORMAT_R32G32B32A32_SFLOAT)?VK_IMAGE_TILING_LINEAR:VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -830,23 +829,23 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		Image->ImageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 		// Setup a command buffer to transfer image to device and change shader read layout
-		vkAllocateCommandBuffers(device, &(VkCommandBufferAllocateInfo)
+		vkAllocateCommandBuffers(Context->Device, &(VkCommandBufferAllocateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-			.commandPool=commandPool,
+			.commandPool=Context->CommandPool,
 			.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 			.commandBufferCount=1,
-		}, &copyCmd);
+		}, &CopyCmd);
 
 		// Start recording commands
-		vkBeginCommandBuffer(copyCmd, &(VkCommandBufferBeginInfo)
+		vkBeginCommandBuffer(CopyCmd, &(VkCommandBufferBeginInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 			.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 		});
 
 		// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
-		vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		vkCmdPipelineBarrier(CopyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 		{
 			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
@@ -866,30 +865,30 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		});
 
 		// Setup buffer copy regions for each face including all of its miplevels
-		VkBufferImageCopy bufferCopyRegions[6];
+		VkBufferImageCopy BufferCopyRegions[6];
 
-		for(i=0;i<6;i++)
+		for(uint32_t i=0;i<6;i++)
 		{
-			bufferCopyRegions[i].bufferOffset=size*i;
-			bufferCopyRegions[i].bufferRowLength=0;
-			bufferCopyRegions[i].bufferImageHeight=0;
-			bufferCopyRegions[i].imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT;
-			bufferCopyRegions[i].imageSubresource.mipLevel=0;
-			bufferCopyRegions[i].imageSubresource.baseArrayLayer=i;
-			bufferCopyRegions[i].imageSubresource.layerCount=1;
-			bufferCopyRegions[i].imageOffset.x=0;
-			bufferCopyRegions[i].imageOffset.y=0;
-			bufferCopyRegions[i].imageOffset.z=0;
-			bufferCopyRegions[i].imageExtent.width=Out.Width;
-			bufferCopyRegions[i].imageExtent.height=Out.Height;
-			bufferCopyRegions[i].imageExtent.depth=1;
+			BufferCopyRegions[i].bufferOffset=Size*i;
+			BufferCopyRegions[i].bufferRowLength=0;
+			BufferCopyRegions[i].bufferImageHeight=0;
+			BufferCopyRegions[i].imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT;
+			BufferCopyRegions[i].imageSubresource.mipLevel=0;
+			BufferCopyRegions[i].imageSubresource.baseArrayLayer=i;
+			BufferCopyRegions[i].imageSubresource.layerCount=1;
+			BufferCopyRegions[i].imageOffset.x=0;
+			BufferCopyRegions[i].imageOffset.y=0;
+			BufferCopyRegions[i].imageOffset.z=0;
+			BufferCopyRegions[i].imageExtent.width=Out.Width;
+			BufferCopyRegions[i].imageExtent.height=Out.Height;
+			BufferCopyRegions[i].imageExtent.depth=1;
 		}
 
 		// Copy from staging buffer to the texture buffer.
-		vkCmdCopyBufferToImage(copyCmd, stagingBuffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, bufferCopyRegions);
+		vkCmdCopyBufferToImage(CopyCmd, StagingBuffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, BufferCopyRegions);
 
 		// Now change the image layout from destination optimal to be optimal reading only by shader.
-		vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		vkCmdPipelineBarrier(CopyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 		{
 			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
@@ -909,37 +908,43 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		});
 
 		// Stop recording
-		vkEndCommandBuffer(copyCmd);
-		
+		vkEndCommandBuffer(CopyCmd);
+
+		// Create a fence for the queue submit
+		vkCreateFence(Context->Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &Fence);
+
 		// Submit to the queue
-		vkQueueSubmit(queue, 1, &(VkSubmitInfo)
+		vkQueueSubmit(Context->Queue, 1, &(VkSubmitInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 			.commandBufferCount=1,
-			.pCommandBuffers=&copyCmd,
-		}, VK_NULL_HANDLE);
+			.pCommandBuffers=&CopyCmd,
+		}, Fence);
 
-		// Wait for the queue to idle (finished commands)
-		vkQueueWaitIdle(queue);
+		// Wait for the queue submit to finish
+		vkWaitForFences(Context->Device, 1, &Fence, VK_TRUE, UINT64_MAX);
+
+		// Destroy fence
+		vkDestroyFence(Context->Device, Fence, VK_NULL_HANDLE);
 
 		// Free the command buffer
-		vkFreeCommandBuffers(device, commandPool, 1, &copyCmd);
+		vkFreeCommandBuffers(Context->Device, Context->CommandPool, 1, &CopyCmd);
 
 		// Delete staging buffers
-		vkFreeMemory(device, stagingBufferMemory, VK_NULL_HANDLE);
-		vkDestroyBuffer(device, stagingBuffer, VK_NULL_HANDLE);
+		vkFreeMemory(Context->Device, StagingBufferMemory, VK_NULL_HANDLE);
+		vkDestroyBuffer(Context->Device, StagingBuffer, VK_NULL_HANDLE);
 
 		// Create texture sampler object
-		vkCreateSampler(device, &(VkSamplerCreateInfo)
+		vkCreateSampler(Context->Device, &(VkSamplerCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 			.maxAnisotropy=1.0f,
-			.magFilter=magFilter,
-			.minFilter=minFilter,
-			.mipmapMode=mipmapMode,
-			.addressModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-			.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-			.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			.magFilter=MagFilter,
+			.minFilter=MinFilter,
+			.mipmapMode=MipmapMode,
+			.addressModeU=WrapModeU,
+			.addressModeV=WrapModeV,
+			.addressModeW=WrapModeW,
 			.mipLodBias=0.0f,
 			.compareOp=VK_COMPARE_OP_NEVER,
 			.minLod=0.0f,
@@ -950,7 +955,7 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		}, VK_NULL_HANDLE, &Image->Sampler);
 
 		// Create texture image view object
-		vkCreateImageView(device, &(VkImageViewCreateInfo)
+		vkCreateImageView(Context->Device, &(VkImageViewCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 			.viewType=VK_IMAGE_VIEW_TYPE_CUBE,
@@ -964,61 +969,59 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 			.image=Image->Image,
 		}, VK_NULL_HANDLE, &Image->View);
 
-		return 1;
+		return VK_FALSE;
 	}
 
 	// Byte size of image data
-	size=Image->Width*Image->Height*(Image->Depth>>3);
+	Size=Image->Width*Image->Height*(Image->Depth>>3);
 
 	// Create staging buffer
-	vkuCreateBuffer(device, &queueFamilyIndex, deviceMemProperties,
-		&stagingBuffer, &stagingBufferMemory,
-		size,
+	vkuCreateBuffer(Context,
+		&StagingBuffer, &StagingBufferMemory, Size,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	// Map image memory and copy data
-	vkMapMemory(device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &data);
-	memcpy(data, Image->Data, size);
-	vkUnmapMemory(device, stagingBufferMemory);
+	vkMapMemory(Context->Device, StagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+	memcpy(Data, Image->Data, Size);
+	vkUnmapMemory(Context->Device, StagingBufferMemory);
 
 	// Original image data is now in a Vulkan memory object, so no longer need the original data.
 	FREE(Image->Data);
  
-	uint32_t mipLevels=1;
+	uint32_t MipLevels=1;
 
 	if(Flags&IMAGE_MIPMAP)
-		mipLevels=(uint32_t)(floor(log2(max(Image->Width, Image->Height))))+1;
+		MipLevels=(uint32_t)(floor(log2(max(Image->Width, Image->Height))))+1;
 
-	if(!vkuCreateImageBuffer(device, &queueFamilyIndex, deviceMemProperties,
-		VK_IMAGE_TYPE_2D, Format, mipLevels, 1, Image->Width, Image->Height, 1,
-		&Image->Image, &Image->DeviceMemory,
+	if(!vkuCreateImageBuffer(Context, Image,
+		VK_IMAGE_TYPE_2D, Format, MipLevels, 1, Image->Width, Image->Height, 1,
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
-		return false;
+		return VK_FALSE;
 
 	// Linear tiled images don't need to be staged and can be directly used as textures
 	Image->ImageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	// Setup a command buffer to transfer image to device and change shader read layout
-	vkAllocateCommandBuffers(device, &(VkCommandBufferAllocateInfo)
+	vkAllocateCommandBuffers(Context->Device, &(VkCommandBufferAllocateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=commandPool,
+		.commandPool=Context->CommandPool,
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount=1,
-	}, &copyCmd);
+	}, &CopyCmd);
 
 	// Start recording commands
-	vkBeginCommandBuffer(copyCmd, &(VkCommandBufferBeginInfo)
+	vkBeginCommandBuffer(CopyCmd, &(VkCommandBufferBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 	});
 
 	// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
-	vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+	vkCmdPipelineBarrier(CopyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
@@ -1028,7 +1031,7 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 		{
 			.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.baseMipLevel=0,
-			.levelCount=mipLevels,
+			.levelCount=MipLevels,
 			.layerCount=1,
 		},
 		.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
@@ -1038,7 +1041,7 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 	});
 
 	// Copy from staging buffer to the texture buffer.
-	vkCmdCopyBufferToImage(copyCmd, stagingBuffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkBufferImageCopy)
+	vkCmdCopyBufferToImage(CopyCmd, StagingBuffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkBufferImageCopy)
 	{
 		.imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 		.imageSubresource.mipLevel=0,
@@ -1051,7 +1054,7 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 	});
 
 	// Now change the image layout from destination optimal to be optimal reading only by shader.
-	//vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+	//vkCmdPipelineBarrier(CopyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 	//{
 	//	.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 	//		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
@@ -1072,69 +1075,69 @@ unsigned int Image_Upload(Image_t *Image, char *Filename, unsigned long Flags)
 
 	// Generate mipmaps, if needed
 	if(Flags&IMAGE_MIPMAP)
-		generateMipmaps(copyCmd, Image, mipLevels);
+		generateMipmaps(CopyCmd, Image, MipLevels);
 
 	// Stop recording
-	vkEndCommandBuffer(copyCmd);
+	vkEndCommandBuffer(CopyCmd);
 		
+	// Create a fence for the queue submit
+	vkCreateFence(Context->Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &Fence);
+
 	// Submit to the queue
-	vkQueueSubmit(queue, 1, &(VkSubmitInfo)
+	vkQueueSubmit(Context->Queue, 1, &(VkSubmitInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.commandBufferCount=1,
-		.pCommandBuffers=&copyCmd,
-	}, VK_NULL_HANDLE);
+		.pCommandBuffers=&CopyCmd,
+	}, Fence);
 
-	// Wait for the queue to idle (finished commands)
-	vkQueueWaitIdle(queue);
+	// Wait for the queue submit to finish
+	vkWaitForFences(Context->Device, 1, &Fence, VK_TRUE, UINT64_MAX);
+
+	// Destroy fence
+	vkDestroyFence(Context->Device, Fence, VK_NULL_HANDLE);
 
 	// Free the command buffer
-	vkFreeCommandBuffers(device, commandPool, 1, &copyCmd);
+	vkFreeCommandBuffers(Context->Device, Context->CommandPool, 1, &CopyCmd);
 
 	// Delete staging buffers
-	vkFreeMemory(device, stagingBufferMemory, VK_NULL_HANDLE);
-	vkDestroyBuffer(device, stagingBuffer, VK_NULL_HANDLE);
+	vkFreeMemory(Context->Device, StagingBufferMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(Context->Device, StagingBuffer, VK_NULL_HANDLE);
 
 	// Create texture sampler object
-	vkCreateSampler(device, &(VkSamplerCreateInfo)
+	vkCreateSampler(Context->Device, &(VkSamplerCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 		.maxAnisotropy=1.0f,
-		.magFilter=magFilter,
-		.minFilter=minFilter,
-		.mipmapMode=mipmapMode,
-		.addressModeU=wrapModeU,
-		.addressModeV=wrapModeV,
-		.addressModeW=VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.magFilter=MagFilter,
+		.minFilter=MinFilter,
+		.mipmapMode=MipmapMode,
+		.addressModeU=WrapModeU,
+		.addressModeV=WrapModeV,
+		.addressModeW=WrapModeW,
 		.mipLodBias=0.0f,
 		.compareOp=VK_COMPARE_OP_NEVER,
 		.minLod=0.0f,
-		.maxLod=(float)mipLevels,
+		.maxLod=(float)MipLevels,
 		.maxAnisotropy=1.0,
 		.anisotropyEnable=VK_FALSE,
 		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
 	}, VK_NULL_HANDLE, &Image->Sampler);
 
 	// Create texture image view object
-	vkCreateImageView(device, &(VkImageViewCreateInfo)
+	vkCreateImageView(Context->Device, &(VkImageViewCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.viewType=VK_IMAGE_VIEW_TYPE_2D,
 		.format=Format,
-		.components=
-		{
-			VK_COMPONENT_SWIZZLE_R,
-			VK_COMPONENT_SWIZZLE_G,
-			VK_COMPONENT_SWIZZLE_B,
-			VK_COMPONENT_SWIZZLE_A
-		},
+		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
 		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 		.subresourceRange.baseMipLevel=0,
 		.subresourceRange.baseArrayLayer=0,
 		.subresourceRange.layerCount=1,
-		.subresourceRange.levelCount=mipLevels,
+		.subresourceRange.levelCount=MipLevels,
 		.image=Image->Image,
 	}, VK_NULL_HANDLE, &Image->View);
 
-	return 1;
+	return VK_TRUE;
 }

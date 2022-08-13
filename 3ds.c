@@ -1,27 +1,22 @@
 // A very crude and naive rewrite of the old 3DS loader, which had issues with x64.
 
 #include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 #include <malloc.h>
 #include <memory.h>
+#include "system.h"
+#include "vulkan.h"
 #include "math.h"
 #include "3ds.h"
 
-#ifdef _linux_
-#include <inttypes.h>
-#else
-typedef unsigned int uint32_t;
-#endif
-
-#ifndef FREE
-#define FREE(p) { if(p) { free(p); p=NULL; } }
-#endif
-
-void CalculateTangent(Mesh3DS_t *Mesh)
+void CalculateTangent3DS(Mesh3DS_t *Mesh)
 {
-	int i;
-	float v0[3], v1[3], uv0[2], uv1[2];
-	float s[3], t[3], n[3], r;
+	int32_t i;
+	vec3 v0, v1, s, t, n;
+	vec2 uv0, uv1;
+	float r;
 
 	Mesh->Tangent=(float *)malloc(sizeof(float)*3*Mesh->NumVertex);
 
@@ -46,9 +41,9 @@ void CalculateTangent(Mesh3DS_t *Mesh)
 
 	for(i=0;i<Mesh->NumFace;i++)
 	{
-		unsigned short i1=Mesh->Face[3*i+0];
-		unsigned short i2=Mesh->Face[3*i+1];
-		unsigned short i3=Mesh->Face[3*i+2];
+		uint16_t i1=Mesh->Face[3*i+0];
+		uint16_t i2=Mesh->Face[3*i+1];
+		uint16_t i3=Mesh->Face[3*i+2];
 
 		v0[0]=Mesh->Vertex[3*i2+0]-Mesh->Vertex[3*i1+0];
 		v0[1]=Mesh->Vertex[3*i2+1]-Mesh->Vertex[3*i1+1];
@@ -69,7 +64,7 @@ void CalculateTangent(Mesh3DS_t *Mesh)
 		s[0]=(uv1[1]*v0[0]-uv0[1]*v1[0])*r;
 		s[1]=(uv1[1]*v0[1]-uv0[1]*v1[1])*r;
 		s[2]=(uv1[1]*v0[2]-uv0[1]*v1[2])*r;
-		Normalize(s);
+		Vec3_Normalize(s);
 
 		Mesh->Tangent[3*i1+0]+=s[0];	Mesh->Tangent[3*i1+1]+=s[1];	Mesh->Tangent[3*i1+2]+=s[2];
 		Mesh->Tangent[3*i2+0]+=s[0];	Mesh->Tangent[3*i2+1]+=s[1];	Mesh->Tangent[3*i2+2]+=s[2];
@@ -78,35 +73,58 @@ void CalculateTangent(Mesh3DS_t *Mesh)
 		t[0]=(uv0[0]*v1[0]-uv1[0]*v0[0])*r;
 		t[1]=(uv0[0]*v1[1]-uv1[0]*v0[1])*r;
 		t[2]=(uv0[0]*v1[2]-uv1[0]*v0[2])*r;
-		Normalize(t);
+		Vec3_Normalize(t);
 
 		Mesh->Binormal[3*i1+0]+=t[0];	Mesh->Binormal[3*i1+1]+=t[1];	Mesh->Binormal[3*i1+2]+=t[2];
 		Mesh->Binormal[3*i2+0]+=t[0];	Mesh->Binormal[3*i2+1]+=t[1];	Mesh->Binormal[3*i2+2]+=t[2];
 		Mesh->Binormal[3*i3+0]+=t[0];	Mesh->Binormal[3*i3+1]+=t[1];	Mesh->Binormal[3*i3+2]+=t[2];
 
 		Cross(v0, v1, n);
-		Normalize(n);
+		Vec3_Normalize(n);
 
 		Mesh->Normal[3*i1+0]+=n[0];		Mesh->Normal[3*i1+1]+=n[1];		Mesh->Normal[3*i1+2]+=n[2];
 		Mesh->Normal[3*i2+0]+=n[0];		Mesh->Normal[3*i2+1]+=n[1];		Mesh->Normal[3*i2+2]+=n[2];
 		Mesh->Normal[3*i3+0]+=n[0];		Mesh->Normal[3*i3+1]+=n[1];		Mesh->Normal[3*i3+2]+=n[2];
 	}
+
+	for(uint32_t i=0;i<Mesh->NumVertex;i++)
+	{
+		float *t=&Mesh->Tangent[3*i];
+		float *b=&Mesh->Binormal[3*i];
+		float *n=&Mesh->Normal[3*i];
+
+		float d=Vec3_Dot(n, t);
+		t[0]-=n[0]*d;
+		t[1]-=n[1]*d;
+		t[2]-=n[2]*d;
+		Vec3_Normalize(t);
+		Vec3_Normalize(b);
+		Vec3_Normalize(n);
+
+		vec3 NxT;
+		Cross(n, t, NxT);
+
+		if(Vec3_Dot(NxT, b)<0.0f)
+			Vec3_Muls(t, -1.0f);
+
+		Vec3_Setv(b, NxT);
+	}
 }
 
-int Load3DS(Model3DS_t *Model, char *Filename)
+bool Load3DS(Model3DS_t *Model, char *Filename)
 {
 	FILE *Stream=NULL;
-	long i, Length;
-	unsigned short ChunkID;
+	long Length;
+	uint16_t ChunkID;
 	uint32_t ChunkLength;
 	uint32_t Temp;
-	unsigned short Temp16;
+	uint16_t Temp16;
 	char *Ptr=NULL;
-	unsigned char RGB[3];
+	uint8_t RGB[3];
 	float *ColorPtr=NULL;
 
-	if(fopen_s(&Stream, Filename, "rb"))
-		return 0;
+	if((Stream=fopen(Filename, "rb"))==NULL)
+		return false;
 
 	fseek(Stream, 0, SEEK_END);
 	Length=ftell(Stream);
@@ -114,7 +132,7 @@ int Load3DS(Model3DS_t *Model, char *Filename)
 
 	while(ftell(Stream)<Length)
 	{
-		fread(&ChunkID, sizeof(unsigned short), 1, Stream);
+		fread(&ChunkID, sizeof(uint16_t), 1, Stream);
 		fread(&ChunkLength, sizeof(uint32_t), 1, Stream);
 
 		// Any chunk to be read *must* be in the switch block.
@@ -138,7 +156,7 @@ int Load3DS(Model3DS_t *Model, char *Filename)
 				if(Model->Mesh==NULL)
 				{
 					fclose(Stream);
-					return 0;
+					return false;
 				}
 
 				memset(&Model->Mesh[Model->NumMesh-1], 0, sizeof(Mesh3DS_t));
@@ -160,7 +178,7 @@ int Load3DS(Model3DS_t *Model, char *Filename)
 
 			// Vertex list subchunk
 			case 0x4110:
-				fread(&Model->Mesh[Model->NumMesh-1].NumVertex, sizeof(unsigned short), 1, Stream);
+				fread(&Model->Mesh[Model->NumMesh-1].NumVertex, sizeof(uint16_t), 1, Stream);
 
 				if(!Model->Mesh[Model->NumMesh-1].NumVertex)
 					break;
@@ -172,12 +190,12 @@ int Load3DS(Model3DS_t *Model, char *Filename)
 					Free3DS(Model);
 					fclose(Stream);
 
-					return 0;
+					return false;
 				}
 
 				fread(Model->Mesh[Model->NumMesh-1].Vertex, sizeof(float), 3*Model->Mesh[Model->NumMesh-1].NumVertex, Stream);
 
-				for(i=0;i<Model->Mesh[Model->NumMesh-1].NumVertex;i++)
+				for(int32_t i=0;i<Model->Mesh[Model->NumMesh-1].NumVertex;i++)
 				{
 					float Temp=Model->Mesh[Model->NumMesh-1].Vertex[3*i+1];
 					Model->Mesh[Model->NumMesh-1].Vertex[3*i+1]=Model->Mesh[Model->NumMesh-1].Vertex[3*i+2];
@@ -187,25 +205,25 @@ int Load3DS(Model3DS_t *Model, char *Filename)
 
 			// Face description (contains vertex indices) subchunk
 			case 0x4120:
-				fread(&Model->Mesh[Model->NumMesh-1].NumFace, sizeof(unsigned short), 1, Stream);
+				fread(&Model->Mesh[Model->NumMesh-1].NumFace, sizeof(uint16_t), 1, Stream);
 
 				if(!Model->Mesh[Model->NumMesh-1].NumFace)
 					break;
 
-				Model->Mesh[Model->NumMesh-1].Face=(unsigned short *)malloc(3*sizeof(unsigned short)*Model->Mesh[Model->NumMesh-1].NumFace);
+				Model->Mesh[Model->NumMesh-1].Face=(uint16_t *)malloc(3*sizeof(uint16_t)*Model->Mesh[Model->NumMesh-1].NumFace);
 
 				if(Model->Mesh[Model->NumMesh-1].Face==NULL)
 				{
 					Free3DS(Model);
 					fclose(Stream);
 
-					return 0;
+					return false;
 				}
 
-				for(i=0;i<Model->Mesh[Model->NumMesh-1].NumFace;i++)
+				for(int32_t i=0;i<Model->Mesh[Model->NumMesh-1].NumFace;i++)
 				{
-					fread(&Model->Mesh[Model->NumMesh-1].Face[3*i], sizeof(unsigned short), 3, Stream);
-					fread(&Temp, sizeof(unsigned short), 1, Stream);
+					fread(&Model->Mesh[Model->NumMesh-1].Face[3*i], sizeof(uint16_t), 3, Stream);
+					fread(&Temp, sizeof(uint16_t), 1, Stream);
 				}
 				break;
 
@@ -222,13 +240,13 @@ int Load3DS(Model3DS_t *Model, char *Filename)
 				}
 
 				// Skip face groups, probably should read these though.
-				fread(&Temp16, sizeof(unsigned short), 1, Stream);
-				fseek(Stream, sizeof(unsigned short)*Temp16, SEEK_CUR);
+				fread(&Temp16, sizeof(uint16_t), 1, Stream);
+				fseek(Stream, sizeof(uint16_t)*Temp16, SEEK_CUR);
 				break;
 
 			// Texture coordinates subchunk
 			case 0x4140:
-				fread(&Temp16, sizeof(unsigned short), 1, Stream);
+				fread(&Temp16, sizeof(uint16_t), 1, Stream);
 
 				if(!Temp16||Temp16!=Model->Mesh[Model->NumMesh-1].NumVertex)
 					break;
@@ -240,7 +258,7 @@ int Load3DS(Model3DS_t *Model, char *Filename)
 					Free3DS(Model);
 					fclose(Stream);
 
-					return 0;
+					return false;
 				}
 
 				fread(Model->Mesh[Model->NumMesh-1].UV, sizeof(float), 2*Model->Mesh[Model->NumMesh-1].NumVertex, Stream);
@@ -255,7 +273,7 @@ int Load3DS(Model3DS_t *Model, char *Filename)
 				if(Model->Material==NULL)
 				{
 					fclose(Stream);
-					return 0;
+					return false;
 				}
 
 				memset(&Model->Material[Model->NumMaterial-1], 0, sizeof(Material3DS_t));
@@ -337,7 +355,7 @@ int Load3DS(Model3DS_t *Model, char *Filename)
 			// RGB byte color subchunk read
 			case 0x0011:
 				// Read in bytes from file stream
-				fread(RGB, sizeof(unsigned char), 3, Stream);
+				fread(RGB, sizeof(uint8_t), 3, Stream);
 
 				if(ColorPtr!=NULL)
 				{
@@ -387,19 +405,30 @@ int Load3DS(Model3DS_t *Model, char *Filename)
 
 	fclose(Stream);
 
-	for(i=0;i<Model->NumMesh;i++)
-		CalculateTangent(&Model->Mesh[i]);
+	// If there are materials, match them to their meshes with an index number
+	if(Model->Material)
+	{
+		for(int32_t i=0;i<Model->NumMesh;i++)
+		{
+			for(int32_t j=0;j<Model->NumMaterial;j++)
+			{
+				if(strcmp(Model->Mesh[i].MaterialName, Model->Material[j].Name)==0)
+					Model->Mesh[i].MaterialNumber=j;
+			}
+		}
+	}
 
-	return 1;
+	for(int32_t i=0;i<Model->NumMesh;i++)
+		CalculateTangent3DS(&Model->Mesh[i]);
+
+	return true;
 }
 
 void Free3DS(Model3DS_t *Model)
 {
-	int i;
-
 	if(Model->Mesh)
 	{
-		for(i=0;i<Model->NumMesh;i++)
+		for(int32_t i=0;i<Model->NumMesh;i++)
 		{
 			FREE(Model->Mesh[i].Vertex);
 			FREE(Model->Mesh[i].UV);

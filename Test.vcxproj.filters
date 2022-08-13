@@ -56,9 +56,6 @@
     <ClInclude Include="font.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="fontdata.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="vulkan.h">
       <Filter>Header Files</Filter>
     </ClInclude>
