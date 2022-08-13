@@ -18,20 +18,16 @@
 #define IMAGE_REPEAT_V									0x00008000
 #define IMAGE_REPEAT									(IMAGE_REPEAT_U|IMAGE_REPEAT_V)
 
-#include <vulkan/vulkan.h>
-#include <sys/types.h>
-
 typedef struct
 {
 	uint32_t Width, Height, Depth;
 	uint8_t *Data;
-	uint32_t mipLevels;
 
-	VkSampler sampler;
-	VkImage image;
-	VkImageLayout imageLayout;
-	VkDeviceMemory deviceMemory;
-	VkImageView view;
+	VkSampler Sampler;
+	VkImage Image;
+	VkImageLayout ImageLayout;
+	VkDeviceMemory DeviceMemory;
+	VkImageView View;
 } Image_t;
 
 bool TGA_Load(const char *Filename, Image_t *Image);
