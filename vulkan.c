@@ -60,7 +60,7 @@ uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_pro
 	return 0;
 }
 
-VkBool32 vkuCreateImageBuffer(VkContext_t *Context, Image_t *Image,
+VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, Image_t *Image,
 	VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth,
 	VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags)
 {
@@ -102,7 +102,7 @@ VkBool32 vkuCreateImageBuffer(VkContext_t *Context, Image_t *Image,
 	return VK_TRUE;
 }
 
-VkBool32 vkuCreateBuffer(VkContext_t *Context, VkBuffer *Buffer, VkDeviceMemory *Memory, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask)
+VkBool32 vkuCreateBuffer(VkuContext_t *Context, VkBuffer *Buffer, VkDeviceMemory *Memory, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask)
 {
 	VkMemoryRequirements memoryRequirements;
 
@@ -138,7 +138,7 @@ VkBool32 vkuCreateBuffer(VkContext_t *Context, VkBuffer *Buffer, VkDeviceMemory 
 }
 
 // Copy from one buffer to another
-VkBool32 vkuCopyBuffer(VkContext_t *Context, VkBuffer Src, VkBuffer Dest, uint32_t Size)
+VkBool32 vkuCopyBuffer(VkuContext_t *Context, VkBuffer Src, VkBuffer Dest, uint32_t Size)
 {
 	VkCommandBuffer CopyCmd=VK_NULL_HANDLE;
 	VkFence Fence=VK_NULL_HANDLE;
@@ -182,8 +182,11 @@ VkBool32 vkuCopyBuffer(VkContext_t *Context, VkBuffer Src, VkBuffer Dest, uint32
 // Adds a vertex binding
 VkBool32 vkuPipeline_AddVertexBinding(VkuPipeline_t *Pipeline, uint32_t Binding, uint32_t Stride, VkVertexInputRate InputRate)
 {
+	if(!Pipeline)
+		return VK_FALSE;
+
 	// Already at max bindings
-	if(Pipeline->NumVertexBindings>=5)
+	if(Pipeline->NumVertexBindings>=VKU_MAX_PIPELINE_VERTEX_BINDINGS)
 		return VK_FALSE;
 
 	// Set the binding decriptor
@@ -204,8 +207,11 @@ VkBool32 vkuPipeline_AddVertexBinding(VkuPipeline_t *Pipeline, uint32_t Binding,
 // Adds a vertex attribute
 VkBool32 vkuPipeline_AddVertexAttribute(VkuPipeline_t *Pipeline, uint32_t Location, uint32_t Binding, VkFormat Format, uint32_t Offset)
 {
+	if(!Pipeline)
+		return VK_FALSE;
+
 	// Already at max attributes
-	if(Pipeline->NumVertexAttribs>=5)
+	if(Pipeline->NumVertexAttribs>=VKU_MAX_PIPELINE_VERTEX_ATTRIBUTES)
 		return VK_FALSE;
 
 	// Set the attribute decriptor
@@ -227,8 +233,11 @@ VkBool32 vkuPipeline_AddVertexAttribute(VkuPipeline_t *Pipeline, uint32_t Locati
 // Loads a shader and assign to a stage
 VkBool32 vkuPipeline_AddStage(VkuPipeline_t *Pipeline, const char *ShaderFilename, VkShaderStageFlagBits Stage)
 {
+	if(!Pipeline)
+		return VK_FALSE;
+
 	// Already at max stages
-	if(Pipeline->NumStages>=4)
+	if(Pipeline->NumStages>=VKU_MAX_PIPELINE_SHADER_STAGES)
 		return VK_FALSE;
 
 	// Load and create the shader module from file
@@ -254,27 +263,52 @@ VkBool32 vkuPipeline_AddStage(VkuPipeline_t *Pipeline, const char *ShaderFilenam
 	return VK_TRUE;
 }
 
-// Create an initial pipeline configuration with some default states
-VkBool32 vkuInitPipeline(VkuPipeline_t *Pipeline, VkDevice Device, VkPipelineLayout PipelineLayout, VkRenderPass RenderPass)
+VkBool32 vkuPipeline_SetRenderPass(VkuPipeline_t *Pipeline, VkRenderPass RenderPass)
 {
-	// Pass in handles to dependencies
-	Pipeline->Device=Device;
-	Pipeline->PipelineLayout=PipelineLayout;
+	if(!Pipeline)
+		return VK_FALSE;
+
 	Pipeline->RenderPass=RenderPass;
+
+	return VK_TRUE;
+}
+
+VkBool32 vkuPipeline_SetPipelineLayout(VkuPipeline_t *Pipeline, VkPipelineLayout PipelineLayout)
+{
+	if(!Pipeline)
+		return VK_FALSE;
+
+	Pipeline->PipelineLayout=PipelineLayout;
+
+	return VK_TRUE;
+}
+
+// Create an initial pipeline configuration with some default states
+VkBool32 vkuInitPipeline(VkuPipeline_t *Pipeline, VkuContext_t *Context)
+{
+	if(!Pipeline||!Context)
+		return VK_FALSE;
+
+	// Pass in handles to dependencies
+	Pipeline->Device=Context->Device;
+	Pipeline->PipelineCache=Context->PipelineCache;
+
+	Pipeline->PipelineLayout=VK_NULL_HANDLE;
+	Pipeline->RenderPass=VK_NULL_HANDLE;
 
 	// Set up default state:
 
 	// Vertex binding descriptions
 	Pipeline->NumVertexBindings=0;
-	memset(Pipeline->VertexBindings, 0, sizeof(VkVertexInputBindingDescription)*5);
+	memset(Pipeline->VertexBindings, 0, sizeof(VkVertexInputBindingDescription)*VKU_MAX_PIPELINE_VERTEX_BINDINGS);
 
 	// Vertex attribute descriptions
 	Pipeline->NumVertexAttribs=0;
-	memset(Pipeline->VertexAttribs, 0, sizeof(VkVertexInputAttributeDescription)*5);
+	memset(Pipeline->VertexAttribs, 0, sizeof(VkVertexInputAttributeDescription)*VKU_MAX_PIPELINE_VERTEX_ATTRIBUTES);
 
 	// Shader stages
 	Pipeline->NumStages=0;
-	memset(Pipeline->Stages, 0, sizeof(VkPipelineShaderStageCreateInfo)*4);
+	memset(Pipeline->Stages, 0, sizeof(VkPipelineShaderStageCreateInfo)*VKU_MAX_PIPELINE_SHADER_STAGES);
 
 	// Input assembly state
 	Pipeline->Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -344,7 +378,10 @@ VkBool32 vkuInitPipeline(VkuPipeline_t *Pipeline, VkDevice Device, VkPipelineLay
 
 VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline)
 {
-	VkResult Result=vkCreateGraphicsPipelines(Pipeline->Device, VK_NULL_HANDLE, 1, &(VkGraphicsPipelineCreateInfo)
+	if(!Pipeline)
+		return VK_FALSE;
+
+	VkResult Result=vkCreateGraphicsPipelines(Pipeline->Device, Pipeline->PipelineCache, 1, &(VkGraphicsPipelineCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
 		.stageCount=Pipeline->NumStages,
@@ -464,6 +501,63 @@ VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline)
 }
 /////
 
+///// DescriptorSetLayout stuff
+VkBool32 vkuDescriptorSetLayout_AddBinding(VkuDescriptorSetLayout_t *DescriptorSetLayout, uint32_t Binding,
+										   VkDescriptorType Type, uint32_t Count, VkShaderStageFlags Stage,
+										   const VkSampler *ImmutableSamplers)
+{
+	if(!DescriptorSetLayout)
+		return VK_FALSE;
+
+	// Already at max bindings
+	if(DescriptorSetLayout->NumBindings>=VKU_MAX_DESCRIPTORSETLAYOUT_BINDINGS)
+		return VK_FALSE;
+
+	VkDescriptorSetLayoutBinding DescriptorSetLayoutBinding=
+	{
+		.binding=Binding,
+		.descriptorType=Type,
+		.descriptorCount=Count,
+		.stageFlags=Stage,
+		.pImmutableSamplers=ImmutableSamplers
+	};
+
+	DescriptorSetLayout->Bindings[DescriptorSetLayout->NumBindings]=DescriptorSetLayoutBinding;
+	DescriptorSetLayout->NumBindings++;
+
+	return VK_TRUE;
+}
+
+VkBool32 vkuInitDescriptorSetLayout(VkuDescriptorSetLayout_t *DescriptorSetLayout, VkuContext_t *Context)
+{
+	if(!DescriptorSetLayout||!Context)
+		return VK_FALSE;
+
+	DescriptorSetLayout->Device=Context->Device;
+
+	DescriptorSetLayout->NumBindings=0;
+	memset(DescriptorSetLayout->Bindings, 0, sizeof(VkDescriptorSetLayout)*VKU_MAX_DESCRIPTORSETLAYOUT_BINDINGS);
+
+	return VK_TRUE;
+}
+
+VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSetLayout_t *DescriptorSetLayout)
+{
+	if(!DescriptorSetLayout)
+		return VK_FALSE;
+
+	VkResult Result=vkCreateDescriptorSetLayout(DescriptorSetLayout->Device, &(VkDescriptorSetLayoutCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		.pNext=VK_NULL_HANDLE,
+		.bindingCount=DescriptorSetLayout->NumBindings,
+		.pBindings=DescriptorSetLayout->Bindings,
+	}, NULL, &DescriptorSetLayout->DescriptorSetLayout);
+
+	return Result==VK_SUCCESS?VK_TRUE:VK_FALSE;
+}
+/////
+
 ///// Vulkan context stuff
 
 // Create Vulkan Instance
@@ -476,7 +570,7 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 		.applicationVersion=VK_MAKE_VERSION(1, 0, 0),
 		.pEngineName="Engine",
 		.engineVersion=VK_MAKE_VERSION(1, 0, 0),
-		.apiVersion=VK_API_VERSION_1_0
+		.apiVersion=VK_API_VERSION_1_2
 	};
 	const char *Extensions[]=
 	{
@@ -484,12 +578,19 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 		VK_KHR_SURFACE_EXTENSION_NAME,
 		VK_KHR_WIN32_SURFACE_EXTENSION_NAME
 	};
+	const char *ValidationLayers[]={
+		"VK_LAYER_KHRONOS_validation"
+	};
 	VkInstanceCreateInfo InstanceInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
 		.pApplicationInfo=&AppInfo,
 		.enabledExtensionCount=3,
-		.ppEnabledExtensionNames=Extensions
+		.ppEnabledExtensionNames=Extensions,
+#ifdef _DEBUG
+		.enabledLayerCount=1,
+		.ppEnabledLayerNames=ValidationLayers,
+#endif
 	};
 
 	if(vkCreateInstance(&InstanceInfo, 0, Instance)!=VK_SUCCESS)
@@ -499,10 +600,8 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 }
 
 // Create Vulkan Context
-VkBool32 CreateVulkanContext(VkInstance Instance, VkContext_t *Context)
-{
-	VkPresentModeKHR presentMode=VK_PRESENT_MODE_FIFO_KHR;
-			
+VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
+{			
 	if(vkCreateWin32SurfaceKHR(Instance, &(VkWin32SurfaceCreateInfoKHR)
 	{
 		.sType=VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
@@ -595,6 +694,11 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkContext_t *Context)
 	// Get device queue
 	vkGetDeviceQueue(Context->Device, Context->QueueFamilyIndex, 0, &Context->Queue);
 
+	vkCreatePipelineCache(Context->Device, &(VkPipelineCacheCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO
+	}, VK_NULL_HANDLE, &Context->PipelineCache);
+
 	// Create command pool
 	vkCreateCommandPool(Context->Device, &(VkCommandPoolCreateInfo)
 	{
@@ -607,12 +711,21 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkContext_t *Context)
 }
 
 // Destroy Vulkan context
-void DestroyVulkan(VkInstance Instance, VkContext_t *Context)
+void DestroyVulkan(VkInstance Instance, VkuContext_t *Context)
 {
-	// Take down Vulkan context
+	if(!Context)
+		return;
+
+	// Destroy pipeline cache
+	vkDestroyPipelineCache(Context->Device, Context->PipelineCache, VK_NULL_HANDLE);
+
+	// Destroy command pool
 	vkDestroyCommandPool(Context->Device, Context->CommandPool, VK_NULL_HANDLE);
 
+	// Destroy logical device
 	vkDestroyDevice(Context->Device, VK_NULL_HANDLE);
+
+	// Destroy rendering surface
 	vkDestroySurfaceKHR(Instance, Context->Surface, VK_NULL_HANDLE);
 }
 /////

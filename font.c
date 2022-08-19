@@ -17,7 +17,7 @@
 #include "font.h"
 
 // external Vulkan context data/functions for this module:
-extern VkContext_t Context;
+extern VkuContext_t Context;
 extern VkRenderPass RenderPass;
 
 extern int Width, Height;	// Window width/height from main app.
@@ -32,7 +32,7 @@ VkDescriptorSetLayout fontDescriptorSetLayout=VK_NULL_HANDLE;
 
 // Pipeline
 VkPipelineLayout fontPipelineLayout=VK_NULL_HANDLE;
-VkPipeline fontPipeline=VK_NULL_HANDLE;
+VkuPipeline_t fontPipeline;
 
 // Texture handles
 Image_t fontTexture;
@@ -61,8 +61,6 @@ void _Font_Init(void)
 	VkDeviceMemory stagingBufferMemory=VK_NULL_HANDLE;
 	VkCommandBuffer copyCmd=VK_NULL_HANDLE;
 	VkFence fence=VK_NULL_HANDLE;
-	VkShaderModule vertexShader=vkuCreateShaderModule(Context.Device, "font_v.spv");
-	VkShaderModule fragmentShader=vkuCreateShaderModule(Context.Device, "font_f.spv");
 	void *data=NULL;
 
 	// Create new descriptor sets and pipeline
@@ -116,165 +114,33 @@ void _Font_Init(void)
 		.pSetLayouts=&fontDescriptorSetLayout,
 	}, 0, &fontPipelineLayout);
 
-	vkCreateGraphicsPipelines(Context.Device, VK_NULL_HANDLE, 1, &(VkGraphicsPipelineCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-		.stageCount=2,
-		.pStages=(VkPipelineShaderStageCreateInfo[])
-		{
-			{
-				.sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-				.stage=VK_SHADER_STAGE_VERTEX_BIT,
-				.module=vertexShader,
-				.pName="main",
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-				.stage=VK_SHADER_STAGE_FRAGMENT_BIT,
-				.module=fragmentShader,
-				.pName="main",
-			},
-		},
-		.pVertexInputState=&(VkPipelineVertexInputStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-			.vertexBindingDescriptionCount=2,
-			.pVertexBindingDescriptions=(VkVertexInputBindingDescription[])
-			{
-				{
-					.binding=0,
-					.stride=sizeof(float)*4,
-					.inputRate=VK_VERTEX_INPUT_RATE_VERTEX,
-				},
-				{
-					.binding=1,
-					.stride=sizeof(float)*7,
-					.inputRate=VK_VERTEX_INPUT_RATE_INSTANCE,
-				}
-			},
-			.vertexAttributeDescriptionCount=3,
-			.pVertexAttributeDescriptions=(VkVertexInputAttributeDescription[])
-			{
-				{
-					.location=0,
-					.binding=0,
-					.format=VK_FORMAT_R32G32B32A32_SFLOAT,
-					.offset=0
-				},
-				{
-					.location=1,
-					.binding=1,
-					.format=VK_FORMAT_R32G32B32A32_SFLOAT,
-					.offset=0
-				},
-				{
-					.location=2,
-					.binding=1,
-					.format=VK_FORMAT_R32G32B32_SFLOAT,
-					.offset=sizeof(float)*4
-				},
-			},
-		},
-		.pInputAssemblyState=&(VkPipelineInputAssemblyStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-			.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-			.primitiveRestartEnable=VK_FALSE,
-		},
-		.pViewportState=&(VkPipelineViewportStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-			.viewportCount=1,
-			.pViewports=0,
-			.scissorCount=1,
-			.pScissors=0,
-		},
-		.pRasterizationState=&(VkPipelineRasterizationStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-			.depthClampEnable=VK_FALSE,
-			.rasterizerDiscardEnable=VK_FALSE,
-			.polygonMode=VK_POLYGON_MODE_FILL,
-			.cullMode=VK_CULL_MODE_NONE,
-			.frontFace=VK_FRONT_FACE_CLOCKWISE,
-			.depthBiasEnable=VK_FALSE,
-			.depthBiasConstantFactor=0.0f,
-			.depthBiasClamp=0.0f,
-			.depthBiasSlopeFactor=0.0f,
-			.lineWidth=1.0f,
-		},
-		.pDepthStencilState=&(VkPipelineDepthStencilStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-			.depthTestEnable=VK_FALSE,
-			.depthWriteEnable=VK_FALSE,
-			.depthCompareOp=VK_COMPARE_OP_LESS_OR_EQUAL,
-			.depthBoundsTestEnable=VK_FALSE,
-			.stencilTestEnable=VK_FALSE,
-			.minDepthBounds=0.0f,
-			.maxDepthBounds=0.0f,
-			.front=(VkStencilOpState)
-			{
-				.failOp=VK_STENCIL_OP_KEEP,
-				.passOp=VK_STENCIL_OP_KEEP,
-				.depthFailOp=VK_STENCIL_OP_KEEP,
-				.compareOp=VK_COMPARE_OP_ALWAYS,
-				.compareMask=0,
-				.writeMask=0,
-				.reference=0,
-			},
-			.back=(VkStencilOpState)
-			{
-				.failOp=VK_STENCIL_OP_KEEP,
-				.passOp=VK_STENCIL_OP_KEEP,
-				.depthFailOp=VK_STENCIL_OP_KEEP,
-				.compareOp=VK_COMPARE_OP_ALWAYS,
-				.compareMask=0,
-				.writeMask=0,
-				.reference=0,
-			},
-		},
-		.pMultisampleState=&(VkPipelineMultisampleStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-			.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT,
-			.sampleShadingEnable=VK_FALSE,
-			.minSampleShading=1.0f,
-			.pSampleMask=0,
-			.alphaToCoverageEnable=VK_FALSE,
-			.alphaToOneEnable=VK_FALSE,
-		},
-		.pColorBlendState=&(VkPipelineColorBlendStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-			.logicOpEnable=VK_FALSE,
-			.attachmentCount=1,
-			.pAttachments=(VkPipelineColorBlendAttachmentState[])
-			{
-				{
-					.blendEnable=VK_TRUE,
-					.srcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA,
-					.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-					.colorBlendOp=VK_BLEND_OP_ADD,
-					.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA,
-					.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-					.alphaBlendOp=VK_BLEND_OP_ADD,
-					.colorWriteMask=VK_COLOR_COMPONENT_R_BIT|VK_COLOR_COMPONENT_G_BIT|VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT,
-				},
-			},
-		},
-		.pDynamicState=&(VkPipelineDynamicStateCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-			.dynamicStateCount=2,
-			.pDynamicStates=(VkDynamicState[]) { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR },
-		},
-		.layout=fontPipelineLayout,
-		.renderPass=RenderPass,
-	}, 0, &fontPipeline);
+	vkuInitPipeline(&fontPipeline, &Context);
 
-	vkDestroyShaderModule(Context.Device, vertexShader, 0);
-	vkDestroyShaderModule(Context.Device, fragmentShader, 0);
+	vkuPipeline_AddStage(&fontPipeline, "font_v.spv", VK_SHADER_STAGE_VERTEX_BIT);
+	vkuPipeline_AddStage(&fontPipeline, "font_f.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+
+	vkuPipeline_SetPipelineLayout(&fontPipeline, fontPipelineLayout);
+	vkuPipeline_SetRenderPass(&fontPipeline, RenderPass);
+
+	vkuPipeline_AddVertexBinding(&fontPipeline, 0, sizeof(float)*4, VK_VERTEX_INPUT_RATE_VERTEX);
+	vkuPipeline_AddVertexBinding(&fontPipeline, 1, sizeof(float)*7, VK_VERTEX_INPUT_RATE_INSTANCE);
+
+	vkuPipeline_AddVertexAttribute(&fontPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+	vkuPipeline_AddVertexAttribute(&fontPipeline, 1, 1, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+	vkuPipeline_AddVertexAttribute(&fontPipeline, 2, 1, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float)*4);
+
+	fontPipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+	fontPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+
+	fontPipeline.Blend=VK_TRUE;
+	fontPipeline.SrcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
+	fontPipeline.DstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+	fontPipeline.ColorBlendOp=VK_BLEND_OP_ADD;
+	fontPipeline.SrcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
+	fontPipeline.DstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+	fontPipeline.AlphaBlendOp=VK_BLEND_OP_ADD;
+
+	vkuAssemblePipeline(&fontPipeline);
 	// ---
 
 	// Create sampler and load texture data
@@ -331,7 +197,7 @@ void _Font_Init(void)
 	}, &copyCmd);
 	vkBeginCommandBuffer(copyCmd, &(VkCommandBufferBeginInfo) { .sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO });
 
-	vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+	vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
@@ -344,8 +210,8 @@ void _Font_Init(void)
 			.levelCount=1,
 			.layerCount=1,
 		},
-		.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
-		.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+		.srcAccessMask=VK_ACCESS_HOST_READ_BIT,
+		.dstAccessMask=VK_ACCESS_HOST_WRITE_BIT,
 		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
 		.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 	});
@@ -477,7 +343,7 @@ void _Font_Init(void)
 			{
 				.imageView=fontTexture.View,
 				.sampler=fontTexture.Sampler,
-				.imageLayout=fontTexture.ImageLayout,
+				.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			},
 			.dstSet=fontDescriptorSet,
 		},
@@ -635,7 +501,7 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 	// ---
 
 	// Bind the font rendering pipeline (sets states and shaders)
-	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, fontPipeline);
+	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, fontPipeline.Pipeline);
 	// Bind descriptor sets (sets uniform/texture bindings)
 	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, fontPipelineLayout, 0, 1, &fontDescriptorSet, 0, NULL);
 
@@ -671,7 +537,7 @@ void Font_Destroy(void)
 
 	// Pipeline
 	vkDestroyPipelineLayout(Context.Device, fontPipelineLayout, VK_NULL_HANDLE);
-	vkDestroyPipeline(Context.Device, fontPipeline, VK_NULL_HANDLE);
+	vkDestroyPipeline(Context.Device, fontPipeline.Pipeline, VK_NULL_HANDLE);
 
 	// Descriptors
 	vkDestroyDescriptorPool(Context.Device, fontDescriptorPool, VK_NULL_HANDLE);

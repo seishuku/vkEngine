@@ -28,7 +28,6 @@ typedef struct
 
 	VkSampler Sampler;
 	VkImage Image;
-	VkImageLayout ImageLayout;
 	VkDeviceMemory DeviceMemory;
 	VkImageView View;
 } Image_t;
@@ -40,6 +39,6 @@ bool QOI_Load(const char *Filename, Image_t *Image);
 bool QOI_Write(const char *filename, Image_t *Image);
 
 // Creates texture objects
-VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename, uint32_t Flags);
+VkBool32 Image_Upload(VkuContext_t *Context, Image_t *Image, const char *Filename, uint32_t Flags);
 
 #endif

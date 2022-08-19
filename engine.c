@@ -16,7 +16,7 @@ int Width=1280, Height=720;
  int Done=0, Key[256];
 
  VkInstance Instance;
- VkContext_t Context;
+ VkuContext_t Context;
  
  float RotateX=0.0f, RotateY=0.0f, PanX=0.0f, PanY=0.0f, Zoom=-100.0f;
 
@@ -79,7 +79,7 @@ VkExtent2D SwapchainExtent;
 VkSurfaceFormatKHR SurfaceFormat;
 VkFormat DepthFormat=VK_FORMAT_D24_UNORM_S8_UINT;
 
-#define MAX_FRAME_COUNT 3
+#define MAX_FRAME_COUNT 2
 
 uint32_t SwapchainImageCount=0;
 
@@ -96,9 +96,8 @@ VkuPipeline_t Pipeline;
 
 VkDescriptorPool DescriptorPool;
 VkDescriptorSet DescriptorSet[4];
-VkDescriptorSetLayout DescriptorSetLayout;
+VkuDescriptorSetLayout_t DescriptorSetLayout;
 
-uint32_t FrameIndex=0;
 
 VkCommandBuffer CommandBuffers[MAX_FRAME_COUNT];
 
@@ -161,7 +160,7 @@ void InitShadowCubeMap(Image_t *Image)
 		.image=Image->Image,
 		.subresourceRange=(VkImageSubresourceRange)
 		{
-			.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
+			.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
 			.baseMipLevel=0,
 			.levelCount=1,
 			.layerCount=6,
@@ -253,7 +252,7 @@ void InitShadowFramebuffer(void)
 		.image=ShadowDepth.Image,
 		.subresourceRange=(VkImageSubresourceRange)
 		{
-			.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
+			.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
 			.baseMipLevel=0,
 			.levelCount=1,
 			.layerCount=1,
@@ -282,7 +281,7 @@ void InitShadowFramebuffer(void)
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.viewType=VK_IMAGE_VIEW_TYPE_2D,
 		.format=DepthFormat,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
 		.subresourceRange.baseMipLevel=0,
 		.subresourceRange.baseArrayLayer=0,
 		.subresourceRange.layerCount=1,
@@ -346,7 +345,10 @@ bool InitShadowPipeline(void)
 		},		
 	}, 0, &ShadowPipelineLayout);
 
-	vkuInitPipeline(&ShadowPipeline, Context.Device, ShadowPipelineLayout, ShadowRenderPass);
+	vkuInitPipeline(&ShadowPipeline, &Context);
+
+	vkuPipeline_SetPipelineLayout(&ShadowPipeline, ShadowPipelineLayout);
+	vkuPipeline_SetRenderPass(&ShadowPipeline, ShadowRenderPass);
 
 	// Add in vertex shader
 	if(!vkuPipeline_AddStage(&ShadowPipeline, "distance_v.spv", VK_SHADER_STAGE_VERTEX_BIT))
@@ -452,7 +454,7 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 			.image=ShadowDepth.Image,
 			.subresourceRange=(VkImageSubresourceRange)
 			{
-				.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
+				.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
 				.baseMipLevel=0,
 				.baseArrayLayer=0,
 				.levelCount=1,
@@ -473,7 +475,7 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 			.image=Shadow.Image,
 			.subresourceRange=(VkImageSubresourceRange)
 			{
-				.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
+				.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
 				.baseMipLevel=0,
 				.baseArrayLayer=face,
 				.levelCount=1,
@@ -488,12 +490,12 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 		// Copy image from framebuffer to cube face
 		vkCmdCopyImage(CommandBuffer, ShadowDepth.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Shadow.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageCopy)
 		{
-			.srcSubresource.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
+			.srcSubresource.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
 			.srcSubresource.baseArrayLayer=0,
 			.srcSubresource.mipLevel=0,
 			.srcSubresource.layerCount=1,
 			.srcOffset={ 0, 0, 0 },
-			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
+			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
 			.dstSubresource.baseArrayLayer=face,
 			.dstSubresource.mipLevel=0,
 			.dstSubresource.layerCount=1,
@@ -512,7 +514,7 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 			.image=ShadowDepth.Image,
 			.subresourceRange=(VkImageSubresourceRange)
 			{
-				.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
+				.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
 				.baseMipLevel=0,
 				.baseArrayLayer=0,
 				.levelCount=1,
@@ -533,7 +535,7 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 			.image=Shadow.Image,
 			.subresourceRange=(VkImageSubresourceRange)
 			{
-				.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
+				.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
 				.baseMipLevel=0,
 				.baseArrayLayer=face,
 				.levelCount=1,
@@ -613,7 +615,7 @@ bool CreateFramebuffers(void)
 		.components.g=VK_COMPONENT_SWIZZLE_G,
 		.components.b=VK_COMPONENT_SWIZZLE_B,
 		.components.a=VK_COMPONENT_SWIZZLE_A,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
 		.subresourceRange.baseMipLevel=0,
 		.subresourceRange.levelCount=1,
 		.subresourceRange.baseArrayLayer=0,
@@ -660,67 +662,28 @@ bool CreatePipeline(void)
 		},
 	}, NULL, &DescriptorPool);
 
-	vkCreateDescriptorSetLayout(Context.Device, &(VkDescriptorSetLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-		.pNext=VK_NULL_HANDLE,
-		.bindingCount=6,
-		.pBindings=(VkDescriptorSetLayoutBinding[])
-		{
-			{
-				.binding=0,
-				.descriptorType=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-				.descriptorCount=1,
-				.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
-				.pImmutableSamplers=NULL,
-			},
-			{
-				.binding=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.descriptorCount=1,
-				.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
-				.pImmutableSamplers=NULL,
+	vkuInitDescriptorSetLayout(&DescriptorSetLayout, &Context);
 
-			},
-			{
-				.binding=2,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.descriptorCount=1,
-				.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
-				.pImmutableSamplers=NULL,
-			},
-			{
-				.binding=3,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.descriptorCount=1,
-				.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
-				.pImmutableSamplers=NULL,
-			},
-			{
-				.binding=4,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.descriptorCount=1,
-				.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
-				.pImmutableSamplers=NULL,
-			},
-			{
-				.binding=5,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.descriptorCount=1,
-				.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
-				.pImmutableSamplers=NULL,
-			},
-		},
-	}, NULL, &DescriptorSetLayout);
+	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
+	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
+	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
+	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
+	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
+	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
+
+	vkuAssembleDescriptorSetLayout(&DescriptorSetLayout);
 
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
-		.pSetLayouts=&DescriptorSetLayout,
+		.pSetLayouts=&DescriptorSetLayout.DescriptorSetLayout,
 	}, 0, &PipelineLayout);
 
-	vkuInitPipeline(&Pipeline, Context.Device, PipelineLayout, RenderPass);
+	vkuInitPipeline(&Pipeline, &Context);
+
+	vkuPipeline_SetPipelineLayout(&Pipeline, PipelineLayout);
+	vkuPipeline_SetRenderPass(&Pipeline, RenderPass);
 
 	Pipeline.DepthTest=VK_TRUE;
 	Pipeline.CullMode=VK_CULL_MODE_BACK_BIT;
@@ -854,7 +817,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 
 void Render(void)
 {
-	uint32_t Index=FrameIndex%SwapchainImageCount;
+	static OldIndex=0;
+	uint32_t Index=OldIndex;
 	uint32_t ImageIndex;
 	int i, j;
 
@@ -1009,7 +973,7 @@ void Render(void)
 		.pImageIndices=&ImageIndex,
 	});
 
-	FrameIndex++;
+	OldIndex=Index;
 }
 
 bool Init(void)
@@ -1076,7 +1040,7 @@ bool Init(void)
 			.pNext=NULL,
 			.descriptorPool=DescriptorPool,
 			.descriptorSetCount=1,
-			.pSetLayouts=&DescriptorSetLayout
+			.pSetLayouts=&DescriptorSetLayout.DescriptorSetLayout
 		}, &DescriptorSet[i]);
 
 		vkUpdateDescriptorSets(Context.Device, 6, (VkWriteDescriptorSet[])
@@ -1103,7 +1067,7 @@ bool Init(void)
 				{
 					.imageView=Textures[2*i+0].View,
 					.sampler=Textures[2*i+0].Sampler,
-					.imageLayout=Textures[2*i+0].ImageLayout,
+					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				},
 				.dstSet=DescriptorSet[i],
 			},
@@ -1116,7 +1080,7 @@ bool Init(void)
 				{
 					.imageView=Textures[2*i+1].View,
 					.sampler=Textures[2*i+1].Sampler,
-					.imageLayout=Textures[2*i+1].ImageLayout,
+					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				},
 				.dstSet=DescriptorSet[i],
 			},
@@ -1165,10 +1129,9 @@ bool Init(void)
 	return true;
 }
 
-void vkuCreateSwapchain(VkContext_t *Context, uint32_t Width, uint32_t Height, int VSync)
+void vkuCreateSwapchain(VkuContext_t *Context, uint32_t Width, uint32_t Height, int VSync)
 {
 	uint32_t FormatCount, PresentModeCount;
-	uint32_t DesiredNumberOfSwapchainImages;
 	VkSurfaceCapabilitiesKHR SurfCaps;
 	VkPresentModeKHR SwapchainPresentMode=VK_PRESENT_MODE_FIFO_KHR;
 	VkSurfaceTransformFlagsKHR Pretransform;
@@ -1235,12 +1198,6 @@ void vkuCreateSwapchain(VkContext_t *Context, uint32_t Width, uint32_t Height, i
 
 	FREE(PresentModes);
 
-	// Determine the number of images
-	DesiredNumberOfSwapchainImages=SurfCaps.minImageCount+1;
-
-	if((SurfCaps.maxImageCount>0)&&(DesiredNumberOfSwapchainImages>SurfCaps.maxImageCount))
-		DesiredNumberOfSwapchainImages=SurfCaps.maxImageCount;
-
 	// Find the transformation of the surface
 	if(SurfCaps.supportedTransforms&VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)
 		// We prefer a non-rotated transform
@@ -1272,7 +1229,7 @@ void vkuCreateSwapchain(VkContext_t *Context, uint32_t Width, uint32_t Height, i
 		.sType=VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
 		.pNext=VK_NULL_HANDLE,
 		.surface=Context->Surface,
-		.minImageCount=DesiredNumberOfSwapchainImages,
+		.minImageCount=MAX_FRAME_COUNT,
 		.imageFormat=SurfaceFormat.format,
 		.imageColorSpace=SurfaceFormat.colorSpace,
 		.imageExtent={ SwapchainExtent.width, SwapchainExtent.height },
@@ -1396,7 +1353,7 @@ void Destroy(void)
 	vkFreeMemory(Context.Device, uniformBufferMemory, VK_NULL_HANDLE);
 	vkDestroyBuffer(Context.Device, uniformBuffer, VK_NULL_HANDLE);
 
-	vkDestroyDescriptorSetLayout(Context.Device, DescriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(Context.Device, DescriptorSetLayout.DescriptorSetLayout, VK_NULL_HANDLE);
 	vkDestroyDescriptorPool(Context.Device, DescriptorPool, VK_NULL_HANDLE);
 
 	vkDestroyPipeline(Context.Device, Pipeline.Pipeline, VK_NULL_HANDLE);

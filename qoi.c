@@ -63,11 +63,10 @@ bool QOI_Load(const char *Filename, Image_t *Image)
 	if(width==0||height==0||channels<3||channels>4||colorspace>1||magic!=QOI_MAGIC)
 		return false;
 
-	// Result image will always be 32bit, for easier loading.
 	Image->Width=width;
 	Image->Height=height;
-	Image->Depth=32;
-	Image->Data=(uint8_t *)malloc(width*height*4);
+	Image->Depth=channels<<3;
+	Image->Data=(uint8_t *)malloc(width*height*channels);
 
 	if(!Image->Data)
 		return false;
@@ -122,15 +121,12 @@ bool QOI_Load(const char *Filename, Image_t *Image)
 			index[QOI_HASH(bytes)%64][3]=bytes[3];
 		}
 
-		uint32_t idx=4*(i/channels);
-
-		Image->Data[idx+0]=bytes[2];
-		Image->Data[idx+1]=bytes[1];
-		Image->Data[idx+2]=bytes[0];
-		Image->Data[idx+3]=0;
+		Image->Data[i+2]=bytes[0];
+		Image->Data[i+1]=bytes[1];
+		Image->Data[i+0]=bytes[2];
 
 		if(channels==4)
-			Image->Data[idx+3]=bytes[3];
+			Image->Data[i+3]=bytes[3];
 	}
 
 	fclose(stream);

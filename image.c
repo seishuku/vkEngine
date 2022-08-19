@@ -610,7 +610,77 @@ void _AngularMapFace(Image_t *In, int Face, Image_t *Out)
 	}
 }
 
-void generateMipmaps(VkCommandBuffer commandBuffer, Image_t *Image, uint32_t mipLevels)
+void RGBtoRGBA(Image_t *Image)
+{
+	if(Image->Depth==96)
+	{
+		float *Dst=(float *)malloc(sizeof(float)*Image->Width*Image->Height*4);
+
+		if(Dst==NULL)
+			return;
+
+		for(uint32_t i=0;i<Image->Width*Image->Height;i++)
+		{
+			uint32_t SrcIdx=3*i;
+			uint32_t DstIdx=4*i;
+
+			Dst[DstIdx+0]=((float *)Image->Data)[SrcIdx+0];
+			Dst[DstIdx+1]=((float *)Image->Data)[SrcIdx+1];
+			Dst[DstIdx+2]=((float *)Image->Data)[SrcIdx+2];
+			Dst[DstIdx+3]=1.0f;
+		}
+
+		FREE(Image->Data);
+		Image->Data=(uint8_t *)Dst;
+		Image->Depth=128;
+	}
+	else if(Image->Depth==48)
+	{
+		uint16_t *Dst=(uint16_t *)malloc(sizeof(uint16_t)*Image->Width*Image->Height*4);
+
+		if(Dst==NULL)
+			return;
+
+		for(uint32_t i=0;i<Image->Width*Image->Height;i++)
+		{
+			uint32_t SrcIdx=3*i;
+			uint32_t DstIdx=4*i;
+
+			Dst[DstIdx+0]=((uint16_t *)Image->Data)[SrcIdx+0];
+			Dst[DstIdx+1]=((uint16_t *)Image->Data)[SrcIdx+1];
+			Dst[DstIdx+2]=((uint16_t *)Image->Data)[SrcIdx+2];
+			Dst[DstIdx+3]=UINT16_MAX;
+		}
+
+		FREE(Image->Data);
+		Image->Data=(uint8_t *)Dst;
+		Image->Depth=64;
+	}
+	else if(Image->Depth==24)
+	{
+		uint8_t *Dst=(uint8_t *)malloc(sizeof(uint8_t)*Image->Width*Image->Height*4);
+
+		if(Dst==NULL)
+			return;
+
+		for(uint32_t i=0;i<Image->Width*Image->Height;i++)
+		{
+			uint32_t SrcIdx=3*i;
+			uint32_t DstIdx=4*i;
+
+			Dst[DstIdx+0]=Image->Data[SrcIdx+0];
+			Dst[DstIdx+1]=Image->Data[SrcIdx+1];
+			Dst[DstIdx+2]=Image->Data[SrcIdx+2];
+			Dst[DstIdx+3]=UINT8_MAX;
+		}
+
+		FREE(Image->Data);
+		Image->Data=Dst;
+		Image->Depth=32;
+	}
+}
+
+void GenerateMipmaps(VkCommandBuffer commandBuffer, Image_t *Image, uint32_t mipLevels)
 {
 	uint32_t texWidth=Image->Width;
 	uint32_t texHeight=Image->Height;
@@ -664,6 +734,7 @@ void generateMipmaps(VkCommandBuffer commandBuffer, Image_t *Image, uint32_t mip
 		if(texHeight>1)
 			texHeight/=2;
 	}
+
 	MemoryBarrier.subresourceRange.baseMipLevel=mipLevels-1;
 	MemoryBarrier.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 	MemoryBarrier.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -673,11 +744,9 @@ void generateMipmaps(VkCommandBuffer commandBuffer, Image_t *Image, uint32_t mip
 	vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &MemoryBarrier);
 }
 
-VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename, uint32_t Flags)
+VkBool32 Image_Upload(VkuContext_t *Context, Image_t *Image, const char *Filename, uint32_t Flags)
 {
 	char *Extension=strrchr(Filename, '.');
-	VkFence Fence=VK_NULL_HANDLE;
-	VkCommandBuffer CopyCmd=VK_NULL_HANDLE;
 	VkFilter MinFilter=VK_FILTER_LINEAR;
 	VkFilter MagFilter=VK_FILTER_LINEAR;
 	VkSamplerMipmapMode MipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
@@ -685,6 +754,8 @@ VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename
 	VkSamplerAddressMode WrapModeV=VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	VkSamplerAddressMode WrapModeW=VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	VkFormat Format=VK_FORMAT_UNDEFINED;
+	VkCommandBuffer CommandBuffer;
+	VkFence Fence;
 	VkBuffer StagingBuffer;
 	VkDeviceMemory StagingBufferMemory;
 	void *Data=NULL;
@@ -755,23 +826,19 @@ VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename
 	if(Flags&IMAGE_NORMALIZE)
 		_Normalize(Image);
 
+	RGBtoRGBA(Image);
+
 	switch(Image->Depth)
 	{
 		case 128:
-		case 96:
-			MagFilter=VK_FILTER_NEAREST;
-			MipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
-			MinFilter=VK_FILTER_NEAREST;
 			Format=VK_FORMAT_R32G32B32A32_SFLOAT;
 			break;
 
 		case 64:
-		case 48:
 			Format=VK_FORMAT_R16G16B16A16_UNORM;
 			break;
 
 		case 32:
-		case 24:
 			Format=VK_FORMAT_B8G8R8A8_UNORM;
 			break;
 
@@ -821,12 +888,10 @@ VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename
 
 		vkuCreateImageBuffer(Context, Image,
 			VK_IMAGE_TYPE_2D, Format, 1, 6, Out.Width, Out.Height, 1,
-			(Format==VK_FORMAT_R32G32B32_SFLOAT||Format==VK_FORMAT_R32G32B32A32_SFLOAT)?VK_IMAGE_TILING_LINEAR:VK_IMAGE_TILING_OPTIMAL,
+			Format==VK_FORMAT_R32G32B32A32_SFLOAT?VK_IMAGE_TILING_LINEAR:VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
-
-		Image->ImageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 		// Setup a command buffer to transfer image to device and change shader read layout
 		vkAllocateCommandBuffers(Context->Device, &(VkCommandBufferAllocateInfo)
@@ -835,29 +900,26 @@ VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename
 			.commandPool=Context->CommandPool,
 			.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 			.commandBufferCount=1,
-		}, &CopyCmd);
+		}, &CommandBuffer);
 
 		// Start recording commands
-		vkBeginCommandBuffer(CopyCmd, &(VkCommandBufferBeginInfo)
+		vkBeginCommandBuffer(CommandBuffer, &(VkCommandBufferBeginInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 			.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 		});
 
 		// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
-		vkCmdPipelineBarrier(CopyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 		{
 			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 			.image=Image->Image,
-			.subresourceRange=(VkImageSubresourceRange)
-			{
-				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel=0,
-				.levelCount=1,
-				.layerCount=6,
-			},
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseMipLevel=0,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.layerCount=6,
 			.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
 			.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
 			.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
@@ -885,22 +947,19 @@ VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename
 		}
 
 		// Copy from staging buffer to the texture buffer.
-		vkCmdCopyBufferToImage(CopyCmd, StagingBuffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, BufferCopyRegions);
+		vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, BufferCopyRegions);
 
 		// Now change the image layout from destination optimal to be optimal reading only by shader.
-		vkCmdPipelineBarrier(CopyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 		{
 			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 			.image=Image->Image,
-			.subresourceRange=(VkImageSubresourceRange)
-			{
-				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel=0,
-				.levelCount=1,
-				.layerCount=6,
-			},
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseMipLevel=0,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.layerCount=6,
 			.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
 			.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
 			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -908,7 +967,7 @@ VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename
 		});
 
 		// Stop recording
-		vkEndCommandBuffer(CopyCmd);
+		vkEndCommandBuffer(CommandBuffer);
 
 		// Create a fence for the queue submit
 		vkCreateFence(Context->Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &Fence);
@@ -918,7 +977,7 @@ VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename
 		{
 			.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 			.commandBufferCount=1,
-			.pCommandBuffers=&CopyCmd,
+			.pCommandBuffers=&CommandBuffer,
 		}, Fence);
 
 		// Wait for the queue submit to finish
@@ -928,7 +987,7 @@ VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename
 		vkDestroyFence(Context->Device, Fence, VK_NULL_HANDLE);
 
 		// Free the command buffer
-		vkFreeCommandBuffers(Context->Device, Context->CommandPool, 1, &CopyCmd);
+		vkFreeCommandBuffers(Context->Device, Context->CommandPool, 1, &CommandBuffer);
 
 		// Delete staging buffers
 		vkFreeMemory(Context->Device, StagingBufferMemory, VK_NULL_HANDLE);
@@ -996,13 +1055,10 @@ VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename
 
 	if(!vkuCreateImageBuffer(Context, Image,
 		VK_IMAGE_TYPE_2D, Format, MipLevels, 1, Image->Width, Image->Height, 1,
-		VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
 		return VK_FALSE;
-
-	// Linear tiled images don't need to be staged and can be directly used as textures
-	Image->ImageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	// Setup a command buffer to transfer image to device and change shader read layout
 	vkAllocateCommandBuffers(Context->Device, &(VkCommandBufferAllocateInfo)
@@ -1011,37 +1067,34 @@ VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename
 		.commandPool=Context->CommandPool,
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount=1,
-	}, &CopyCmd);
+	}, &CommandBuffer);
 
 	// Start recording commands
-	vkBeginCommandBuffer(CopyCmd, &(VkCommandBufferBeginInfo)
+	vkBeginCommandBuffer(CommandBuffer, &(VkCommandBufferBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 	});
 
 	// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
-	vkCmdPipelineBarrier(CopyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+	vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 		.image=Image->Image,
-		.subresourceRange=(VkImageSubresourceRange)
-		{
-			.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.baseMipLevel=0,
-			.levelCount=MipLevels,
-			.layerCount=1,
-		},
-		.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
-		.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+		.subresourceRange.baseMipLevel=0,
+		.subresourceRange.levelCount=MipLevels,
+		.subresourceRange.layerCount=1,
+		.srcAccessMask=VK_ACCESS_HOST_READ_BIT,
+		.dstAccessMask=VK_ACCESS_HOST_WRITE_BIT,
 		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
 		.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 	});
 
 	// Copy from staging buffer to the texture buffer.
-	vkCmdCopyBufferToImage(CopyCmd, StagingBuffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkBufferImageCopy)
+	vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkBufferImageCopy)
 	{
 		.imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 		.imageSubresource.mipLevel=0,
@@ -1053,32 +1106,31 @@ VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename
 		.bufferOffset=0,
 	});
 
-	// Now change the image layout from destination optimal to be optimal reading only by shader.
-	//vkCmdPipelineBarrier(CopyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-	//		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-	//		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-	//		.image=Image->Image,
-	//		.subresourceRange=(VkImageSubresourceRange)
-	//	{
-	//		.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-	//		.baseMipLevel=0,
-	//		.levelCount=1,
-	//		.layerCount=1,
-	//	},
-	//	.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
-	//	.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-	//	.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-	//	.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-	//});
-
 	// Generate mipmaps, if needed
 	if(Flags&IMAGE_MIPMAP)
-		generateMipmaps(CopyCmd, Image, MipLevels);
+		GenerateMipmaps(CommandBuffer, Image, MipLevels);
+	else
+	{
+		// Now change the image layout from destination optimal to be optimal reading only by shader.
+		vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.image=Image->Image,
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseMipLevel=0,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.layerCount=1,
+			.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
+			.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		});
+	}
 
 	// Stop recording
-	vkEndCommandBuffer(CopyCmd);
+	vkEndCommandBuffer(CommandBuffer);
 		
 	// Create a fence for the queue submit
 	vkCreateFence(Context->Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &Fence);
@@ -1088,7 +1140,7 @@ VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.commandBufferCount=1,
-		.pCommandBuffers=&CopyCmd,
+		.pCommandBuffers=&CommandBuffer,
 	}, Fence);
 
 	// Wait for the queue submit to finish
@@ -1098,7 +1150,7 @@ VkBool32 Image_Upload(VkContext_t *Context, Image_t *Image, const char *Filename
 	vkDestroyFence(Context->Device, Fence, VK_NULL_HANDLE);
 
 	// Free the command buffer
-	vkFreeCommandBuffers(Context->Device, Context->CommandPool, 1, &CopyCmd);
+	vkFreeCommandBuffers(Context->Device, Context->CommandPool, 1, &CommandBuffer);
 
 	// Delete staging buffers
 	vkFreeMemory(Context->Device, StagingBufferMemory, VK_NULL_HANDLE);

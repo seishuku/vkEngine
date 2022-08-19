@@ -7,6 +7,11 @@
 #include <Windows.h>
 #endif
 
+#define VKU_MAX_PIPELINE_VERTEX_BINDINGS 8
+#define VKU_MAX_PIPELINE_VERTEX_ATTRIBUTES 8
+#define VKU_MAX_PIPELINE_SHADER_STAGES 4
+#define VKU_MAX_DESCRIPTORSETLAYOUT_BINDINGS 16
+
 typedef struct
 {
 	HWND hWnd;
@@ -18,15 +23,18 @@ typedef struct
 
 	VkDevice Device;
 	VkQueue Queue;
+	VkPipelineCache PipelineCache;
 	VkCommandPool CommandPool;
-} VkContext_t;
+} VkuContext_t;
 
+// Because vulkan stuff here depends on image.h and image.h depends on the VkContext_t struct, annoying.
 #include "image.h"
 
 typedef struct
 {
 	// Handles to dependencies
 	VkDevice Device;
+	VkPipelineCache PipelineCache;
 	VkPipelineLayout PipelineLayout;
 	VkRenderPass RenderPass;
 
@@ -35,17 +43,17 @@ typedef struct
 
 	// Settable states:
 
-	// Vertex bindings, up to 5 should be enough? (to match attrib count)
+	// Vertex bindings
 	uint32_t NumVertexBindings;
-	VkVertexInputBindingDescription VertexBindings[5];
+	VkVertexInputBindingDescription VertexBindings[VKU_MAX_PIPELINE_VERTEX_BINDINGS];
 
 	// Vertex attributes
 	uint32_t NumVertexAttribs;
-	VkVertexInputAttributeDescription VertexAttribs[5];
+	VkVertexInputAttributeDescription VertexAttribs[VKU_MAX_PIPELINE_VERTEX_ATTRIBUTES];
 
 	// Shader Stages
 	uint32_t NumStages;
-	VkPipelineShaderStageCreateInfo Stages[4];
+	VkPipelineShaderStageCreateInfo Stages[VKU_MAX_PIPELINE_SHADER_STAGES];
 
 	// Input assembly state
 	VkPrimitiveTopology Topology;
@@ -111,24 +119,38 @@ typedef struct
 	VkColorComponentFlags ColorWriteMask;
 } VkuPipeline_t;
 
+typedef struct
+{
+	VkDevice Device;
+
+	VkDescriptorSetLayout DescriptorSetLayout;
+
+	uint32_t NumBindings;
+	VkDescriptorSetLayoutBinding Bindings[VKU_MAX_DESCRIPTORSETLAYOUT_BINDINGS];
+} VkuDescriptorSetLayout_t;
+
 VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile);
 
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask);
 
-VkBool32 vkuCreateImageBuffer(VkContext_t *Context, Image_t *Image,
-	VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth,
-	VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags);
-VkBool32 vkuCreateBuffer(VkContext_t *Context, VkBuffer *Buffer, VkDeviceMemory *Memory, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask);
-VkBool32 vkuCopyBuffer(VkContext_t *Context, VkBuffer Src, VkBuffer Dest, uint32_t Size);
+VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, Image_t *Image, VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth, VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags);
+VkBool32 vkuCreateBuffer(VkuContext_t *Context, VkBuffer *Buffer, VkDeviceMemory *Memory, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask);
+VkBool32 vkuCopyBuffer(VkuContext_t *Context, VkBuffer Src, VkBuffer Dest, uint32_t Size);
 
 VkBool32 vkuPipeline_AddVertexBinding(VkuPipeline_t *Pipeline, uint32_t Binding, uint32_t Stride, VkVertexInputRate InputRate);
 VkBool32 vkuPipeline_AddVertexAttribute(VkuPipeline_t *Pipeline, uint32_t Location, uint32_t Binding, VkFormat Format, uint32_t Offset);
 VkBool32 vkuPipeline_AddStage(VkuPipeline_t *Pipeline, const char *ShaderFilename, VkShaderStageFlagBits Stage);
-VkBool32 vkuInitPipeline(VkuPipeline_t *Pipeline, VkDevice Device, VkPipelineLayout PipelineLayout, VkRenderPass RenderPass);
+VkBool32 vkuPipeline_SetRenderPass(VkuPipeline_t *Pipeline, VkRenderPass RenderPass);
+VkBool32 vkuPipeline_SetPipelineLayout(VkuPipeline_t *Pipeline, VkPipelineLayout PipelineLayout);
+VkBool32 vkuInitPipeline(VkuPipeline_t *Pipeline, VkuContext_t *Context);
 VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline);
 
+VkBool32 vkuDescriptorSetLayout_AddBinding(VkuDescriptorSetLayout_t *DescriptorSetLayout, uint32_t Binding, VkDescriptorType Type, uint32_t Count, VkShaderStageFlags Stage, const VkSampler *ImmutableSamplers);
+VkBool32 vkuInitDescriptorSetLayout(VkuDescriptorSetLayout_t *DescriptorSetLayout, VkuContext_t *Context);
+VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSetLayout_t *DescriptorSetLayout);
+	
 VkBool32 CreateVulkanInstance(VkInstance *Instance);
-VkBool32 CreateVulkanContext(VkInstance Instance, VkContext_t *Context);
-void DestroyVulkan(VkInstance Instance, VkContext_t *Context);
+VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context);
+void DestroyVulkan(VkInstance Instance, VkuContext_t *Context);
 
 #endif
