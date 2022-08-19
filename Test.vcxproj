@@ -92,90 +92,75 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="3ds.c">
-      <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Level3</WarningLevel>
-      <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Level3</WarningLevel>
-    </ClCompile>
     <ClCompile Include="engine.c" />
-    <ClCompile Include="font.c" />
-    <ClCompile Include="image.c" />
-    <ClCompile Include="math.c" />
-    <ClCompile Include="qoi.c" />
-    <ClCompile Include="tga.c" />
-    <ClCompile Include="vulkan.c" />
+    <ClCompile Include="font\font.c" />
+    <ClCompile Include="image\image.c" />
+    <ClCompile Include="image\qoi.c" />
+    <ClCompile Include="image\tga.c" />
+    <ClCompile Include="math\math.c" />
+    <ClCompile Include="model\3ds.c" />
+    <ClCompile Include="vulkan\vulkan.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="3ds.h" />
-    <ClInclude Include="font.h" />
-    <ClInclude Include="image.h" />
-    <ClInclude Include="math.h" />
-    <ClInclude Include="system.h" />
-    <ClInclude Include="vulkan.h" />
+    <ClInclude Include="font\font.h" />
+    <ClInclude Include="image\image.h" />
+    <ClInclude Include="math\math.h" />
+    <ClInclude Include="model\3ds.h" />
+    <ClInclude Include="system\system.h" />
+    <ClInclude Include="vulkan\vulkan.h" />
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="font_f.glsl">
+    <CustomBuild Include="shaders\distance_f.glsl">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin\glslangValidator -S frag -V %(Identity) -o  %(Filename).spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).spv</Outputs>
-      <TreatOutputAsContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</TreatOutputAsContent>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin\glslangValidator -S frag -V %(Identity) -o  %(Filename).spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).spv</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin\glslangValidator -S frag -V %(Identity) -o  .\shaders\%(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.\shaders\%(Filename).spv</Outputs>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</BuildInParallel>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin\glslangValidator -S frag -V %(Identity) -o  .\shaders\%(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\shaders\%(Filename).spv</Outputs>
       <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+    </CustomBuild>
+    <CustomBuild Include="shaders\distance_v.glsl">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin\glslangValidator -S vert -V %(Identity) -o  .\shaders\%(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.\shaders\%(Filename).spv</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin\glslangValidator -S vert -V %(Identity) -o  .\shaders\%(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\shaders\%(Filename).spv</Outputs>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+    </CustomBuild>
+    <CustomBuild Include="shaders\font_f.glsl">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin\glslangValidator -S frag -V %(Identity) -o  .\shaders\%(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.\shaders\%(Filename).spv</Outputs>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</BuildInParallel>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin\glslangValidator -S frag -V %(Identity) -o  .\shaders\%(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\shaders\%(Filename).spv</Outputs>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+    </CustomBuild>
+    <CustomBuild Include="shaders\font_v.glsl">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin\glslangValidator -S vert -V %(Identity) -o  .\shaders\%(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\shaders\%(Filename).spv</Outputs>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin\glslangValidator -S vert -V %(Identity) -o  .\shaders\%(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.\shaders\%(Filename).spv</Outputs>
       <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</BuildInParallel>
     </CustomBuild>
-    <CustomBuild Include="font_v.glsl">
+    <CustomBuild Include="shaders\lighting_f.glsl">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin\glslangValidator -S vert -V %(Identity) -o  %(Filename).spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).spv</Outputs>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin\glslangValidator -S vert -V %(Identity) -o  %(Filename).spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).spv</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin\glslangValidator -S frag -V %(Identity) -o  .\shaders\%(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\shaders\%(Filename).spv</Outputs>
       <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin\glslangValidator -S frag -V %(Identity) -o  .\shaders\%(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.\shaders\%(Filename).spv</Outputs>
       <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</BuildInParallel>
     </CustomBuild>
-    <CustomBuild Include="lighting_f.glsl">
+    <CustomBuild Include="shaders\lighting_v.glsl">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin\glslangValidator -S frag -V %(Identity) -o  %(Filename).spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).spv</Outputs>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin\glslangValidator -S frag -V %(Identity) -o  %(Filename).spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).spv</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin\glslangValidator -S vert -V %(Identity) -o  .\shaders\%(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\shaders\%(Filename).spv</Outputs>
       <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
-      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</BuildInParallel>
-    </CustomBuild>
-    <CustomBuild Include="lighting_v.glsl">
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin\glslangValidator -S vert -V %(Identity) -o  %(Filename).spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).spv</Outputs>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin\glslangValidator -S vert -V %(Identity) -o  %(Filename).spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).spv</Outputs>
-      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
-      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</BuildInParallel>
-    </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="distance_f.glsl">
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin\glslangValidator -S frag -V %(Identity) -o  %(Filename).spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).spv</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin\glslangValidator -S frag -V %(Identity) -o  %(Filename).spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).spv</Outputs>
-      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
-      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</BuildInParallel>
-    </CustomBuild>
-    <CustomBuild Include="distance_v.glsl">
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin\glslangValidator -S vert -V %(Identity) -o  %(Filename).spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).spv</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%VULKAN_SDK%\Bin\glslangValidator -S vert -V %(Identity) -o  %(Filename).spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).spv</Outputs>
-      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%VULKAN_SDK%\Bin\glslangValidator -S vert -V %(Identity) -o  .\shaders\%(Filename).spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.\shaders\%(Filename).spv</Outputs>
       <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</BuildInParallel>
     </CustomBuild>
   </ItemGroup>

@@ -11,10 +11,10 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "system.h"
-#include "vulkan.h"
-#include "math.h"
-#include "font.h"
+#include "../system/system.h"
+#include "../vulkan/vulkan.h"
+#include "../math/math.h"
+#include "../font/font.h"
 
 // external Vulkan context data/functions for this module:
 extern VkuContext_t Context;
@@ -116,8 +116,8 @@ void _Font_Init(void)
 
 	vkuInitPipeline(&fontPipeline, &Context);
 
-	vkuPipeline_AddStage(&fontPipeline, "font_v.spv", VK_SHADER_STAGE_VERTEX_BIT);
-	vkuPipeline_AddStage(&fontPipeline, "font_f.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuPipeline_AddStage(&fontPipeline, "./shaders/font_v.spv", VK_SHADER_STAGE_VERTEX_BIT);
+	vkuPipeline_AddStage(&fontPipeline, "./shaders/font_f.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
 	vkuPipeline_SetPipelineLayout(&fontPipeline, fontPipelineLayout);
 	vkuPipeline_SetRenderPass(&fontPipeline, RenderPass);
@@ -151,7 +151,7 @@ void _Font_Init(void)
 	{
 		FILE *Stream=NULL;
 
-		if(fopen_s(&Stream, "font.bin", "rb"))
+		if(fopen_s(&Stream, "./assets/font.bin", "rb"))
 			return;
 
 		if(Stream==NULL)

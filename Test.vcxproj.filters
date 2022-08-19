@@ -16,70 +16,106 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{da33e577-6214-473f-bd17-eed0af3e439f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\vulkan">
+      <UniqueIdentifier>{bcc64417-1d0d-4093-acfe-a77377bb25eb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\system">
+      <UniqueIdentifier>{755907bf-c236-4784-99c9-ad6bdface157}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\math">
+      <UniqueIdentifier>{07a907dd-9612-41f4-8ee8-b655c0ebbba3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\font">
+      <UniqueIdentifier>{052fa67a-ae43-4223-8ebd-cd545e07444a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\model">
+      <UniqueIdentifier>{9cc29cbc-fe13-45ca-b216-69be8a4987f2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\image">
+      <UniqueIdentifier>{f3965da7-eacc-40a7-adb9-895adeb1fa69}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\math">
+      <UniqueIdentifier>{fc6862ee-6f13-40e7-a511-6cc001ac7ec4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\font">
+      <UniqueIdentifier>{eccf5011-2987-45ec-bdc9-cf78f26e5ee8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\model">
+      <UniqueIdentifier>{b914293e-84d0-4207-9fcc-5ecc8da94c2a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\image">
+      <UniqueIdentifier>{93381c07-7d53-448e-81a6-2e96f1bb9b25}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\system">
+      <UniqueIdentifier>{88c22324-f6bf-421a-b00c-3fb655cf3cbc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\vulkan">
+      <UniqueIdentifier>{e9489a5f-472f-49ab-9d20-08a3bd05daa2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="math.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="3ds.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="image.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="tga.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="engine.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="font.c">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="math\math.c">
+      <Filter>Source Files\math</Filter>
     </ClCompile>
-    <ClCompile Include="vulkan.c">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="font\font.c">
+      <Filter>Source Files\font</Filter>
     </ClCompile>
-    <ClCompile Include="qoi.c">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="model\3ds.c">
+      <Filter>Source Files\model</Filter>
+    </ClCompile>
+    <ClCompile Include="image\image.c">
+      <Filter>Source Files\image</Filter>
+    </ClCompile>
+    <ClCompile Include="image\qoi.c">
+      <Filter>Source Files\image</Filter>
+    </ClCompile>
+    <ClCompile Include="image\tga.c">
+      <Filter>Source Files\image</Filter>
+    </ClCompile>
+    <ClCompile Include="vulkan\vulkan.c">
+      <Filter>Source Files\vulkan</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="3ds.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="math\math.h">
+      <Filter>Header Files\math</Filter>
     </ClInclude>
-    <ClInclude Include="math.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="font\font.h">
+      <Filter>Header Files\font</Filter>
     </ClInclude>
-    <ClInclude Include="image.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="model\3ds.h">
+      <Filter>Header Files\model</Filter>
     </ClInclude>
-    <ClInclude Include="font.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="image\image.h">
+      <Filter>Header Files\image</Filter>
     </ClInclude>
-    <ClInclude Include="vulkan.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="system\system.h">
+      <Filter>Header Files\system</Filter>
     </ClInclude>
-    <ClInclude Include="system.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="vulkan\vulkan.h">
+      <Filter>Header Files\vulkan</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="font_f.glsl">
+    <CustomBuild Include="shaders\distance_f.glsl">
       <Filter>Shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="lighting_f.glsl">
+    <CustomBuild Include="shaders\distance_v.glsl">
       <Filter>Shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="font_v.glsl">
+    <CustomBuild Include="shaders\font_f.glsl">
       <Filter>Shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="lighting_v.glsl">
+    <CustomBuild Include="shaders\font_v.glsl">
       <Filter>Shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="distance_v.glsl">
+    <CustomBuild Include="shaders\lighting_f.glsl">
       <Filter>Shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="distance_f.glsl">
+    <CustomBuild Include="shaders\lighting_v.glsl">
       <Filter>Shaders</Filter>
     </CustomBuild>
   </ItemGroup>

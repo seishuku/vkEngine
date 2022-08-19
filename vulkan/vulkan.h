@@ -28,7 +28,7 @@ typedef struct
 } VkuContext_t;
 
 // Because vulkan stuff here depends on image.h and image.h depends on the VkContext_t struct, annoying.
-#include "image.h"
+#include "../image/image.h"
 
 typedef struct
 {

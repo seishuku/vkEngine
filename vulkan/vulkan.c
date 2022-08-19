@@ -3,10 +3,10 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "system.h"
+#include "../system/system.h"
 #include "vulkan.h"
-#include "image.h"
-#include "math.h"
+#include "../image/image.h"
+#include "../math/math.h"
 
 VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile)
 {

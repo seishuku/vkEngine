@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <malloc.h>
 #include <string.h>
-#include "vulkan.h"
+#include "../vulkan/vulkan.h"
 #include "image.h"
 
 #ifndef FREE

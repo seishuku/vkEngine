@@ -6,9 +6,9 @@
 #include <string.h>
 #include <malloc.h>
 #include <memory.h>
-#include "system.h"
-#include "vulkan.h"
-#include "math.h"
+#include "../system/system.h"
+#include "../vulkan/vulkan.h"
+#include "../math/math.h"
 #include "3ds.h"
 
 void CalculateTangent3DS(Mesh3DS_t *Mesh)

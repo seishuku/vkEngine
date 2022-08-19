@@ -1,14 +1,13 @@
 #include <windows.h>
-#include <sys/types.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "system.h"
-#include "vulkan.h"
-#include "math.h"
-#include "3ds.h"
-#include "image.h"
-#include "font.h"
+#include "system/system.h"
+#include "vulkan/vulkan.h"
+#include "math/math.h"
+#include "model/3ds.h"
+#include "image/image.h"
+#include "font/font.h"
 
 char szAppName[]="Vulkan";
 
@@ -162,13 +161,10 @@ void InitShadowCubeMap(Image_t *Image)
 		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 		.image=Image->Image,
-		.subresourceRange=(VkImageSubresourceRange)
-		{
-			.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.baseMipLevel=0,
-			.levelCount=1,
-			.layerCount=6,
-		},
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+		.subresourceRange.baseMipLevel=0,
+		.subresourceRange.levelCount=1,
+		.subresourceRange.layerCount=6,
 		.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT|VK_ACCESS_TRANSFER_WRITE_BIT,
 		.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
 		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
@@ -268,16 +264,13 @@ void InitShadowFramebuffer(void)
 	vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=ShadowColor.Image,
-			.subresourceRange=(VkImageSubresourceRange)
-		{
-			.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.baseMipLevel=0,
-			.levelCount=1,
-			.layerCount=1,
-		},
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=ShadowColor.Image,
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+		.subresourceRange.baseMipLevel=0,
+		.subresourceRange.levelCount=1,
+		.subresourceRange.layerCount=1,
 		.srcAccessMask=0,
 		.dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
@@ -290,13 +283,10 @@ void InitShadowFramebuffer(void)
 		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 		.image=ShadowDepth.Image,
-		.subresourceRange=(VkImageSubresourceRange)
-		{
-			.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
-			.baseMipLevel=0,
-			.levelCount=1,
-			.layerCount=1,
-		},
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
+		.subresourceRange.baseMipLevel=0,
+		.subresourceRange.levelCount=1,
+		.subresourceRange.layerCount=1,
 		.srcAccessMask=0,
 		.dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
@@ -427,11 +417,11 @@ bool InitShadowPipeline(void)
 	vkuPipeline_SetRenderPass(&ShadowPipeline, ShadowRenderPass);
 
 	// Add in vertex shader
-	if(!vkuPipeline_AddStage(&ShadowPipeline, "distance_v.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&ShadowPipeline, "./shaders/distance_v.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
 	// Add in fragment shader
-	if(!vkuPipeline_AddStage(&ShadowPipeline, "distance_f.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	if(!vkuPipeline_AddStage(&ShadowPipeline, "./shaders/distance_f.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
 	// Set states that are different than defaults
@@ -439,8 +429,8 @@ bool InitShadowPipeline(void)
 	ShadowPipeline.DepthTest=VK_TRUE;
 
 	// Add vertex binding and attrib parameters
-	vkuPipeline_AddVertexBinding(&ShadowPipeline, 0, sizeof(float)*14, VK_VERTEX_INPUT_RATE_VERTEX);
-	vkuPipeline_AddVertexAttribute(&ShadowPipeline, 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0);
+	vkuPipeline_AddVertexBinding(&ShadowPipeline, 0, sizeof(float)*20, VK_VERTEX_INPUT_RATE_VERTEX);
+	vkuPipeline_AddVertexAttribute(&ShadowPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
 
 	// Assemble the pipeline
 	if(!vkuAssemblePipeline(&ShadowPipeline))
@@ -528,14 +518,11 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 			.image=ShadowColor.Image,
-			.subresourceRange=(VkImageSubresourceRange)
-			{
-				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel=0,
-				.baseArrayLayer=0,
-				.levelCount=1,
-				.layerCount=1,
-			},
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseMipLevel=0,
+			.subresourceRange.baseArrayLayer=0,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.layerCount=1,
 			.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 			.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
 			.oldLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -549,14 +536,11 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 			.image=Shadow.Image,
-			.subresourceRange=(VkImageSubresourceRange)
-			{
-				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel=0,
-				.baseArrayLayer=face,
-				.levelCount=1,
-				.layerCount=1,
-			},
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseMipLevel=0,
+			.subresourceRange.baseArrayLayer=face,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.layerCount=1,
 			.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
 			.dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
 			.oldLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -588,14 +572,11 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 			.image=ShadowColor.Image,
-			.subresourceRange=(VkImageSubresourceRange)
-			{
-				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel=0,
-				.baseArrayLayer=0,
-				.levelCount=1,
-				.layerCount=1,
-			},
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseMipLevel=0,
+			.subresourceRange.baseArrayLayer=0,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.layerCount=1,
 			.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
 			.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -609,14 +590,11 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 			.image=Shadow.Image,
-			.subresourceRange=(VkImageSubresourceRange)
-			{
-				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel=0,
-				.baseArrayLayer=face,
-				.levelCount=1,
-				.layerCount=1,
-			},
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseMipLevel=0,
+			.subresourceRange.baseArrayLayer=face,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.layerCount=1,
 			.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
 			.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
 			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -764,19 +742,19 @@ bool CreatePipeline(void)
 	Pipeline.DepthTest=VK_TRUE;
 	Pipeline.CullMode=VK_CULL_MODE_BACK_BIT;
 
-	if(!vkuPipeline_AddStage(&Pipeline, "lighting_v.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&Pipeline, "./shaders/lighting_v.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
-	if(!vkuPipeline_AddStage(&Pipeline, "lighting_f.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	if(!vkuPipeline_AddStage(&Pipeline, "./shaders/lighting_f.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
-	vkuPipeline_AddVertexBinding(&Pipeline, 0, sizeof(float)*14, VK_VERTEX_INPUT_RATE_VERTEX);
+	vkuPipeline_AddVertexBinding(&Pipeline, 0, sizeof(float)*20, VK_VERTEX_INPUT_RATE_VERTEX);
 
-	vkuPipeline_AddVertexAttribute(&Pipeline, 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 1, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float)*3);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 2, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float)*5);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 3, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float)*8);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 4, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float)*11);
+	vkuPipeline_AddVertexAttribute(&Pipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+	vkuPipeline_AddVertexAttribute(&Pipeline, 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*4);
+	vkuPipeline_AddVertexAttribute(&Pipeline, 2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*8);
+	vkuPipeline_AddVertexAttribute(&Pipeline, 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*12);
+	vkuPipeline_AddVertexAttribute(&Pipeline, 4, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*16);
 
 	if(!vkuAssemblePipeline(&Pipeline))
 		return false;
@@ -795,14 +773,14 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 		// Vertex data on device memory
 		vkuCreateBuffer(&Context,
 			&Model->Mesh[i].Buffer, &Model->Mesh[i].BufferMemory,
-			sizeof(float)*14*Model->Mesh[i].NumVertex,
+			sizeof(float)*20*Model->Mesh[i].NumVertex,
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		// Create staging buffer to transfer from host memory to device memory
 		vkuCreateBuffer(&Context,
 			&stagingBuffer, &stagingBufferMemory,
-			sizeof(float)*14*Model->Mesh[i].NumVertex,
+			sizeof(float)*20*Model->Mesh[i].NumVertex,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
@@ -813,27 +791,33 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 			*((float *)Data)++=Model->Mesh[i].Vertex[3*j+0];
 			*((float *)Data)++=Model->Mesh[i].Vertex[3*j+1];
 			*((float *)Data)++=Model->Mesh[i].Vertex[3*j+2];
+			*((float *)Data)++=1.0f;
 
 			*((float *)Data)++=Model->Mesh[i].UV[2*j+0];
 			*((float *)Data)++=1.0f-Model->Mesh[i].UV[2*j+1];
+			*((float *)Data)++=0.0f;
+			*((float *)Data)++=0.0f;
 
 			*((float *)Data)++=Model->Mesh[i].Tangent[3*j+0];
 			*((float *)Data)++=Model->Mesh[i].Tangent[3*j+1];
 			*((float *)Data)++=Model->Mesh[i].Tangent[3*j+2];
+			*((float *)Data)++=0.0f;
 
 			*((float *)Data)++=Model->Mesh[i].Binormal[3*j+0];
 			*((float *)Data)++=Model->Mesh[i].Binormal[3*j+1];
 			*((float *)Data)++=Model->Mesh[i].Binormal[3*j+2];
+			*((float *)Data)++=0.0f;
 
 			*((float *)Data)++=Model->Mesh[i].Normal[3*j+0];
 			*((float *)Data)++=Model->Mesh[i].Normal[3*j+1];
 			*((float *)Data)++=Model->Mesh[i].Normal[3*j+2];
+			*((float *)Data)++=0.0f;
 		}
 
 		vkUnmapMemory(Context.Device, stagingBufferMemory);
 
 		// Copy to device memory
-		vkuCopyBuffer(&Context, stagingBuffer, Model->Mesh[i].Buffer, sizeof(float)*14*Model->Mesh[i].NumVertex);
+		vkuCopyBuffer(&Context, stagingBuffer, Model->Mesh[i].Buffer, sizeof(float)*20*Model->Mesh[i].NumVertex);
 
 		// Delete staging data
 		vkFreeMemory(Context.Device, stagingBufferMemory, VK_NULL_HANDLE);
@@ -974,24 +958,8 @@ void Render(void)
 		.renderPass=RenderPass,
 		.framebuffer=FrameBuffers[ImageIndex],
 		.clearValueCount=2,
-		.pClearValues=(VkClearValue[])
-		{
-			{
-				.color.float32[0]=0.0f,
-				.color.float32[1]=0.0f,
-				.color.float32[2]=0.0f,
-				.color.float32[3]=1.0f
-			},
-			{
-				.depthStencil.depth=1.0f,
-				.depthStencil.stencil=0
-			}
-		},
-		.renderArea.offset=(VkOffset2D)
-		{
-			.x=0,
-			.y=0
-		},
+		.pClearValues=(VkClearValue[]) { { 0.0f, 0.0f, 0.0f, 1.0f }, { 1.0f, 0 } },
+		.renderArea.offset={ 0, 0 },
 		.renderArea.extent=SwapchainExtent,
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -1072,27 +1040,27 @@ bool Init(void)
 	CreatePipeline();
 
 	// Load models
-	if(Load3DS(&Model[MODEL_HELLKNIGHT], "hellknight.3ds"))
+	if(Load3DS(&Model[MODEL_HELLKNIGHT], "./assets/hellknight.3ds"))
 		BuildMemoryBuffers(&Model[MODEL_HELLKNIGHT]);
 
-	if(Load3DS(&Model[MODEL_PINKY], "pinky.3ds"))
+	if(Load3DS(&Model[MODEL_PINKY], "./assets/pinky.3ds"))
 		BuildMemoryBuffers(&Model[MODEL_PINKY]);
 
-	if(Load3DS(&Model[MODEL_FATTY], "fatty.3ds"))
+	if(Load3DS(&Model[MODEL_FATTY], "./assets/fatty.3ds"))
 		BuildMemoryBuffers(&Model[MODEL_FATTY]);
 
-	if(Load3DS(&Model[MODEL_LEVEL], "level.3ds"))
+	if(Load3DS(&Model[MODEL_LEVEL], "./assets/level.3ds"))
 		BuildMemoryBuffers(&Model[MODEL_LEVEL]);
 
 	// Load textures
-	Image_Upload(&Context, &Textures[TEXTURE_HELLKNIGHT], "hellknight.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_HELLKNIGHT_NORMAL], "hellknight_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	Image_Upload(&Context, &Textures[TEXTURE_PINKY], "pinky.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_PINKY_NORMAL], "pinky_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	Image_Upload(&Context, &Textures[TEXTURE_FATTY], "fatty.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_FATTY_NORMAL], "fatty_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	Image_Upload(&Context, &Textures[TEXTURE_LEVEL], "tile.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_LEVEL_NORMAL], "tile_b.tga", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALMAP);
+	Image_Upload(&Context, &Textures[TEXTURE_HELLKNIGHT], "./assets/hellknight.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Context, &Textures[TEXTURE_HELLKNIGHT_NORMAL], "./assets/hellknight_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&Context, &Textures[TEXTURE_PINKY], "./assets/pinky.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Context, &Textures[TEXTURE_PINKY_NORMAL], "./assets/pinky_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&Context, &Textures[TEXTURE_FATTY], "./assets/fatty.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Context, &Textures[TEXTURE_FATTY_NORMAL], "./assets/fatty_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&Context, &Textures[TEXTURE_LEVEL], "./assets/tile.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Context, &Textures[TEXTURE_LEVEL_NORMAL], "./assets/tile_b.tga", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALMAP);
 
 	// Uniform data buffer and pointer mapping
 	vkuCreateBuffer(&Context, &uniformBuffer, &uniformBufferMemory, sizeof(ubo),

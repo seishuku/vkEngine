@@ -15,8 +15,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include <vulkan/vulkan.h>
-#include "math.h"
-#include "vulkan.h"
+#include "../math/math.h"
+#include "../vulkan/vulkan.h"
 #include "image.h"
 
 #ifndef FREE
