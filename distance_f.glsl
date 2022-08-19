@@ -8,7 +8,9 @@ layout (push_constant) uniform PushConsts
 	vec4 Light_Pos;
 };
 
+layout (location=0) out float Output;
+
 void main()
 {
-	gl_FragDepth=length(Position-Light_Pos.xyz)*Light_Pos.w;
+	Output=length(Position-Light_Pos.xyz)*Light_Pos.w;
 }

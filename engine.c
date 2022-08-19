@@ -111,8 +111,11 @@ int32_t ShadowCubeSize=1024;
 
 VkFramebuffer ShadowFrameBuffer;
 
-// Frame buffer depth
+// Shadow Frame buffer
+Image_t ShadowColor;
 Image_t ShadowDepth;
+VkFormat ShadowColorFormat=VK_FORMAT_R32_SFLOAT;
+VkFormat ShadowDepthFormat=VK_FORMAT_D32_SFLOAT;
 
 VkuPipeline_t ShadowPipeline;
 VkPipelineLayout ShadowPipelineLayout;
@@ -129,10 +132,11 @@ struct
 
 void InitShadowCubeMap(Image_t *Image)
 {
-	VkCommandBuffer layoutCmd;
+	VkCommandBuffer CommandBuffer;
+	VkFence Fence;
 
 	vkuCreateImageBuffer(&Context, Image,
-		VK_IMAGE_TYPE_2D, DepthFormat, 1, 6, ShadowCubeSize, ShadowCubeSize, 1,
+		VK_IMAGE_TYPE_2D, ShadowColorFormat, 1, 6, ShadowCubeSize, ShadowCubeSize, 1,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -144,15 +148,15 @@ void InitShadowCubeMap(Image_t *Image)
 		.commandPool=Context.CommandPool,
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount=1,
-	}, &layoutCmd);
+	}, &CommandBuffer);
 
-	vkBeginCommandBuffer(layoutCmd, &(VkCommandBufferBeginInfo)
+	vkBeginCommandBuffer(CommandBuffer, &(VkCommandBufferBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 	});
 
-	vkCmdPipelineBarrier(layoutCmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+	vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
@@ -160,7 +164,7 @@ void InitShadowCubeMap(Image_t *Image)
 		.image=Image->Image,
 		.subresourceRange=(VkImageSubresourceRange)
 		{
-			.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
+			.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.baseMipLevel=0,
 			.levelCount=1,
 			.layerCount=6,
@@ -171,18 +175,26 @@ void InitShadowCubeMap(Image_t *Image)
 		.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 	});
 
-	vkEndCommandBuffer(layoutCmd);
+	vkEndCommandBuffer(CommandBuffer);
 		
+	// Create a fence for the queue submit
+	vkCreateFence(Context.Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &Fence);
+
+	// Submit commands to the queue
 	vkQueueSubmit(Context.Queue, 1, &(VkSubmitInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.commandBufferCount=1,
-		.pCommandBuffers=&layoutCmd,
-	}, VK_NULL_HANDLE);
+		.pCommandBuffers=&CommandBuffer,
+	}, Fence);
 
-	vkQueueWaitIdle(Context.Queue);
+	// Wait for the queue submit to finish
+	vkWaitForFences(Context.Device, 1, &Fence, VK_TRUE, UINT64_MAX);
 
-	vkFreeCommandBuffers(Context.Device, Context.CommandPool, 1, &layoutCmd);
+	// Destroy fence
+	vkDestroyFence(Context.Device, Fence, VK_NULL_HANDLE);
+
+	vkFreeCommandBuffers(Context.Device, Context.CommandPool, 1, &CommandBuffer);
 
 	vkCreateSampler(Context.Device, &(VkSamplerCreateInfo)
 	{
@@ -207,9 +219,9 @@ void InitShadowCubeMap(Image_t *Image)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.viewType=VK_IMAGE_VIEW_TYPE_CUBE,
-		.format=DepthFormat,
+		.format=ShadowColorFormat,
 		.components.r={ VK_COMPONENT_SWIZZLE_R },
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 		.subresourceRange.baseMipLevel=0,
 		.subresourceRange.baseArrayLayer=0,
 		.subresourceRange.layerCount=6,
@@ -220,13 +232,22 @@ void InitShadowCubeMap(Image_t *Image)
 
 void InitShadowFramebuffer(void)
 {
-	VkCommandBuffer copyCmd;
+	VkCommandBuffer CommandBuffer;
+	VkFence Fence;
+
+	// Color
+	vkuCreateImageBuffer(&Context, &ShadowColor,
+		VK_IMAGE_TYPE_2D, ShadowColorFormat, 1, 1, ShadowCubeSize, ShadowCubeSize, 1,
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		0);
 
 	// Depth
 	vkuCreateImageBuffer(&Context, &ShadowDepth,
-		VK_IMAGE_TYPE_2D, DepthFormat, 1, 1, ShadowCubeSize, ShadowCubeSize, 1,
+		VK_IMAGE_TYPE_2D, ShadowDepthFormat, 1, 1, ShadowCubeSize, ShadowCubeSize, 1,
 		VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		0);
 
@@ -236,15 +257,34 @@ void InitShadowFramebuffer(void)
 		.commandPool=Context.CommandPool,
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount=1,
-	}, &copyCmd);
+	}, &CommandBuffer);
 
-	vkBeginCommandBuffer(copyCmd, &(VkCommandBufferBeginInfo)
+	vkBeginCommandBuffer(CommandBuffer, &(VkCommandBufferBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 	});
 
-	vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+	vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.image=ShadowColor.Image,
+			.subresourceRange=(VkImageSubresourceRange)
+		{
+			.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.baseMipLevel=0,
+			.levelCount=1,
+			.layerCount=1,
+		},
+		.srcAccessMask=0,
+		.dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+		.newLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	});
+
+	vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
@@ -252,7 +292,7 @@ void InitShadowFramebuffer(void)
 		.image=ShadowDepth.Image,
 		.subresourceRange=(VkImageSubresourceRange)
 		{
-			.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
+			.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
 			.baseMipLevel=0,
 			.levelCount=1,
 			.layerCount=1,
@@ -263,25 +303,46 @@ void InitShadowFramebuffer(void)
 		.newLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 	});
 
-	vkEndCommandBuffer(copyCmd);
+	vkEndCommandBuffer(CommandBuffer);
 		
+	// Create a fence for the queue submit
+	vkCreateFence(Context.Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &Fence);
+
+	// Submit commands to the queue
 	vkQueueSubmit(Context.Queue, 1, &(VkSubmitInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.commandBufferCount=1,
-		.pCommandBuffers=&copyCmd,
-	}, VK_NULL_HANDLE);
+		.pCommandBuffers=&CommandBuffer,
+	}, Fence);
 
-	vkQueueWaitIdle(Context.Queue);
+	// Wait for the queue submit to finish
+	vkWaitForFences(Context.Device, 1, &Fence, VK_TRUE, UINT64_MAX);
 
-	vkFreeCommandBuffers(Context.Device, Context.CommandPool, 1, &copyCmd);
+	// Destroy fence
+	vkDestroyFence(Context.Device, Fence, VK_NULL_HANDLE);
+
+	vkFreeCommandBuffers(Context.Device, Context.CommandPool, 1, &CommandBuffer);
 
 	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.viewType=VK_IMAGE_VIEW_TYPE_2D,
-		.format=DepthFormat,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
+		.format=ShadowColorFormat,
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+		.subresourceRange.baseMipLevel=0,
+		.subresourceRange.baseArrayLayer=0,
+		.subresourceRange.layerCount=1,
+		.subresourceRange.levelCount=1,
+		.image=ShadowColor.Image,
+	}, VK_NULL_HANDLE, &ShadowColor.View);
+
+	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+		.viewType=VK_IMAGE_VIEW_TYPE_2D,
+		.format=ShadowDepthFormat,
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
 		.subresourceRange.baseMipLevel=0,
 		.subresourceRange.baseArrayLayer=0,
 		.subresourceRange.layerCount=1,
@@ -292,28 +353,43 @@ void InitShadowFramebuffer(void)
 	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-		.attachmentCount=1,
+		.attachmentCount=2,
 		.pAttachments=(VkAttachmentDescription[])
 		{
 			{
-				.format=DepthFormat,
+				.format=ShadowColorFormat,
 				.samples=VK_SAMPLE_COUNT_1_BIT,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
 				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+				.finalLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			},
+			{
+				.format=ShadowDepthFormat,
+				.samples=VK_SAMPLE_COUNT_1_BIT,
+				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
+				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+				.finalLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 			},
 		},
 		.subpassCount=1,
 		.pSubpasses=&(VkSubpassDescription)
 		{
 			.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS,
-			.colorAttachmentCount=0,
-			.pDepthStencilAttachment=&(VkAttachmentReference)
+			.colorAttachmentCount=1,
+			.pColorAttachments=&(VkAttachmentReference)
 			{
 				.attachment=0,
+				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			},
+			.pDepthStencilAttachment=&(VkAttachmentReference)
+			{
+				.attachment=1,
 				.layout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 			},
 		},
@@ -323,8 +399,8 @@ void InitShadowFramebuffer(void)
 	{
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 		.renderPass=ShadowRenderPass,
-		.attachmentCount=1,
-		.pAttachments=(VkImageView[]) { ShadowDepth.View },
+		.attachmentCount=2,
+		.pAttachments=(VkImageView[]) { ShadowColor.View, ShadowDepth.View },
 		.width=ShadowCubeSize,
 		.height=ShadowCubeSize,
 		.layers=1,
@@ -340,7 +416,7 @@ bool InitShadowPipeline(void)
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
 			.offset=0,
-			.size=sizeof(float)*(16+4),
+			.size=sizeof(shadow_ubo),
 			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
 		},		
 	}, 0, &ShadowPipelineLayout);
@@ -417,8 +493,8 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 			.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 			.renderPass=ShadowRenderPass,
 			.framebuffer=ShadowFrameBuffer,
-			.clearValueCount=1,
-			.pClearValues=(VkClearValue[]) { { .depthStencil.depth=1.0f, .depthStencil.stencil=0 } },
+			.clearValueCount=2,
+			.pClearValues=(VkClearValue[]) { { 0.0f, 0.0f, 0.0f, 1.0f }, { 1.0f, 0 } },
 			.renderArea.offset=(VkOffset2D) { 0, 0 },
 			.renderArea.extent=(VkExtent2D)	{ ShadowCubeSize, ShadowCubeSize },
 		}, VK_SUBPASS_CONTENTS_INLINE);
@@ -446,23 +522,23 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 		vkCmdEndRenderPass(CommandBuffer);
 
 		// Change frame buffer image layout to source transfer
-		vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 		{
 			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=ShadowDepth.Image,
+			.image=ShadowColor.Image,
 			.subresourceRange=(VkImageSubresourceRange)
 			{
-				.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
+				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 				.baseMipLevel=0,
 				.baseArrayLayer=0,
 				.levelCount=1,
 				.layerCount=1,
 			},
-			.srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+			.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 			.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+			.oldLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			.newLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 		});
 
@@ -475,7 +551,7 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 			.image=Shadow.Image,
 			.subresourceRange=(VkImageSubresourceRange)
 			{
-				.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
+				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 				.baseMipLevel=0,
 				.baseArrayLayer=face,
 				.levelCount=1,
@@ -488,14 +564,14 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 		});
 
 		// Copy image from framebuffer to cube face
-		vkCmdCopyImage(CommandBuffer, ShadowDepth.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Shadow.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageCopy)
+		vkCmdCopyImage(CommandBuffer, ShadowColor.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Shadow.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageCopy)
 		{
-			.srcSubresource.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
+			.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.srcSubresource.baseArrayLayer=0,
 			.srcSubresource.mipLevel=0,
 			.srcSubresource.layerCount=1,
 			.srcOffset={ 0, 0, 0 },
-			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
+			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.dstSubresource.baseArrayLayer=face,
 			.dstSubresource.mipLevel=0,
 			.dstSubresource.layerCount=1,
@@ -506,24 +582,24 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 		});
 
 		// Change frame buffer image layout back to color arrachment
-		vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
 		{
 			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=ShadowDepth.Image,
+			.image=ShadowColor.Image,
 			.subresourceRange=(VkImageSubresourceRange)
 			{
-				.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
+				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 				.baseMipLevel=0,
 				.baseArrayLayer=0,
 				.levelCount=1,
 				.layerCount=1,
 			},
 			.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-			.dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+			.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-			.newLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+			.newLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		});
 
 		// Change cubemap texture image face back to shader read-only (for use in the main render shader)
@@ -535,7 +611,7 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 			.image=Shadow.Image,
 			.subresourceRange=(VkImageSubresourceRange)
 			{
-				.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
+				.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 				.baseMipLevel=0,
 				.baseArrayLayer=face,
 				.levelCount=1,
@@ -1306,7 +1382,12 @@ void Destroy(void)
 
 	vkDestroyRenderPass(Context.Device, ShadowRenderPass, VK_NULL_HANDLE);
 
-	// Frame buffer depth
+	// Shadow frame buffer color
+	vkDestroyImageView(Context.Device, ShadowColor.View, VK_NULL_HANDLE);
+	vkFreeMemory(Context.Device, ShadowColor.DeviceMemory, VK_NULL_HANDLE);
+	vkDestroyImage(Context.Device, ShadowColor.Image, VK_NULL_HANDLE);
+
+	// Shadow frame buffer depth
 	vkDestroyImageView(Context.Device, ShadowDepth.View, VK_NULL_HANDLE);
 	vkFreeMemory(Context.Device, ShadowDepth.DeviceMemory, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, ShadowDepth.Image, VK_NULL_HANDLE);
