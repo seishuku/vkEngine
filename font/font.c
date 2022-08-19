@@ -116,8 +116,8 @@ void _Font_Init(void)
 
 	vkuInitPipeline(&fontPipeline, &Context);
 
-	vkuPipeline_AddStage(&fontPipeline, "./shaders/font_v.spv", VK_SHADER_STAGE_VERTEX_BIT);
-	vkuPipeline_AddStage(&fontPipeline, "./shaders/font_f.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuPipeline_AddStage(&fontPipeline, "./shaders/font.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+	vkuPipeline_AddStage(&fontPipeline, "./shaders/font.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
 	vkuPipeline_SetPipelineLayout(&fontPipeline, fontPipelineLayout);
 	vkuPipeline_SetRenderPass(&fontPipeline, RenderPass);

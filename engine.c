@@ -417,11 +417,11 @@ bool InitShadowPipeline(void)
 	vkuPipeline_SetRenderPass(&ShadowPipeline, ShadowRenderPass);
 
 	// Add in vertex shader
-	if(!vkuPipeline_AddStage(&ShadowPipeline, "./shaders/distance_v.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&ShadowPipeline, "./shaders/distance.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
 	// Add in fragment shader
-	if(!vkuPipeline_AddStage(&ShadowPipeline, "./shaders/distance_f.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	if(!vkuPipeline_AddStage(&ShadowPipeline, "./shaders/distance.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
 	// Set states that are different than defaults
@@ -742,10 +742,10 @@ bool CreatePipeline(void)
 	Pipeline.DepthTest=VK_TRUE;
 	Pipeline.CullMode=VK_CULL_MODE_BACK_BIT;
 
-	if(!vkuPipeline_AddStage(&Pipeline, "./shaders/lighting_v.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&Pipeline, "./shaders/lighting.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
-	if(!vkuPipeline_AddStage(&Pipeline, "./shaders/lighting_f.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	if(!vkuPipeline_AddStage(&Pipeline, "./shaders/lighting.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
 	vkuPipeline_AddVertexBinding(&Pipeline, 0, sizeof(float)*20, VK_VERTEX_INPUT_RATE_VERTEX);

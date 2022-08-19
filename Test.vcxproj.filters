@@ -100,23 +100,23 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="shaders\distance_f.glsl">
+    <GLSL Include="shaders\distance.frag">
       <Filter>Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="shaders\distance_v.glsl">
+    </GLSL>
+    <GLSL Include="shaders\font.frag">
       <Filter>Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="shaders\font_f.glsl">
+    </GLSL>
+    <GLSL Include="shaders\lighting.frag">
       <Filter>Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="shaders\font_v.glsl">
+    </GLSL>
+    <GLSL Include="shaders\distance.vert">
       <Filter>Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="shaders\lighting_f.glsl">
+    </GLSL>
+    <GLSL Include="shaders\font.vert">
       <Filter>Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="shaders\lighting_v.glsl">
+    </GLSL>
+    <GLSL Include="shaders\lighting.vert">
       <Filter>Shaders</Filter>
-    </CustomBuild>
+    </GLSL>
   </ItemGroup>
 </Project>

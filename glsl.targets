@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <PropertyPageSchema Include="$(MSBuildThisFileDirectory)glsl.xml" />
+    <AvailableItemName Include="GLSL">
+      <Targets>GLSL</Targets>
+    </AvailableItemName>
+  </ItemGroup>
+
+  <Target Name="GLSL" Condition="'@(glsl)' != ''" BeforeTargets="ClCompile">
+  <ItemGroup>
+    <GLSL>
+      <Message>%(Identity).spv</Message>
+      <Command>"$(VULKAN_SDK)\bin\glslangValidator.exe" -V "%(Identity)" -o "%(Identity).spv" </Command>
+      <Outputs>%(Identity).spv</Outputs>
+    </GLSL>
+  </ItemGroup>
+  <CustomBuild Sources="@(GLSL)" MinimalRebuildFromTracking="true" TrackerLogDirectory="$(TLogLocation)" ErrorListRegex="(?'FILENAME'.+):(?'LINE'\d+):(?'COLUMN'\d+): (?'CATEGORY'error|warning): (?'TEXT'.*)"/>
+  </Target>
+</Project>
