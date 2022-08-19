@@ -46,12 +46,6 @@ VkDeviceMemory fontInstanceBufferMemory=VK_NULL_HANDLE;
 VkBuffer fontInstanceBuffer=VK_NULL_HANDLE;
 void *fontInstanceBufferPtr=VK_NULL_HANDLE;
 
-// Uniform data handles
-VkDeviceMemory fontUniformBufferMemory=VK_NULL_HANDLE;
-VkBuffer fontUniformBuffer=VK_NULL_HANDLE;
-void *fontUniformBufferPtr=VK_NULL_HANDLE;
-// ---
-
 // Initialization flag
 bool Font_Init=false;
 
@@ -69,13 +63,9 @@ void _Font_Init(void)
 		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 		.pNext=VK_NULL_HANDLE,
 		.maxSets=1,
-		.poolSizeCount=2,
+		.poolSizeCount=1,
 		.pPoolSizes=(VkDescriptorPoolSize[])
 		{
-			{
-				.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-				.descriptorCount=1,
-			},
 			{
 				.type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 				.descriptorCount=1,
@@ -87,18 +77,11 @@ void _Font_Init(void)
 	{
 		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
 		.pNext=VK_NULL_HANDLE,
-		.bindingCount=2,
+		.bindingCount=1,
 		.pBindings=(VkDescriptorSetLayoutBinding[])
 		{
 			{
 				.binding=0,
-				.descriptorType=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-				.descriptorCount=1,
-				.stageFlags=VK_SHADER_STAGE_VERTEX_BIT,
-				.pImmutableSamplers=NULL,
-			},
-			{
-				.binding=1,
 				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 				.descriptorCount=1,
 				.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -112,6 +95,13 @@ void _Font_Init(void)
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
 		.pSetLayouts=&fontDescriptorSetLayout,
+		.pushConstantRangeCount=1,
+		.pPushConstantRanges=&(VkPushConstantRange)
+		{
+			.offset=0,
+			.size=sizeof(uint32_t)*2,
+			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+		},		
 	}, 0, &fontPipelineLayout);
 
 	vkuInitPipeline(&fontPipeline, &Context);
@@ -182,7 +172,7 @@ void _Font_Init(void)
 	}
 
 	vkuCreateImageBuffer(&Context, &fontTexture,
-		VK_IMAGE_TYPE_3D, VK_FORMAT_R8_UNORM, 1, 1, 16, 16, 223,
+		VK_IMAGE_TYPE_2D, VK_FORMAT_R8_UNORM, 1, 223, 16, 16, 1,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
@@ -195,6 +185,7 @@ void _Font_Init(void)
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount=1,
 	}, &copyCmd);
+
 	vkBeginCommandBuffer(copyCmd, &(VkCommandBufferBeginInfo) { .sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO });
 
 	vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
@@ -203,13 +194,10 @@ void _Font_Init(void)
 		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 		.image=fontTexture.Image,
-		.subresourceRange=(VkImageSubresourceRange)
-		{
-			.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.baseMipLevel=0,
-			.levelCount=1,
-			.layerCount=1,
-		},
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+		.subresourceRange.baseMipLevel=0,
+		.subresourceRange.levelCount=1,
+		.subresourceRange.layerCount=223,
 		.srcAccessMask=VK_ACCESS_HOST_READ_BIT,
 		.dstAccessMask=VK_ACCESS_HOST_WRITE_BIT,
 		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
@@ -222,10 +210,10 @@ void _Font_Init(void)
 		.imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 		.imageSubresource.mipLevel=0,
 		.imageSubresource.baseArrayLayer=0,
-		.imageSubresource.layerCount=1,
+		.imageSubresource.layerCount=223,
 		.imageExtent.width=16,
 		.imageExtent.height=16,
-		.imageExtent.depth=223,
+		.imageExtent.depth=1,
 		.bufferOffset=0,
 	});
 
@@ -238,13 +226,10 @@ void _Font_Init(void)
 		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 		.image=fontTexture.Image,
-		.subresourceRange=(VkImageSubresourceRange)
-		{
-			.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.baseMipLevel=0,
-			.levelCount=1,
-			.layerCount=1,
-		},
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+		.subresourceRange.baseMipLevel=0,
+		.subresourceRange.levelCount=1,
+		.subresourceRange.layerCount=223,
 		.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
 		.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
 		.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -290,23 +275,16 @@ void _Font_Init(void)
 	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.viewType=VK_IMAGE_VIEW_TYPE_3D,
+		.viewType=VK_IMAGE_VIEW_TYPE_2D_ARRAY,
 		.format=VK_FORMAT_R8_UNORM,
 		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
 		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 		.subresourceRange.baseMipLevel=0,
 		.subresourceRange.baseArrayLayer=0,
-		.subresourceRange.layerCount=1,
+		.subresourceRange.layerCount=223,
 		.subresourceRange.levelCount=1,
 		.image=fontTexture.Image,
 	}, VK_NULL_HANDLE, &fontTexture.View);
-	// ---
-
-	// Uniform data
-	vkuCreateBuffer(&Context, &fontUniformBuffer, &fontUniformBufferMemory, sizeof(uint32_t)*2,
-		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-	vkMapMemory(Context.Device, fontUniformBufferMemory, 0, VK_WHOLE_SIZE, 0, &fontUniformBufferPtr);
 	// ---
 
 	// Allocate and update descripter set with uniform/texture handles
@@ -316,29 +294,16 @@ void _Font_Init(void)
 		.pNext=NULL,
 		.descriptorPool=fontDescriptorPool,
 		.descriptorSetCount=1,
-		.pSetLayouts=&fontDescriptorSetLayout
+		.pSetLayouts=&fontDescriptorSetLayout,
 	}, &fontDescriptorSet);
 
-	vkUpdateDescriptorSets(Context.Device, 2, (VkWriteDescriptorSet[])
+	vkUpdateDescriptorSets(Context.Device, 1, (VkWriteDescriptorSet[])
 	{
 		{
 			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.descriptorCount=1,
-			.descriptorType=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			.dstBinding=0,
-			.pBufferInfo=&(VkDescriptorBufferInfo)
-			{
-				.buffer=fontUniformBuffer,
-				.offset=0,
-				.range=sizeof(uint32_t)*2,
-			},
-			.dstSet=fontDescriptorSet,
-		},
-		{
-			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.descriptorCount=1,
 			.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.dstBinding=1,
+			.dstBinding=0,
 			.pImageInfo=&(VkDescriptorImageInfo)
 			{
 				.imageView=fontTexture.View,
@@ -391,7 +356,7 @@ void _Font_Init(void)
 
 	// Create instance buffer and map it
 	vkuCreateBuffer(&Context, &fontInstanceBuffer, &fontInstanceBufferMemory, sizeof(float)*7*255,
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	vkMapMemory(Context.Device, fontInstanceBufferMemory, 0, VK_WHOLE_SIZE, 0, (void *)&fontInstanceBufferPtr);
 	// ---
@@ -430,9 +395,6 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 		// Done with init
 		Font_Init=true;
 	}
-
-	((uint32_t *)fontUniformBufferPtr)[0]=Width;
-	((uint32_t *)fontUniformBufferPtr)[1]=Height;
 
 	// Update instance data
 	// Get the pointer to the mapped instance buffer
@@ -487,13 +449,13 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 		}
 
 		// Emit position, atlas offset, and color for this character
-		*verts++=x;									// InstancePos.x
-		*verts++=y;									// InstancePos.y
-		*verts++=((float)(*ptr-33)/223.0f)+0.0023f;	// InstancePos.z
-		*verts++=0.0f;								// InstancePos.w
-		*verts++=r;									// InstanceColor.r
-		*verts++=g;									// InstanceColor.g
-		*verts++=b;									// InstanceColor.b
+		*verts++=x;					// InstancePos.x
+		*verts++=y;					// InstancePos.y
+		*verts++=(float)(*ptr-33);	// InstancePos.z
+		*verts++=0.0f;				// InstancePos.w
+		*verts++=r;					// InstanceColor.r
+		*verts++=g;					// InstanceColor.g
+		*verts++=b;					// InstanceColor.b
 
 		// Advance one character
 		x+=9;
@@ -502,8 +464,12 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 
 	// Bind the font rendering pipeline (sets states and shaders)
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, fontPipeline.Pipeline);
+	
 	// Bind descriptor sets (sets uniform/texture bindings)
 	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, fontPipelineLayout, 0, 1, &fontDescriptorSet, 0, NULL);
+
+	uint32_t viewport[2]={ Width, Height };
+	vkCmdPushConstants(cmd, fontPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t)*2, viewport);
 
 	// Bind vertex data buffer
 	vkCmdBindVertexBuffers(cmd, 0, 1, &fontVertexBuffer, &(VkDeviceSize) { 0 });
@@ -516,10 +482,6 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 
 void Font_Destroy(void)
 {
-	vkUnmapMemory(Context.Device, fontUniformBufferMemory);
-	vkFreeMemory(Context.Device, fontUniformBufferMemory, VK_NULL_HANDLE);
-	vkDestroyBuffer(Context.Device, fontUniformBuffer, VK_NULL_HANDLE);
-
 	// Instance buffer handles
 	vkUnmapMemory(Context.Device, fontInstanceBufferMemory);
 	vkFreeMemory(Context.Device, fontInstanceBufferMemory, VK_NULL_HANDLE);

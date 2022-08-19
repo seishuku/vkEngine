@@ -8,16 +8,18 @@
 #include "model/3ds.h"
 #include "image/image.h"
 #include "font/font.h"
+#include "utils/list.h"
+#include "lights/lights.h"
 
 char szAppName[]="Vulkan";
 
-int Width=1280, Height=720;
- int Done=0, Key[256];
+uint32_t Width=1280, Height=720;
+bool Done=0, Key[256];
 
- VkInstance Instance;
- VkuContext_t Context;
+VkInstance Instance;
+VkuContext_t Context;
  
- float RotateX=0.0f, RotateY=0.0f, PanX=0.0f, PanY=0.0f, Zoom=-100.0f;
+float RotateX=0.0f, RotateY=0.0f, PanX=0.0f, PanY=0.0f, Zoom=-100.0f;
 
 unsigned __int64 Frequency, StartTime, EndTime;
 float avgfps=0.0f, fps=0.0f, fTimeStep, fTime=0.0f;
@@ -52,17 +54,14 @@ Image_t Textures[NUM_TEXTURES];
 matrix ModelView, Projection;
 vec4 QuatX, QuatY, Quat;
 
+Lights_t Lights;
+
 struct
 {
-	float mvp[16];
-	float eye[4];
+	matrix mvp;
+	vec4 eye;
 
-	float Light0_Pos[4];
-	float Light0_Kd[4];
-	float Light1_Pos[4];
-	float Light1_Kd[4];
-	float Light2_Pos[4];
-	float Light2_Kd[4];
+	uint32_t NumLights;
 } ubo;
 
 VkBuffer uniformBuffer;
@@ -94,7 +93,7 @@ VkPipelineLayout PipelineLayout;
 VkuPipeline_t Pipeline;
 
 VkDescriptorPool DescriptorPool;
-VkDescriptorSet DescriptorSet[4];
+VkDescriptorSet DescriptorSet;
 VkuDescriptorSetLayout_t DescriptorSetLayout;
 
 
@@ -489,7 +488,7 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 			.renderArea.extent=(VkExtent2D)	{ ShadowCubeSize, ShadowCubeSize },
 		}, VK_SUBPASS_CONTENTS_INLINE);
 
-		vkCmdPushConstants(CommandBuffer, ShadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*(16+4), &shadow_ubo);
+		vkCmdPushConstants(CommandBuffer, ShadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shadow_ubo), &shadow_ubo);
 
 		// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
 		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ShadowPipeline.Pipeline);
@@ -701,24 +700,24 @@ bool CreatePipeline(void)
 	{
 		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 		.pNext=VK_NULL_HANDLE,
-		.maxSets=NUM_MODELS,
+		.maxSets=1,
 		.poolSizeCount=2,
 		.pPoolSizes=(VkDescriptorPoolSize[])
 		{
 			{
-				.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-				.descriptorCount=NUM_MODELS,
+				.type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				.descriptorCount=1,
 			},
 			{
 				.type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.descriptorCount=NUM_MODELS*6,
+				.descriptorCount=6,
 			},
 		},
 	}, NULL, &DescriptorPool);
 
 	vkuInitDescriptorSetLayout(&DescriptorSetLayout, &Context);
 
-	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
+	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
 	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
 	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
 	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
@@ -727,11 +726,27 @@ bool CreatePipeline(void)
 
 	vkuAssembleDescriptorSetLayout(&DescriptorSetLayout);
 
+	vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+		.pNext=NULL,
+		.descriptorPool=DescriptorPool,
+		.descriptorSetCount=1,
+		.pSetLayouts=&DescriptorSetLayout.DescriptorSetLayout
+	}, &DescriptorSet);
+
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
 		.pSetLayouts=&DescriptorSetLayout.DescriptorSetLayout,
+		.pushConstantRangeCount=1,
+		.pPushConstantRanges=&(VkPushConstantRange)
+		{
+			.offset=0,
+			.size=sizeof(ubo),
+			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
 	}, 0, &PipelineLayout);
 
 	vkuInitPipeline(&Pipeline, &Context);
@@ -850,31 +865,6 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 	}
 }
 
-VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkDebugUtilsMessengerEXT *pDebugMessenger)
-{
-	PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT=(PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-
-	if(vkCreateDebugUtilsMessengerEXT!=NULL)
-		return vkCreateDebugUtilsMessengerEXT(instance, pCreateInfo, pAllocator, pDebugMessenger);
-	else
-		return VK_ERROR_EXTENSION_NOT_PRESENT;
-}
-
-void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks *pAllocator)
-{
-	PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT=(PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-
-	if(vkDestroyDebugUtilsMessengerEXT!=NULL)
-		vkDestroyDebugUtilsMessengerEXT(instance, debugMessenger, pAllocator);
-}
-
-static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
-{
-	DBGPRINTF("validation layer: %s\n", pCallbackData->pMessage);
-
-	return VK_FALSE;
-}
-
 void Render(void)
 {
 	static OldIndex=0;
@@ -896,7 +886,6 @@ void Render(void)
 	QuatMatrix(Quat, ModelView);
 
 	// Generate an inverse modelview matrix (only really need the last 3 from the calculation)
-//	MatrixInverse(ModelView, ubo.mvinv);
 	ubo.eye[0]=-(ModelView[12]*ModelView[ 0])-(ModelView[13]*ModelView[ 1])-(ModelView[14]*ModelView[ 2]);
 	ubo.eye[1]=-(ModelView[12]*ModelView[ 4])-(ModelView[13]*ModelView[ 5])-(ModelView[14]*ModelView[ 6]);
 	ubo.eye[2]=-(ModelView[12]*ModelView[ 8])-(ModelView[13]*ModelView[ 9])-(ModelView[14]*ModelView[10]);
@@ -904,36 +893,10 @@ void Render(void)
 	// Generate a modelview+projection matrix
 	MatrixMult(ModelView, Projection, ubo.mvp);
 
-	// Set light uniform positions and color
-	ubo.Light0_Pos[0]=sinf(fTime)*150.0f;
-	ubo.Light0_Pos[1]=-25.0f;
-	ubo.Light0_Pos[2]=cosf(fTime)*150.0f;
-	ubo.Light0_Pos[3]=1.0f/256.0f;
-	ubo.Light0_Kd[0]=1.0f;
-	ubo.Light0_Kd[1]=1.0f;
-	ubo.Light0_Kd[2]=1.0f;
-	ubo.Light0_Kd[3]=1.0f;
+	// Set number of lights to the shader
+	ubo.NumLights=(uint32_t)List_GetCount(&Lights.Lights);
 
-	ubo.Light1_Pos[0]=cosf(fTime)*100.0f;
-	ubo.Light1_Pos[1]=50.0f;
-	ubo.Light1_Pos[2]=sinf(fTime)*100.0f;
-	ubo.Light1_Pos[3]=1.0f/256.0f;
-	ubo.Light1_Kd[0]=1.0f;
-	ubo.Light1_Kd[1]=1.0f;
-	ubo.Light1_Kd[2]=1.0f;
-	ubo.Light1_Kd[3]=1.0f;
-
-	ubo.Light2_Pos[0]=cosf(fTime)*100.0f;
-	ubo.Light2_Pos[1]=-80.0f;
-	ubo.Light2_Pos[2]=-15.0f;
-	ubo.Light2_Pos[3]=1.0f/256.0f;
-	ubo.Light2_Kd[0]=1.0f;
-	ubo.Light2_Kd[1]=1.0f;
-	ubo.Light2_Kd[2]=1.0f;
-	ubo.Light2_Kd[3]=1.0f;
-
-	// Copy uniform data to the Vulkan UBO buffer
-	memcpy(uniformBufferPtr, &ubo, sizeof(ubo));
+	Lights_UpdateSSBO(&Lights);
 
 	vkAcquireNextImageKHR(Context.Device, Swapchain, UINT64_MAX, PresentCompleteSemaphores[Index], VK_NULL_HANDLE, &ImageIndex);
 
@@ -947,9 +910,9 @@ void Render(void)
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 	});
 
-	ShadowUpdateCubemap(CommandBuffers[Index], ShadowBuf[0], ubo.Light0_Pos);
-	ShadowUpdateCubemap(CommandBuffers[Index], ShadowBuf[1], ubo.Light1_Pos);
-	ShadowUpdateCubemap(CommandBuffers[Index], ShadowBuf[2], ubo.Light2_Pos);
+	//ShadowUpdateCubemap(CommandBuffers[Index], ShadowBuf[0], ubo.Light0_Pos);
+	//ShadowUpdateCubemap(CommandBuffers[Index], ShadowBuf[1], ubo.Light1_Pos);
+	//ShadowUpdateCubemap(CommandBuffers[Index], ShadowBuf[2], ubo.Light2_Pos);
 
 	// Start a render pass and clear the frame/depth buffer
 	vkCmdBeginRenderPass(CommandBuffers[Index], &(VkRenderPassBeginInfo)
@@ -969,11 +932,95 @@ void Render(void)
 	vkCmdSetViewport(CommandBuffers[Index], 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)SwapchainExtent.width, (float)SwapchainExtent.height, 0.0f, 1.0f });
 	vkCmdSetScissor(CommandBuffers[Index], 0, 1, &(VkRect2D) { { 0, 0 }, SwapchainExtent});
 
+	vkCmdPushConstants(CommandBuffers[Index], PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ubo), &ubo);
+
 	// Draw the models
 	for(i=0;i<NUM_MODELS;i++)
 	{
+		vkUpdateDescriptorSets(Context.Device, 6, (VkWriteDescriptorSet[])
+		{
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.descriptorCount=1,
+				.descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				.dstBinding=0,
+				.pBufferInfo=&(VkDescriptorBufferInfo)
+				{
+					.buffer=Lights.StorageBuffer,
+					.offset=0,
+					.range=VK_WHOLE_SIZE,
+				},
+				.dstSet=DescriptorSet,
+			},
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.descriptorCount=1,
+				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.dstBinding=1,
+				.pImageInfo=&(VkDescriptorImageInfo)
+				{
+					.imageView=Textures[2*i+0].View,
+					.sampler=Textures[2*i+0].Sampler,
+					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				},
+				.dstSet=DescriptorSet,
+			},
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.descriptorCount=1,
+				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.dstBinding=2,
+				.pImageInfo=&(VkDescriptorImageInfo)
+				{
+					.imageView=Textures[2*i+1].View,
+					.sampler=Textures[2*i+1].Sampler,
+					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				},
+				.dstSet=DescriptorSet,
+			},
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.descriptorCount=1,
+				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.dstBinding=3,
+				.pImageInfo=&(VkDescriptorImageInfo)
+				{
+					.imageView=ShadowBuf[0].View,
+					.sampler=ShadowBuf[0].Sampler,
+					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				},
+				.dstSet=DescriptorSet,
+			},
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.descriptorCount=1,
+				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.dstBinding=4,
+				.pImageInfo=&(VkDescriptorImageInfo)
+				{
+					.imageView=ShadowBuf[1].View,
+					.sampler=ShadowBuf[1].Sampler,
+					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				},
+				.dstSet=DescriptorSet,
+			},
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.descriptorCount=1,
+				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.dstBinding=5,
+				.pImageInfo=&(VkDescriptorImageInfo)
+				{
+					.imageView=ShadowBuf[2].View,
+					.sampler=ShadowBuf[2].Sampler,
+					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				},
+				.dstSet=DescriptorSet,
+			},
+		}, 0, VK_NULL_HANDLE);
+
 		// Bind per-model destriptor set, this changes texture binding
-		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[i], 0, NULL);
+		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet, 0, NULL);
 
 		// Bind model data buffers and draw the triangles
 		for(j=0;j<Model[i].NumMesh;j++)
@@ -987,7 +1034,7 @@ void Render(void)
 
 	// Should UI overlay stuff have it's own render pass?
 	// Maybe even separate thread?
-	Font_Print(CommandBuffers[Index], 0.0f, 0.0f, "FPS: %0.1f", fps);
+	Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f\n\n\n\nNumber of lights: %d", fps, ubo.NumLights);
 
 	vkCmdEndRenderPass(CommandBuffers[Index]);
 
@@ -1020,6 +1067,31 @@ void Render(void)
 	OldIndex=Index;
 }
 
+VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkDebugUtilsMessengerEXT *pDebugMessenger)
+{
+	PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT=(PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+
+	if(vkCreateDebugUtilsMessengerEXT!=NULL)
+		return vkCreateDebugUtilsMessengerEXT(instance, pCreateInfo, pAllocator, pDebugMessenger);
+	else
+		return VK_ERROR_EXTENSION_NOT_PRESENT;
+}
+
+void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks *pAllocator)
+{
+	PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT=(PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+
+	if(vkDestroyDebugUtilsMessengerEXT!=NULL)
+		vkDestroyDebugUtilsMessengerEXT(instance, debugMessenger, pAllocator);
+}
+
+static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
+{
+	DBGPRINTF("Validation layer: %s\n", pCallbackData->pMessage);
+
+	return VK_FALSE;
+}
+
 bool Init(void)
 {
 	VkDebugUtilsMessengerCreateInfoEXT createInfo=
@@ -1032,6 +1104,11 @@ bool Init(void)
 
 	if(CreateDebugUtilsMessengerEXT(Instance, &createInfo, VK_NULL_HANDLE, &debugMessenger)!=VK_SUCCESS)
 		return false;
+
+	Lights_Init(&Lights);
+	Lights_Add(&Lights, (vec3) { 0.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 1.0f, 0.0f, 0.0f, 1.0f });
+	Lights_Add(&Lights, (vec3) { -50.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 0.0f, 1.0f, 0.0f, 1.0f });
+	Lights_Add(&Lights, (vec3) { 50.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 0.0f, 0.0f, 1.0f, 1.0f });
 
 	// Create primary frame buffers, depth image, and renderpass
 	CreateFramebuffers();
@@ -1074,101 +1151,6 @@ bool Init(void)
 
 	InitShadowFramebuffer();
 	InitShadowPipeline();
-
-	// Allocate and update descriptor sets for each model, each model has a different texture, so different sampler bindings are needed.
-	for(uint32_t i=0;i<NUM_MODELS;i++)
-	{
-		vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-			.pNext=NULL,
-			.descriptorPool=DescriptorPool,
-			.descriptorSetCount=1,
-			.pSetLayouts=&DescriptorSetLayout.DescriptorSetLayout
-		}, &DescriptorSet[i]);
-
-		vkUpdateDescriptorSets(Context.Device, 6, (VkWriteDescriptorSet[])
-		{
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-				.dstBinding=0,
-				.pBufferInfo=&(VkDescriptorBufferInfo)
-				{
-					.buffer=uniformBuffer,
-					.offset=0,
-					.range=sizeof(ubo),
-				},
-				.dstSet=DescriptorSet[i],
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.dstBinding=1,
-				.pImageInfo=&(VkDescriptorImageInfo)
-				{
-					.imageView=Textures[2*i+0].View,
-					.sampler=Textures[2*i+0].Sampler,
-					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				},
-				.dstSet=DescriptorSet[i],
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.dstBinding=2,
-				.pImageInfo=&(VkDescriptorImageInfo)
-				{
-					.imageView=Textures[2*i+1].View,
-					.sampler=Textures[2*i+1].Sampler,
-					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				},
-				.dstSet=DescriptorSet[i],
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.dstBinding=3,
-				.pImageInfo=&(VkDescriptorImageInfo)
-				{
-					.imageView=ShadowBuf[0].View,
-					.sampler=ShadowBuf[0].Sampler,
-					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				},
-				.dstSet=DescriptorSet[i],
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.dstBinding=4,
-				.pImageInfo=&(VkDescriptorImageInfo)
-				{
-					.imageView=ShadowBuf[1].View,
-					.sampler=ShadowBuf[1].Sampler,
-					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				},
-				.dstSet=DescriptorSet[i],
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.dstBinding=5,
-				.pImageInfo=&(VkDescriptorImageInfo)
-				{
-					.imageView=ShadowBuf[2].View,
-					.sampler=ShadowBuf[2].Sampler,
-					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				},
-				.dstSet=DescriptorSet[i],
-			},
-		}, 0, VK_NULL_HANDLE);
-	}
  
 	return true;
 }
@@ -1342,6 +1324,8 @@ void Destroy(void)
 
 	DestroyDebugUtilsMessengerEXT(Instance, debugMessenger, VK_NULL_HANDLE);
 
+	Lights_Destroy(&Lights);
+
 	// Shadow stuff
 	vkDestroyPipeline(Context.Device, ShadowPipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, ShadowPipelineLayout, VK_NULL_HANDLE);
@@ -1463,126 +1447,146 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	switch(uMsg)
 	{
-	case WM_CREATE:
-		break;
-
-	case WM_CLOSE:
-		PostQuitMessage(0);
-		break;
-
-	case WM_DESTROY:
-		break;
-
-	case WM_SIZE:
-		Width=max(LOWORD(lParam), 2);
-		Height=max(HIWORD(lParam), 2);
-
-		if(Context.Device!=VK_NULL_HANDLE) // Windows quirk, WM_SIZE is signaled on window creation, *before* Vulkan get initalized
-		{
-			// Wait for the device to complete any pending work
-			vkDeviceWaitIdle(Context.Device);
-
-			// To resize a surface, we need to destroy and recreate anything that's tied to the surface.
-			// This is basically just the swapchain and frame buffers
-
-			vkDestroyImageView(Context.Device, Depth.View, VK_NULL_HANDLE);
-			vkFreeMemory(Context.Device, Depth.DeviceMemory, VK_NULL_HANDLE);
-			vkDestroyImage(Context.Device, Depth.Image, VK_NULL_HANDLE);
-
-			for(uint32_t i=0;i<SwapchainImageCount;i++)
-			{
-				vkDestroyFramebuffer(Context.Device, FrameBuffers[i], VK_NULL_HANDLE);
-
-				vkDestroyImageView(Context.Device, SwapchainImageView[i], VK_NULL_HANDLE);
-
-				vkDestroyFence(Context.Device, FrameFences[i], VK_NULL_HANDLE);
-
-				vkDestroySemaphore(Context.Device, PresentCompleteSemaphores[i], VK_NULL_HANDLE);
-				vkDestroySemaphore(Context.Device, RenderCompleteSemaphores[i], VK_NULL_HANDLE);
-			}
-
-			vkDestroySwapchainKHR(Context.Device, Swapchain, VK_NULL_HANDLE);
-
-			// Recreate the swapchain and frame buffers
-			vkuCreateSwapchain(&Context, Width, Height, VK_TRUE);
-			CreateFramebuffers();
-
-			// Does the render pass need to be recreated as well?
-			// Validation doesn't complain about it...?
-		}
-		break;
-
-	case WM_LBUTTONDOWN:
-	case WM_MBUTTONDOWN:
-	case WM_RBUTTONDOWN:
-		SetCapture(hWnd);
-		ShowCursor(FALSE);
-
-		GetCursorPos(&pos);
-		old.x=pos.x;
-		old.y=pos.y;
-		break;
-
-	case WM_LBUTTONUP:
-	case WM_MBUTTONUP:
-	case WM_RBUTTONUP:
-		ShowCursor(TRUE);
-		ReleaseCapture();
-		break;
-
-	case WM_MOUSEMOVE:
-		GetCursorPos(&pos);
-
-		if(!wParam)
-		{
-			old.x=pos.x;
-			old.y=pos.y;
-			break;
-		}
-
-		delta.x=pos.x-old.x;
-		delta.y=old.y-pos.y;
-
-		if(!delta.x&&!delta.y)
+		case WM_CREATE:
 			break;
 
-		SetCursorPos(old.x, old.y);
-
-		switch(wParam)
-		{
-		case MK_LBUTTON:
-			RotateX+=(delta.x*0.01f);
-			RotateY-=(delta.y*0.01f);
-			break;
-
-		case MK_MBUTTON:
-			PanX+=delta.x;
-			PanY+=delta.y;
-			break;
-
-		case MK_RBUTTON:
-			Zoom+=delta.y;
-			break;
-		}
-		break;
-
-	case WM_KEYDOWN:
-		Key[wParam]=1;
-
-		switch(wParam)
-		{
-		case VK_ESCAPE:
+		case WM_CLOSE:
 			PostQuitMessage(0);
 			break;
 
-		default:
+		case WM_DESTROY:
 			break;
-		}
-		break;
 
-	case WM_KEYUP:
-		Key[wParam]=0;
-		break;
+		case WM_SIZE:
+			Width=max(LOWORD(lParam), 2);
+			Height=max(HIWORD(lParam), 2);
+
+			if(Context.Device!=VK_NULL_HANDLE) // Windows quirk, WM_SIZE is signaled on window creation, *before* Vulkan get initalized
+			{
+				// Wait for the device to complete any pending work
+				vkDeviceWaitIdle(Context.Device);
+
+				// To resize a surface, we need to destroy and recreate anything that's tied to the surface.
+				// This is basically just the swapchain and frame buffers
+
+				vkDestroyImageView(Context.Device, Depth.View, VK_NULL_HANDLE);
+				vkFreeMemory(Context.Device, Depth.DeviceMemory, VK_NULL_HANDLE);
+				vkDestroyImage(Context.Device, Depth.Image, VK_NULL_HANDLE);
+
+				for(uint32_t i=0;i<SwapchainImageCount;i++)
+				{
+					vkDestroyFramebuffer(Context.Device, FrameBuffers[i], VK_NULL_HANDLE);
+
+					vkDestroyImageView(Context.Device, SwapchainImageView[i], VK_NULL_HANDLE);
+
+					vkDestroyFence(Context.Device, FrameFences[i], VK_NULL_HANDLE);
+
+					vkDestroySemaphore(Context.Device, PresentCompleteSemaphores[i], VK_NULL_HANDLE);
+					vkDestroySemaphore(Context.Device, RenderCompleteSemaphores[i], VK_NULL_HANDLE);
+				}
+
+				vkDestroySwapchainKHR(Context.Device, Swapchain, VK_NULL_HANDLE);
+
+				// Recreate the swapchain and frame buffers
+				vkuCreateSwapchain(&Context, Width, Height, VK_TRUE);
+				CreateFramebuffers();
+
+				// Does the render pass need to be recreated as well?
+				// Validation doesn't complain about it...?
+			}
+			break;
+
+		case WM_LBUTTONDOWN:
+		case WM_MBUTTONDOWN:
+		case WM_RBUTTONDOWN:
+			SetCapture(hWnd);
+			ShowCursor(FALSE);
+
+			GetCursorPos(&pos);
+			old.x=pos.x;
+			old.y=pos.y;
+			break;
+
+		case WM_LBUTTONUP:
+		case WM_MBUTTONUP:
+		case WM_RBUTTONUP:
+			ShowCursor(TRUE);
+			ReleaseCapture();
+			break;
+
+		case WM_MOUSEMOVE:
+			GetCursorPos(&pos);
+
+			if(!wParam)
+			{
+				old.x=pos.x;
+				old.y=pos.y;
+				break;
+			}
+
+			delta.x=pos.x-old.x;
+			delta.y=old.y-pos.y;
+
+			if(!delta.x&&!delta.y)
+				break;
+
+			SetCursorPos(old.x, old.y);
+
+			switch(wParam)
+			{
+				case MK_LBUTTON:
+					RotateX+=(delta.x*0.01f);
+					RotateY-=(delta.y*0.01f);
+					break;
+
+				case MK_MBUTTON:
+					PanX+=delta.x;
+					PanY+=delta.y;
+					break;
+
+				case MK_RBUTTON:
+					Zoom+=delta.y;
+					break;
+			}
+			break;
+
+		case WM_KEYDOWN:
+			Key[wParam]=1;
+
+			switch(wParam)
+			{
+				case 'O':
+					for(uint32_t i=0;i<10;i++)
+					{
+						Lights_Add(&Lights, 
+						(vec3)
+						{
+							(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f,
+							(((float)rand()/RAND_MAX)*2.0f-1.0f)*100.0f,
+							(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f
+						}, 50.0f,
+						(vec4)
+						{
+							(float)rand()/RAND_MAX,
+							(float)rand()/RAND_MAX,
+							(float)rand()/RAND_MAX,
+							1.0f
+						});
+					}
+					break;
+
+				case VK_ESCAPE:
+					PostQuitMessage(0);
+					break;
+
+				default:
+					break;
+			}
+			break;
+
+		case WM_KEYUP:
+			Key[wParam]=0;
+			break;
 	}
 
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);

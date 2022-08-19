@@ -4,7 +4,7 @@
 layout (location=0) in vec3 UV;
 layout (location=1) in vec4 Color;
 
-layout (binding=1) uniform sampler3D Texture;
+layout (binding=0) uniform sampler2DArray Texture;
 
 layout (location=0) out vec4 Output;
 

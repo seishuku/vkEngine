@@ -4,7 +4,7 @@ layout (location=0) in vec4 vVert;			// Incoming vertex position
 layout (location=1) in vec4 InstancePos;	// Instanced data position
 layout (location=2) in vec3 InstanceColor;	// Instanced data color
 
-layout (binding=0) uniform ubo {
+layout (push_constant) uniform ubo {
 	ivec2 Viewport;	// Window width/height
 };
 

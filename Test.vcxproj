@@ -97,16 +97,22 @@
     <ClCompile Include="image\image.c" />
     <ClCompile Include="image\qoi.c" />
     <ClCompile Include="image\tga.c" />
+    <ClCompile Include="lights\lights.c" />
     <ClCompile Include="math\math.c" />
     <ClCompile Include="model\3ds.c" />
+    <ClCompile Include="utils\genid.c" />
+    <ClCompile Include="utils\list.c" />
     <ClCompile Include="vulkan\vulkan.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="font\font.h" />
     <ClInclude Include="image\image.h" />
+    <ClInclude Include="lights\lights.h" />
     <ClInclude Include="math\math.h" />
     <ClInclude Include="model\3ds.h" />
     <ClInclude Include="system\system.h" />
+    <ClInclude Include="utils\genid.h" />
+    <ClInclude Include="utils\list.h" />
     <ClInclude Include="vulkan\vulkan.h" />
   </ItemGroup>
   <ItemGroup>

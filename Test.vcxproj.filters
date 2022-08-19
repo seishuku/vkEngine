@@ -52,6 +52,18 @@
     <Filter Include="Source Files\vulkan">
       <UniqueIdentifier>{e9489a5f-472f-49ab-9d20-08a3bd05daa2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\utils">
+      <UniqueIdentifier>{6f0deacc-98ba-4606-8c1a-46fdbb859a12}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\utils">
+      <UniqueIdentifier>{5dae7961-ad06-42ae-b7bb-61b2a0a167bd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\lights">
+      <UniqueIdentifier>{cdffb61b-69f2-4b32-b2eb-5885f31cf64f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\lights">
+      <UniqueIdentifier>{b0d9988b-18d0-49bf-9714-0f81f8de27fa}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="engine.c">
@@ -78,6 +90,15 @@
     <ClCompile Include="vulkan\vulkan.c">
       <Filter>Source Files\vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="utils\genid.c">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="utils\list.c">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="lights\lights.c">
+      <Filter>Source Files\lights</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
@@ -97,6 +118,15 @@
     </ClInclude>
     <ClInclude Include="vulkan\vulkan.h">
       <Filter>Header Files\vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\genid.h">
+      <Filter>Header Files\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\list.h">
+      <Filter>Header Files\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="lights\lights.h">
+      <Filter>Header Files\lights</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

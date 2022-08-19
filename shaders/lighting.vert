@@ -1,21 +1,17 @@
 #version 450
 
-layout(location=0) in vec3 vPosition;
-layout(location=1) in vec2 vUV;
-layout(location=2) in vec3 vTangent;
-layout(location=3) in vec3 vBinormal;
-layout(location=4) in vec3 vNormal;
+layout (location=0) in vec3 vPosition;
+layout (location=1) in vec2 vUV;
+layout (location=2) in vec3 vTangent;
+layout (location=3) in vec3 vBinormal;
+layout (location=4) in vec3 vNormal;
 
-layout(binding=0) uniform ubo {
+layout (push_constant) uniform ubo
+{
     mat4 mvp;
     vec4 eye;
 
-    vec4 Light0_Pos;
-    vec4 Light0_Kd;
-    vec4 Light1_Pos;
-    vec4 Light1_Kd;
-    vec4 Light2_Pos;
-    vec4 Light2_Kd;
+	uint NumLights;
 };
 
 out gl_PerVertex
@@ -23,12 +19,9 @@ out gl_PerVertex
     vec4 gl_Position;
 };
 
-layout(location=0) out vec3 Position;
-layout(location=1) out vec2 UV;
-layout(location=2) out vec3 TangentX;
-layout(location=3) out vec3 TangentY;
-layout(location=4) out vec3 TangentZ;
-layout(location=5) out vec3 Eye;
+layout (location=0) out vec3 Position;
+layout (location=1) out vec2 UV;
+layout (location=2) out mat3 Tangent;
 
 void main()
 {
@@ -37,15 +30,5 @@ void main()
 	Position=vPosition;
 	UV=vUV;
 
-	TangentX.x=vTangent.x;
-	TangentX.y=vBinormal.x;
-	TangentX.z=vNormal.x;
-
-	TangentY.x=vTangent.y;
-	TangentY.y=vBinormal.y;
-	TangentY.z=vNormal.y;
-
-	TangentZ.x=vTangent.z;
-	TangentZ.y=vBinormal.z;
-	TangentZ.z=vNormal.z;
+	Tangent=mat3(vTangent.xyz, vBinormal.xyz, vNormal.xyz);
 }
