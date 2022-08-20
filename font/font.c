@@ -141,7 +141,7 @@ void _Font_Init(void)
 	{
 		FILE *Stream=NULL;
 
-		if(fopen_s(&Stream, "./assets/font.bin", "rb"))
+		if((Stream=fopen("./assets/font.bin", "rb"))==NULL)
 			return;
 
 		if(Stream==NULL)
@@ -156,7 +156,7 @@ void _Font_Init(void)
 		if(_FontData==NULL)
 			return;
 
-		fread_s(_FontData, Size, 1, Size, Stream);
+		fread(_FontData, 1, Size, Stream);
 		fclose(Stream);
 
 		// Map image memory and copy data
