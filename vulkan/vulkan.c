@@ -608,7 +608,10 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 	};
 
 	if(vkCreateInstance(&InstanceInfo, 0, Instance)!=VK_SUCCESS)
+	{
+		DBGPRINTF("vkCreateInstance failed.\n");
 		return VK_FALSE;
+	}
 
 	return VK_TRUE;
 }
@@ -623,7 +626,10 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		.hinstance=GetModuleHandle(0),
 		.hwnd=Context->hWnd,
 	}, VK_NULL_HANDLE, &Context->Surface)!=VK_SUCCESS)
+	{
+		DBGPRINTF("vkCreateWin32SurfaceKHR failed.\n");
 		return VK_FALSE;
+	}
 #else
 	if(vkCreateXlibSurfaceKHR(Instance, &(VkXlibSurfaceCreateInfoKHR)
 	{
@@ -631,7 +637,10 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		.dpy=Context->Dpy,
 		.window=Context->Win,
 	}, VK_NULL_HANDLE, &Context->Surface)!=VK_SUCCESS)
+	{
+		DBGPRINTF("vkCreateXlibSurfaceKHR failed.\n");
 		return VK_FALSE;
+	}
 #endif
 
 	// Get the number of physical devices in the system
@@ -642,7 +651,10 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	VkPhysicalDevice *DeviceHandles=(VkPhysicalDevice *)malloc(sizeof(VkPhysicalDevice)*PhysicalDeviceCount);
 
 	if(DeviceHandles==NULL)
+	{
+		DBGPRINTF("Unable to allocate memory for physical device handles.\n");
 		return VK_FALSE;
+	}
 
 	// Get the handles to the devices
 	vkEnumeratePhysicalDevices(Instance, &PhysicalDeviceCount, DeviceHandles);
@@ -659,6 +671,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 
 		if(QueueFamilyProperties==NULL)
 		{
+			DBGPRINTF("Unable to allocate memory for queue family properties.\n");
 			FREE(DeviceHandles);
 			return VK_FALSE;
 		}
@@ -711,7 +724,10 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	vkGetPhysicalDeviceFeatures2(Context->PhysicalDevice, &DeviceFeatures2);
 
 	if(!IndexingFeatures.descriptorBindingPartiallyBound&&!IndexingFeatures.runtimeDescriptorArray)
+	{
+		DBGPRINTF("Device does not support partial descriptor binding or descriptor arrays.\n");
 		return VK_FALSE;
+	}
 
 	// Create the logical device from the physical device and queue index from above
 	if(vkCreateDevice(Context->PhysicalDevice, &(VkDeviceCreateInfo)
@@ -731,7 +747,10 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 			}
 		}
 	}, VK_NULL_HANDLE, &Context->Device)!=VK_SUCCESS)
+	{
+		DBGPRINTF("vkCreateDevice failed.\n");
 		return VK_FALSE;
+	}
 
 	// Get device queue
 	vkGetDeviceQueue(Context->Device, Context->QueueFamilyIndex, 0, &Context->Queue);
