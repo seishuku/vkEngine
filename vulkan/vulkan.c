@@ -1,7 +1,9 @@
 // Vulkan helper functions
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include "../system/system.h"
 #include "vulkan.h"
 #include "../image/image.h"
@@ -12,7 +14,7 @@ VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile)
 	VkShaderModule shaderModule=VK_NULL_HANDLE;
 	FILE *stream=NULL;
 
-	if(fopen_s(&stream, shaderFile, "rb"))
+	if((stream=fopen(shaderFile, "rb"))==NULL)
 		return VK_NULL_HANDLE;
 
 	// Seek to end of file to get file size, rescaling to align to 32 bit
@@ -25,7 +27,7 @@ VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile)
 	if(data==NULL)
 		return VK_NULL_HANDLE;
 
-	fread_s(data, size, 1, size, stream);
+	fread(data, 1, size, stream);
 
 	fclose(stream);
 
