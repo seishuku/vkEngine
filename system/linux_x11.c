@@ -222,16 +222,16 @@ int main(int argc, char **argv)
 	{
 		DBGPRINTF("\t...failed.\n");
 
-		glXMakeCurrent(dpy, None, NULL);
-		XDestroyWindow(dpy, Context.win);
-		DestroyContext(&Context);
+		DestroyVulkan(Instance, &Context);
+		vkDestroyInstance(Instance, VK_NULL_HANDLE);
 
-		XCloseDisplay(dpy);
+		XDestroyWindow(Context.Dpy, Context.Win);
+		XCloseDisplay(Context.Dpy);
 
 		return -1;
 	}
 
-	XMapWindow(dpy, Context.win);
+	XMapWindow(Context.Dpy, Context.Win);
 
 	Frequency=GetFrequency();
 	DBGPRINTF("\nCPU freqency: %0.2fGHz\n", (float)Frequency/1000000000);
