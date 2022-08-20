@@ -7,9 +7,7 @@
 #include <stdbool.h>
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
-#include "../camera/camera.h"
 #include "../utils/list.h"
-#include "../particle/particle.h"
 #include "system.h"
 
 char szAppName[]="OpenGL";
