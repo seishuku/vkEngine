@@ -2,6 +2,7 @@
 #include <X11/keysym.h>
 #include <sys/time.h>
 #include <strings.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
