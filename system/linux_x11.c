@@ -2,7 +2,7 @@
 #include <X11/keysym.h>
 #include <sys/time.h>
 #include <strings.h>
-#include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include "../vulkan/vulkan.h"
@@ -160,7 +160,7 @@ void EventLoop(void)
 
 		StartTime=rdtsc();
 		Render();
-		EndFrameTime=rdtsc();
+		EndTime=rdtsc();
 
 		// Total screen time in seconds
 		fTimeStep=(float)(EndTime-StartTime)/Frequency;
@@ -193,7 +193,7 @@ int main(int argc, char **argv)
 	}
 
 	int32_t Screen=DefaultScreen(display)
-	Windows Root=RootWindow(Context.Dpy, Screen);
+	Window Root=RootWindow(Context.Dpy, Screen);
 
 	DBGPRINTF("Creating X11 Window...\n");
 	Context.Win=XCreateSimpleWindow(Context.Dpy, Root, 10, 10, Width, Height, 1, BlackPixel(Context.Dpy, Screen), WhitePixel(Context.Dpy, Screen));
