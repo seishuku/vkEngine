@@ -9,9 +9,10 @@
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
 #include "../utils/list.h"
+#include "../lights/lights.h"
 #include "system.h"
 
-char szAppName[]="OpenGL";
+char szAppName[]="Vulkan";
 
 bool Key[65536];
 
@@ -72,7 +73,7 @@ void EventLoop(void)
 			ox=Event.xmotion.x;
 			oy=Event.xmotion.y;
 
-			XNextEvent(dpy, &Event);
+			XNextEvent(Context.Dpy, &Event);
 
 			switch(Event.type)
 			{
