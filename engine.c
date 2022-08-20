@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include "system/system.h"
@@ -795,32 +796,37 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 
 		vkMapMemory(Context.Device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &Data);
 
+		if(!Data)
+			return;
+
+		float *Ptr=Data;
+
 		for(int32_t j=0;j<Model->Mesh[i].NumVertex;j++)
 		{
-			*((float *)Data)++=Model->Mesh[i].Vertex[3*j+0];
-			*((float *)Data)++=Model->Mesh[i].Vertex[3*j+1];
-			*((float *)Data)++=Model->Mesh[i].Vertex[3*j+2];
-			*((float *)Data)++=1.0f;
+			*Ptr++=Model->Mesh[i].Vertex[3*j+0];
+			*Ptr++=Model->Mesh[i].Vertex[3*j+1];
+			*Ptr++=Model->Mesh[i].Vertex[3*j+2];
+			*Ptr++=1.0f;
 
-			*((float *)Data)++=Model->Mesh[i].UV[2*j+0];
-			*((float *)Data)++=1.0f-Model->Mesh[i].UV[2*j+1];
-			*((float *)Data)++=0.0f;
-			*((float *)Data)++=0.0f;
+			*Ptr++=Model->Mesh[i].UV[2*j+0];
+			*Ptr++=1.0f-Model->Mesh[i].UV[2*j+1];
+			*Ptr++=0.0f;
+			*Ptr++=0.0f;
 
-			*((float *)Data)++=Model->Mesh[i].Tangent[3*j+0];
-			*((float *)Data)++=Model->Mesh[i].Tangent[3*j+1];
-			*((float *)Data)++=Model->Mesh[i].Tangent[3*j+2];
-			*((float *)Data)++=0.0f;
+			*Ptr++=Model->Mesh[i].Tangent[3*j+0];
+			*Ptr++=Model->Mesh[i].Tangent[3*j+1];
+			*Ptr++=Model->Mesh[i].Tangent[3*j+2];
+			*Ptr++=0.0f;
 
-			*((float *)Data)++=Model->Mesh[i].Binormal[3*j+0];
-			*((float *)Data)++=Model->Mesh[i].Binormal[3*j+1];
-			*((float *)Data)++=Model->Mesh[i].Binormal[3*j+2];
-			*((float *)Data)++=0.0f;
+			*Ptr++=Model->Mesh[i].Binormal[3*j+0];
+			*Ptr++=Model->Mesh[i].Binormal[3*j+1];
+			*Ptr++=Model->Mesh[i].Binormal[3*j+2];
+			*Ptr++=0.0f;
 
-			*((float *)Data)++=Model->Mesh[i].Normal[3*j+0];
-			*((float *)Data)++=Model->Mesh[i].Normal[3*j+1];
-			*((float *)Data)++=Model->Mesh[i].Normal[3*j+2];
-			*((float *)Data)++=0.0f;
+			*Ptr++=Model->Mesh[i].Normal[3*j+0];
+			*Ptr++=Model->Mesh[i].Normal[3*j+1];
+			*Ptr++=Model->Mesh[i].Normal[3*j+2];
+			*Ptr++=0.0f;
 		}
 
 		vkUnmapMemory(Context.Device, stagingBufferMemory);
