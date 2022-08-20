@@ -25,7 +25,6 @@ extern float RotateX, RotateY, PanX, PanY, Zoom;
 
 uint64_t Frequency, StartTime, EndTime;
 float avgfps=0.0f, fps=0.0f, fTimeStep, fTime=0.0f;
-uint32_t Frames=0;
 
 void Render(void);
 bool Init(void);
@@ -78,24 +77,24 @@ void EventLoop(void)
 			switch(Event.type)
 			{
 				case MotionNotify:
-					dx=ox-Event.xmotion.x;
-					dy=oy-Event.xmotion.y;
+					dx=Event.xmotion.x-ox;
+					dy=Event.xmotion.y-oy;
 
 					if(Event.xmotion.state&Button1Mask)
 					{
 						RotateX+=(dx*0.01f);
-						RotateY-=(dy*0.01f);
+						RotateY+=(dy*0.01f);
 					}
 
 					if(Event.xmotion.state&Button2Mask)
 					{
-						Zoom+=dy;
+						PanX+=dx;
+						PanY-=dy;
 					}
 
 					if(Event.xmotion.state&Button3Mask)
 					{
-						PanX+=dx;
-						PanY+=dy;
+						Zoom-=dy;
 					}
 					break;
 
@@ -173,6 +172,7 @@ void EventLoop(void)
 		avgfps+=1.0f/fTimeStep;
 
 		// Average over 100 frames
+		static uint32_t Frames=0;
 		if(Frames++>100)
 		{
 			fps=avgfps/Frames;
@@ -199,7 +199,7 @@ int main(int argc, char **argv)
 
 	DBGPRINTF("Creating X11 Window...\n");
 	Context.Win=XCreateSimpleWindow(Context.Dpy, Root, 10, 10, Width, Height, 1, BlackPixel(Context.Dpy, Screen), WhitePixel(Context.Dpy, Screen));
-	XSelectInput(Context.Dpy, Context.Win, ExposureMask|KeyPressMask);
+	XSelectInput(Context.Dpy, Context.Win, StructureNotifyMask|PointerMotionMask|ExposureMask|ButtonPressMask|KeyPressMask|KeyReleaseMask);
 	XStoreName(Context.Dpy, Context.Win, szAppName);
 
 	DBGPRINTF("Creating Vulkan Instance...\n");
@@ -217,7 +217,7 @@ int main(int argc, char **argv)
 	}
 
 	DBGPRINTF("Creating Vulkan Swapchain...\n");
-	vkuCreateSwapchain(&Context, Width, Height, VK_TRUE);
+	vkuCreateSwapchain(&Context, Width, Height, VK_FALSE);
 
 	DBGPRINTF("Initalizing Vulkan resources...\n");
 	if(!Init())
@@ -247,7 +247,10 @@ int main(int argc, char **argv)
 	vkDestroyInstance(Instance, VK_NULL_HANDLE);
 
 	XDestroyWindow(Context.Dpy, Context.Win);
-	XCloseDisplay(Context.Dpy);
+
+	// TODO: Segfaulting on XCloseDisplay for some reason?
+	//			Not sure what's going on here.
+	//XCloseDisplay(Context.Dpy);
 
 	DBGPRINTF("Exit\n");
 

@@ -20,21 +20,39 @@ OBJS+=utils/genid.o
 OBJS+=utils/list.o
 OBJS+=engine.o
 
+SHADERS=shaders/distance.frag.spv
+SHADERS+=shaders/distance.vert.spv
+SHADERS+=shaders/font.frag.spv
+SHADERS+=shaders/font.vert.spv
+SHADERS+=shaders/lighting.frag.spv
+SHADERS+=shaders/lighting.vert.spv
+
 CC=gcc
 CFLAGS=-Wall -O3 -std=c17 -I/usr/X11/include
 LDFLAGS=-L/usr/X11/lib -lvulkan -lX11 -lm
 
-all: $(TARGET)
+all: $(TARGET) $(SHADERS)
 
 debug: CFLAGS+= -DDEBUG -D_DEBUG -g -ggdb -O1
-debug: $(TARGET)
+debug: $(TARGET) $(SHADERS)
 
 $(TARGET): $(OBJS)
 	$(CC) -o $@ $(OBJS) $(LDFLAGS)
 
-.c: .o
+%.o: %.c
 	$(CC) -c $(CFLAGS) -o $@ $<
 
+%.frag.spv: %.frag
+	glslangValidator -V $< -o $@
+
+%.vert.spv: %.vert
+	glslangValidator -V $< -o $@
+
+%.geom.spv: %.geom
+	glslangValidator -V $< -o $@
+
+%.comp.spv: %.comp
+	glslangValidator -V $< -o $@
+
 clean:
-	-rm -r *.o
-	-rm $(TARGET)
+	$(RM) $(TARGET) $(OBJS) $(SHADERS)
