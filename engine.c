@@ -81,7 +81,7 @@ VkImageView SwapchainImageView[MAX_FRAME_COUNT];
 VkFramebuffer FrameBuffers[MAX_FRAME_COUNT];
 
 // Depth buffer handles
-Image_t Depth;
+Image_t DepthImage;
 
 VkRenderPass RenderPass;
 VkPipelineLayout PipelineLayout;
@@ -646,7 +646,7 @@ bool CreateFramebuffers(void)
 		},
 	}, 0, &RenderPass);
 
-	vkuCreateImageBuffer(&Context, &Depth,
+	vkuCreateImageBuffer(&Context, &DepthImage,
 		VK_IMAGE_TYPE_2D, DepthFormat, 1, 1, Width, Height, 1,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
@@ -657,7 +657,7 @@ bool CreateFramebuffers(void)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.pNext=NULL,
-		.image=Depth.Image,
+		.image=DepthImage.Image,
 		.format=DepthFormat,
 		.components.r=VK_COMPONENT_SWIZZLE_R,
 		.components.g=VK_COMPONENT_SWIZZLE_G,
@@ -670,7 +670,7 @@ bool CreateFramebuffers(void)
 		.subresourceRange.layerCount=1,
 		.viewType=VK_IMAGE_VIEW_TYPE_2D,
 		.flags=0,
-	}, NULL, &Depth.View);
+	}, NULL, &DepthImage.View);
 
 	for(uint32_t i=0;i<SwapchainImageCount;i++)
 	{
@@ -679,7 +679,7 @@ bool CreateFramebuffers(void)
 			.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 			.renderPass=RenderPass,
 			.attachmentCount=2,
-			.pAttachments=(VkImageView[]) { SwapchainImageView[i], Depth.View },
+			.pAttachments=(VkImageView[]) { SwapchainImageView[i], DepthImage.View },
 			.width=SwapchainExtent.width,
 			.height=SwapchainExtent.height,
 			.layers=1,
@@ -799,34 +799,34 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 		if(!Data)
 			return;
 
-		float *Ptr=Data;
+		float *fPtr=Data;
 
 		for(int32_t j=0;j<Model->Mesh[i].NumVertex;j++)
 		{
-			*Ptr++=Model->Mesh[i].Vertex[3*j+0];
-			*Ptr++=Model->Mesh[i].Vertex[3*j+1];
-			*Ptr++=Model->Mesh[i].Vertex[3*j+2];
-			*Ptr++=1.0f;
+			*fPtr++=Model->Mesh[i].Vertex[3*j+0];
+			*fPtr++=Model->Mesh[i].Vertex[3*j+1];
+			*fPtr++=Model->Mesh[i].Vertex[3*j+2];
+			*fPtr++=1.0f;
 
-			*Ptr++=Model->Mesh[i].UV[2*j+0];
-			*Ptr++=1.0f-Model->Mesh[i].UV[2*j+1];
-			*Ptr++=0.0f;
-			*Ptr++=0.0f;
+			*fPtr++=Model->Mesh[i].UV[2*j+0];
+			*fPtr++=1.0f-Model->Mesh[i].UV[2*j+1];
+			*fPtr++=0.0f;
+			*fPtr++=0.0f;
 
-			*Ptr++=Model->Mesh[i].Tangent[3*j+0];
-			*Ptr++=Model->Mesh[i].Tangent[3*j+1];
-			*Ptr++=Model->Mesh[i].Tangent[3*j+2];
-			*Ptr++=0.0f;
+			*fPtr++=Model->Mesh[i].Tangent[3*j+0];
+			*fPtr++=Model->Mesh[i].Tangent[3*j+1];
+			*fPtr++=Model->Mesh[i].Tangent[3*j+2];
+			*fPtr++=0.0f;
 
-			*Ptr++=Model->Mesh[i].Binormal[3*j+0];
-			*Ptr++=Model->Mesh[i].Binormal[3*j+1];
-			*Ptr++=Model->Mesh[i].Binormal[3*j+2];
-			*Ptr++=0.0f;
+			*fPtr++=Model->Mesh[i].Binormal[3*j+0];
+			*fPtr++=Model->Mesh[i].Binormal[3*j+1];
+			*fPtr++=Model->Mesh[i].Binormal[3*j+2];
+			*fPtr++=0.0f;
 
-			*Ptr++=Model->Mesh[i].Normal[3*j+0];
-			*Ptr++=Model->Mesh[i].Normal[3*j+1];
-			*Ptr++=Model->Mesh[i].Normal[3*j+2];
-			*Ptr++=0.0f;
+			*fPtr++=Model->Mesh[i].Normal[3*j+0];
+			*fPtr++=Model->Mesh[i].Normal[3*j+1];
+			*fPtr++=Model->Mesh[i].Normal[3*j+2];
+			*fPtr++=0.0f;
 		}
 
 		vkUnmapMemory(Context.Device, stagingBufferMemory);
@@ -848,11 +848,16 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 
 		vkMapMemory(Context.Device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &Data);
 
+		if(!Data)
+			return;
+
+		uint16_t *sPtr=Data;
+
 		for(int32_t j=0;j<Model->Mesh[i].NumFace;j++)
 		{
-			*((uint16_t *)Data)++=Model->Mesh[i].Face[3*j+0];
-			*((uint16_t *)Data)++=Model->Mesh[i].Face[3*j+1];
-			*((uint16_t *)Data)++=Model->Mesh[i].Face[3*j+2];
+			*sPtr++=Model->Mesh[i].Face[3*j+0];
+			*sPtr++=Model->Mesh[i].Face[3*j+1];
+			*sPtr++=Model->Mesh[i].Face[3*j+2];
 		}
 
 		vkUnmapMemory(Context.Device, stagingBufferMemory);
@@ -1328,9 +1333,9 @@ void RecreateSwapchain(void)
 		// To resize a surface, we need to destroy and recreate anything that's tied to the surface.
 		// This is basically just the swapchain and frame buffers
 
-		vkDestroyImageView(Context.Device, Depth.View, VK_NULL_HANDLE);
-		vkFreeMemory(Context.Device, Depth.DeviceMemory, VK_NULL_HANDLE);
-		vkDestroyImage(Context.Device, Depth.Image, VK_NULL_HANDLE);
+		vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
+		vkFreeMemory(Context.Device, DepthImage.DeviceMemory, VK_NULL_HANDLE);
+		vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
 
 		for(uint32_t i=0;i<SwapchainImageCount;i++)
 		{
@@ -1429,9 +1434,9 @@ void Destroy(void)
 	vkDestroyPipeline(Context.Device, Pipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, PipelineLayout, VK_NULL_HANDLE);
 
-	vkDestroyImageView(Context.Device, Depth.View, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, Depth.DeviceMemory, VK_NULL_HANDLE);
-	vkDestroyImage(Context.Device, Depth.Image, VK_NULL_HANDLE);
+	vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
+	vkFreeMemory(Context.Device, DepthImage.DeviceMemory, VK_NULL_HANDLE);
+	vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
 
 	for(uint32_t i=0;i<SwapchainImageCount;i++)
 	{
