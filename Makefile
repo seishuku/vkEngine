@@ -22,7 +22,7 @@ OBJS+=engine.o
 
 CC=gcc
 CFLAGS=-Wall -O3 -std=c17 -I/usr/X11/include
-LDFLAGS=-L/usr/X11/lib -lvulkan-1 -lX11 -lm
+LDFLAGS=-L/usr/X11/lib -lvulkan -lX11 -lm
 
 all: $(TARGET)
 
