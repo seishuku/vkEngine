@@ -100,6 +100,7 @@
     <ClCompile Include="lights\lights.c" />
     <ClCompile Include="math\math.c" />
     <ClCompile Include="model\3ds.c" />
+    <ClCompile Include="system\win32.c" />
     <ClCompile Include="utils\genid.c" />
     <ClCompile Include="utils\list.c" />
     <ClCompile Include="vulkan\vulkan.c" />

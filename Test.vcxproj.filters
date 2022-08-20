@@ -99,6 +99,9 @@
     <ClCompile Include="lights\lights.c">
       <Filter>Source Files\lights</Filter>
     </ClCompile>
+    <ClCompile Include="system\win32.c">
+      <Filter>Source Files\system</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">

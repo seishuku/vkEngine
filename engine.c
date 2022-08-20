@@ -1,4 +1,3 @@
-#include <windows.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -11,19 +10,14 @@
 #include "utils/list.h"
 #include "lights/lights.h"
 
-char szAppName[]="Vulkan";
-
 uint32_t Width=1280, Height=720;
-bool Done=0, Key[256];
 
 VkInstance Instance;
 VkuContext_t Context;
  
 float RotateX=0.0f, RotateY=0.0f, PanX=0.0f, PanY=0.0f, Zoom=-100.0f;
 
-unsigned __int64 Frequency, StartTime, EndTime;
-float avgfps=0.0f, fps=0.0f, fTimeStep, fTime=0.0f;
-int Frames=0;
+extern float fps, fTimeStep, fTime;
 
 enum
 {
@@ -1318,6 +1312,43 @@ void vkuCreateSwapchain(VkuContext_t *Context, uint32_t Width, uint32_t Height, 
 	}, CommandBuffers);
 }
 
+void RecreateSwapchain(void)
+{
+	if(Context.Device!=VK_NULL_HANDLE) // Windows quirk, WM_SIZE is signaled on window creation, *before* Vulkan get initalized
+	{
+		// Wait for the device to complete any pending work
+		vkDeviceWaitIdle(Context.Device);
+
+		// To resize a surface, we need to destroy and recreate anything that's tied to the surface.
+		// This is basically just the swapchain and frame buffers
+
+		vkDestroyImageView(Context.Device, Depth.View, VK_NULL_HANDLE);
+		vkFreeMemory(Context.Device, Depth.DeviceMemory, VK_NULL_HANDLE);
+		vkDestroyImage(Context.Device, Depth.Image, VK_NULL_HANDLE);
+
+		for(uint32_t i=0;i<SwapchainImageCount;i++)
+		{
+			vkDestroyFramebuffer(Context.Device, FrameBuffers[i], VK_NULL_HANDLE);
+
+			vkDestroyImageView(Context.Device, SwapchainImageView[i], VK_NULL_HANDLE);
+
+			vkDestroyFence(Context.Device, FrameFences[i], VK_NULL_HANDLE);
+
+			vkDestroySemaphore(Context.Device, PresentCompleteSemaphores[i], VK_NULL_HANDLE);
+			vkDestroySemaphore(Context.Device, RenderCompleteSemaphores[i], VK_NULL_HANDLE);
+		}
+
+		vkDestroySwapchainKHR(Context.Device, Swapchain, VK_NULL_HANDLE);
+
+		// Recreate the swapchain and frame buffers
+		vkuCreateSwapchain(&Context, Width, Height, VK_TRUE);
+		CreateFramebuffers();
+
+		// Does the render pass need to be recreated as well?
+		// Validation doesn't complain about it...?
+	}
+}
+
 void Destroy(void)
 {
 	vkDeviceWaitIdle(Context.Device);
@@ -1411,271 +1442,4 @@ void Destroy(void)
 	vkDestroySwapchainKHR(Context.Device, Swapchain, VK_NULL_HANDLE);
 
 	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);
-}
-//----------------------------------------------------------
-
-// Windows junk beyond here:
-
-unsigned __int64 rdtsc(void)
-{
-	return __rdtsc();
-}
-
-unsigned __int64 GetFrequency(void)
-{
-	unsigned __int64 TimeStart, TimeStop, TimeFreq;
-	unsigned __int64 StartTicks, StopTicks;
-	volatile unsigned __int64 i;
-
-	QueryPerformanceFrequency((LARGE_INTEGER *)&TimeFreq);
-
-	QueryPerformanceCounter((LARGE_INTEGER *)&TimeStart);
-	StartTicks=rdtsc();
-
-	for(i=0;i<1000000;i++);
-
-	StopTicks=rdtsc();
-	QueryPerformanceCounter((LARGE_INTEGER *)&TimeStop);
-
-	return (StopTicks-StartTicks)*TimeFreq/(TimeStop-TimeStart);
-}
-
-LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-	static POINT old;
-	POINT pos, delta;
-
-	switch(uMsg)
-	{
-		case WM_CREATE:
-			break;
-
-		case WM_CLOSE:
-			PostQuitMessage(0);
-			break;
-
-		case WM_DESTROY:
-			break;
-
-		case WM_SIZE:
-			Width=max(LOWORD(lParam), 2);
-			Height=max(HIWORD(lParam), 2);
-
-			if(Context.Device!=VK_NULL_HANDLE) // Windows quirk, WM_SIZE is signaled on window creation, *before* Vulkan get initalized
-			{
-				// Wait for the device to complete any pending work
-				vkDeviceWaitIdle(Context.Device);
-
-				// To resize a surface, we need to destroy and recreate anything that's tied to the surface.
-				// This is basically just the swapchain and frame buffers
-
-				vkDestroyImageView(Context.Device, Depth.View, VK_NULL_HANDLE);
-				vkFreeMemory(Context.Device, Depth.DeviceMemory, VK_NULL_HANDLE);
-				vkDestroyImage(Context.Device, Depth.Image, VK_NULL_HANDLE);
-
-				for(uint32_t i=0;i<SwapchainImageCount;i++)
-				{
-					vkDestroyFramebuffer(Context.Device, FrameBuffers[i], VK_NULL_HANDLE);
-
-					vkDestroyImageView(Context.Device, SwapchainImageView[i], VK_NULL_HANDLE);
-
-					vkDestroyFence(Context.Device, FrameFences[i], VK_NULL_HANDLE);
-
-					vkDestroySemaphore(Context.Device, PresentCompleteSemaphores[i], VK_NULL_HANDLE);
-					vkDestroySemaphore(Context.Device, RenderCompleteSemaphores[i], VK_NULL_HANDLE);
-				}
-
-				vkDestroySwapchainKHR(Context.Device, Swapchain, VK_NULL_HANDLE);
-
-				// Recreate the swapchain and frame buffers
-				vkuCreateSwapchain(&Context, Width, Height, VK_TRUE);
-				CreateFramebuffers();
-
-				// Does the render pass need to be recreated as well?
-				// Validation doesn't complain about it...?
-			}
-			break;
-
-		case WM_LBUTTONDOWN:
-		case WM_MBUTTONDOWN:
-		case WM_RBUTTONDOWN:
-			SetCapture(hWnd);
-			ShowCursor(FALSE);
-
-			GetCursorPos(&pos);
-			old.x=pos.x;
-			old.y=pos.y;
-			break;
-
-		case WM_LBUTTONUP:
-		case WM_MBUTTONUP:
-		case WM_RBUTTONUP:
-			ShowCursor(TRUE);
-			ReleaseCapture();
-			break;
-
-		case WM_MOUSEMOVE:
-			GetCursorPos(&pos);
-
-			if(!wParam)
-			{
-				old.x=pos.x;
-				old.y=pos.y;
-				break;
-			}
-
-			delta.x=pos.x-old.x;
-			delta.y=old.y-pos.y;
-
-			if(!delta.x&&!delta.y)
-				break;
-
-			SetCursorPos(old.x, old.y);
-
-			switch(wParam)
-			{
-				case MK_LBUTTON:
-					RotateX+=(delta.x*0.01f);
-					RotateY-=(delta.y*0.01f);
-					break;
-
-				case MK_MBUTTON:
-					PanX+=delta.x;
-					PanY+=delta.y;
-					break;
-
-				case MK_RBUTTON:
-					Zoom+=delta.y;
-					break;
-			}
-			break;
-
-		case WM_KEYDOWN:
-			Key[wParam]=1;
-
-			switch(wParam)
-			{
-				case 'O':
-					for(uint32_t i=0;i<10;i++)
-					{
-						Lights_Add(&Lights, 
-						(vec3)
-						{
-							(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f,
-							(((float)rand()/RAND_MAX)*2.0f-1.0f)*100.0f,
-							(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f
-						}, 50.0f,
-						(vec4)
-						{
-							(float)rand()/RAND_MAX,
-							(float)rand()/RAND_MAX,
-							(float)rand()/RAND_MAX,
-							1.0f
-						});
-					}
-					break;
-
-				case VK_ESCAPE:
-					PostQuitMessage(0);
-					break;
-
-				default:
-					break;
-			}
-			break;
-
-		case WM_KEYUP:
-			Key[wParam]=0;
-			break;
-	}
-
-	return DefWindowProc(hWnd, uMsg, wParam, lParam);
-}
-
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int iCmdShow)
-{
-	WNDCLASS wc;
-	MSG msg;
-	RECT Rect;
-
-	wc.style=CS_VREDRAW|CS_HREDRAW|CS_OWNDC;
-	wc.lpfnWndProc=WndProc;
-	wc.cbClsExtra=0;
-	wc.cbWndExtra=0;
-	wc.hInstance=hInstance;
-	wc.hIcon=LoadIcon(NULL, IDI_WINLOGO);
-	wc.hCursor=LoadCursor(NULL, IDC_ARROW);
-	wc.hbrBackground=GetStockObject(BLACK_BRUSH);
-	wc.lpszMenuName=NULL;
-	wc.lpszClassName=szAppName;
-
-	RegisterClass(&wc);
-
-	SetRect(&Rect, 0, 0, Width, Height);
-	AdjustWindowRect(&Rect, WS_OVERLAPPEDWINDOW, FALSE);
-
-	Context.hWnd=CreateWindow(szAppName, szAppName, WS_OVERLAPPEDWINDOW|WS_CLIPSIBLINGS, CW_USEDEFAULT, CW_USEDEFAULT, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
-
-	ShowWindow(Context.hWnd, SW_SHOW);
-	SetForegroundWindow(Context.hWnd);
-
-	Frequency=GetFrequency();
-
-	if(!CreateVulkanInstance(&Instance))
-	{
-		MessageBox(Context.hWnd, "Failed to create Vulkan instance", "Error", MB_OK);
-		return -1;
-	}
-
-	if(!CreateVulkanContext(Instance, &Context))
-	{
-		MessageBox(Context.hWnd, "Failed to create Vulkan context", "Error", MB_OK);
-		return -1;
-	}
-
-	vkuCreateSwapchain(&Context, Width, Height, VK_TRUE);
-
-	if(!Init())
-	{
-		MessageBox(Context.hWnd, "Failed to init resources", "Error", MB_OK);
-		return -1;
-	}
-
-	while(!Done)
-	{
-		if(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-		{
-			if(msg.message==WM_QUIT)
-				Done=1;
-			else
-			{
-				TranslateMessage(&msg);
-				DispatchMessage(&msg);
-			}
-		}
-		else
-		{
-			StartTime=rdtsc();
-			Render();
-			EndTime=rdtsc();
-
-			fTimeStep=(float)(EndTime-StartTime)/Frequency;
-			fTime+=fTimeStep;
-			avgfps+=1.0f/fTimeStep;
-
-			if(Frames++>100)
-			{
-				fps=avgfps/Frames;
-				avgfps=0.0f;
-				Frames=0;
-			}
-		}
-	}
-
-	Destroy();
-	DestroyVulkan(Instance, &Context);
-	vkDestroyInstance(Instance, VK_NULL_HANDLE);
-	DestroyWindow(Context.hWnd);
-
-	return (int)msg.wParam;
 }

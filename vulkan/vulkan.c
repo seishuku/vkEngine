@@ -546,10 +546,19 @@ VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSetLayout_t *DescriptorSetL
 	if(!DescriptorSetLayout)
 		return VK_FALSE;
 
+	VkDescriptorBindingFlags BindFlag=VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+	VkDescriptorSetLayoutBindingFlagsCreateInfo ExtendedInfo=
+	{
+		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+		.pNext=VK_NULL_HANDLE,
+		.bindingCount=1,
+		.pBindingFlags=&BindFlag,
+	};
+
 	VkResult Result=vkCreateDescriptorSetLayout(DescriptorSetLayout->Device, &(VkDescriptorSetLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-		.pNext=VK_NULL_HANDLE,
+		.pNext=&ExtendedInfo,
 		.bindingCount=DescriptorSetLayout->NumBindings,
 		.pBindings=DescriptorSetLayout->Bindings,
 	}, NULL, &DescriptorSetLayout->DescriptorSetLayout);
@@ -576,7 +585,11 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 	{
 		VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 		VK_KHR_SURFACE_EXTENSION_NAME,
-		VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+#ifdef WIN32
+		VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+#else
+		VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
+#endif
 	};
 	const char *ValidationLayers[]={
 		"VK_LAYER_KHRONOS_validation"
@@ -601,7 +614,8 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 
 // Create Vulkan Context
 VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
-{			
+{
+#ifdef WIN32
 	if(vkCreateWin32SurfaceKHR(Instance, &(VkWin32SurfaceCreateInfoKHR)
 	{
 		.sType=VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
@@ -609,6 +623,14 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		.hwnd=Context->hWnd,
 	}, VK_NULL_HANDLE, &Context->Surface)!=VK_SUCCESS)
 		return VK_FALSE;
+#else
+	if(vkCreateXlibSurfaceKHR(Instance, &(VkXlibSurfaceCreateInfoKHR)
+	{
+		.sType=VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,
+		.dpy=Context->Dpy,
+		.window=Context->Win,
+	}, VK_NULL_HANDLE, &Context->Surface);
+#endif
 
 	// Get the number of physical devices in the system
 	uint32_t PhysicalDeviceCount=0;
@@ -672,10 +694,28 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	// Get device physical memory properties
 	vkGetPhysicalDeviceMemoryProperties(Context->PhysicalDevice, &Context->DeviceMemProperties);
 
+	VkPhysicalDeviceDescriptorIndexingFeatures IndexingFeatures=
+	{
+		.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
+		.pNext=VK_NULL_HANDLE
+	};
+
+	VkPhysicalDeviceFeatures2 DeviceFeatures2=
+	{
+		.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+		.pNext=&IndexingFeatures
+	};
+
+	vkGetPhysicalDeviceFeatures2(Context->PhysicalDevice, &DeviceFeatures2);
+
+	if(!IndexingFeatures.descriptorBindingPartiallyBound&&!IndexingFeatures.runtimeDescriptorArray)
+		return VK_FALSE;
+
 	// Create the logical device from the physical device and queue index from above
 	if(vkCreateDevice(Context->PhysicalDevice, &(VkDeviceCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+		.pNext=&IndexingFeatures,
 		.enabledExtensionCount=1,
 		.ppEnabledExtensionNames=(const char *const []) { VK_KHR_SWAPCHAIN_EXTENSION_NAME },
 		.queueCreateInfoCount=1,

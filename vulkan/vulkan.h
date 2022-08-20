@@ -1,11 +1,15 @@
 #ifndef __VULKAN_H__
 #define __VULKAN_H__
 
-#include <vulkan/vulkan.h>
-
 #ifdef WIN32
 #include <Windows.h>
+#else
+#define VK_USE_PLATFORM_XLIB_KHR
+#include <X11/Xlib.h>
+#include <GL/glx.h>
 #endif
+
+#include <vulkan/vulkan.h>
 
 #define VKU_MAX_PIPELINE_VERTEX_BINDINGS 8
 #define VKU_MAX_PIPELINE_VERTEX_ATTRIBUTES 8
@@ -14,7 +18,14 @@
 
 typedef struct
 {
+#ifdef WIN32
 	HWND hWnd;
+#else
+	Display *Dpy;
+	Window Win;
+// Xlib stuff here?
+#endif
+
 	VkSurfaceKHR Surface;
 
 	uint32_t QueueFamilyIndex;
