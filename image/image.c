@@ -35,7 +35,7 @@ void _MakeNormalMap(Image_t *Image)
 {
 	uint32_t x, y, xx, yy;
 	uint32_t Channels=Image->Depth>>3;
-	unsigned short *Buffer=NULL;
+	uint16_t *Buffer=NULL;
 	const float OneOver255=1.0f/255.0f;
 	float KernelX[9]={ 1.0f, 0.0f, -1.0f, 2.0f, 0.0f, -2.0f, 1.0f, 0.0f, -1.0f };
 	float KernelY[9]={ -1.0f, -2.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 2.0f, 1.0f };
@@ -43,7 +43,7 @@ void _MakeNormalMap(Image_t *Image)
 	if(!((Image->Depth==32)||(Image->Depth==24)||(Image->Depth==8)))
 		return;
 
-	Buffer=(unsigned short *)malloc(sizeof(unsigned short)*Image->Width*Image->Height*4);
+	Buffer=(uint16_t *)malloc(sizeof(uint16_t)*Image->Width*Image->Height*4);
 
 	if(Buffer==NULL)
 		return;
@@ -98,7 +98,7 @@ void _Normalize(Image_t *Image)
 	if(!((Image->Depth==32)||(Image->Depth==24)))
 		return;
 
-	Buffer=(unsigned short *)malloc(sizeof(unsigned short)*Image->Width*Image->Height*4);
+	Buffer=(uint16_t *)malloc(sizeof(uint16_t)*Image->Width*Image->Height*4);
 
 	if(Buffer==NULL)
 		return;
@@ -129,7 +129,7 @@ void _Normalize(Image_t *Image)
 	Image->Depth=64;
 
 	FREE(Image->Data);
-	Image->Data=(unsigned char *)Buffer;
+	Image->Data=(uint8_t *)Buffer;
 }
 
 void _RGBE2Float(Image_t *Image)
@@ -174,7 +174,7 @@ void _RGBE2Float(Image_t *Image)
 	Image->Depth=96;
 
 	FREE(Image->Data);
-	Image->Data=(unsigned char *)Buffer;
+	Image->Data=(uint8_t *)Buffer;
 }
 
 void _Resample(Image_t *Src, Image_t *Dst)
@@ -365,7 +365,7 @@ void _Resample(Image_t *Src, Image_t *Dst)
 void _BuildMipmaps(Image_t *Image, unsigned int Target)
 {
 	int i=0, levels;
-	unsigned int MaxSize=UINT_MAX;
+	uint32_t MaxSize=UINT32_MAX;
 	Image_t Dst;
 
 //	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &MaxSize);
