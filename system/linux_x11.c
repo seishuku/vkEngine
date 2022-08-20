@@ -193,7 +193,7 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	int32_t Screen=DefaultScreen(display)
+	int32_t Screen=DefaultScreen(Context.Dpy);
 	Window Root=RootWindow(Context.Dpy, Screen);
 
 	DBGPRINTF("Creating X11 Window...\n");
