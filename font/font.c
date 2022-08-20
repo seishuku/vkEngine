@@ -325,25 +325,30 @@ void _Font_Init(void)
 	// Map it
 	vkMapMemory(Context.Device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &data);
 
-	*((float *)data)++=0.0f;	// X
-	*((float *)data)++=16.0f;	// Y
-	*((float *)data)++=0.0f;
-	*((float *)data)++=1.0f;
+	if(!data)
+		return;
 
-	*((float *)data)++=0.0f;
-	*((float *)data)++=0.0f;
-	*((float *)data)++=0.0f;	// U
-	*((float *)data)++=0.0f;	// V
+	float *Ptr=data;
 
-	*((float *)data)++=16.0f;
-	*((float *)data)++=16.0f;
-	*((float *)data)++=1.0f;
-	*((float *)data)++=1.0f;
+	*Ptr++=0.0f;	// X
+	*Ptr++=16.0f;	// Y
+	*Ptr++=0.0f;	// U
+	*Ptr++=1.0f;	// V
 
-	*((float *)data)++=16.0f;
-	*((float *)data)++=0.0f;
-	*((float *)data)++=1.0f;
-	*((float *)data)++=0.0f;
+	*Ptr++=0.0f;
+	*Ptr++=0.0f;
+	*Ptr++=0.0f;
+	*Ptr++=0.0f;
+
+	*Ptr++=16.0f;
+	*Ptr++=16.0f;
+	*Ptr++=1.0f;
+	*Ptr++=1.0f;
+
+	*Ptr++=16.0f;
+	*Ptr++=0.0f;
+	*Ptr++=1.0f;
+	*Ptr++=0.0f;
 
 	vkUnmapMemory(Context.Device, stagingBufferMemory);
 
@@ -381,7 +386,7 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 
 	// Format string, including variable arguments
 	va_start(ap, string);
-	vsprintf_s(text, 255, string, ap);
+	vsprintf(text, string, ap);
 	va_end(ap);
 
 	// Find how many characters were need to deal with
