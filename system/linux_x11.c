@@ -241,12 +241,11 @@ int main(int argc, char **argv)
 
 	DBGPRINTF("Shutting down...\n");
 	Destroy();
-
-	Destroy();
 	DestroyVulkan(Instance, &Context);
 	vkDestroyInstance(Instance, VK_NULL_HANDLE);
-	XDestroyWindow(dpy, Context.win);
-	XCloseDisplay(dpy);
+
+	XDestroyWindow(Context.Dpy, Context.Win);
+	XCloseDisplay(Context.Dpy);
 
 	DBGPRINTF("Exit\n");
 
