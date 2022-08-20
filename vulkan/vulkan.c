@@ -630,7 +630,8 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		.sType=VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,
 		.dpy=Context->Dpy,
 		.window=Context->Win,
-	}, VK_NULL_HANDLE, &Context->Surface);
+	}, VK_NULL_HANDLE, &Context->Surface)!=VK_SUCCESS)
+		return VK_FALSE;
 #endif
 
 	// Get the number of physical devices in the system
