@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "../system/system.h"
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
 #include "../camera/camera.h"
@@ -11,6 +12,7 @@
 char szAppName[]="Vulkan";
 
 bool Done=0, Key[256];
+bool ToggleFullscreen=true;
 
 extern VkInstance Instance;
 extern VkuContext_t Context;
@@ -130,6 +132,35 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				case MK_RBUTTON:
 					Zoom+=delta.y;
 					break;
+			}
+			break;
+
+		case WM_SYSKEYUP:
+			if(HIWORD(lParam)&KF_ALTDOWN&&LOWORD(wParam)==VK_RETURN)
+			{
+				static uint32_t OldWidth, OldHeight;
+
+				if(ToggleFullscreen)
+				{
+					ToggleFullscreen=false;
+					DBGPRINTF("Going full screen...\n");
+
+					OldWidth=Width;
+					OldHeight=Height;
+
+					Width=GetSystemMetrics(SM_CXSCREEN);
+					Height=GetSystemMetrics(SM_CYSCREEN);
+					SetWindowPos(Context.hWnd, HWND_TOPMOST, 0, 0, Width, Height, 0);
+				}
+				else
+				{
+					ToggleFullscreen=true;
+					DBGPRINTF("Going windowed...\n");
+
+					Width=OldWidth;
+					Height=OldHeight;
+					SetWindowPos(Context.hWnd, HWND_TOPMOST, 0, 0, Width, Height, 0);
+				}
 			}
 			break;
 
@@ -299,7 +330,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	SetRect(&Rect, 0, 0, Width, Height);
 	AdjustWindowRect(&Rect, WS_OVERLAPPEDWINDOW, FALSE);
 
-	Context.hWnd=CreateWindow(szAppName, szAppName, WS_OVERLAPPEDWINDOW|WS_CLIPSIBLINGS, CW_USEDEFAULT, CW_USEDEFAULT, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
+	Context.hWnd=CreateWindow(szAppName, szAppName, WS_POPUP|WS_CLIPSIBLINGS, CW_USEDEFAULT, CW_USEDEFAULT, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
 
 	ShowWindow(Context.hWnd, SW_SHOW);
 	SetForegroundWindow(Context.hWnd);

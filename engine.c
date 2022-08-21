@@ -961,7 +961,7 @@ void Render(void)
 
 	// Should UI overlay stuff have it's own render pass?
 	// Maybe even separate thread?
-	Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f\n\n\n\nNumber of lights: %d %0.3f %0.3f %0.3f", fps, ubo.NumLights, Camera.View[0], Camera.View[1], Camera.View[2]);
+	Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f\n\n\n\nNumber of lights: %d", fps, ubo.NumLights);
 
 	vkCmdEndRenderPass(CommandBuffers[Index]);
 
