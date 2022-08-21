@@ -2,6 +2,7 @@
 #define __VULKAN_H__
 
 #ifdef WIN32
+#define VK_USE_PLATFORM_WIN32_KHR
 #include <Windows.h>
 #else
 #define VK_USE_PLATFORM_XLIB_KHR
@@ -23,7 +24,6 @@ typedef struct
 #else
 	Display *Dpy;
 	Window Win;
-// Xlib stuff here?
 #endif
 
 	VkSurfaceKHR Surface;

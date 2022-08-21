@@ -15,7 +15,16 @@ uint32_t Width=1280, Height=720;
 
 VkInstance Instance;
 VkuContext_t Context;
- 
+
+#define vkCreateDebugUtilsMessengerEXT _vkCreateDebugUtilsMessengerEXT
+PFN_vkCreateDebugUtilsMessengerEXT _vkCreateDebugUtilsMessengerEXT=VK_NULL_HANDLE;
+
+#define vkDestroyDebugUtilsMessengerEXT _vkDestroyDebugUtilsMessengerEXT
+PFN_vkDestroyDebugUtilsMessengerEXT _vkDestroyDebugUtilsMessengerEXT=VK_NULL_HANDLE;
+
+#define vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR
+PFN_vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR=VK_NULL_HANDLE;
+
 float RotateX=0.0f, RotateY=0.0f, PanX=0.0f, PanY=0.0f, Zoom=-100.0f;
 
 extern float fps, fTimeStep, fTime;
@@ -83,10 +92,7 @@ VkRenderPass RenderPass;
 VkPipelineLayout PipelineLayout;
 VkuPipeline_t Pipeline;
 
-VkDescriptorPool DescriptorPool;
-VkDescriptorSet DescriptorSet[MAX_FRAME_COUNT];
 VkuDescriptorSetLayout_t DescriptorSetLayout;
-
 
 VkCommandBuffer CommandBuffers[MAX_FRAME_COUNT];
 
@@ -687,25 +693,6 @@ bool CreateFramebuffers(void)
 
 bool CreatePipeline(void)
 {
-	vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-		.pNext=VK_NULL_HANDLE,
-		.maxSets=MAX_FRAME_COUNT,
-		.poolSizeCount=2,
-		.pPoolSizes=(VkDescriptorPoolSize[])
-		{
-			{
-				.type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-				.descriptorCount=MAX_FRAME_COUNT*1,
-			},
-			{
-				.type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.descriptorCount=MAX_FRAME_COUNT*6,
-			},
-		},
-	}, NULL, &DescriptorPool);
-
 	vkuInitDescriptorSetLayout(&DescriptorSetLayout, &Context);
 
 	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
@@ -716,24 +703,6 @@ bool CreatePipeline(void)
 	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
 
 	vkuAssembleDescriptorSetLayout(&DescriptorSetLayout);
-
-	vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-		.pNext=NULL,
-		.descriptorPool=DescriptorPool,
-		.descriptorSetCount=1,
-		.pSetLayouts=&DescriptorSetLayout.DescriptorSetLayout
-	}, &DescriptorSet[0]);
-
-	vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-		.pNext=NULL,
-		.descriptorPool=DescriptorPool,
-		.descriptorSetCount=1,
-		.pSetLayouts=&DescriptorSetLayout.DescriptorSetLayout
-	}, &DescriptorSet[1]);
 
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
@@ -912,89 +881,6 @@ void Render(void)
 	vkWaitForFences(Context.Device, 1, &FrameFences[Index], VK_TRUE, UINT64_MAX);
 	vkResetFences(Context.Device, 1, &FrameFences[Index]);
 
-	uint32_t i=0;
-	vkUpdateDescriptorSets(Context.Device, 6, (VkWriteDescriptorSet[])
-	{
-		{
-			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.descriptorCount=1,
-			.descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-			.dstBinding=0,
-			.pBufferInfo=&(VkDescriptorBufferInfo)
-			{
-				.buffer=Lights.StorageBuffer,
-				.offset=0,
-				.range=VK_WHOLE_SIZE,
-			},
-			.dstSet=DescriptorSet[ImageIndex],
-		},
-		{
-			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.descriptorCount=1,
-			.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.dstBinding=1,
-			.pImageInfo=&(VkDescriptorImageInfo)
-			{
-				.imageView=Textures[2*i+0].View,
-				.sampler=Textures[2*i+0].Sampler,
-				.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			},
-			.dstSet=DescriptorSet[ImageIndex],
-		},
-		{
-			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.descriptorCount=1,
-			.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.dstBinding=2,
-			.pImageInfo=&(VkDescriptorImageInfo)
-			{
-				.imageView=Textures[2*i+1].View,
-				.sampler=Textures[2*i+1].Sampler,
-				.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			},
-			.dstSet=DescriptorSet[ImageIndex],
-		},
-		{
-			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.descriptorCount=1,
-			.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.dstBinding=3,
-			.pImageInfo=&(VkDescriptorImageInfo)
-			{
-				.imageView=ShadowBuf[0].View,
-				.sampler=ShadowBuf[0].Sampler,
-				.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			},
-			.dstSet=DescriptorSet[ImageIndex],
-		},
-		{
-			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.descriptorCount=1,
-			.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.dstBinding=4,
-			.pImageInfo=&(VkDescriptorImageInfo)
-			{
-				.imageView=ShadowBuf[1].View,
-				.sampler=ShadowBuf[1].Sampler,
-				.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			},
-			.dstSet=DescriptorSet[ImageIndex],
-		},
-		{
-			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.descriptorCount=1,
-			.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.dstBinding=5,
-			.pImageInfo=&(VkDescriptorImageInfo)
-			{
-				.imageView=ShadowBuf[2].View,
-				.sampler=ShadowBuf[2].Sampler,
-				.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			},
-			.dstSet=DescriptorSet[ImageIndex],
-		},
-	}, 0, VK_NULL_HANDLE);
-
 	// Start recording the commands
 	vkBeginCommandBuffer(CommandBuffers[Index], &(VkCommandBufferBeginInfo)
 	{
@@ -1026,13 +912,89 @@ void Render(void)
 
 	vkCmdPushConstants(CommandBuffers[Index], PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ubo), &ubo);
 
-	vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[Index], 0, NULL);
-
 	// Draw the models
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
+		VkWriteDescriptorSet WriteDescriptorSet[]=
+		{
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.descriptorCount=1,
+				.descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				.dstBinding=0,
+				.pBufferInfo=&(VkDescriptorBufferInfo)
+				{
+					.buffer=Lights.StorageBuffer,
+					.offset=0,
+					.range=VK_WHOLE_SIZE,
+				},
+			},
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.descriptorCount=1,
+				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.dstBinding=1,
+				.pImageInfo=&(VkDescriptorImageInfo)
+				{
+					.imageView=Textures[2*i+0].View,
+					.sampler=Textures[2*i+0].Sampler,
+					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				},
+			},
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.descriptorCount=1,
+				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.dstBinding=2,
+				.pImageInfo=&(VkDescriptorImageInfo)
+				{
+					.imageView=Textures[2*i+1].View,
+					.sampler=Textures[2*i+1].Sampler,
+					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				},
+			},
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.descriptorCount=1,
+				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.dstBinding=3,
+				.pImageInfo=&(VkDescriptorImageInfo)
+				{
+					.imageView=ShadowBuf[0].View,
+					.sampler=ShadowBuf[0].Sampler,
+					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				},
+			},
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.descriptorCount=1,
+				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.dstBinding=4,
+				.pImageInfo=&(VkDescriptorImageInfo)
+				{
+					.imageView=ShadowBuf[1].View,
+					.sampler=ShadowBuf[1].Sampler,
+					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				},
+			},
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.descriptorCount=1,
+				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.dstBinding=5,
+				.pImageInfo=&(VkDescriptorImageInfo)
+				{
+					.imageView=ShadowBuf[2].View,
+					.sampler=ShadowBuf[2].Sampler,
+					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				},
+			},
+		};
+
+		vkCmdPushDescriptorSetKHR(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 6, WriteDescriptorSet);
+
 		// Bind model data buffers and draw the triangles
-		for(uint32_t j=0;j<Model[i].NumMesh;j++)
+		for(int32_t j=0;j<Model[i].NumMesh;j++)
 		{
 			vkCmdBindVertexBuffers(CommandBuffers[Index], 0, 1, &Model[i].Mesh[j].Buffer, &(VkDeviceSize) { 0 });
 			vkCmdBindIndexBuffer(CommandBuffers[Index], Model[i].Mesh[j].IndexBuffer, 0, VK_INDEX_TYPE_UINT16);
@@ -1076,27 +1038,8 @@ void Render(void)
 	OldIndex=Index;
 }
 
-VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkDebugUtilsMessengerEXT *pDebugMessenger)
-{
-	PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT=(PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-
-	if(vkCreateDebugUtilsMessengerEXT!=NULL)
-		return vkCreateDebugUtilsMessengerEXT(instance, pCreateInfo, pAllocator, pDebugMessenger);
-	else
-		return VK_ERROR_EXTENSION_NOT_PRESENT;
-}
-
-void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks *pAllocator)
-{
-	PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT=(PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-
-	if(vkDestroyDebugUtilsMessengerEXT!=NULL)
-		vkDestroyDebugUtilsMessengerEXT(instance, debugMessenger, pAllocator);
-}
-
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
 {
-	DBGPRINTF("POOP!\n");
 	DBGPRINTF("%s\n", pCallbackData->pMessage);
 
 	return VK_FALSE;
@@ -1104,6 +1047,10 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 
 bool Init(void)
 {
+	_vkCreateDebugUtilsMessengerEXT=(PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkCreateDebugUtilsMessengerEXT");
+	_vkDestroyDebugUtilsMessengerEXT=(PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkDestroyDebugUtilsMessengerEXT");
+	_vkCmdPushDescriptorSetKHR=(PFN_vkCmdPushDescriptorSetKHR)vkGetInstanceProcAddr(Instance, "vkCmdPushDescriptorSetKHR");
+
 	VkDebugUtilsMessengerCreateInfoEXT createInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
@@ -1112,7 +1059,7 @@ bool Init(void)
 		.pfnUserCallback=debugCallback
 	};
 
-	if(CreateDebugUtilsMessengerEXT(Instance, &createInfo, VK_NULL_HANDLE, &debugMessenger)!=VK_SUCCESS)
+	if(vkCreateDebugUtilsMessengerEXT(Instance, &createInfo, VK_NULL_HANDLE, &debugMessenger)!=VK_SUCCESS)
 		return false;
 
 	Lights_Init(&Lights);
@@ -1363,7 +1310,7 @@ void Destroy(void)
 {
 	vkDeviceWaitIdle(Context.Device);
 
-	DestroyDebugUtilsMessengerEXT(Instance, debugMessenger, VK_NULL_HANDLE);
+	vkDestroyDebugUtilsMessengerEXT(Instance, debugMessenger, VK_NULL_HANDLE);
 
 	Lights_Destroy(&Lights);
 
@@ -1371,7 +1318,6 @@ void Destroy(void)
 	vkDestroyPipeline(Context.Device, ShadowPipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, ShadowPipelineLayout, VK_NULL_HANDLE);
 	vkDestroyRenderPass(Context.Device, ShadowRenderPass, VK_NULL_HANDLE);
-	vkDestroyRenderPass(Context.Device, ShadowPipeline.RenderPass, VK_NULL_HANDLE);
 	vkDestroyFramebuffer(Context.Device, ShadowFrameBuffer, VK_NULL_HANDLE);
 
 	// Shadow frame buffer color
@@ -1424,11 +1370,9 @@ void Destroy(void)
 	}
 
 	vkDestroyDescriptorSetLayout(Context.Device, DescriptorSetLayout.DescriptorSetLayout, VK_NULL_HANDLE);
-	vkDestroyDescriptorPool(Context.Device, DescriptorPool, VK_NULL_HANDLE);
 
 	vkDestroyPipeline(Context.Device, Pipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, PipelineLayout, VK_NULL_HANDLE);
-	vkDestroyRenderPass(Context.Device, Pipeline.RenderPass, VK_NULL_HANDLE);
 	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);
 
 	vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);

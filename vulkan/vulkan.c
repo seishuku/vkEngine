@@ -547,19 +547,10 @@ VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSetLayout_t *DescriptorSetL
 	if(!DescriptorSetLayout)
 		return VK_FALSE;
 
-	VkDescriptorBindingFlags BindFlag=VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
-	VkDescriptorSetLayoutBindingFlagsCreateInfo ExtendedInfo=
-	{
-		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
-		.pNext=VK_NULL_HANDLE,
-		.bindingCount=1,
-		.pBindingFlags=&BindFlag,
-	};
-
 	VkResult Result=vkCreateDescriptorSetLayout(DescriptorSetLayout->Device, &(VkDescriptorSetLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-		.pNext=&ExtendedInfo,
+		.flags=VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR,
 		.bindingCount=DescriptorSetLayout->NumBindings,
 		.pBindings=DescriptorSetLayout->Bindings,
 	}, NULL, &DescriptorSetLayout->DescriptorSetLayout);
@@ -709,33 +700,37 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	// Get device physical memory properties
 	vkGetPhysicalDeviceMemoryProperties(Context->PhysicalDevice, &Context->DeviceMemProperties);
 
-	//VkPhysicalDeviceDescriptorIndexingFeatures IndexingFeatures=
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
-	//	.pNext=VK_NULL_HANDLE
-	//};
+	VkPhysicalDeviceDescriptorIndexingFeatures IndexingFeatures=
+	{
+		.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
+		.pNext=VK_NULL_HANDLE
+	};
 
-	//VkPhysicalDeviceFeatures2 DeviceFeatures2=
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-	//	.pNext=&IndexingFeatures
-	//};
+	VkPhysicalDeviceFeatures2 DeviceFeatures2=
+	{
+		.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+		.pNext=&IndexingFeatures
+	};
 
-	//vkGetPhysicalDeviceFeatures2(Context->PhysicalDevice, &DeviceFeatures2);
+	vkGetPhysicalDeviceFeatures2(Context->PhysicalDevice, &DeviceFeatures2);
 
-	//if(!IndexingFeatures.descriptorBindingPartiallyBound&&!IndexingFeatures.runtimeDescriptorArray)
-	//{
-	//	DBGPRINTF("Device does not support partial descriptor binding or descriptor arrays.\n");
-	//	return VK_FALSE;
-	//}
+	if(!IndexingFeatures.descriptorBindingPartiallyBound&&!IndexingFeatures.runtimeDescriptorArray)
+	{
+		DBGPRINTF("Device does not support partial descriptor binding or descriptor arrays.\n");
+		return VK_FALSE;
+	}
 
 	// Create the logical device from the physical device and queue index from above
 	if(vkCreateDevice(Context->PhysicalDevice, &(VkDeviceCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-//		.pNext=&IndexingFeatures,
-		.enabledExtensionCount=1,
-		.ppEnabledExtensionNames=(const char *const []) { VK_KHR_SWAPCHAIN_EXTENSION_NAME },
+		.pNext=&IndexingFeatures,
+		.enabledExtensionCount=2,
+		.ppEnabledExtensionNames=(const char *const [])
+		{
+			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+			VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
+		},
 		.queueCreateInfoCount=1,
 		.pQueueCreateInfos=(VkDeviceQueueCreateInfo[])
 		{
