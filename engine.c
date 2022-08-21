@@ -75,7 +75,7 @@ VkSwapchainKHR Swapchain;
 
 VkExtent2D SwapchainExtent;
 VkSurfaceFormatKHR SurfaceFormat;
-VkFormat DepthFormat=VK_FORMAT_D24_UNORM_S8_UINT;
+VkFormat DepthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
 
 #define MAX_FRAME_COUNT 2
 
