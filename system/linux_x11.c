@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
+#include "../camera/camera.h"
 #include "../utils/list.h"
 #include "../lights/lights.h"
 #include "system.h"
@@ -15,11 +16,13 @@
 char szAppName[]="Vulkan";
 
 bool Key[65536];
+bool ToggleFullscreen=true;
 
 extern VkInstance Instance;
 extern VkuContext_t Context;
 extern uint32_t Width, Height;
 extern Lights_t Lights;
+extern Camera_t Camera;
 
 extern float RotateX, RotateY, PanX, PanY, Zoom;
 
@@ -114,6 +117,33 @@ void EventLoop(void)
 				case KeyPress:
 					Keysym=XLookupKeysym(&Event.xkey, 0);
 					Key[Keysym]=true;
+
+					if(Keysym==XK_Return&&Event.xkey.state&Mod1Mask)
+					{
+						static uint32_t OldWidth, OldHeight;
+
+						if(ToggleFullscreen)
+						{
+							ToggleFullscreen=false;
+							DBGPRINTF("Going full screen...\n");
+
+							OldWidth=Width;
+							OldHeight=Height;
+
+							Width=XDisplayWidth(Context.Dpy, DefaultScreen(Context.Dpy));
+							Height=XDisplayHeight(Context.Dpy, DefaultScreen(Context.Dpy));
+							XMoveResizeWindow(Context.Dpy, Context.Win, 0, 0, Width, Height);
+						}
+						else
+						{
+							ToggleFullscreen=true;
+							DBGPRINTF("Going windowed...\n");
+
+							Width=OldWidth;
+							Height=OldHeight;
+							XMoveResizeWindow(Context.Dpy, Context.Win, 0, 0, Width, Height);
+						}
+					}
 
 					switch(Keysym)
 					{
