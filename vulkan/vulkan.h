@@ -12,6 +12,15 @@
 
 #include <vulkan/vulkan.h>
 
+#define vkCreateDebugUtilsMessengerEXT _vkCreateDebugUtilsMessengerEXT
+extern PFN_vkCreateDebugUtilsMessengerEXT _vkCreateDebugUtilsMessengerEXT;
+
+#define vkDestroyDebugUtilsMessengerEXT _vkDestroyDebugUtilsMessengerEXT
+extern PFN_vkDestroyDebugUtilsMessengerEXT _vkDestroyDebugUtilsMessengerEXT;
+
+#define vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR
+extern PFN_vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR;
+
 #define VKU_MAX_PIPELINE_VERTEX_BINDINGS 8
 #define VKU_MAX_PIPELINE_VERTEX_ATTRIBUTES 8
 #define VKU_MAX_PIPELINE_SHADER_STAGES 4

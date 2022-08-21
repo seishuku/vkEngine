@@ -9,6 +9,10 @@
 #include "../image/image.h"
 #include "../math/math.h"
 
+PFN_vkCreateDebugUtilsMessengerEXT _vkCreateDebugUtilsMessengerEXT=VK_NULL_HANDLE;
+PFN_vkDestroyDebugUtilsMessengerEXT _vkDestroyDebugUtilsMessengerEXT=VK_NULL_HANDLE;
+PFN_vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR=VK_NULL_HANDLE;
+
 VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile)
 {
 	VkShaderModule shaderModule=VK_NULL_HANDLE;
@@ -564,6 +568,58 @@ VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSetLayout_t *DescriptorSetL
 // Create Vulkan Instance
 VkBool32 CreateVulkanInstance(VkInstance *Instance)
 {
+	uint32_t ExtensionCount=0;
+
+	if(vkEnumerateInstanceExtensionProperties(NULL, &ExtensionCount, NULL)!=VK_SUCCESS)
+	{
+		DBGPRINTF("vkEnumerateInstanceExtensionProperties failed.\n");
+		return VK_FALSE;
+	}
+
+	VkExtensionProperties *ExtensionProperties=(VkExtensionProperties *)malloc(sizeof(VkExtensionProperties)*ExtensionCount);
+
+	if(ExtensionProperties==VK_NULL_HANDLE)
+	{
+		DBGPRINTF("Failed to allocate memory for extension properties.\n");
+		return VK_FALSE;
+	}
+
+	if(vkEnumerateInstanceExtensionProperties(VK_NULL_HANDLE, &ExtensionCount, ExtensionProperties)!=VK_SUCCESS)
+	{
+		FREE(ExtensionProperties);
+		DBGPRINTF("vkEnumerateInstanceExtensionProperties failed.\n");
+		return VK_FALSE;
+	}
+
+	VkBool32 SurfaceOSExtension=VK_FALSE;
+	VkBool32 SurfaceExtension=VK_FALSE;
+	VkBool32 DebugExtension=VK_FALSE;
+
+	for(uint32_t i=0;i<ExtensionCount;i++)
+	{
+#ifdef WIN32
+		if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_WIN32_SURFACE_EXTENSION_NAME)==0)
+			SurfaceOSExtension=VK_TRUE;
+#else
+		if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_XLIB_SURFACE_EXTENSION_NAME)==0)
+			SurfaceOSExtension=VK_TRUE;
+#endif
+		else if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_SURFACE_EXTENSION_NAME)==0)
+			SurfaceExtension=VK_TRUE;
+#ifdef _DEBUG
+		else if(strcmp(ExtensionProperties[i].extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)==0)
+			DebugExtension=VK_TRUE;
+#endif
+	}
+
+	FREE(ExtensionProperties);
+
+	if(!SurfaceExtension||!SurfaceOSExtension)
+	{
+		DBGPRINTF("Missing required instance surface extension!\n");
+		return VK_FALSE;
+	}
+
 	VkApplicationInfo AppInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -573,34 +629,57 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 		.engineVersion=VK_MAKE_VERSION(1, 0, 0),
 		.apiVersion=VK_API_VERSION_1_2
 	};
-	const char *Extensions[]=
-	{
-		VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-		VK_KHR_SURFACE_EXTENSION_NAME,
-#ifdef WIN32
-		VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-#else
-		VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
-#endif
-	};
-	const char *ValidationLayers[]={
-		"VK_LAYER_KHRONOS_validation"
-	};
+
 	VkInstanceCreateInfo InstanceInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
 		.pApplicationInfo=&AppInfo,
+#ifdef _DEBUG
 		.enabledExtensionCount=3,
-		.ppEnabledExtensionNames=Extensions,
+#else
+		.enabledExtensionCount=2,
+#endif
+		.ppEnabledExtensionNames=(const char *[])
+		{
+#ifdef WIN32
+			VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+#else
+			VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
+#endif
+			VK_KHR_SURFACE_EXTENSION_NAME,
+#ifdef _DEBUG
+			VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+#endif
+		},
 #ifdef _DEBUG
 		.enabledLayerCount=1,
-		.ppEnabledLayerNames=ValidationLayers,
+		.ppEnabledLayerNames=(const char *[]) { "VK_LAYER_KHRONOS_validation" },
 #endif
 	};
 
 	if(vkCreateInstance(&InstanceInfo, 0, Instance)!=VK_SUCCESS)
 	{
 		DBGPRINTF("vkCreateInstance failed.\n");
+		return VK_FALSE;
+	}
+
+#ifdef _DEBUG
+	if((_vkCreateDebugUtilsMessengerEXT=(PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(*Instance, "vkCreateDebugUtilsMessengerEXT"))==VK_NULL_HANDLE)
+	{
+		DBGPRINTF("vkGetInstanceProcAddr failed on vkCreateDebugUtilsMessengerEXT.\n");
+		return VK_FALSE;
+	}
+
+	if((_vkDestroyDebugUtilsMessengerEXT=(PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(*Instance, "vkDestroyDebugUtilsMessengerEXT"))==VK_NULL_HANDLE)
+	{
+		DBGPRINTF("vkGetInstanceProcAddr failed on vkDestroyDebugUtilsMessengerEXT.\n");
+		return VK_FALSE;
+	}
+#endif
+
+	if((_vkCmdPushDescriptorSetKHR=(PFN_vkCmdPushDescriptorSetKHR)vkGetInstanceProcAddr(*Instance, "vkCmdPushDescriptorSetKHR"))==VK_NULL_HANDLE)
+	{
+		DBGPRINTF("vkGetInstanceProcAddr failed on vkCmdPushDescriptorSetKHR.\n");
 		return VK_FALSE;
 	}
 
@@ -697,49 +776,64 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	// Free allocated handles
 	FREE(DeviceHandles);
 
-	// Get device physical memory properties
-	vkGetPhysicalDeviceMemoryProperties(Context->PhysicalDevice, &Context->DeviceMemProperties);
+	uint32_t ExtensionCount=0;
 
-	VkPhysicalDeviceDescriptorIndexingFeatures IndexingFeatures=
+	vkEnumerateDeviceExtensionProperties(Context->PhysicalDevice, VK_NULL_HANDLE, &ExtensionCount, VK_NULL_HANDLE);
+
+	VkExtensionProperties *ExtensionProperties=(VkExtensionProperties *)malloc(sizeof(VkExtensionProperties)*ExtensionCount);
+
+	if(ExtensionProperties==VK_NULL_HANDLE)
 	{
-		.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
-		.pNext=VK_NULL_HANDLE
-	};
-
-	VkPhysicalDeviceFeatures2 DeviceFeatures2=
-	{
-		.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-		.pNext=&IndexingFeatures
-	};
-
-	vkGetPhysicalDeviceFeatures2(Context->PhysicalDevice, &DeviceFeatures2);
-
-	if(!IndexingFeatures.descriptorBindingPartiallyBound&&!IndexingFeatures.runtimeDescriptorArray)
-	{
-		DBGPRINTF("Device does not support partial descriptor binding or descriptor arrays.\n");
+		FREE(ExtensionProperties);
+		DBGPRINTF("Failed to allocate memory for extension properties.\n");
 		return VK_FALSE;
 	}
+
+	vkEnumerateDeviceExtensionProperties(Context->PhysicalDevice, VK_NULL_HANDLE, &ExtensionCount, ExtensionProperties);
+
+	VkBool32 SwapchainExtension=VK_FALSE;
+	VkBool32 PushDescriptorExtension=VK_FALSE;
+
+	for(uint32_t i=0;i<ExtensionCount;i++)
+	{
+		if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME)==0)
+			SwapchainExtension=VK_TRUE;
+		else if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)==0)
+			PushDescriptorExtension=VK_TRUE;
+	}
+
+	FREE(ExtensionProperties);
+
+	if(!SwapchainExtension||!PushDescriptorExtension)
+	{
+		DBGPRINTF("Missing required device extensions!\n");
+		return VK_FALSE;
+	}
+
+	// Get device physical memory properties
+	vkGetPhysicalDeviceMemoryProperties(Context->PhysicalDevice, &Context->DeviceMemProperties);
 
 	// Create the logical device from the physical device and queue index from above
 	if(vkCreateDevice(Context->PhysicalDevice, &(VkDeviceCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-		.pNext=&IndexingFeatures,
 		.enabledExtensionCount=2,
-		.ppEnabledExtensionNames=(const char *const [])
+		.pEnabledFeatures=&(VkPhysicalDeviceFeatures)
+		{
+			.imageCubeArray=VK_TRUE,
+		},
+		.ppEnabledExtensionNames=(const char *[])
 		{
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 			VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
 		},
 		.queueCreateInfoCount=1,
-		.pQueueCreateInfos=(VkDeviceQueueCreateInfo[])
+		.pQueueCreateInfos=&(VkDeviceQueueCreateInfo)
 		{
-			{
-				.sType=VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-				.queueFamilyIndex=Context->QueueFamilyIndex,
-				.queueCount=1,
-				.pQueuePriorities=(const float[]) { 1.0f }
-			}
+			.sType=VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+			.queueFamilyIndex=Context->QueueFamilyIndex,
+			.queueCount=1,
+			.pQueuePriorities=(const float[]) { 1.0f }
 		}
 	}, VK_NULL_HANDLE, &Context->Device)!=VK_SUCCESS)
 	{

@@ -144,7 +144,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 							(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f,
 							(((float)rand()/RAND_MAX)*2.0f-1.0f)*100.0f,
 							(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f
-						}, 50.0f,
+						}, 200.0f,
 						(vec4)
 						{
 							(float)rand()/RAND_MAX,

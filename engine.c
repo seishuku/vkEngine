@@ -16,15 +16,6 @@ uint32_t Width=1280, Height=720;
 VkInstance Instance;
 VkuContext_t Context;
 
-#define vkCreateDebugUtilsMessengerEXT _vkCreateDebugUtilsMessengerEXT
-PFN_vkCreateDebugUtilsMessengerEXT _vkCreateDebugUtilsMessengerEXT=VK_NULL_HANDLE;
-
-#define vkDestroyDebugUtilsMessengerEXT _vkDestroyDebugUtilsMessengerEXT
-PFN_vkDestroyDebugUtilsMessengerEXT _vkDestroyDebugUtilsMessengerEXT=VK_NULL_HANDLE;
-
-#define vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR
-PFN_vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR=VK_NULL_HANDLE;
-
 float RotateX=0.0f, RotateY=0.0f, PanX=0.0f, PanY=0.0f, Zoom=-100.0f;
 
 extern float fps, fTimeStep, fTime;
@@ -117,7 +108,7 @@ VkPipelineLayout ShadowPipelineLayout;
 VkRenderPass ShadowRenderPass;
 
 // Shadow depth cubemap texture
-Image_t ShadowBuf[3];
+Image_t ShadowBuf;
 
 struct
 {
@@ -125,13 +116,13 @@ struct
 	vec4 Light_Pos;
 } shadow_ubo;
 
-void InitShadowCubeMap(Image_t *Image)
+void InitShadowCubeMap(Image_t *Image, uint32_t NumMaps)
 {
 	VkCommandBuffer CommandBuffer;
 	VkFence Fence;
 
 	vkuCreateImageBuffer(&Context, Image,
-		VK_IMAGE_TYPE_2D, ShadowColorFormat, 1, 6, ShadowCubeSize, ShadowCubeSize, 1,
+		VK_IMAGE_TYPE_2D, ShadowColorFormat, 1, 6*NumMaps, ShadowCubeSize, ShadowCubeSize, 1,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -160,7 +151,7 @@ void InitShadowCubeMap(Image_t *Image)
 		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 		.subresourceRange.baseMipLevel=0,
 		.subresourceRange.levelCount=1,
-		.subresourceRange.layerCount=6,
+		.subresourceRange.layerCount=6*NumMaps,
 		.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT|VK_ACCESS_TRANSFER_WRITE_BIT,
 		.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
 		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
@@ -210,13 +201,13 @@ void InitShadowCubeMap(Image_t *Image)
 	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.viewType=VK_IMAGE_VIEW_TYPE_CUBE,
+		.viewType=VK_IMAGE_VIEW_TYPE_CUBE_ARRAY,
 		.format=ShadowColorFormat,
 		.components.r={ VK_COMPONENT_SWIZZLE_R },
 		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 		.subresourceRange.baseMipLevel=0,
 		.subresourceRange.baseArrayLayer=0,
-		.subresourceRange.layerCount=6,
+		.subresourceRange.layerCount=6*NumMaps,
 		.subresourceRange.levelCount=1,
 		.image=Image->Image,
 	}, VK_NULL_HANDLE, &Image->View);
@@ -435,7 +426,7 @@ bool InitShadowPipeline(void)
 	return true;
 }
 
-void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos)
+void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, uint32_t i, vec4 Pos)
 {
 	MatrixIdentity(Projection);
 	MatrixInfPerspective(90.0f, 1.0f, 0.01f, false, Projection);
@@ -534,7 +525,7 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 			.image=Shadow.Image,
 			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.subresourceRange.baseMipLevel=0,
-			.subresourceRange.baseArrayLayer=face,
+			.subresourceRange.baseArrayLayer=6*i+face,
 			.subresourceRange.levelCount=1,
 			.subresourceRange.layerCount=1,
 			.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
@@ -552,7 +543,7 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 			.srcSubresource.layerCount=1,
 			.srcOffset={ 0, 0, 0 },
 			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.dstSubresource.baseArrayLayer=face,
+			.dstSubresource.baseArrayLayer=6*i+face,
 			.dstSubresource.mipLevel=0,
 			.dstSubresource.layerCount=1,
 			.dstOffset={ 0, 0, 0 },
@@ -588,7 +579,7 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, vec4 Pos
 			.image=Shadow.Image,
 			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.subresourceRange.baseMipLevel=0,
-			.subresourceRange.baseArrayLayer=face,
+			.subresourceRange.baseArrayLayer=6*i+face,
 			.subresourceRange.levelCount=1,
 			.subresourceRange.layerCount=1,
 			.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -888,9 +879,16 @@ void Render(void)
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 	});
 
-	//ShadowUpdateCubemap(CommandBuffers[Index], ShadowBuf[0], ubo.Light0_Pos);
-	//ShadowUpdateCubemap(CommandBuffers[Index], ShadowBuf[1], ubo.Light1_Pos);
-	//ShadowUpdateCubemap(CommandBuffers[Index], ShadowBuf[2], ubo.Light2_Pos);
+	for(uint32_t i=0;i<List_GetCount(&Lights.Lights);i++)
+	{
+		Light_t *Light=List_GetPointer(&Lights.Lights, i);
+
+		vec4 LightPositionRadius;
+		Vec3_Setv(LightPositionRadius, Light->Position);
+		LightPositionRadius[3]=Light->Radius;
+
+		ShadowUpdateCubemap(CommandBuffers[Index], ShadowBuf, i, LightPositionRadius);
+	}
 
 	// Start a render pass and clear the frame/depth buffer
 	vkCmdBeginRenderPass(CommandBuffers[Index], &(VkRenderPassBeginInfo)
@@ -919,79 +917,27 @@ void Render(void)
 		{
 			{
 				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-				.dstBinding=0,
-				.pBufferInfo=&(VkDescriptorBufferInfo)
-				{
-					.buffer=Lights.StorageBuffer,
-					.offset=0,
-					.range=VK_WHOLE_SIZE,
-				},
+				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .dstBinding=0,
+				.pBufferInfo=&(VkDescriptorBufferInfo) { Lights.StorageBuffer, 0, VK_WHOLE_SIZE },
 			},
 			{
 				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.dstBinding=1,
-				.pImageInfo=&(VkDescriptorImageInfo)
-				{
-					.imageView=Textures[2*i+0].View,
-					.sampler=Textures[2*i+0].Sampler,
-					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				},
+				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .dstBinding=1,
+				.pImageInfo=&(VkDescriptorImageInfo) { Textures[2*i+0].Sampler, Textures[2*i+0].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
 			},
 			{
 				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.dstBinding=2,
-				.pImageInfo=&(VkDescriptorImageInfo)
-				{
-					.imageView=Textures[2*i+1].View,
-					.sampler=Textures[2*i+1].Sampler,
-					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				},
+				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .dstBinding=2,
+				.pImageInfo=&(VkDescriptorImageInfo) { Textures[2*i+1].Sampler, Textures[2*i+1].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
 			},
 			{
 				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.dstBinding=3,
-				.pImageInfo=&(VkDescriptorImageInfo)
-				{
-					.imageView=ShadowBuf[0].View,
-					.sampler=ShadowBuf[0].Sampler,
-					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				},
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.dstBinding=4,
-				.pImageInfo=&(VkDescriptorImageInfo)
-				{
-					.imageView=ShadowBuf[1].View,
-					.sampler=ShadowBuf[1].Sampler,
-					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				},
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.dstBinding=5,
-				.pImageInfo=&(VkDescriptorImageInfo)
-				{
-					.imageView=ShadowBuf[2].View,
-					.sampler=ShadowBuf[2].Sampler,
-					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				},
-			},
+				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .dstBinding=3,
+				.pImageInfo=&(VkDescriptorImageInfo) { ShadowBuf.Sampler, ShadowBuf.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+			}
 		};
 
-		vkCmdPushDescriptorSetKHR(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 6, WriteDescriptorSet);
+		vkCmdPushDescriptorSetKHR(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 4, WriteDescriptorSet);
 
 		// Bind model data buffers and draw the triangles
 		for(int32_t j=0;j<Model[i].NumMesh;j++)
@@ -1047,25 +993,21 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 
 bool Init(void)
 {
-	_vkCreateDebugUtilsMessengerEXT=(PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkCreateDebugUtilsMessengerEXT");
-	_vkDestroyDebugUtilsMessengerEXT=(PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkDestroyDebugUtilsMessengerEXT");
-	_vkCmdPushDescriptorSetKHR=(PFN_vkCmdPushDescriptorSetKHR)vkGetInstanceProcAddr(Instance, "vkCmdPushDescriptorSetKHR");
-
-	VkDebugUtilsMessengerCreateInfoEXT createInfo=
+#ifdef _DEBUG
+	if(vkCreateDebugUtilsMessengerEXT(Instance, &(VkDebugUtilsMessengerCreateInfoEXT)
 	{
 		.sType=VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
 		.messageSeverity=VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT|VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT|VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
 		.messageType=VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT|VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT|VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
 		.pfnUserCallback=debugCallback
-	};
-
-	if(vkCreateDebugUtilsMessengerEXT(Instance, &createInfo, VK_NULL_HANDLE, &debugMessenger)!=VK_SUCCESS)
+	}, VK_NULL_HANDLE, &debugMessenger)!=VK_SUCCESS)
 		return false;
+#endif
 
 	Lights_Init(&Lights);
 	Lights_Add(&Lights, (vec3) { 0.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 1.0f, 0.0f, 0.0f, 1.0f });
-	Lights_Add(&Lights, (vec3) { -50.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 0.0f, 1.0f, 0.0f, 1.0f });
-	Lights_Add(&Lights, (vec3) { 50.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 0.0f, 0.0f, 1.0f, 1.0f });
+	Lights_Add(&Lights, (vec3) { -100.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 0.0f, 1.0f, 0.0f, 1.0f });
+	Lights_Add(&Lights, (vec3) { 100.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 0.0f, 0.0f, 1.0f, 1.0f });
 
 	// Load models
 	if(Load3DS(&Model[MODEL_HELLKNIGHT], "./assets/hellknight.3ds"))
@@ -1096,9 +1038,7 @@ bool Init(void)
 	// Create main render pipeline
 	CreatePipeline();
 
-	InitShadowCubeMap(&ShadowBuf[0]);
-	InitShadowCubeMap(&ShadowBuf[1]);
-	InitShadowCubeMap(&ShadowBuf[2]);
+	InitShadowCubeMap(&ShadowBuf, 13);
 
 	InitShadowFramebuffer();
 	InitShadowPipeline();
@@ -1310,7 +1250,9 @@ void Destroy(void)
 {
 	vkDeviceWaitIdle(Context.Device);
 
+#ifdef _DEBUG
 	vkDestroyDebugUtilsMessengerEXT(Instance, debugMessenger, VK_NULL_HANDLE);
+#endif
 
 	Lights_Destroy(&Lights);
 
@@ -1331,20 +1273,10 @@ void Destroy(void)
 	vkDestroyImage(Context.Device, ShadowDepth.Image, VK_NULL_HANDLE);
 
 	// Shadow depth cubemap texture
-	vkDestroySampler(Context.Device, ShadowBuf[0].Sampler, VK_NULL_HANDLE);
-	vkDestroyImageView(Context.Device, ShadowBuf[0].View, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, ShadowBuf[0].DeviceMemory, VK_NULL_HANDLE);
-	vkDestroyImage(Context.Device, ShadowBuf[0].Image, VK_NULL_HANDLE);
-
-	vkDestroySampler(Context.Device, ShadowBuf[1].Sampler, VK_NULL_HANDLE);
-	vkDestroyImageView(Context.Device, ShadowBuf[1].View, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, ShadowBuf[1].DeviceMemory, VK_NULL_HANDLE);
-	vkDestroyImage(Context.Device, ShadowBuf[1].Image, VK_NULL_HANDLE);
-
-	vkDestroySampler(Context.Device, ShadowBuf[2].Sampler, VK_NULL_HANDLE);
-	vkDestroyImageView(Context.Device, ShadowBuf[2].View, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, ShadowBuf[2].DeviceMemory, VK_NULL_HANDLE);
-	vkDestroyImage(Context.Device, ShadowBuf[2].Image, VK_NULL_HANDLE);
+	vkDestroySampler(Context.Device, ShadowBuf.Sampler, VK_NULL_HANDLE);
+	vkDestroyImageView(Context.Device, ShadowBuf.View, VK_NULL_HANDLE);
+	vkFreeMemory(Context.Device, ShadowBuf.DeviceMemory, VK_NULL_HANDLE);
+	vkDestroyImage(Context.Device, ShadowBuf.Image, VK_NULL_HANDLE);
 	// ---
 
 	Font_Destroy();

@@ -10,6 +10,9 @@
 #include "lights.h"
 
 extern VkuContext_t Context;
+extern Image_t ShadowBuf;
+
+void InitShadowCubeMap(Image_t *Image, uint32_t NumMaps);
 
 uint32_t Lights_Add(Lights_t *Lights, vec3 Position, float Radius, vec4 Kd)
 {
@@ -144,8 +147,6 @@ void Lights_UpdateSpotlight(Lights_t *Lights, uint32_t ID, vec3 Direction, float
 	}
 }
 
-extern int32_t DynSize;
-
 void Lights_UpdateSSBO(Lights_t *Lights)
 {
 	static size_t oldSize=0;
@@ -159,11 +160,18 @@ void Lights_UpdateSSBO(Lights_t *Lights)
 		{
 			vkDeviceWaitIdle(Context.Device);
 
+			vkDestroySampler(Context.Device, ShadowBuf.Sampler, VK_NULL_HANDLE);
+			vkDestroyImageView(Context.Device, ShadowBuf.View, VK_NULL_HANDLE);
+			vkFreeMemory(Context.Device, ShadowBuf.DeviceMemory, VK_NULL_HANDLE);
+			vkDestroyImage(Context.Device, ShadowBuf.Image, VK_NULL_HANDLE);
+
 			vkDestroyBuffer(Context.Device, Lights->StorageBuffer, VK_NULL_HANDLE);
 			vkFreeMemory(Context.Device, Lights->StorageMemory, VK_NULL_HANDLE);
 
 			vkuCreateBuffer(&Context, &Lights->StorageBuffer, &Lights->StorageMemory,
 							(uint32_t)Lights->Lights.bufSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+			InitShadowCubeMap(&ShadowBuf, (uint32_t)(Lights->Lights.bufSize/Lights->Lights.Stride));
 		}
 	}
 
