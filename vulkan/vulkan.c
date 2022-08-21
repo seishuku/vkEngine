@@ -813,15 +813,22 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	// Get device physical memory properties
 	vkGetPhysicalDeviceMemoryProperties(Context->PhysicalDevice, &Context->DeviceMemProperties);
 
+	VkPhysicalDeviceFeatures Features;
+
+	vkGetPhysicalDeviceFeatures(Context->PhysicalDevice, &Features);
+
+	if(!Features.imageCubeArray)
+	{
+		DBGPRINTF("Missing cubemap arrays feature.\n");
+		return VK_FALSE;
+	}
+
 	// Create the logical device from the physical device and queue index from above
 	if(vkCreateDevice(Context->PhysicalDevice, &(VkDeviceCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
 		.enabledExtensionCount=2,
-		.pEnabledFeatures=&(VkPhysicalDeviceFeatures)
-		{
-			.imageCubeArray=VK_TRUE,
-		},
+		.pEnabledFeatures=&Features,
 		.ppEnabledExtensionNames=(const char *[])
 		{
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
