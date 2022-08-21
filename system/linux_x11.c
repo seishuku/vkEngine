@@ -228,7 +228,7 @@ int main(int argc, char **argv)
 		vkDestroyInstance(Instance, VK_NULL_HANDLE);
 
 		XDestroyWindow(Context.Dpy, Context.Win);
-		XCloseDisplay(Context.Dpy);
+		//XCloseDisplay(Context.Dpy);
 
 		return -1;
 	}

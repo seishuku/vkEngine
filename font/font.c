@@ -54,7 +54,7 @@ void _Font_Init(void)
 	VkBuffer stagingBuffer=VK_NULL_HANDLE;
 	VkDeviceMemory stagingBufferMemory=VK_NULL_HANDLE;
 	VkCommandBuffer copyCmd=VK_NULL_HANDLE;
-	VkFence fence=VK_NULL_HANDLE;
+	VkFence Fence=VK_NULL_HANDLE;
 	void *data=NULL;
 
 	// Create new descriptor sets and pipeline
@@ -237,19 +237,28 @@ void _Font_Init(void)
 	});
 
 	vkEndCommandBuffer(copyCmd);
-		
+
+	// Create a fence for the command buffer queue submit
+	vkCreateFence(Context.Device, &(VkFenceCreateInfo) { .sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, }, VK_NULL_HANDLE, &Fence);
+
 	// Submit to the queue
 	vkQueueSubmit(Context.Queue, 1, &(VkSubmitInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.commandBufferCount=1,
 		.pCommandBuffers=&copyCmd,
-	}, VK_NULL_HANDLE);
+	}, Fence);
 
 	// Wait for the fence to signal that command buffer has finished executing
-	vkQueueWaitIdle(Context.Queue);
+	vkWaitForFences(Context.Device, 1, &Fence, VK_TRUE, UINT64_MAX);
+
+	// Done with the fence
+	vkDestroyFence(Context.Device, Fence, VK_NULL_HANDLE);
+
+	// Done with the command buffer
 	vkFreeCommandBuffers(Context.Device, Context.CommandPool, 1, &copyCmd);
 
+	// Done with the staging buffer
 	vkFreeMemory(Context.Device, stagingBufferMemory, VK_NULL_HANDLE);
 	vkDestroyBuffer(Context.Device, stagingBuffer, VK_NULL_HANDLE);
 

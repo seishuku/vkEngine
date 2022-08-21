@@ -59,10 +59,6 @@ struct
 	uint32_t NumLights;
 } ubo;
 
-VkBuffer uniformBuffer;
-VkDeviceMemory uniformBufferMemory;
-void *uniformBufferPtr;
-
 VkDebugUtilsMessengerEXT debugMessenger;
 
 // Swapchain
@@ -88,7 +84,7 @@ VkPipelineLayout PipelineLayout;
 VkuPipeline_t Pipeline;
 
 VkDescriptorPool DescriptorPool;
-VkDescriptorSet DescriptorSet;
+VkDescriptorSet DescriptorSet[MAX_FRAME_COUNT];
 VkuDescriptorSetLayout_t DescriptorSetLayout;
 
 
@@ -695,17 +691,17 @@ bool CreatePipeline(void)
 	{
 		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 		.pNext=VK_NULL_HANDLE,
-		.maxSets=1,
+		.maxSets=MAX_FRAME_COUNT,
 		.poolSizeCount=2,
 		.pPoolSizes=(VkDescriptorPoolSize[])
 		{
 			{
 				.type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-				.descriptorCount=1,
+				.descriptorCount=MAX_FRAME_COUNT*1,
 			},
 			{
 				.type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.descriptorCount=6,
+				.descriptorCount=MAX_FRAME_COUNT*6,
 			},
 		},
 	}, NULL, &DescriptorPool);
@@ -728,7 +724,16 @@ bool CreatePipeline(void)
 		.descriptorPool=DescriptorPool,
 		.descriptorSetCount=1,
 		.pSetLayouts=&DescriptorSetLayout.DescriptorSetLayout
-	}, &DescriptorSet);
+	}, &DescriptorSet[0]);
+
+	vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+		.pNext=NULL,
+		.descriptorPool=DescriptorPool,
+		.descriptorSetCount=1,
+		.pSetLayouts=&DescriptorSetLayout.DescriptorSetLayout
+	}, &DescriptorSet[1]);
 
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
@@ -875,7 +880,6 @@ void Render(void)
 	static OldIndex=0;
 	uint32_t Index=OldIndex;
 	uint32_t ImageIndex;
-	int i, j;
 
 	// Generate the projection matrix
 	MatrixIdentity(Projection);
@@ -908,6 +912,89 @@ void Render(void)
 	vkWaitForFences(Context.Device, 1, &FrameFences[Index], VK_TRUE, UINT64_MAX);
 	vkResetFences(Context.Device, 1, &FrameFences[Index]);
 
+	uint32_t i=0;
+	vkUpdateDescriptorSets(Context.Device, 6, (VkWriteDescriptorSet[])
+	{
+		{
+			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.descriptorCount=1,
+			.descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			.dstBinding=0,
+			.pBufferInfo=&(VkDescriptorBufferInfo)
+			{
+				.buffer=Lights.StorageBuffer,
+				.offset=0,
+				.range=VK_WHOLE_SIZE,
+			},
+			.dstSet=DescriptorSet[ImageIndex],
+		},
+		{
+			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.descriptorCount=1,
+			.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.dstBinding=1,
+			.pImageInfo=&(VkDescriptorImageInfo)
+			{
+				.imageView=Textures[2*i+0].View,
+				.sampler=Textures[2*i+0].Sampler,
+				.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			},
+			.dstSet=DescriptorSet[ImageIndex],
+		},
+		{
+			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.descriptorCount=1,
+			.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.dstBinding=2,
+			.pImageInfo=&(VkDescriptorImageInfo)
+			{
+				.imageView=Textures[2*i+1].View,
+				.sampler=Textures[2*i+1].Sampler,
+				.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			},
+			.dstSet=DescriptorSet[ImageIndex],
+		},
+		{
+			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.descriptorCount=1,
+			.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.dstBinding=3,
+			.pImageInfo=&(VkDescriptorImageInfo)
+			{
+				.imageView=ShadowBuf[0].View,
+				.sampler=ShadowBuf[0].Sampler,
+				.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			},
+			.dstSet=DescriptorSet[ImageIndex],
+		},
+		{
+			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.descriptorCount=1,
+			.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.dstBinding=4,
+			.pImageInfo=&(VkDescriptorImageInfo)
+			{
+				.imageView=ShadowBuf[1].View,
+				.sampler=ShadowBuf[1].Sampler,
+				.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			},
+			.dstSet=DescriptorSet[ImageIndex],
+		},
+		{
+			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.descriptorCount=1,
+			.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.dstBinding=5,
+			.pImageInfo=&(VkDescriptorImageInfo)
+			{
+				.imageView=ShadowBuf[2].View,
+				.sampler=ShadowBuf[2].Sampler,
+				.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			},
+			.dstSet=DescriptorSet[ImageIndex],
+		},
+	}, 0, VK_NULL_HANDLE);
+
 	// Start recording the commands
 	vkBeginCommandBuffer(CommandBuffers[Index], &(VkCommandBufferBeginInfo)
 	{
@@ -939,96 +1026,13 @@ void Render(void)
 
 	vkCmdPushConstants(CommandBuffers[Index], PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ubo), &ubo);
 
+	vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[Index], 0, NULL);
+
 	// Draw the models
-	for(i=0;i<NUM_MODELS;i++)
+	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		vkUpdateDescriptorSets(Context.Device, 6, (VkWriteDescriptorSet[])
-		{
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-				.dstBinding=0,
-				.pBufferInfo=&(VkDescriptorBufferInfo)
-				{
-					.buffer=Lights.StorageBuffer,
-					.offset=0,
-					.range=VK_WHOLE_SIZE,
-				},
-				.dstSet=DescriptorSet,
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.dstBinding=1,
-				.pImageInfo=&(VkDescriptorImageInfo)
-				{
-					.imageView=Textures[2*i+0].View,
-					.sampler=Textures[2*i+0].Sampler,
-					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				},
-				.dstSet=DescriptorSet,
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.dstBinding=2,
-				.pImageInfo=&(VkDescriptorImageInfo)
-				{
-					.imageView=Textures[2*i+1].View,
-					.sampler=Textures[2*i+1].Sampler,
-					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				},
-				.dstSet=DescriptorSet,
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.dstBinding=3,
-				.pImageInfo=&(VkDescriptorImageInfo)
-				{
-					.imageView=ShadowBuf[0].View,
-					.sampler=ShadowBuf[0].Sampler,
-					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				},
-				.dstSet=DescriptorSet,
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.dstBinding=4,
-				.pImageInfo=&(VkDescriptorImageInfo)
-				{
-					.imageView=ShadowBuf[1].View,
-					.sampler=ShadowBuf[1].Sampler,
-					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				},
-				.dstSet=DescriptorSet,
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.descriptorCount=1,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.dstBinding=5,
-				.pImageInfo=&(VkDescriptorImageInfo)
-				{
-					.imageView=ShadowBuf[2].View,
-					.sampler=ShadowBuf[2].Sampler,
-					.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				},
-				.dstSet=DescriptorSet,
-			},
-		}, 0, VK_NULL_HANDLE);
-
-		// Bind per-model destriptor set, this changes texture binding
-		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet, 0, NULL);
-
 		// Bind model data buffers and draw the triangles
-		for(j=0;j<Model[i].NumMesh;j++)
+		for(uint32_t j=0;j<Model[i].NumMesh;j++)
 		{
 			vkCmdBindVertexBuffers(CommandBuffers[Index], 0, 1, &Model[i].Mesh[j].Buffer, &(VkDeviceSize) { 0 });
 			vkCmdBindIndexBuffer(CommandBuffers[Index], Model[i].Mesh[j].IndexBuffer, 0, VK_INDEX_TYPE_UINT16);
@@ -1092,7 +1096,8 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
 {
-	DBGPRINTF("Validation layer: %s\n", pCallbackData->pMessage);
+	DBGPRINTF("POOP!\n");
+	DBGPRINTF("%s\n", pCallbackData->pMessage);
 
 	return VK_FALSE;
 }
@@ -1114,12 +1119,6 @@ bool Init(void)
 	Lights_Add(&Lights, (vec3) { 0.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 1.0f, 0.0f, 0.0f, 1.0f });
 	Lights_Add(&Lights, (vec3) { -50.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 0.0f, 1.0f, 0.0f, 1.0f });
 	Lights_Add(&Lights, (vec3) { 50.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 0.0f, 0.0f, 1.0f, 1.0f });
-
-	// Create primary frame buffers, depth image, and renderpass
-	CreateFramebuffers();
-
-	// Create main render pipeline
-	CreatePipeline();
 
 	// Load models
 	if(Load3DS(&Model[MODEL_HELLKNIGHT], "./assets/hellknight.3ds"))
@@ -1144,11 +1143,11 @@ bool Init(void)
 	Image_Upload(&Context, &Textures[TEXTURE_LEVEL], "./assets/tile.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_LEVEL_NORMAL], "./assets/tile_b.tga", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALMAP);
 
-	// Uniform data buffer and pointer mapping
-	vkuCreateBuffer(&Context, &uniformBuffer, &uniformBufferMemory, sizeof(ubo),
-		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	// Create primary frame buffers, depth image, and renderpass
+	CreateFramebuffers();
 
-	vkMapMemory(Context.Device, uniformBufferMemory, 0, VK_WHOLE_SIZE, 0, &uniformBufferPtr);
+	// Create main render pipeline
+	CreatePipeline();
 
 	InitShadowCubeMap(&ShadowBuf[0]);
 	InitShadowCubeMap(&ShadowBuf[1]);
@@ -1156,7 +1155,7 @@ bool Init(void)
 
 	InitShadowFramebuffer();
 	InitShadowPipeline();
- 
+
 	return true;
 }
 
@@ -1371,10 +1370,9 @@ void Destroy(void)
 	// Shadow stuff
 	vkDestroyPipeline(Context.Device, ShadowPipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, ShadowPipelineLayout, VK_NULL_HANDLE);
-
-	vkDestroyFramebuffer(Context.Device, ShadowFrameBuffer, VK_NULL_HANDLE);
-
 	vkDestroyRenderPass(Context.Device, ShadowRenderPass, VK_NULL_HANDLE);
+	vkDestroyRenderPass(Context.Device, ShadowPipeline.RenderPass, VK_NULL_HANDLE);
+	vkDestroyFramebuffer(Context.Device, ShadowFrameBuffer, VK_NULL_HANDLE);
 
 	// Shadow frame buffer color
 	vkDestroyImageView(Context.Device, ShadowColor.View, VK_NULL_HANDLE);
@@ -1425,14 +1423,13 @@ void Destroy(void)
 		}
 	}
 
-	vkFreeMemory(Context.Device, uniformBufferMemory, VK_NULL_HANDLE);
-	vkDestroyBuffer(Context.Device, uniformBuffer, VK_NULL_HANDLE);
-
 	vkDestroyDescriptorSetLayout(Context.Device, DescriptorSetLayout.DescriptorSetLayout, VK_NULL_HANDLE);
 	vkDestroyDescriptorPool(Context.Device, DescriptorPool, VK_NULL_HANDLE);
 
 	vkDestroyPipeline(Context.Device, Pipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, PipelineLayout, VK_NULL_HANDLE);
+	vkDestroyRenderPass(Context.Device, Pipeline.RenderPass, VK_NULL_HANDLE);
+	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);
 
 	vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
 	vkFreeMemory(Context.Device, DepthImage.DeviceMemory, VK_NULL_HANDLE);
@@ -1451,6 +1448,4 @@ void Destroy(void)
 	}
 
 	vkDestroySwapchainKHR(Context.Device, Swapchain, VK_NULL_HANDLE);
-
-	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);
 }
