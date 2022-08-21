@@ -5,6 +5,7 @@
 #include "system/system.h"
 #include "vulkan/vulkan.h"
 #include "math/math.h"
+#include "camera/camera.h"
 #include "model/3ds.h"
 #include "image/image.h"
 #include "font/font.h"
@@ -17,6 +18,8 @@ VkInstance Instance;
 VkuContext_t Context;
 
 float RotateX=0.0f, RotateY=0.0f, PanX=0.0f, PanY=0.0f, Zoom=-100.0f;
+
+Camera_t Camera;
 
 extern float fps, fTimeStep, fTime;
 
@@ -841,18 +844,25 @@ void Render(void)
 	uint32_t Index=OldIndex;
 	uint32_t ImageIndex;
 
+	Lights_UpdatePosition(&Lights, 0, (vec3) { sinf(fTime)*150.0f, -25.0f, cosf(fTime)*150.0f });
+	Lights_UpdatePosition(&Lights, 1, (vec3) { cosf(fTime)*100.0f, 50.0f, sinf(fTime)*100.0f });
+	Lights_UpdatePosition(&Lights, 2, (vec3) { cosf(fTime)*100.0f, -80.0f, -15.0f });
+	Lights_UpdatePosition(&Lights, 10, (vec3) { cosf(fTime)*300.0f, 100.0f, sinf(fTime)*300.0f });
+	Lights_UpdateRadius(&Lights, 10, 300.0f);
+
 	// Generate the projection matrix
 	MatrixIdentity(Projection);
 	MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, true, Projection);
 
 	// Set up the modelview matrix
 	MatrixIdentity(ModelView);
-	MatrixTranslate(PanX, PanY, Zoom, ModelView);
+	//MatrixTranslate(PanX, PanY, Zoom, ModelView);
 
-	QuatAngle(RotateX, 0.0f, 1.0f, 0.0f, QuatX);
-	QuatAngle(RotateY, 1.0f, 0.0f, 0.0f, QuatY);
-	QuatMultiply(QuatY, QuatX, Quat);
-	QuatMatrix(Quat, ModelView);
+	//QuatAngle(RotateX, 0.0f, 1.0f, 0.0f, QuatX);
+	//QuatAngle(RotateY, 1.0f, 0.0f, 0.0f, QuatY);
+	//QuatMultiply(QuatY, QuatX, Quat);
+	//QuatMatrix(Quat, ModelView);
+	CameraUpdate(&Camera, fTimeStep, ModelView);
 
 	// Generate an inverse modelview matrix (only really need the last 3 from the calculation)
 	ubo.eye[0]=-(ModelView[12]*ModelView[ 0])-(ModelView[13]*ModelView[ 1])-(ModelView[14]*ModelView[ 2]);
@@ -951,7 +961,7 @@ void Render(void)
 
 	// Should UI overlay stuff have it's own render pass?
 	// Maybe even separate thread?
-	Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f\n\n\n\nNumber of lights: %d", fps, ubo.NumLights);
+	Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f\n\n\n\nNumber of lights: %d %0.3f %0.3f %0.3f", fps, ubo.NumLights, Camera.View[0], Camera.View[1], Camera.View[2]);
 
 	vkCmdEndRenderPass(CommandBuffers[Index]);
 
@@ -1003,6 +1013,8 @@ bool Init(void)
 	}, VK_NULL_HANDLE, &debugMessenger)!=VK_SUCCESS)
 		return false;
 #endif
+
+	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 100.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
 
 	Lights_Init(&Lights);
 	Lights_Add(&Lights, (vec3) { 0.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 1.0f, 0.0f, 0.0f, 1.0f });

@@ -137,6 +137,54 @@ void EventLoop(void)
 							}
 							break;
 
+						case 'w':
+							Camera.key_w=true;
+							break;
+
+						case 's':
+							Camera.key_s=true;
+							break;
+
+						case 'a':
+							Camera.key_a=true;
+							break;
+
+						case 'd':
+							Camera.key_d=true;
+							break;
+
+						case 'v':
+							Camera.key_v=true;
+							break;
+
+						case 'c':
+							Camera.key_c=true;
+							break;
+
+						case 'q':
+							Camera.key_q=true;
+							break;
+
+						case 'e':
+							Camera.key_e=true;
+							break;
+
+						case XK_Up:
+							Camera.key_up=true;
+							break;
+
+						case XK_Down:
+							Camera.key_down=true;
+							break;
+
+						case XK_Left:
+							Camera.key_left=true;
+							break;
+
+						case XK_Right:
+							Camera.key_right=true;
+							break;
+
 						case XK_Escape:
 							Done=true;
 							break;
@@ -152,6 +200,54 @@ void EventLoop(void)
 
 					switch(Keysym)
 					{
+						case 'w':
+							Camera.key_w=false;
+							break;
+
+						case 's':
+							Camera.key_s=false;
+							break;
+
+						case 'a':
+							Camera.key_a=false;
+							break;
+
+						case 'd':
+							Camera.key_d=false;
+							break;
+
+						case 'v':
+							Camera.key_v=false;
+							break;
+
+						case 'c':
+							Camera.key_c=false;
+							break;
+
+						case 'q':
+							Camera.key_q=false;
+							break;
+
+						case 'e':
+							Camera.key_e=false;
+							break;
+
+						case XK_Up:
+							Camera.key_up=false;
+							break;
+
+						case XK_Down:
+							Camera.key_down=false;
+							break;
+
+						case XK_Left:
+							Camera.key_left=false;
+							break;
+
+						case XK_Right:
+							Camera.key_right=false;
+							break;
+
 						default:
 							break;
 					}

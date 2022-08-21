@@ -64,6 +64,12 @@
     <Filter Include="Header Files\lights">
       <UniqueIdentifier>{b0d9988b-18d0-49bf-9714-0f81f8de27fa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\camera">
+      <UniqueIdentifier>{fd66522e-6afb-4e25-8589-38fa9a318e95}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\camera">
+      <UniqueIdentifier>{3c6294bb-196d-4d97-a5e5-63e2e9019398}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="engine.c">
@@ -102,6 +108,9 @@
     <ClCompile Include="system\win32.c">
       <Filter>Source Files\system</Filter>
     </ClCompile>
+    <ClCompile Include="camera\camera.c">
+      <Filter>Source Files\camera</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
@@ -130,6 +139,9 @@
     </ClInclude>
     <ClInclude Include="lights\lights.h">
       <Filter>Header Files\lights</Filter>
+    </ClInclude>
+    <ClInclude Include="camera\camera.h">
+      <Filter>Header Files\camera</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -11,6 +11,9 @@ OBJS+=image/image.o
 # math
 OBJS+=math/math.o
 
+# camera
+OBJS+=camera/camera.o
+
 # core stuff
 OBJS+=system/linux_x11.o
 OBJS+=vulkan/vulkan.o

@@ -93,6 +93,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="camera\camera.c" />
     <ClCompile Include="engine.c" />
     <ClCompile Include="font\font.c" />
     <ClCompile Include="image\image.c" />
@@ -107,6 +108,7 @@
     <ClCompile Include="vulkan\vulkan.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="camera\camera.h" />
     <ClInclude Include="font\font.h" />
     <ClInclude Include="image\image.h" />
     <ClInclude Include="lights\lights.h" />
