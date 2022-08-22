@@ -877,7 +877,14 @@ void Render(void)
 
 	Lights_UpdateSSBO(&Lights);
 
-	vkAcquireNextImageKHR(Context.Device, Swapchain, UINT64_MAX, PresentCompleteSemaphores[Index], VK_NULL_HANDLE, &ImageIndex);
+	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain, UINT64_MAX, PresentCompleteSemaphores[Index], VK_NULL_HANDLE, &ImageIndex);
+
+	if(Result==VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		DBGPRINTF("Swapchain out of date... Rebuilding.\n");
+		RecreateSwapchain();
+		return;
+	}
 
 	vkWaitForFences(Context.Device, 1, &FrameFences[Index], VK_TRUE, UINT64_MAX);
 	vkResetFences(Context.Device, 1, &FrameFences[Index]);
