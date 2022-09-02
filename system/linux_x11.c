@@ -85,19 +85,21 @@ void EventLoop(void)
 
 					if(Event.xmotion.state&Button1Mask)
 					{
-						RotateX+=(dx*0.01f);
-						RotateY+=(dy*0.01f);
+						Camera.Yaw+=(float)dx/800.0f;
+						Camera.Pitch+=(float)dy/800.0f;
+						//RotateX+=(dx*0.01f);
+						//RotateY+=(dy*0.01f);
 					}
 
 					if(Event.xmotion.state&Button2Mask)
 					{
-						PanX+=dx;
-						PanY-=dy;
+						//PanX+=dx;
+						//PanY-=dy;
 					}
 
 					if(Event.xmotion.state&Button3Mask)
 					{
-						Zoom-=dy;
+						//Zoom-=dy;
 					}
 					break;
 

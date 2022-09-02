@@ -32,7 +32,7 @@ layout(std430, binding=0) readonly buffer layoutLights
 
 layout (binding=1) uniform sampler2D TexBase;
 layout (binding=2) uniform sampler2D TexNormal;
-layout (binding=3) uniform samplerCubeArray TexDistance;
+layout (binding=3) uniform samplerCubeArrayShadow TexDistance;
 
 layout (location=0) out vec4 Output;
 
@@ -79,7 +79,7 @@ void main()
 		float lAtten=max(0.0, 1.0-length(lPos*Lights[i].Position.w));
 
 		// Shadow map compare, divide the light distance by the radius to match the depth map distance space
-		float Shadow=(texture(TexDistance, vec4(-lPos, i)).x+0.01)>=length(lPos*Lights[i].Position.w)?1.0:0.0;
+		float Shadow=texture(TexDistance, vec4(-lPos, i), (length(lPos)*Lights[i].Position.w)-0.01);
 
 		// Now we can normalize the light position vector
 		lPos=normalize(lPos);

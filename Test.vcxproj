@@ -121,6 +121,7 @@
   </ItemGroup>
   <ItemGroup>
     <GLSL Include="shaders\distance.frag" />
+    <GLSL Include="shaders\distance.geom" />
     <GLSL Include="shaders\distance.vert" />
     <GLSL Include="shaders\font.frag" />
     <GLSL Include="shaders\font.vert" />

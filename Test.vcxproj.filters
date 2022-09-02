@@ -163,5 +163,8 @@
     <GLSL Include="shaders\lighting.vert">
       <Filter>Shaders</Filter>
     </GLSL>
+    <GLSL Include="shaders\distance.geom">
+      <Filter>Shaders</Filter>
+    </GLSL>
   </ItemGroup>
 </Project>

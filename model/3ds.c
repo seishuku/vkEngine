@@ -75,9 +75,9 @@ void CalculateTangent3DS(Mesh3DS_t *Mesh)
 		t[2]=(uv0[0]*v1[2]-uv1[0]*v0[2])*r;
 		Vec3_Normalize(t);
 
-		Mesh->Binormal[3*i1+0]+=t[0];	Mesh->Binormal[3*i1+1]+=t[1];	Mesh->Binormal[3*i1+2]+=t[2];
-		Mesh->Binormal[3*i2+0]+=t[0];	Mesh->Binormal[3*i2+1]+=t[1];	Mesh->Binormal[3*i2+2]+=t[2];
-		Mesh->Binormal[3*i3+0]+=t[0];	Mesh->Binormal[3*i3+1]+=t[1];	Mesh->Binormal[3*i3+2]+=t[2];
+		Mesh->Binormal[3*i1+0]-=t[0];	Mesh->Binormal[3*i1+1]-=t[1];	Mesh->Binormal[3*i1+2]-=t[2];
+		Mesh->Binormal[3*i2+0]-=t[0];	Mesh->Binormal[3*i2+1]-=t[1];	Mesh->Binormal[3*i2+2]-=t[2];
+		Mesh->Binormal[3*i3+0]-=t[0];	Mesh->Binormal[3*i3+1]-=t[1];	Mesh->Binormal[3*i3+2]-=t[2];
 
 		Cross(v0, v1, n);
 		Vec3_Normalize(n);

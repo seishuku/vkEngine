@@ -118,17 +118,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			switch(wParam)
 			{
 				case MK_LBUTTON:
-					RotateX+=(delta.x*0.01f);
-					RotateY-=(delta.y*0.01f);
+					Camera.Yaw+=(float)delta.x/800.0f;
+					Camera.Pitch+=(float)delta.y/800.0f;
+					//RotateX+=(delta.x*0.01f);
+					//RotateY-=(delta.y*0.01f);
 					break;
 
 				case MK_MBUTTON:
-					PanX+=delta.x;
-					PanY+=delta.y;
+					//PanX+=delta.x;
+					//PanY+=delta.y;
 					break;
 
 				case MK_RBUTTON:
-					Zoom+=delta.y;
+					//Zoom+=delta.y;
 					break;
 			}
 			break;
