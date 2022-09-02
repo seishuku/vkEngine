@@ -118,7 +118,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			switch(wParam)
 			{
 				case MK_LBUTTON:
-					Camera.Yaw+=(float)delta.x/800.0f;
+					Camera.Yaw-=(float)delta.x/800.0f;
 					Camera.Pitch+=(float)delta.y/800.0f;
 					//RotateX+=(delta.x*0.01f);
 					//RotateY-=(delta.y*0.01f);
