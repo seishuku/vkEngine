@@ -13,6 +13,8 @@
 #include "../lights/lights.h"
 #include "system.h"
 
+MemZone_t *Zone;
+
 char szAppName[]="Vulkan";
 
 bool Key[65536];
