@@ -729,9 +729,14 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	// Get the handles to the devices
 	vkEnumeratePhysicalDevices(Instance, &PhysicalDeviceCount, DeviceHandles);
 
+	DBGPRINTF("Found devices:\n")
 	for(uint32_t i=0;i<PhysicalDeviceCount;i++)
 	{
 		uint32_t QueueFamilyCount=0;
+
+		VkPhysicalDeviceProperties DeviceProperties;
+		vkGetPhysicalDeviceProperties(DeviceHandles[i], &DeviceProperties);
+		DBGPRINTF("\t#%d: %s VendorID: 0x%0.4X ProductID: 0x%0.4X\n", i, DeviceProperties.deviceName, DeviceProperties.vendorID, DeviceProperties.deviceID);
 
 		// Get the number of queue families for this device
 		vkGetPhysicalDeviceQueueFamilyProperties(DeviceHandles[i], &QueueFamilyCount, VK_NULL_HANDLE);
@@ -810,11 +815,21 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		return VK_FALSE;
 	}
 
+	vkGetPhysicalDeviceProperties(Context->PhysicalDevice, &Context->DeviceProperties);
+	DBGPRINTF("Vulkan device name: %s\nVulkan API version: %d.%d.%d\n",
+			  Context->DeviceProperties.deviceName,
+			  VK_API_VERSION_MAJOR(Context->DeviceProperties.apiVersion),
+			  VK_API_VERSION_MINOR(Context->DeviceProperties.apiVersion),
+			  VK_API_VERSION_PATCH(Context->DeviceProperties.apiVersion));
+
 	// Get device physical memory properties
 	vkGetPhysicalDeviceMemoryProperties(Context->PhysicalDevice, &Context->DeviceMemProperties);
 
-	VkPhysicalDeviceFeatures Features;
+	DBGPRINTF("Vulkan memory heaps: \n");
+	for(uint32_t i=0;i<Context->DeviceMemProperties.memoryHeapCount;i++)
+		DBGPRINTF("\t#%d: Size: %0.3fGB\n", i, (float)Context->DeviceMemProperties.memoryHeaps[i].size/1000.0f/1000.0f/1000.0f);
 
+	VkPhysicalDeviceFeatures Features;
 	vkGetPhysicalDeviceFeatures(Context->PhysicalDevice, &Features);
 
 	if(!Features.imageCubeArray)

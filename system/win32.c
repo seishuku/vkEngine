@@ -317,7 +317,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int iCmdShow)
 {
 	DBGPRINTF("Allocating zone memory...\n");
-	Zone=Zone_Init(18*1024*1024);
+	Zone=Zone_Init(32*1000*1000);
 
 	if(Zone==NULL)
 	{
@@ -350,28 +350,34 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ShowWindow(Context.hWnd, SW_SHOW);
 	SetForegroundWindow(Context.hWnd);
 
-	Frequency=GetFrequency();
-
+	DBGPRINTF("Creating Vulkan instance...\n");
 	if(!CreateVulkanInstance(&Instance))
 	{
-		MessageBox(Context.hWnd, "Failed to create Vulkan instance", "Error", MB_OK);
+		DBGPRINTF("\t...failed.\n");
 		return -1;
 	}
 
+	DBGPRINTF("Creating Vulkan context...\n");
 	if(!CreateVulkanContext(Instance, &Context))
 	{
-		MessageBox(Context.hWnd, "Failed to create Vulkan context", "Error", MB_OK);
+		DBGPRINTF("\t...failed.\n");
 		return -1;
 	}
 
+	DBGPRINTF("Creating swapchain...\n");
 	vkuCreateSwapchain(&Context, Width, Height, VK_TRUE);
 
+	DBGPRINTF("Initalizing Vulkan resources...\n");
 	if(!Init())
 	{
-		MessageBox(Context.hWnd, "Failed to init resources", "Error", MB_OK);
+		DBGPRINTF("\t...failed.\n");
 		return -1;
 	}
 
+	Frequency=GetFrequency();
+	DBGPRINTF("\nCPU freqency: %0.2fGHz\n", (float)Frequency/1000000000);
+
+	DBGPRINTF("\nStarting main loop.\n");
 	while(!Done)
 	{
 		MSG msg;
@@ -405,6 +411,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		}
 	}
 
+	DBGPRINTF("Shutting down...\n");
 	Destroy();
 	DestroyVulkan(Instance, &Context);
 	vkDestroyInstance(Instance, VK_NULL_HANDLE);

@@ -39,6 +39,8 @@ typedef struct
 
 	uint32_t QueueFamilyIndex;
 	VkPhysicalDevice PhysicalDevice;
+
+	VkPhysicalDeviceProperties DeviceProperties;
 	VkPhysicalDeviceMemoryProperties DeviceMemProperties;
 
 	VkDevice Device;

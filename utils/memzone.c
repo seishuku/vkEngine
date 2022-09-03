@@ -31,6 +31,7 @@ MemZone_t *Zone_Init(size_t Size)
 
 	Zone->Size=Size;
 
+	DBGPRINTF("Zone allocated at 0x%p, size: %0.3fMB\n", Zone, (float)Size/1000.0f/1000.0f);
 	return Zone;
 }
 
@@ -130,6 +131,9 @@ void *Zone_Malloc(MemZone_t *Zone, size_t Size)
 
 	Zone->Current=Base->Next;
 
+#ifdef _DEBUG
+	DBGPRINTF("Zone allocate block - Location: 0x%p Size: %0.3fKB\n", Base, (float)Size/1000.0f);
+#endif
 	return (void *)((uint8_t *)Base+sizeof(MemBlock_t));
 }
 
@@ -150,6 +154,9 @@ void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 	{
 		assert((Ptr)&&(Size>Block->Size));
 
+#ifdef _DEBUG
+		DBGPRINTF("Zone_Realloc: ");
+#endif
 		void *New=Zone_Malloc(Zone, Size);
 
 		if(New)
@@ -164,11 +171,11 @@ void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 
 void Zone_Print(MemZone_t *Zone)
 {
-	DBGPRINTF("\nZone size: %0.2fKB  Location: 0x%p\n", (float)(Zone->Size/1024.0f), Zone);
+	DBGPRINTF("\nZone size: %0.2fMB  Location: 0x%p\n", (float)(Zone->Size/1000.0f/1000.0f), Zone);
 
 	for(MemBlock_t *Block=Zone->Blocks.Next;;Block=Block->Next)
 	{
-		DBGPRINTF("Block: 0x%p Size: %0.2fKB Block free: %s\n", Block, (float)(Block->Size/1024.0f), Block->Free?"no":"yes");
+		DBGPRINTF("Block: 0x%p Size: %0.2fKB Block free: %s\n", Block, (float)(Block->Size/1000.0f), Block->Free?"no":"yes");
 
 		if(Block->Next==&Zone->Blocks)
 			break;
