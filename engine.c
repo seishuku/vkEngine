@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "system/system.h"
 #include "vulkan/vulkan.h"
+#include "vulkan/vulkanmem.h"
 #include "math/math.h"
 #include "camera/camera.h"
 #include "model/3ds.h"
@@ -16,6 +17,8 @@ uint32_t Width=1280, Height=720;
 
 VkInstance Instance;
 VkuContext_t Context;
+
+VulkanMemZone_t *VkZone;
 
 float RotateX=0.0f, RotateY=0.0f, PanX=0.0f, PanY=0.0f, Zoom=-100.0f;
 
@@ -773,6 +776,14 @@ bool Init(void)
 		return false;
 #endif
 
+	VkZone=VulkanMem_Init(&Context, Context.DeviceMemProperties.memoryHeaps[0].size);
+
+	VulkanMem_Print(VkZone);
+	VulkanMemBlock_t *Allocation=VulkanMem_Malloc(VkZone, 10*1000*1000); // 10MB
+	VulkanMem_Print(VkZone);
+	VulkanMem_Free(VkZone, Allocation);
+	VulkanMem_Print(VkZone);
+
 	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 100.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
 
 	Lights_Init(&Lights);
@@ -1087,4 +1098,6 @@ void Destroy(void)
 	}
 
 	vkDestroySwapchainKHR(Context.Device, Swapchain, VK_NULL_HANDLE);
+
+	VulkanMem_Destroy(VkZone);
 }

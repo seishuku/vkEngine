@@ -107,6 +107,7 @@
     <ClCompile Include="utils\list.c" />
     <ClCompile Include="utils\memzone.c" />
     <ClCompile Include="vulkan\vulkan.c" />
+    <ClCompile Include="vulkan\vulkanmem.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera\camera.h" />
@@ -120,6 +121,7 @@
     <ClInclude Include="utils\list.h" />
     <ClInclude Include="utils\memzone.h" />
     <ClInclude Include="vulkan\vulkan.h" />
+    <ClInclude Include="vulkan\vulkanmem.h" />
   </ItemGroup>
   <ItemGroup>
     <GLSL Include="shaders\distance.frag" />
