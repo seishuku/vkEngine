@@ -38,7 +38,7 @@ VulkanMemZone_t *VulkanMem_Init(VkuContext_t *Context, size_t Size)
 	{
 		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.allocationSize=Size,
-		.memoryTypeIndex=0,
+		.memoryTypeIndex=7,
 	};
 	vkAllocateMemory(Context->Device, &AllocateInfo, VK_NULL_HANDLE, &VkZone->DeviceMemory);
 

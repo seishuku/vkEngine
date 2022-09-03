@@ -180,7 +180,7 @@ void InitShadowCubeMap(uint32_t NumMaps)
 		.layers=6*NumMaps,
 	}, 0, &ShadowFrameBuffer);
 
-	vkuCreateBuffer(&Context, &shadow_ubo_buffer, &shadow_ubo_memory, sizeof(shadow_ubo)*NumMaps, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT|VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+	vkuCreateBuffer(&Context, &shadow_ubo_buffer, &shadow_ubo_memory, sizeof(shadow_ubo)*NumMaps, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 }
 
 bool InitShadowPipeline(void)
@@ -778,26 +778,6 @@ bool Init(void)
 
 	VkZone=VulkanMem_Init(&Context, 1000*1000*1000); // 1GB
 
-	VulkanMem_Print(VkZone);
-	VulkanMemBlock_t *Allocation1=VulkanMem_Malloc(VkZone, 200*1000*1000); // 200MB
-	VulkanMemBlock_t *Allocation2=VulkanMem_Malloc(VkZone, 200*1000*1000); // 200MB
-	VulkanMemBlock_t *Allocation3=VulkanMem_Malloc(VkZone, 200*1000*1000); // 200MB
-	VulkanMem_Print(VkZone);
-	VulkanMem_Free(VkZone, Allocation1);
-//	VulkanMem_Free(VkZone, Allocation2);
-	VulkanMem_Free(VkZone, Allocation3);
-	VulkanMem_Print(VkZone);
-	VulkanMemBlock_t *Allocation4=VulkanMem_Malloc(VkZone, 400*1000*1000); // 400MB
-	VulkanMemBlock_t *Allocation5=VulkanMem_Malloc(VkZone, 500*1000*1000); // 500MB <-This should fail
-	VulkanMemBlock_t *Allocation6=VulkanMem_Malloc(VkZone, 99*1000*1000); // 99MB
-	VulkanMemBlock_t *Allocation7=VulkanMem_Malloc(VkZone, 99*1000*1000); // 99MB
-	VulkanMemBlock_t *Allocation8=VulkanMem_Malloc(VkZone, 99*1000*1000); // 99MB
-	VulkanMem_Print(VkZone);
-	VulkanMem_Free(VkZone, Allocation4);
-	VulkanMem_Free(VkZone, Allocation5);
-	VulkanMem_Free(VkZone, Allocation6);
-	VulkanMem_Print(VkZone);
-
 	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 100.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
 
 	Lights_Init(&Lights);
@@ -836,6 +816,8 @@ bool Init(void)
 
 	InitShadowPipeline();
 	InitShadowCubeMap(13);
+
+	VulkanMem_Print(VkZone);
 
 	return true;
 }
@@ -1058,11 +1040,11 @@ void Destroy(void)
 	vkDestroyFramebuffer(Context.Device, ShadowFrameBuffer, VK_NULL_HANDLE);
 	vkDestroySampler(Context.Device, ShadowDepth.Sampler, VK_NULL_HANDLE);
 	vkDestroyImageView(Context.Device, ShadowDepth.View, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, ShadowDepth.DeviceMemory, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, ShadowDepth.Image, VK_NULL_HANDLE);
+	vkFreeMemory(Context.Device, ShadowDepth.DeviceMemory, VK_NULL_HANDLE);
 
-	vkFreeMemory(Context.Device, shadow_ubo_memory, VK_NULL_HANDLE);
 	vkDestroyBuffer(Context.Device, shadow_ubo_buffer, VK_NULL_HANDLE);
+	vkFreeMemory(Context.Device, shadow_ubo_memory, VK_NULL_HANDLE);
 	// ---
 
 	Font_Destroy();
@@ -1071,19 +1053,19 @@ void Destroy(void)
 	{
 		vkDestroySampler(Context.Device, Textures[i].Sampler, VK_NULL_HANDLE);
 		vkDestroyImageView(Context.Device, Textures[i].View, VK_NULL_HANDLE);
-		vkFreeMemory(Context.Device, Textures[i].DeviceMemory, VK_NULL_HANDLE);
 		vkDestroyImage(Context.Device, Textures[i].Image, VK_NULL_HANDLE);
+		vkFreeMemory(Context.Device, Textures[i].DeviceMemory, VK_NULL_HANDLE);
 	}
 
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
 		for(uint32_t j=0;j<(uint32_t)Model[i].NumMesh;j++)
 		{
-			vkFreeMemory(Context.Device, Model[i].Mesh[j].BufferMemory, VK_NULL_HANDLE);
 			vkDestroyBuffer(Context.Device, Model[i].Mesh[j].Buffer, VK_NULL_HANDLE);
+			vkFreeMemory(Context.Device, Model[i].Mesh[j].BufferMemory, VK_NULL_HANDLE);
 
-			vkFreeMemory(Context.Device, Model[i].Mesh[j].IndexBufferMemory, VK_NULL_HANDLE);
 			vkDestroyBuffer(Context.Device, Model[i].Mesh[j].IndexBuffer, VK_NULL_HANDLE);
+			vkFreeMemory(Context.Device, Model[i].Mesh[j].IndexBufferMemory, VK_NULL_HANDLE);
 		}
 
 		Free3DS(&Model[i]);
@@ -1096,8 +1078,8 @@ void Destroy(void)
 	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);
 
 	vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, DepthImage.DeviceMemory, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
+	vkFreeMemory(Context.Device, DepthImage.DeviceMemory, VK_NULL_HANDLE);
 
 	for(uint32_t i=0;i<SwapchainImageCount;i++)
 	{

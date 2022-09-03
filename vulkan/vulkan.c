@@ -6,8 +6,11 @@
 #include <string.h>
 #include "../system/system.h"
 #include "vulkan.h"
+#include "vulkanmem.h"
 #include "../image/image.h"
 #include "../math/math.h"
+
+extern VulkanMemZone_t *VkZone;
 
 PFN_vkCreateDebugUtilsMessengerEXT _vkCreateDebugUtilsMessengerEXT=VK_NULL_HANDLE;
 PFN_vkDestroyDebugUtilsMessengerEXT _vkDestroyDebugUtilsMessengerEXT=VK_NULL_HANDLE;
@@ -99,10 +102,35 @@ VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, Image_t *Image,
 		.allocationSize=memoryRequirements.size,
 		.memoryTypeIndex=vkuMemoryTypeFromProperties(Context->DeviceMemProperties, memoryRequirements.memoryTypeBits, RequirementsMask),
 	};
-	if(vkAllocateMemory(Context->Device, &AllocateInfo, NULL, &Image->DeviceMemory)!=VK_SUCCESS)
-		return VK_FALSE;
 
-	vkBindImageMemory(Context->Device, Image->Image, Image->DeviceMemory, 0);
+	// Quick hack: getting it to use the vulkan memory allocator
+	VulkanMemBlock_t *Block=NULL;
+	size_t AlignedOffset=0;
+
+	if(RequirementsMask&VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT&&!(RequirementsMask&VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
+	{
+		Block=VulkanMem_Malloc(VkZone, memoryRequirements.size+memoryRequirements.alignment);
+		AlignedOffset=(size_t)(ceilf((float)Block->Offset/memoryRequirements.alignment)*memoryRequirements.alignment);
+
+		if(Block==NULL)
+			return VK_FALSE;
+	}
+	else
+	{
+		if(vkAllocateMemory(Context->Device, &AllocateInfo, NULL, &Image->DeviceMemory)!=VK_SUCCESS)
+			return VK_FALSE;
+	}
+
+	if(Block)
+	{
+		if(vkBindImageMemory(Context->Device, Image->Image, VkZone->DeviceMemory, AlignedOffset)!=VK_SUCCESS)
+			return VK_FALSE;
+	}
+	else
+	{
+		if(vkBindImageMemory(Context->Device, Image->Image, Image->DeviceMemory, 0)!=VK_SUCCESS)
+			return VK_FALSE;
+	}
 
 	return VK_TRUE;
 }
@@ -133,11 +161,32 @@ VkBool32 vkuCreateBuffer(VkuContext_t *Context, VkBuffer *Buffer, VkDeviceMemory
 		.memoryTypeIndex=vkuMemoryTypeFromProperties(Context->DeviceMemProperties, memoryRequirements.memoryTypeBits, RequirementsMask),
 	};
 
-	if(vkAllocateMemory(Context->Device, &AllocateInfo, NULL, Memory)!=VK_SUCCESS)
-		return VK_FALSE;
+	// Quick hack: getting it to use the vulkan memory allocator
+	VulkanMemBlock_t *Block=NULL;
 
-	if(vkBindBufferMemory(Context->Device, *Buffer, *Memory, 0)!=VK_SUCCESS)
-		return VK_FALSE;
+	if(RequirementsMask&VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT&&!(RequirementsMask&VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
+	{
+		Block=VulkanMem_Malloc(VkZone, memoryRequirements.size);
+
+		if(Block==NULL)
+			return VK_FALSE;
+	}
+	else
+	{
+		if(vkAllocateMemory(Context->Device, &AllocateInfo, NULL, Memory)!=VK_SUCCESS)
+			return VK_FALSE;
+	}
+
+	if(Block)
+	{
+		if(vkBindBufferMemory(Context->Device, *Buffer, VkZone->DeviceMemory, Block->Offset)!=VK_SUCCESS)
+			return VK_FALSE;
+	}
+	else
+	{
+		if(vkBindBufferMemory(Context->Device, *Buffer, *Memory, 0)!=VK_SUCCESS)
+			return VK_FALSE;
+	}
 
 	return VK_TRUE;
 }
@@ -828,6 +877,10 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	DBGPRINTF("Vulkan memory heaps: \n");
 	for(uint32_t i=0;i<Context->DeviceMemProperties.memoryHeapCount;i++)
 		DBGPRINTF("\t#%d: Size: %0.3fGB\n", i, (float)Context->DeviceMemProperties.memoryHeaps[i].size/1000.0f/1000.0f/1000.0f);
+
+	DBGPRINTF("Vulkan memory types: \n");
+	for(uint32_t i=0;i<Context->DeviceMemProperties.memoryTypeCount;i++)
+		DBGPRINTF("\t#%d: Heap index: %d Flags: 0x%X\n", i, Context->DeviceMemProperties.memoryTypes[i].heapIndex, Context->DeviceMemProperties.memoryTypes[i].propertyFlags);
 
 	VkPhysicalDeviceFeatures Features;
 	vkGetPhysicalDeviceFeatures(Context->PhysicalDevice, &Features);
