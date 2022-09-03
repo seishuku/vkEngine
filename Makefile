@@ -17,6 +17,7 @@ OBJS+=camera/camera.o
 # core stuff
 OBJS+=system/linux_x11.o
 OBJS+=vulkan/vulkan.o
+OBJS+=vulkan/vulkanmem.o
 OBJS+=font/font.o
 OBJS+=lights/lights.o
 OBJS+=utils/genid.o
