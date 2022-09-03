@@ -163,10 +163,12 @@ VkBool32 vkuCreateBuffer(VkuContext_t *Context, VkBuffer *Buffer, VkDeviceMemory
 
 	// Quick hack: getting it to use the vulkan memory allocator
 	VulkanMemBlock_t *Block=NULL;
+	size_t AlignedOffset=0;
 
 	if(RequirementsMask&VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT&&!(RequirementsMask&VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
 	{
 		Block=VulkanMem_Malloc(VkZone, memoryRequirements.size);
+		AlignedOffset=(size_t)(ceilf((float)Block->Offset/memoryRequirements.alignment)*memoryRequirements.alignment);
 
 		if(Block==NULL)
 			return VK_FALSE;
@@ -179,7 +181,7 @@ VkBool32 vkuCreateBuffer(VkuContext_t *Context, VkBuffer *Buffer, VkDeviceMemory
 
 	if(Block)
 	{
-		if(vkBindBufferMemory(Context->Device, *Buffer, VkZone->DeviceMemory, Block->Offset)!=VK_SUCCESS)
+		if(vkBindBufferMemory(Context->Device, *Buffer, VkZone->DeviceMemory, AlignedOffset)!=VK_SUCCESS)
 			return VK_FALSE;
 	}
 	else

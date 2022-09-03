@@ -40,7 +40,14 @@ VulkanMemZone_t *VulkanMem_Init(VkuContext_t *Context, size_t Size)
 		.allocationSize=Size,
 		.memoryTypeIndex=7,
 	};
-	vkAllocateMemory(Context->Device, &AllocateInfo, VK_NULL_HANDLE, &VkZone->DeviceMemory);
+	
+	VkResult Result=vkAllocateMemory(Context->Device, &AllocateInfo, VK_NULL_HANDLE, &VkZone->DeviceMemory);
+
+	if(Result!=VK_SUCCESS)
+	{
+		DBGPRINTF("Failed to allocate vulakn memory zone (Result=%d).\n", Result);
+		return NULL;
+	}
 
 	DBGPRINTF("Vulakn memory zone allocated (OBJ: 0x%p), size: %0.3fMB\n", VkZone->DeviceMemory, (float)Size/1000.0f/1000.0f);
 	return VkZone;
@@ -173,7 +180,7 @@ void VulkanMem_Print(VulkanMemZone_t *VkZone)
 
 	for(VulkanMemBlock_t *Block=VkZone->Blocks.Next;;Block=Block->Next)
 	{
-		DBGPRINTF("\tOffset: %lldB Size: %lldB Block free: %s\n", Block->Offset, Block->Size, Block->Free?"no":"yes");
+		DBGPRINTF("\tOffset: %0.4fMB Size: %0.4fMB Block free: %s\n", (float)Block->Offset/1000.0f/1000.0f, (float)Block->Size/1000.0f/1000.0f, Block->Free?"no":"yes");
 
 		if(Block->Next==&VkZone->Blocks)
 			break;

@@ -776,7 +776,8 @@ bool Init(void)
 		return false;
 #endif
 
-	VkZone=VulkanMem_Init(&Context, 1000*1000*1000); // 1GB
+	DBGPRINTF("Heap size: %lld\n", Context.DeviceMemProperties.memoryHeaps[0].size);
+	VkZone=VulkanMem_Init(&Context, Context.DeviceMemProperties.memoryHeaps[0].size-(1000*1000*1000));
 
 	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 100.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
 
@@ -1095,5 +1096,7 @@ void Destroy(void)
 
 	vkDestroySwapchainKHR(Context.Device, Swapchain, VK_NULL_HANDLE);
 
+	DBGPRINTF("Remaining Vulkan memory blocks:\n");
+	VulkanMem_Print(VkZone);
 	VulkanMem_Destroy(&Context, VkZone);
 }
