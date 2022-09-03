@@ -22,21 +22,31 @@ VulkanMemZone_t *VulkanMem_Init(VkuContext_t *Context, size_t Size)
 	Block->Next=&VkZone->Blocks;
 	Block->Free=false;
 	Block->Size=Size;
+	Block->Offset=0;
 
 	VkZone->Blocks.Next=Block;
 	VkZone->Blocks.Prev=Block;
 	VkZone->Blocks.Free=true;
 	VkZone->Blocks.Size=0;
+	VkZone->Blocks.Offset=0;
 
 	VkZone->Current=Block;
 
 	VkZone->Size=Size;
 
+	VkMemoryAllocateInfo AllocateInfo=
+	{
+		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+		.allocationSize=Size,
+		.memoryTypeIndex=0,
+	};
+	vkAllocateMemory(Context->Device, &AllocateInfo, VK_NULL_HANDLE, &VkZone->DeviceMemory);
+
 	DBGPRINTF("Vulakn memory zone allocated (OBJ: 0x%p), size: %0.3fMB\n", VkZone->DeviceMemory, (float)Size/1000.0f/1000.0f);
 	return VkZone;
 }
 
-void VulkanMem_Destroy(VulkanMemZone_t *VkZone)
+void VulkanMem_Destroy(VkuContext_t *Context, VulkanMemZone_t *VkZone)
 {
 	if(VkZone)
 	{
@@ -52,6 +62,7 @@ void VulkanMem_Destroy(VulkanMemZone_t *VkZone)
 			Block=Next;
 		}
 
+		vkFreeMemory(Context->Device, VkZone->DeviceMemory, VK_NULL_HANDLE);
 		Zone_Free(Zone, VkZone);
 	}
 }
@@ -114,7 +125,10 @@ VulkanMemBlock_t *VulkanMem_Malloc(VulkanMemZone_t *VkZone, size_t Size)
 	do
 	{
 		if(Current==Start)
+		{
+			DBGPRINTF("Vulkan mem: Unable to find large enough free block.\n");
 			return NULL;
+		}
 
 		if(Current->Free)
 		{
@@ -132,6 +146,7 @@ VulkanMemBlock_t *VulkanMem_Malloc(VulkanMemZone_t *VkZone, size_t Size)
 	{
 		VulkanMemBlock_t *New=(VulkanMemBlock_t *)Zone_Malloc(Zone, sizeof(VulkanMemBlock_t));
 		New->Size=Extra;
+		New->Offset=0;
 		New->Free=false;
 		New->Prev=Base;
 		New->Next=Base->Next;
@@ -139,6 +154,7 @@ VulkanMemBlock_t *VulkanMem_Malloc(VulkanMemZone_t *VkZone, size_t Size)
 
 		Base->Next=New;
 		Base->Size=Size;
+		Base->Offset=Base->Prev->Size+Base->Prev->Offset;
 	}
 
 	Base->Free=true;
@@ -157,7 +173,7 @@ void VulkanMem_Print(VulkanMemZone_t *VkZone)
 
 	for(VulkanMemBlock_t *Block=VkZone->Blocks.Next;;Block=Block->Next)
 	{
-		DBGPRINTF("\tOffset: 0x%lld Size: %0.2fKB Block free: %s\n", Block->Offset, (float)(Block->Size/1000.0f), Block->Free?"no":"yes");
+		DBGPRINTF("\tOffset: %lldB Size: %lldB Block free: %s\n", Block->Offset, Block->Size, Block->Free?"no":"yes");
 
 		if(Block->Next==&VkZone->Blocks)
 			break;

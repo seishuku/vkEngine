@@ -776,12 +776,26 @@ bool Init(void)
 		return false;
 #endif
 
-	VkZone=VulkanMem_Init(&Context, Context.DeviceMemProperties.memoryHeaps[0].size);
+	VkZone=VulkanMem_Init(&Context, 1000*1000*1000); // 1GB
 
 	VulkanMem_Print(VkZone);
-	VulkanMemBlock_t *Allocation=VulkanMem_Malloc(VkZone, 10*1000*1000); // 10MB
+	VulkanMemBlock_t *Allocation1=VulkanMem_Malloc(VkZone, 200*1000*1000); // 200MB
+	VulkanMemBlock_t *Allocation2=VulkanMem_Malloc(VkZone, 200*1000*1000); // 200MB
+	VulkanMemBlock_t *Allocation3=VulkanMem_Malloc(VkZone, 200*1000*1000); // 200MB
 	VulkanMem_Print(VkZone);
-	VulkanMem_Free(VkZone, Allocation);
+	VulkanMem_Free(VkZone, Allocation1);
+//	VulkanMem_Free(VkZone, Allocation2);
+	VulkanMem_Free(VkZone, Allocation3);
+	VulkanMem_Print(VkZone);
+	VulkanMemBlock_t *Allocation4=VulkanMem_Malloc(VkZone, 400*1000*1000); // 400MB
+	VulkanMemBlock_t *Allocation5=VulkanMem_Malloc(VkZone, 500*1000*1000); // 500MB <-This should fail
+	VulkanMemBlock_t *Allocation6=VulkanMem_Malloc(VkZone, 99*1000*1000); // 99MB
+	VulkanMemBlock_t *Allocation7=VulkanMem_Malloc(VkZone, 99*1000*1000); // 99MB
+	VulkanMemBlock_t *Allocation8=VulkanMem_Malloc(VkZone, 99*1000*1000); // 99MB
+	VulkanMem_Print(VkZone);
+	VulkanMem_Free(VkZone, Allocation4);
+	VulkanMem_Free(VkZone, Allocation5);
+	VulkanMem_Free(VkZone, Allocation6);
 	VulkanMem_Print(VkZone);
 
 	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 100.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
@@ -1099,5 +1113,5 @@ void Destroy(void)
 
 	vkDestroySwapchainKHR(Context.Device, Swapchain, VK_NULL_HANDLE);
 
-	VulkanMem_Destroy(VkZone);
+	VulkanMem_Destroy(&Context, VkZone);
 }
