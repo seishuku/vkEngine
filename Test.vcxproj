@@ -88,7 +88,7 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>vulkan-1.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -105,6 +105,7 @@
     <ClCompile Include="system\win32.c" />
     <ClCompile Include="utils\genid.c" />
     <ClCompile Include="utils\list.c" />
+    <ClCompile Include="utils\memzone.c" />
     <ClCompile Include="vulkan\vulkan.c" />
   </ItemGroup>
   <ItemGroup>
@@ -117,6 +118,7 @@
     <ClInclude Include="system\system.h" />
     <ClInclude Include="utils\genid.h" />
     <ClInclude Include="utils\list.h" />
+    <ClInclude Include="utils\memzone.h" />
     <ClInclude Include="vulkan\vulkan.h" />
   </ItemGroup>
   <ItemGroup>

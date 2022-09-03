@@ -21,6 +21,7 @@ OBJS+=font/font.o
 OBJS+=lights/lights.o
 OBJS+=utils/genid.o
 OBJS+=utils/list.o
+OBJS+=utils/memzone.o
 OBJS+=engine.o
 
 SHADERS=shaders/distance.frag.spv

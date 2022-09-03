@@ -18,21 +18,21 @@ void CalculateTangent3DS(Mesh3DS_t *Mesh)
 	vec2 uv0, uv1;
 	float r;
 
-	Mesh->Tangent=(float *)malloc(sizeof(float)*3*Mesh->NumVertex);
+	Mesh->Tangent=(float *)Zone_Malloc(Zone, sizeof(float)*3*Mesh->NumVertex);
 
 	if(Mesh->Tangent==NULL)
 		return;
 
 	memset(Mesh->Tangent, 0, sizeof(float)*3*Mesh->NumVertex);
 
-	Mesh->Binormal=(float *)malloc(sizeof(float)*3*Mesh->NumVertex);
+	Mesh->Binormal=(float *)Zone_Malloc(Zone, sizeof(float)*3*Mesh->NumVertex);
 
 	if(Mesh->Binormal==NULL)
 		return;
 
 	memset(Mesh->Binormal, 0, sizeof(float)*3*Mesh->NumVertex);
 
-	Mesh->Normal=(float *)malloc(sizeof(float)*3*Mesh->NumVertex);
+	Mesh->Normal=(float *)Zone_Malloc(Zone, sizeof(float)*3*Mesh->NumVertex);
 
 	if(Mesh->Normal==NULL)
 		return;
@@ -151,7 +151,7 @@ bool Load3DS(Model3DS_t *Model, char *Filename)
 			case 0x4000:
 				Model->NumMesh++;
 
-				Model->Mesh=(Mesh3DS_t *)realloc(Model->Mesh, sizeof(Mesh3DS_t)*Model->NumMesh);
+				Model->Mesh=(Mesh3DS_t *)Zone_Realloc(Zone, Model->Mesh, sizeof(Mesh3DS_t)*Model->NumMesh);
 
 				if(Model->Mesh==NULL)
 				{
@@ -183,7 +183,7 @@ bool Load3DS(Model3DS_t *Model, char *Filename)
 				if(!Model->Mesh[Model->NumMesh-1].NumVertex)
 					break;
 
-				Model->Mesh[Model->NumMesh-1].Vertex=(float *)malloc(3*sizeof(float)*Model->Mesh[Model->NumMesh-1].NumVertex);
+				Model->Mesh[Model->NumMesh-1].Vertex=(float *)Zone_Malloc(Zone, 3*sizeof(float)*Model->Mesh[Model->NumMesh-1].NumVertex);
 
 				if(Model->Mesh[Model->NumMesh-1].Vertex==NULL)
 				{
@@ -210,7 +210,7 @@ bool Load3DS(Model3DS_t *Model, char *Filename)
 				if(!Model->Mesh[Model->NumMesh-1].NumFace)
 					break;
 
-				Model->Mesh[Model->NumMesh-1].Face=(uint16_t *)malloc(3*sizeof(uint16_t)*Model->Mesh[Model->NumMesh-1].NumFace);
+				Model->Mesh[Model->NumMesh-1].Face=(uint16_t *)Zone_Malloc(Zone, 3*sizeof(uint16_t)*Model->Mesh[Model->NumMesh-1].NumFace);
 
 				if(Model->Mesh[Model->NumMesh-1].Face==NULL)
 				{
@@ -251,7 +251,7 @@ bool Load3DS(Model3DS_t *Model, char *Filename)
 				if(!Temp16||Temp16!=Model->Mesh[Model->NumMesh-1].NumVertex)
 					break;
 
-				Model->Mesh[Model->NumMesh-1].UV=(float *)malloc(2*sizeof(float)*Model->Mesh[Model->NumMesh-1].NumVertex);
+				Model->Mesh[Model->NumMesh-1].UV=(float *)Zone_Malloc(Zone, 2*sizeof(float)*Model->Mesh[Model->NumMesh-1].NumVertex);
 
 				if(Model->Mesh[Model->NumMesh-1].UV==NULL)
 				{
@@ -268,7 +268,7 @@ bool Load3DS(Model3DS_t *Model, char *Filename)
 			case 0xAFFF:
 				Model->NumMaterial++;
 
-				Model->Material=(Material3DS_t *)realloc(Model->Material, sizeof(Material3DS_t)*Model->NumMaterial);
+				Model->Material=(Material3DS_t *)Zone_Realloc(Zone, Model->Material, sizeof(Material3DS_t)*Model->NumMaterial);
 
 				if(Model->Material==NULL)
 				{
@@ -430,16 +430,16 @@ void Free3DS(Model3DS_t *Model)
 	{
 		for(int32_t i=0;i<Model->NumMesh;i++)
 		{
-			FREE(Model->Mesh[i].Vertex);
-			FREE(Model->Mesh[i].UV);
-			FREE(Model->Mesh[i].Face);
-			FREE(Model->Mesh[i].Normal);
-			FREE(Model->Mesh[i].Tangent);
-			FREE(Model->Mesh[i].Binormal);
+			Zone_Free(Zone, Model->Mesh[i].Vertex);
+			Zone_Free(Zone, Model->Mesh[i].UV);
+			Zone_Free(Zone, Model->Mesh[i].Face);
+			Zone_Free(Zone, Model->Mesh[i].Normal);
+			Zone_Free(Zone, Model->Mesh[i].Tangent);
+			Zone_Free(Zone, Model->Mesh[i].Binormal);
 		}
 
-		FREE(Model->Mesh);
+		Zone_Free(Zone, Model->Mesh);
 	}
 
-	FREE(Model->Material);
+	Zone_Free(Zone, Model->Material);
 }

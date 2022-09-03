@@ -310,6 +310,17 @@ void EventLoop(void)
 
 int main(int argc, char **argv)
 {
+	// Get 18MB?
+	DBGPRINTF("Allocating zone memory...\n");
+	Zone=Zone_Init(18*1024*1024);
+
+	if(Zone==NULL)
+	{
+		DBGPRINTF("\t...zone allocation failed!\n");
+
+		return -1;
+	}
+
 	DBGPRINTF("Opening X display...\n");
 	Context.Dpy=XOpenDisplay(NULL);
 
@@ -377,6 +388,10 @@ int main(int argc, char **argv)
 	// TODO: Segfaulting on XCloseDisplay for some reason?
 	//			Not sure what's going on here.
 	//XCloseDisplay(Context.Dpy);
+
+	DBGPRINTF("Zone remaining block list:\n");
+	Zone_Print(Zone);
+	Zone_Destroy(Zone);
 
 	DBGPRINTF("Exit\n");
 

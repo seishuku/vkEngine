@@ -674,7 +674,7 @@ void Render(void)
 	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
 	vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 
-	vkCmdSetViewport(CommandBuffers[Index], 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)SwapchainExtent.width, (float)SwapchainExtent.height, 0.0f, 1.0f });
+	vkCmdSetViewport(CommandBuffers[Index], 0, 1, &(VkViewport) { 0.0f, 0, (float)SwapchainExtent.width, (float)SwapchainExtent.height, 0.0f, 1.0f });
 	vkCmdSetScissor(CommandBuffers[Index], 0, 1, &(VkRect2D) { { 0, 0 }, SwapchainExtent});
 
 	vkCmdPushConstants(CommandBuffers[Index], PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ubo), &ubo);
@@ -827,7 +827,7 @@ void vkuCreateSwapchain(VkuContext_t *Context, uint32_t Width, uint32_t Height, 
 
 	vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &FormatCount, VK_NULL_HANDLE);
 
-	VkSurfaceFormatKHR *SurfaceFormats=(VkSurfaceFormatKHR *)malloc(sizeof(VkSurfaceFormatKHR)*FormatCount);
+	VkSurfaceFormatKHR *SurfaceFormats=(VkSurfaceFormatKHR *)Zone_Malloc(Zone, sizeof(VkSurfaceFormatKHR)*FormatCount);
 
 	if(SurfaceFormats==NULL)
 		return;
@@ -841,7 +841,7 @@ void vkuCreateSwapchain(VkuContext_t *Context, uint32_t Width, uint32_t Height, 
 	else
 		SurfaceFormat=SurfaceFormats[0];
 
-	FREE(SurfaceFormats);
+	Zone_Free(Zone, SurfaceFormats);
 
 	// Get physical device surface properties and formats
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Context->PhysicalDevice, Context->Surface, &SurfCaps);
@@ -849,7 +849,7 @@ void vkuCreateSwapchain(VkuContext_t *Context, uint32_t Width, uint32_t Height, 
 	// Get available present modes
 	vkGetPhysicalDeviceSurfacePresentModesKHR(Context->PhysicalDevice, Context->Surface, &PresentModeCount, NULL);
 
-	VkPresentModeKHR *PresentModes=(VkPresentModeKHR *)malloc(sizeof(VkPresentModeKHR)*PresentModeCount);
+	VkPresentModeKHR *PresentModes=(VkPresentModeKHR *)Zone_Malloc(Zone, sizeof(VkPresentModeKHR)*PresentModeCount);
 
 	if(PresentModes==NULL)
 		return;
@@ -882,7 +882,7 @@ void vkuCreateSwapchain(VkuContext_t *Context, uint32_t Width, uint32_t Height, 
 		}
 	}
 
-	FREE(PresentModes);
+	Zone_Free(Zone, PresentModes);
 
 	// Find the transformation of the surface
 	if(SurfCaps.supportedTransforms&VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)
@@ -1036,7 +1036,6 @@ void Destroy(void)
 	vkFreeMemory(Context.Device, ShadowDepth.DeviceMemory, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, ShadowDepth.Image, VK_NULL_HANDLE);
 
-	vkUnmapMemory(Context.Device, shadow_ubo_memory);
 	vkFreeMemory(Context.Device, shadow_ubo_memory, VK_NULL_HANDLE);
 	vkDestroyBuffer(Context.Device, shadow_ubo_buffer, VK_NULL_HANDLE);
 	// ---
@@ -1061,6 +1060,8 @@ void Destroy(void)
 			vkFreeMemory(Context.Device, Model[i].Mesh[j].IndexBufferMemory, VK_NULL_HANDLE);
 			vkDestroyBuffer(Context.Device, Model[i].Mesh[j].IndexBuffer, VK_NULL_HANDLE);
 		}
+
+		Free3DS(&Model[i]);
 	}
 
 	vkDestroyDescriptorSetLayout(Context.Device, DescriptorSetLayout.DescriptorSetLayout, VK_NULL_HANDLE);

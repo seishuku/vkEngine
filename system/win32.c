@@ -9,6 +9,8 @@
 #include "../utils/list.h"
 #include "../lights/lights.h"
 
+MemZone_t *Zone;
+
 char szAppName[]="Vulkan";
 
 bool Done=0, Key[256];
@@ -169,6 +171,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			switch(wParam)
 			{
+				case 'P':
+					Zone_Print(Zone);
+					break;
+
 				case 'O':
 					for(uint32_t i=0;i<10;i++)
 					{
@@ -310,27 +316,36 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int iCmdShow)
 {
-	WNDCLASS wc;
-	MSG msg;
+	DBGPRINTF("Allocating zone memory...\n");
+	Zone=Zone_Init(18*1024*1024);
+
+	if(Zone==NULL)
+	{
+		DBGPRINTF("\t...zone allocation failed!\n");
+
+		return -1;
+	}
+
+	RegisterClass(&(WNDCLASS)
+	{
+		.style=CS_VREDRAW|CS_HREDRAW|CS_OWNDC,
+		.lpfnWndProc=WndProc,
+		.cbClsExtra=0,
+		.cbWndExtra=0,
+		.hInstance=hInstance,
+		.hIcon=LoadIcon(NULL, IDI_WINLOGO),
+		.hCursor=LoadCursor(NULL, IDC_ARROW),
+		.hbrBackground=GetStockObject(BLACK_BRUSH),
+		.lpszMenuName=NULL,
+		.lpszClassName=szAppName,
+	});
+
 	RECT Rect;
-
-	wc.style=CS_VREDRAW|CS_HREDRAW|CS_OWNDC;
-	wc.lpfnWndProc=WndProc;
-	wc.cbClsExtra=0;
-	wc.cbWndExtra=0;
-	wc.hInstance=hInstance;
-	wc.hIcon=LoadIcon(NULL, IDI_WINLOGO);
-	wc.hCursor=LoadCursor(NULL, IDC_ARROW);
-	wc.hbrBackground=GetStockObject(BLACK_BRUSH);
-	wc.lpszMenuName=NULL;
-	wc.lpszClassName=szAppName;
-
-	RegisterClass(&wc);
 
 	SetRect(&Rect, 0, 0, Width, Height);
 	AdjustWindowRect(&Rect, WS_OVERLAPPEDWINDOW, FALSE);
 
-	Context.hWnd=CreateWindow(szAppName, szAppName, WS_POPUP|WS_CLIPSIBLINGS, CW_USEDEFAULT, CW_USEDEFAULT, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
+	Context.hWnd=CreateWindow(szAppName, szAppName, WS_OVERLAPPEDWINDOW|WS_CLIPSIBLINGS, CW_USEDEFAULT, CW_USEDEFAULT, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
 
 	ShowWindow(Context.hWnd, SW_SHOW);
 	SetForegroundWindow(Context.hWnd);
@@ -359,6 +374,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	while(!Done)
 	{
+		MSG msg;
+
 		if(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
 		{
 			if(msg.message==WM_QUIT)
@@ -393,5 +410,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	vkDestroyInstance(Instance, VK_NULL_HANDLE);
 	DestroyWindow(Context.hWnd);
 
-	return (int)msg.wParam;
+	DBGPRINTF("Zone remaining block list:\n");
+	Zone_Print(Zone);
+	Zone_Destroy(Zone);
+
+	return 0;
 }

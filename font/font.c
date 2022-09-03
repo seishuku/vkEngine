@@ -151,7 +151,7 @@ void _Font_Init(void)
 		uint32_t Size=ftell(Stream);
 		fseek(Stream, 0, SEEK_SET);
 
-		uint8_t *_FontData=(uint8_t *)malloc(Size);
+		uint8_t *_FontData=(uint8_t *)Zone_Malloc(Zone, Size);
 
 		if(_FontData==NULL)
 			return;
@@ -168,7 +168,7 @@ void _Font_Init(void)
 			*ptr++=*FontPtr++;
 		vkUnmapMemory(Context.Device, stagingBufferMemory);
 
-		FREE(_FontData);
+		Zone_Free(Zone, _FontData);
 	}
 
 	vkuCreateImageBuffer(&Context, &fontTexture,

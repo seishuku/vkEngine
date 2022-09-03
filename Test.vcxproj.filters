@@ -111,6 +111,9 @@
     <ClCompile Include="camera\camera.c">
       <Filter>Source Files\camera</Filter>
     </ClCompile>
+    <ClCompile Include="utils\memzone.c">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
@@ -142,6 +145,9 @@
     </ClInclude>
     <ClInclude Include="camera\camera.h">
       <Filter>Header Files\camera</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\memzone.h">
+      <Filter>Header Files\utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

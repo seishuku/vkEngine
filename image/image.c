@@ -15,13 +15,10 @@
 #include <stdbool.h>
 #include <string.h>
 #include <vulkan/vulkan.h>
+#include "../system/system.h"
 #include "../math/math.h"
 #include "../vulkan/vulkan.h"
 #include "image.h"
-
-#ifndef FREE
-#define FREE(p) { if(p) { free(p); p=NULL; } }
-#endif
 
 #ifndef min
 #define min(a, b) ((a)<(b)?(a):(b))
@@ -43,7 +40,7 @@ void _MakeNormalMap(Image_t *Image)
 	if(!((Image->Depth==32)||(Image->Depth==24)||(Image->Depth==8)))
 		return;
 
-	Buffer=(uint16_t *)malloc(sizeof(uint16_t)*Image->Width*Image->Height*4);
+	Buffer=(uint16_t *)Zone_Malloc(Zone, sizeof(uint16_t)*Image->Width*Image->Height*4);
 
 	if(Buffer==NULL)
 		return;
@@ -85,7 +82,7 @@ void _MakeNormalMap(Image_t *Image)
 
 	Image->Depth=64;
 
-	FREE(Image->Data);
+	Zone_Free(Zone, Image->Data);
 	Image->Data=(unsigned char *)Buffer;
 }
 
@@ -98,7 +95,7 @@ void _Normalize(Image_t *Image)
 	if(!((Image->Depth==32)||(Image->Depth==24)))
 		return;
 
-	Buffer=(uint16_t *)malloc(sizeof(uint16_t)*Image->Width*Image->Height*4);
+	Buffer=(uint16_t *)Zone_Malloc(Zone, sizeof(uint16_t)*Image->Width*Image->Height*4);
 
 	if(Buffer==NULL)
 		return;
@@ -128,7 +125,7 @@ void _Normalize(Image_t *Image)
 
 	Image->Depth=64;
 
-	FREE(Image->Data);
+	Zone_Free(Zone, Image->Data);
 	Image->Data=(uint8_t *)Buffer;
 }
 
@@ -137,7 +134,7 @@ void _RGBE2Float(Image_t *Image)
 	uint32_t i;
 	float *Buffer=NULL;
 
-	Buffer=(float *)malloc(sizeof(float)*Image->Width*Image->Height*3);
+	Buffer=(float *)Zone_Malloc(Zone, sizeof(float)*Image->Width*Image->Height*3);
 
 	if(Buffer==NULL)
 		return;
@@ -173,7 +170,7 @@ void _RGBE2Float(Image_t *Image)
 
 	Image->Depth=96;
 
-	FREE(Image->Data);
+	Zone_Free(Zone, Image->Data);
 	Image->Data=(uint8_t *)Buffer;
 }
 
@@ -381,7 +378,7 @@ void _BuildMipmaps(Image_t *Image, unsigned int Target)
 
 	while(i<=levels)
 	{
-		Dst.Data=(unsigned char *)malloc(Dst.Width*Dst.Height*(Dst.Depth>>3));
+		Dst.Data=(unsigned char *)Zone_Malloc(Zone, Dst.Width*Dst.Height*(Dst.Depth>>3));
 
 		_Resample(Image, &Dst);
 
@@ -420,7 +417,7 @@ void _BuildMipmaps(Image_t *Image, unsigned int Target)
 				break;
 		}
 
-		FREE(Dst.Data);
+		Zone_Free(Zone, Dst.Data);
 
 		Dst.Width=(Dst.Width>1)?Dst.Width>>1:Dst.Width;
 		Dst.Height=(Dst.Height>1)?Dst.Height>>1:Dst.Height;
@@ -588,7 +585,7 @@ void _AngularMapFace(Image_t *In, int Face, Image_t *Out)
 	Out->Depth=In->Depth;
 	Out->Width=NextPower2(In->Width>>1);
 	Out->Height=NextPower2(In->Height>>1);
-	Out->Data=(uint8_t *)malloc(Out->Width*Out->Height*(Out->Depth>>3));
+	Out->Data=(uint8_t *)Zone_Malloc(Zone, Out->Width*Out->Height*(Out->Depth>>3));
 
 	if(Out->Data==NULL)
 		return;
@@ -614,7 +611,7 @@ void RGBtoRGBA(Image_t *Image)
 {
 	if(Image->Depth==96)
 	{
-		float *Dst=(float *)malloc(sizeof(float)*Image->Width*Image->Height*4);
+		float *Dst=(float *)Zone_Malloc(Zone, sizeof(float)*Image->Width*Image->Height*4);
 
 		if(Dst==NULL)
 			return;
@@ -630,13 +627,13 @@ void RGBtoRGBA(Image_t *Image)
 			Dst[DstIdx+3]=1.0f;
 		}
 
-		FREE(Image->Data);
+		Zone_Free(Zone, Image->Data);
 		Image->Data=(uint8_t *)Dst;
 		Image->Depth=128;
 	}
 	else if(Image->Depth==48)
 	{
-		uint16_t *Dst=(uint16_t *)malloc(sizeof(uint16_t)*Image->Width*Image->Height*4);
+		uint16_t *Dst=(uint16_t *)Zone_Malloc(Zone, sizeof(uint16_t)*Image->Width*Image->Height*4);
 
 		if(Dst==NULL)
 			return;
@@ -652,13 +649,13 @@ void RGBtoRGBA(Image_t *Image)
 			Dst[DstIdx+3]=UINT16_MAX;
 		}
 
-		FREE(Image->Data);
+		Zone_Free(Zone, Image->Data);
 		Image->Data=(uint8_t *)Dst;
 		Image->Depth=64;
 	}
 	else if(Image->Depth==24)
 	{
-		uint8_t *Dst=(uint8_t *)malloc(sizeof(uint8_t)*Image->Width*Image->Height*4);
+		uint8_t *Dst=(uint8_t *)Zone_Malloc(Zone, sizeof(uint8_t)*Image->Width*Image->Height*4);
 
 		if(Dst==NULL)
 			return;
@@ -674,7 +671,7 @@ void RGBtoRGBA(Image_t *Image)
 			Dst[DstIdx+3]=UINT8_MAX;
 		}
 
-		FREE(Image->Data);
+		Zone_Free(Zone, Image->Data);
 		Image->Data=Dst;
 		Image->Depth=32;
 	}
@@ -851,7 +848,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, Image_t *Image, const char *Filenam
 			break;
 
 		default:
-			FREE(Image->Data);
+			Zone_Free(Zone, Image->Data);
 			return VK_FALSE;
 	}
 
@@ -880,11 +877,11 @@ VkBool32 Image_Upload(VkuContext_t *Context, Image_t *Image, const char *Filenam
 				return VK_FALSE;
 
 			memcpy((uint8_t *)Data+(Size*i), Out.Data, Size);
-			FREE(Out.Data);
+			Zone_Free(Zone, Out.Data);
 		}
 		vkUnmapMemory(Context->Device, StagingBufferMemory);
 
-		FREE(Image->Data);
+		Zone_Free(Zone, Image->Data);
 
 		vkuCreateImageBuffer(Context, Image,
 			VK_IMAGE_TYPE_2D, Format, 1, 6, Out.Width, Out.Height, 1,
@@ -1046,7 +1043,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, Image_t *Image, const char *Filenam
 	vkUnmapMemory(Context->Device, StagingBufferMemory);
 
 	// Original image data is now in a Vulkan memory object, so no longer need the original data.
-	FREE(Image->Data);
+	Zone_Free(Zone, Image->Data);
  
 	uint32_t MipLevels=1;
 

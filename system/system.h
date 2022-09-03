@@ -12,8 +12,8 @@
 #define BUFFER_OFFSET(x) ((char *)NULL+(x))
 #endif
 
-#ifndef FREE
-#define FREE(p) { if(p) { free(p); p=NULL; } }
-#endif
+#include "../utils/memzone.h"
+
+extern MemZone_t *Zone;
 
 #endif

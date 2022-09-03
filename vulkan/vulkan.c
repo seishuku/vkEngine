@@ -26,7 +26,7 @@ VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile)
 	uint32_t size=(uint32_t)(ceilf((float)ftell(stream)/sizeof(uint32_t))*sizeof(uint32_t));
 	fseek(stream, 0, SEEK_SET);
 
-	uint32_t *data=(uint32_t *)malloc(size);
+	uint32_t *data=(uint32_t *)Zone_Malloc(Zone, size);
 
 	if(data==NULL)
 		return VK_NULL_HANDLE;
@@ -38,7 +38,7 @@ VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile)
 	VkShaderModuleCreateInfo CreateInfo={ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, NULL, 0, size, data };
 	VkResult Result=vkCreateShaderModule(Device, &CreateInfo, VK_NULL_HANDLE, &shaderModule);
 
-	free(data);
+	Zone_Free(Zone, data);
 
 	if(Result==VK_SUCCESS)
 		return shaderModule;
@@ -576,7 +576,7 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 		return VK_FALSE;
 	}
 
-	VkExtensionProperties *ExtensionProperties=(VkExtensionProperties *)malloc(sizeof(VkExtensionProperties)*ExtensionCount);
+	VkExtensionProperties *ExtensionProperties=(VkExtensionProperties *)Zone_Malloc(Zone, sizeof(VkExtensionProperties)*ExtensionCount);
 
 	if(ExtensionProperties==VK_NULL_HANDLE)
 	{
@@ -586,7 +586,7 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 
 	if(vkEnumerateInstanceExtensionProperties(VK_NULL_HANDLE, &ExtensionCount, ExtensionProperties)!=VK_SUCCESS)
 	{
-		FREE(ExtensionProperties);
+		Zone_Free(Zone, ExtensionProperties);
 		DBGPRINTF("vkEnumerateInstanceExtensionProperties failed.\n");
 		return VK_FALSE;
 	}
@@ -612,7 +612,7 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 #endif
 	}
 
-	FREE(ExtensionProperties);
+	Zone_Free(Zone, ExtensionProperties);
 
 	if(!SurfaceExtension||!SurfaceOSExtension)
 	{
@@ -718,7 +718,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	vkEnumeratePhysicalDevices(Instance, &PhysicalDeviceCount, VK_NULL_HANDLE);
 
 	// Allocate an array of handles
-	VkPhysicalDevice *DeviceHandles=(VkPhysicalDevice *)malloc(sizeof(VkPhysicalDevice)*PhysicalDeviceCount);
+	VkPhysicalDevice *DeviceHandles=(VkPhysicalDevice *)Zone_Malloc(Zone, sizeof(VkPhysicalDevice)*PhysicalDeviceCount);
 
 	if(DeviceHandles==NULL)
 	{
@@ -737,12 +737,12 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		vkGetPhysicalDeviceQueueFamilyProperties(DeviceHandles[i], &QueueFamilyCount, VK_NULL_HANDLE);
 
 		// Allocate the memory for the structs 
-		VkQueueFamilyProperties *QueueFamilyProperties=(VkQueueFamilyProperties *)malloc(sizeof(VkQueueFamilyProperties)*QueueFamilyCount);
+		VkQueueFamilyProperties *QueueFamilyProperties=(VkQueueFamilyProperties *)Zone_Malloc(Zone, sizeof(VkQueueFamilyProperties)*QueueFamilyCount);
 
 		if(QueueFamilyProperties==NULL)
 		{
 			DBGPRINTF("Unable to allocate memory for queue family properties.\n");
-			FREE(DeviceHandles);
+			Zone_Free(Zone, DeviceHandles);
 			return VK_FALSE;
 		}
 
@@ -766,7 +766,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		}
 
 		// Done with queue family properties
-		FREE(QueueFamilyProperties);
+		Zone_Free(Zone, QueueFamilyProperties);
 
 		// Found device?
 		if(Context->PhysicalDevice)
@@ -774,17 +774,17 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	}
 
 	// Free allocated handles
-	FREE(DeviceHandles);
+	Zone_Free(Zone, DeviceHandles);
 
 	uint32_t ExtensionCount=0;
 
 	vkEnumerateDeviceExtensionProperties(Context->PhysicalDevice, VK_NULL_HANDLE, &ExtensionCount, VK_NULL_HANDLE);
 
-	VkExtensionProperties *ExtensionProperties=(VkExtensionProperties *)malloc(sizeof(VkExtensionProperties)*ExtensionCount);
+	VkExtensionProperties *ExtensionProperties=(VkExtensionProperties *)Zone_Malloc(Zone, sizeof(VkExtensionProperties)*ExtensionCount);
 
 	if(ExtensionProperties==VK_NULL_HANDLE)
 	{
-		FREE(ExtensionProperties);
+		Zone_Free(Zone, ExtensionProperties);
 		DBGPRINTF("Failed to allocate memory for extension properties.\n");
 		return VK_FALSE;
 	}
@@ -802,7 +802,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 			PushDescriptorExtension=VK_TRUE;
 	}
 
-	FREE(ExtensionProperties);
+	Zone_Free(Zone, ExtensionProperties);
 
 	if(!SwapchainExtension||!PushDescriptorExtension)
 	{

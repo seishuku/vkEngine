@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <malloc.h>
 #include <string.h>
+#include "../system/system.h"
 #include "../vulkan/vulkan.h"
 #include "image.h"
 
@@ -215,7 +216,7 @@ bool TGA_Load(const char *Filename, Image_t *Image)
 		case 8:
 			bpp=Depth>>3;
 
-			Image->Data=(uint8_t *)malloc(Width*Height*bpp);
+			Image->Data=(uint8_t *)Zone_Malloc(Zone, Width*Height*bpp);
 
 			if(Image->Data==NULL)
 				return false;
@@ -239,11 +240,11 @@ bool TGA_Load(const char *Filename, Image_t *Image)
 	if(!(ImageDescriptor&0x20))
 	{
 		int32_t Scanline=Width*bpp, Size=Scanline*Height;
-		uint8_t *Buffer=(uint8_t *)malloc(Size);
+		uint8_t *Buffer=(uint8_t *)Zone_Malloc(Zone, Size);
 
 		if(Buffer==NULL)
 		{
-			FREE(Image->Data);
+			Zone_Free(Zone, Image->Data);
 			return false;
 		}
 
@@ -252,7 +253,7 @@ bool TGA_Load(const char *Filename, Image_t *Image)
 
 		memcpy(Image->Data, Buffer, Size);
 
-		FREE(Buffer);
+		Zone_Free(Zone, Buffer);
 	}
 
 	Image->Width=Width;

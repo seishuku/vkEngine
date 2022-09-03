@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
+#include "../system/system.h"
 #include "../vulkan/vulkan.h"
 #include "image.h"
 
@@ -66,7 +67,7 @@ bool QOI_Load(const char *Filename, Image_t *Image)
 	Image->Width=width;
 	Image->Height=height;
 	Image->Depth=channels<<3;
-	Image->Data=(uint8_t *)malloc(width*height*channels);
+	Image->Data=(uint8_t *)Zone_Malloc(Zone, width*height*channels);
 
 	if(!Image->Data)
 		return false;

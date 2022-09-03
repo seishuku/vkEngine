@@ -411,7 +411,7 @@ int32_t CameraLoadPath(char *filename, CameraPath_t *Path)
 		return 0;
 	}
 
-	Path->Position=(float *)malloc(sizeof(float)*Path->NumPoints*3);
+	Path->Position=(float *)Zone_Malloc(Zone, sizeof(float)*Path->NumPoints*3);
 
 	if(Path->Position==NULL)
 	{
@@ -420,11 +420,11 @@ int32_t CameraLoadPath(char *filename, CameraPath_t *Path)
 		return 0;
 	}
 
-	Path->View=(float *)malloc(sizeof(float)*Path->NumPoints*3);
+	Path->View=(float *)Zone_Malloc(Zone, sizeof(float)*Path->NumPoints*3);
 
 	if(Path->View==NULL)
 	{
-		FREE(Path->Position);
+		Zone_Free(Zone, Path->Position);
 		fclose(stream);
 
 		return 0;
@@ -434,8 +434,8 @@ int32_t CameraLoadPath(char *filename, CameraPath_t *Path)
 	{
 		if(fscanf(stream, "%f %f %f %f %f %f", &Path->Position[3*i], &Path->Position[3*i+1], &Path->Position[3*i+2], &Path->View[3*i], &Path->View[3*i+1], &Path->View[3*i+2])!=6)
 		{
-			FREE(Path->Position);
-			FREE(Path->View);
+			Zone_Free(Zone, Path->Position);
+			Zone_Free(Zone, Path->View);
 			fclose(stream);
 
 			return 0;
@@ -447,12 +447,12 @@ int32_t CameraLoadPath(char *filename, CameraPath_t *Path)
 	Path->Time=0.0f;
 	Path->EndTime=(float)(Path->NumPoints-2);
 
-	Path->Knots=(int32_t *)malloc(sizeof(int32_t)*Path->NumPoints*3);
+	Path->Knots=(int32_t *)Zone_Malloc(Zone, sizeof(int32_t)*Path->NumPoints*3);
 
 	if(Path->Knots==NULL)
 	{
-		FREE(Path->Position);
-		FREE(Path->View);
+		Zone_Free(Zone, Path->Position);
+		Zone_Free(Zone, Path->View);
 		fclose(stream);
 
 		return 0;
@@ -484,7 +484,7 @@ void CameraInterpolatePath(CameraPath_t *Path, Camera_t *Camera, float TimeStep,
 
 void CameraDeletePath(CameraPath_t *Path)
 {
-	FREE(Path->Position);
-	FREE(Path->View);
-	FREE(Path->Knots);
+	Zone_Free(Zone, Path->Position);
+	Zone_Free(Zone, Path->View);
+	Zone_Free(Zone, Path->Knots);
 }
