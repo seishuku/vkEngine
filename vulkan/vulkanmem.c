@@ -38,9 +38,10 @@ VulkanMemZone_t *VulkanMem_Init(VkuContext_t *Context, size_t Size)
 	{
 		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.allocationSize=Size,
-		.memoryTypeIndex=7,
+		.memoryTypeIndex=vkuMemoryTypeFromProperties(Context->DeviceMemProperties, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT|VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
 	};
-	
+
+	// Why does this only work with uncached bit memory typed heaps?
 	VkResult Result=vkAllocateMemory(Context->Device, &AllocateInfo, VK_NULL_HANDLE, &VkZone->DeviceMemory);
 
 	if(Result!=VK_SUCCESS)

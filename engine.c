@@ -776,7 +776,7 @@ bool Init(void)
 		return false;
 #endif
 
-	VkZone=VulkanMem_Init(&Context, (size_t)((float)Context.DeviceMemProperties.memoryHeaps[0].size*0.8f));
+	VkZone=VulkanMem_Init(&Context, Context.DeviceProperties2.maxMemoryAllocationSize);
 
 	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 100.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
 

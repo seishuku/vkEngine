@@ -104,33 +104,15 @@ VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, Image_t *Image,
 	};
 
 	// Quick hack: getting it to use the vulkan memory allocator
-	VulkanMemBlock_t *Block=NULL;
-	size_t AlignedOffset=0;
+	VulkanMemBlock_t *Block=VulkanMem_Malloc(VkZone, memoryRequirements.size+memoryRequirements.alignment);
 
-	if(RequirementsMask&VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT&&!(RequirementsMask&VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
-	{
-		Block=VulkanMem_Malloc(VkZone, memoryRequirements.size+memoryRequirements.alignment);
-		AlignedOffset=(size_t)(ceilf((float)Block->Offset/memoryRequirements.alignment)*memoryRequirements.alignment);
+	if(Block==NULL)
+		return VK_FALSE;
 
-		if(Block==NULL)
-			return VK_FALSE;
-	}
-	else
-	{
-		if(vkAllocateMemory(Context->Device, &AllocateInfo, NULL, &Image->DeviceMemory)!=VK_SUCCESS)
-			return VK_FALSE;
-	}
+	size_t AlignedOffset=(size_t)(ceilf((float)Block->Offset/memoryRequirements.alignment)*memoryRequirements.alignment);
 
-	if(Block)
-	{
-		if(vkBindImageMemory(Context->Device, Image->Image, VkZone->DeviceMemory, AlignedOffset)!=VK_SUCCESS)
-			return VK_FALSE;
-	}
-	else
-	{
-		if(vkBindImageMemory(Context->Device, Image->Image, Image->DeviceMemory, 0)!=VK_SUCCESS)
-			return VK_FALSE;
-	}
+	if(vkBindImageMemory(Context->Device, Image->Image, VkZone->DeviceMemory, AlignedOffset)!=VK_SUCCESS)
+		return VK_FALSE;
 
 	return VK_TRUE;
 }
@@ -866,12 +848,16 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		return VK_FALSE;
 	}
 
-	vkGetPhysicalDeviceProperties(Context->PhysicalDevice, &Context->DeviceProperties);
+	Context->DeviceProperties2.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_3_PROPERTIES;
+	Context->DeviceProperties.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+	Context->DeviceProperties.pNext=&Context->DeviceProperties2;
+	vkGetPhysicalDeviceProperties2(Context->PhysicalDevice, &Context->DeviceProperties);
+
 	DBGPRINTF("Vulkan device name: %s\nVulkan API version: %d.%d.%d\n",
-			  Context->DeviceProperties.deviceName,
-			  VK_API_VERSION_MAJOR(Context->DeviceProperties.apiVersion),
-			  VK_API_VERSION_MINOR(Context->DeviceProperties.apiVersion),
-			  VK_API_VERSION_PATCH(Context->DeviceProperties.apiVersion));
+			  Context->DeviceProperties.properties.deviceName,
+			  VK_API_VERSION_MAJOR(Context->DeviceProperties.properties.apiVersion),
+			  VK_API_VERSION_MINOR(Context->DeviceProperties.properties.apiVersion),
+			  VK_API_VERSION_PATCH(Context->DeviceProperties.properties.apiVersion));
 
 	// Get device physical memory properties
 	vkGetPhysicalDeviceMemoryProperties(Context->PhysicalDevice, &Context->DeviceMemProperties);
