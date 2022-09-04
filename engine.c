@@ -776,8 +776,7 @@ bool Init(void)
 		return false;
 #endif
 
-	DBGPRINTF("Heap size: %lld\n", Context.DeviceMemProperties.memoryHeaps[0].size);
-	VkZone=VulkanMem_Init(&Context, Context.DeviceMemProperties.memoryHeaps[0].size-(1000*1000*1000));
+	VkZone=VulkanMem_Init(&Context, (size_t)((float)Context.DeviceMemProperties.memoryHeaps[0].size*0.8f));
 
 	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 100.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
 
@@ -817,8 +816,6 @@ bool Init(void)
 
 	InitShadowPipeline();
 	InitShadowCubeMap(13);
-
-	VulkanMem_Print(VkZone);
 
 	return true;
 }

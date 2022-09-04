@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include <assert.h>
 #include "../system/system.h"
 #include "memzone.h"
@@ -171,11 +172,11 @@ void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 
 void Zone_Print(MemZone_t *Zone)
 {
-	DBGPRINTF("\nZone size: %0.2fMB  Location: 0x%p\n", (float)(Zone->Size/1000.0f/1000.0f), Zone);
+	DBGPRINTF("Zone size: %0.2fMB  Location: 0x%p\n", (float)(Zone->Size/1000.0f/1000.0f), Zone);
 
 	for(MemBlock_t *Block=Zone->Blocks.Next;;Block=Block->Next)
 	{
-		DBGPRINTF("Block: 0x%p Size: %0.2fKB Block free: %s\n", Block, (float)(Block->Size/1000.0f), Block->Free?"no":"yes");
+		DBGPRINTF("\tBlock: 0x%p Size: %0.2fKB Block free: %s\n", Block, (float)(Block->Size/1000.0f), Block->Free?"no":"yes");
 
 		if(Block->Next==&Zone->Blocks)
 			break;

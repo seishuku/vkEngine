@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "../system/system.h"
 #include "../vulkan/vulkan.h"
+#include "../vulkan/vulkanmem.h"
 #include "../math/math.h"
 #include "../camera/camera.h"
 #include "../utils/list.h"
@@ -18,6 +19,9 @@ bool ToggleFullscreen=true;
 
 extern VkInstance Instance;
 extern VkuContext_t Context;
+
+extern VulkanMemZone_t *VkZone;
+
 extern uint32_t Width, Height;
 extern Lights_t Lights;
 
@@ -171,10 +175,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			switch(wParam)
 			{
-				case 'P':
-					Zone_Print(Zone);
-					break;
-
 				case 'O':
 					for(uint32_t i=0;i<10;i++)
 					{
@@ -316,6 +316,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int iCmdShow)
 {
+	if(AllocConsole())
+	{
+		FILE *fDummy;
+		freopen_s(&fDummy, "CONOUT$", "w", stdout);
+		freopen_s(&fDummy, "CONOUT$", "w", stderr);
+		freopen_s(&fDummy, "CONIN$", "r", stdin);
+	}
+
 	DBGPRINTF("Allocating zone memory...\n");
 	Zone=Zone_Init(32*1000*1000);
 
@@ -377,6 +385,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	Frequency=GetFrequency();
 	DBGPRINTF("\nCPU freqency: %0.2fGHz\n", (float)Frequency/1000000000);
 
+	DBGPRINTF("\nCurrent system zone memory allocations:\n");
+	Zone_Print(Zone);
+
+	DBGPRINTF("\nCurrent vulkan zone memory allocations:\n");
+	VulkanMem_Print(VkZone);
+
 	DBGPRINTF("\nStarting main loop.\n");
 	while(!Done)
 	{
@@ -420,6 +434,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	DBGPRINTF("Zone remaining block list:\n");
 	Zone_Print(Zone);
 	Zone_Destroy(Zone);
+
+	system("pause");
+
+	FreeConsole();
 
 	return 0;
 }

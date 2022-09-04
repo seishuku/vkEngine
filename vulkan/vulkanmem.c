@@ -57,16 +57,12 @@ void VulkanMem_Destroy(VkuContext_t *Context, VulkanMemZone_t *VkZone)
 {
 	if(VkZone)
 	{
-		VulkanMemBlock_t *Block=VkZone->Blocks.Next, *Next;
-
-		while(Block)
+		for(VulkanMemBlock_t *Block=VkZone->Blocks.Next;;Block=Block->Next)
 		{
+			Zone_Free(Zone, Block);
+
 			if(Block->Next==&VkZone->Blocks)
 				break;
-
-			Next=Block->Next;
-			Zone_Free(Zone, Block);
-			Block=Next;
 		}
 
 		vkFreeMemory(Context->Device, VkZone->DeviceMemory, VK_NULL_HANDLE);
@@ -117,6 +113,8 @@ void VulkanMem_Free(VulkanMemZone_t *VkZone, VulkanMemBlock_t *Ptr)
 		if(Next==VkZone->Current)
 			VkZone->Current=Block;
 	}
+
+	Zone_Free(Zone, Ptr);
 }
 
 VulkanMemBlock_t *VulkanMem_Malloc(VulkanMemZone_t *VkZone, size_t Size)
@@ -176,7 +174,7 @@ VulkanMemBlock_t *VulkanMem_Malloc(VulkanMemZone_t *VkZone, size_t Size)
 
 void VulkanMem_Print(VulkanMemZone_t *VkZone)
 {
-	DBGPRINTF("\nVulkan zone size: %0.2fMB  Location (OBJ): 0x%p\n", (float)(VkZone->Size/1000.0f/1000.0f), VkZone->DeviceMemory);
+	DBGPRINTF("Vulkan zone size: %0.2fMB  Location: 0x%p (Vulkan Object Address)\n", (float)(VkZone->Size/1000.0f/1000.0f), VkZone->DeviceMemory);
 
 	for(VulkanMemBlock_t *Block=VkZone->Blocks.Next;;Block=Block->Next)
 	{

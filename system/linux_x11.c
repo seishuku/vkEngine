@@ -22,6 +22,9 @@ bool ToggleFullscreen=true;
 
 extern VkInstance Instance;
 extern VkuContext_t Context;
+
+extern VulkanMemZone_t *VkZone;
+
 extern uint32_t Width, Height;
 extern Lights_t Lights;
 extern Camera_t Camera;
@@ -375,6 +378,12 @@ int main(int argc, char **argv)
 
 	Frequency=GetFrequency();
 	DBGPRINTF("\nCPU freqency: %0.2fGHz\n", (float)Frequency/1000000000);
+
+	DBGPRINTF("\nCurrent system zone memory allocations:\n");
+	Zone_Print(Zone);
+
+	DBGPRINTF("\nCurrent vulkan zone memory allocations:\n");
+	VulkanMem_Print(VkZone);
 
 	DBGPRINTF("\nStarting main loop.\n");
 	EventLoop();
