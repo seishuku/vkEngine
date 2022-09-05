@@ -314,6 +314,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
 
+#ifndef _CONSOLE
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int iCmdShow)
 {
 	if(AllocConsole())
@@ -329,6 +330,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		GetConsoleMode(hOutput, &dwMode);
 		SetConsoleMode(hOutput, dwMode|ENABLE_PROCESSED_OUTPUT|ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 	}
+#else
+int main(int argc, char **argv)
+{
+	HINSTANCE hInstance=GetModuleHandle(NULL);
+	HANDLE hOutput=GetStdHandle(STD_OUTPUT_HANDLE);
+	DWORD dwMode;
+	
+	GetConsoleMode(hOutput, &dwMode);
+	SetConsoleMode(hOutput, dwMode|ENABLE_PROCESSED_OUTPUT|ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+#endif
 
 	DBGPRINTF(DEBUG_INFO, "Allocating zone memory...\n");
 	Zone=Zone_Init(32*1000*1000);
@@ -441,9 +452,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	Zone_Print(Zone);
 	Zone_Destroy(Zone);
 
+#ifndef _CONSOLE
 	system("pause");
 
 	FreeConsole();
+#endif
 
 	return 0;
 }

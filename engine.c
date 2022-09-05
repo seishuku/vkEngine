@@ -803,21 +803,13 @@ void Render(void)
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
 {
 	if(messageSeverity&VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
-	{
 		DBGPRINTF(DEBUG_ERROR, "\n%s\n", pCallbackData->pMessage);
-	}
 	else if(messageSeverity&VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-	{
 		DBGPRINTF(DEBUG_WARNING, "\n%s\n", pCallbackData->pMessage);
-	}
 	else if(messageSeverity&VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
-	{
 		DBGPRINTF(DEBUG_INFO, "\n%s\n", pCallbackData->pMessage);
-	}
 	else
-	{
 		DBGPRINTF(DEBUG_WARNING, "\n%s\n", pCallbackData->pMessage);
-	}
 
 	return VK_FALSE;
 }
@@ -1119,6 +1111,7 @@ void Destroy(void)
 	// Shadow stuff
 	vkDestroyPipeline(Context.Device, ShadowPipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, ShadowPipelineLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(Context.Device, ShadowDescriptorSetLayout.DescriptorSetLayout, VK_NULL_HANDLE);
 	vkDestroyRenderPass(Context.Device, ShadowRenderPass, VK_NULL_HANDLE);
 
 	vkDestroyFramebuffer(Context.Device, ShadowFrameBuffer, VK_NULL_HANDLE);
@@ -1155,11 +1148,12 @@ void Destroy(void)
 		Free3DS(&Model[i]);
 	}
 
-	vkDestroyDescriptorSetLayout(Context.Device, DescriptorSetLayout.DescriptorSetLayout, VK_NULL_HANDLE);
-
 	vkDestroyPipeline(Context.Device, Pipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, PipelineLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(Context.Device, DescriptorSetLayout.DescriptorSetLayout, VK_NULL_HANDLE);
 	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);
+
+	vkDestroyDescriptorPool(Context.Device, DescriptorPool, VK_NULL_HANDLE);
 
 	vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);

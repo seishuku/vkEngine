@@ -18,7 +18,7 @@
 #endif
 
 #ifndef DBGPRINTF
-#define DBGPRINTF(level, ...) { fprintf(stderr, level __VA_ARGS__); }
+#define DBGPRINTF(level, ...) fprintf(stderr, level __VA_ARGS__)
 #endif
 
 #ifndef BUFFER_OFFSET

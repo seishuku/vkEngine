@@ -710,12 +710,6 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 	}
 #endif
 
-	if((_vkCmdPushDescriptorSetKHR=(PFN_vkCmdPushDescriptorSetKHR)vkGetInstanceProcAddr(*Instance, "vkCmdPushDescriptorSetKHR"))==VK_NULL_HANDLE)
-	{
-		DBGPRINTF(DEBUG_ERROR, "vkGetInstanceProcAddr failed on vkCmdPushDescriptorSetKHR.\n");
-		return VK_FALSE;
-	}
-
 	return VK_TRUE;
 }
 
@@ -762,7 +756,8 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	// Get the handles to the devices
 	vkEnumeratePhysicalDevices(Instance, &PhysicalDeviceCount, DeviceHandles);
 
-	DBGPRINTF(DEBUG_INFO, "Found devices:\n")
+	DBGPRINTF(DEBUG_INFO, "Found devices:\n");
+
 	for(uint32_t i=0;i<PhysicalDeviceCount;i++)
 	{
 		uint32_t QueueFamilyCount=0;
@@ -837,7 +832,12 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME)==0)
 			SwapchainExtension=VK_TRUE;
 		else if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)==0)
-			PushDescriptorExtension=VK_TRUE;
+		{
+			if((_vkCmdPushDescriptorSetKHR=(PFN_vkCmdPushDescriptorSetKHR)vkGetInstanceProcAddr(Instance, "vkCmdPushDescriptorSetKHR"))==VK_NULL_HANDLE)
+				DBGPRINTF(DEBUG_ERROR, "vkGetInstanceProcAddr failed on vkCmdPushDescriptorSetKHR.\n");
+			else
+				PushDescriptorExtension=VK_TRUE;
+		}
 	}
 
 	Zone_Free(Zone, ExtensionProperties);
