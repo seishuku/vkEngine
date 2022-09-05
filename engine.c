@@ -252,6 +252,7 @@ bool InitShadowPipeline(void)
 		.pSetLayouts=&ShadowDescriptorSetLayout.DescriptorSetLayout,
 	}, 0, &ShadowPipelineLayout);
 
+	// Shadow maps only need one descriptor set for everything (nothing changes between models), but also need one per render frame (buffered)
 	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
 	{
 		vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
@@ -491,6 +492,7 @@ bool CreatePipeline(void)
 		},
 	}, 0, &PipelineLayout);
 
+	// Need one descriptor set per model (each model has a different texture), but also one per render frame (buffered)
 	for(uint32_t i=0;i<MAX_FRAME_COUNT*NUM_MODELS;i++)
 	{
 		vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
@@ -666,6 +668,20 @@ void Render(void)
 
 	Lights_UpdateSSBO(&Lights);
 
+	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain, UINT64_MAX, PresentCompleteSemaphores[Index], VK_NULL_HANDLE, &OldIndex);
+
+	if(Result==VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		DBGPRINTF("Swapchain out of date... Rebuilding.\n");
+		RecreateSwapchain();
+		return;
+	}
+
+	vkWaitForFences(Context.Device, 1, &FrameFences[Index], VK_TRUE, UINT64_MAX);
+	vkResetFences(Context.Device, 1, &FrameFences[Index]);
+
+	// Update descriptor sets *after* waiting on the fence, to be sure the command buffer is no longer using them,
+	// but also before recording the next command buffer.
 	vkUpdateDescriptorSets(Context.Device, 1, (VkWriteDescriptorSet[])
 	{
 		{
@@ -705,18 +721,6 @@ void Render(void)
 		}, 0, VK_NULL_HANDLE);
 	}
 
-	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain, UINT64_MAX, PresentCompleteSemaphores[Index], VK_NULL_HANDLE, &Index);
-
-	if(Result==VK_ERROR_OUT_OF_DATE_KHR)
-	{
-		DBGPRINTF("Swapchain out of date... Rebuilding.\n");
-		RecreateSwapchain();
-		return;
-	}
-
-	vkWaitForFences(Context.Device, 1, &FrameFences[Index], VK_TRUE, UINT64_MAX);
-	vkResetFences(Context.Device, 1, &FrameFences[Index]);
-
 	// Start recording the commands
 	vkBeginCommandBuffer(CommandBuffers[Index], &(VkCommandBufferBeginInfo)
 	{
@@ -724,14 +728,14 @@ void Render(void)
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 	});
 
-	ShadowUpdateCubemap(CommandBuffers[Index], OldIndex);
+	ShadowUpdateCubemap(CommandBuffers[Index], Index);
 
 	// Start a render pass and clear the frame/depth buffer
 	vkCmdBeginRenderPass(CommandBuffers[Index], &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=RenderPass,
-		.framebuffer=FrameBuffers[Index],
+		.framebuffer=FrameBuffers[OldIndex],
 		.clearValueCount=2,
 		.pClearValues=(VkClearValue[]) { { 0.0f, 0.0f, 0.0f, 1.0f }, { 1.0f, 0 } },
 		.renderArea.offset={ 0, 0 },
@@ -749,7 +753,7 @@ void Render(void)
 	// Draw the models
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[NUM_MODELS*OldIndex+i], 0, VK_NULL_HANDLE);
+		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[NUM_MODELS*Index+i], 0, VK_NULL_HANDLE);
 
 		//vkCmdPushDescriptorSetKHR(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 4, WriteDescriptorSet);
 
@@ -792,10 +796,8 @@ void Render(void)
 		.pWaitSemaphores=&RenderCompleteSemaphores[Index],
 		.swapchainCount=1,
 		.pSwapchains=&Swapchain,
-		.pImageIndices=&Index,
+		.pImageIndices=&OldIndex,
 	});
-
-	OldIndex=Index;
 }
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
@@ -850,16 +852,17 @@ bool Init(void)
 	Image_Upload(&Context, &Textures[TEXTURE_LEVEL], "./assets/tile.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_LEVEL_NORMAL], "./assets/tile_b.tga", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALMAP);
 
+	// Create a large descriptor pool, so I don't have to worry about readjusting for exactly what I have
 	vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-		.maxSets=1024,
+		.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
 		.poolSizeCount=4,
 		.pPoolSizes=(VkDescriptorPoolSize[])
 		{
 			{
 				.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-				.descriptorCount=1024,
+				.descriptorCount=1024, // Max number of this descriptor type that can be in each descriptor set?
 			},
 			{
 				.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
