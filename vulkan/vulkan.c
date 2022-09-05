@@ -605,7 +605,7 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 
 	if(vkEnumerateInstanceExtensionProperties(NULL, &ExtensionCount, NULL)!=VK_SUCCESS)
 	{
-		DBGPRINTF("vkEnumerateInstanceExtensionProperties failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "vkEnumerateInstanceExtensionProperties failed.\n");
 		return VK_FALSE;
 	}
 
@@ -613,14 +613,14 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 
 	if(ExtensionProperties==VK_NULL_HANDLE)
 	{
-		DBGPRINTF("Failed to allocate memory for extension properties.\n");
+		DBGPRINTF(DEBUG_ERROR, "Failed to allocate memory for extension properties.\n");
 		return VK_FALSE;
 	}
 
 	if(vkEnumerateInstanceExtensionProperties(VK_NULL_HANDLE, &ExtensionCount, ExtensionProperties)!=VK_SUCCESS)
 	{
 		Zone_Free(Zone, ExtensionProperties);
-		DBGPRINTF("vkEnumerateInstanceExtensionProperties failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "vkEnumerateInstanceExtensionProperties failed.\n");
 		return VK_FALSE;
 	}
 
@@ -649,7 +649,7 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 
 	if(!SurfaceExtension||!SurfaceOSExtension)
 	{
-		DBGPRINTF("Missing required instance surface extension!\n");
+		DBGPRINTF(DEBUG_ERROR, "Missing required instance surface extension!\n");
 		return VK_FALSE;
 	}
 
@@ -692,7 +692,7 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 
 	if(vkCreateInstance(&InstanceInfo, 0, Instance)!=VK_SUCCESS)
 	{
-		DBGPRINTF("vkCreateInstance failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "vkCreateInstance failed.\n");
 		return VK_FALSE;
 	}
 
@@ -712,7 +712,7 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 
 	if((_vkCmdPushDescriptorSetKHR=(PFN_vkCmdPushDescriptorSetKHR)vkGetInstanceProcAddr(*Instance, "vkCmdPushDescriptorSetKHR"))==VK_NULL_HANDLE)
 	{
-		DBGPRINTF("vkGetInstanceProcAddr failed on vkCmdPushDescriptorSetKHR.\n");
+		DBGPRINTF(DEBUG_ERROR, "vkGetInstanceProcAddr failed on vkCmdPushDescriptorSetKHR.\n");
 		return VK_FALSE;
 	}
 
@@ -730,7 +730,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		.hwnd=Context->hWnd,
 	}, VK_NULL_HANDLE, &Context->Surface)!=VK_SUCCESS)
 	{
-		DBGPRINTF("vkCreateWin32SurfaceKHR failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "vkCreateWin32SurfaceKHR failed.\n");
 		return VK_FALSE;
 	}
 #else
@@ -755,21 +755,21 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 
 	if(DeviceHandles==NULL)
 	{
-		DBGPRINTF("Unable to allocate memory for physical device handles.\n");
+		DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for physical device handles.\n");
 		return VK_FALSE;
 	}
 
 	// Get the handles to the devices
 	vkEnumeratePhysicalDevices(Instance, &PhysicalDeviceCount, DeviceHandles);
 
-	DBGPRINTF("Found devices:\n")
+	DBGPRINTF(DEBUG_INFO, "Found devices:\n")
 	for(uint32_t i=0;i<PhysicalDeviceCount;i++)
 	{
 		uint32_t QueueFamilyCount=0;
 
 		VkPhysicalDeviceProperties DeviceProperties;
 		vkGetPhysicalDeviceProperties(DeviceHandles[i], &DeviceProperties);
-		DBGPRINTF("\t#%d: %s VendorID: 0x%0.4X ProductID: 0x%0.4X\n", i, DeviceProperties.deviceName, DeviceProperties.vendorID, DeviceProperties.deviceID);
+		DBGPRINTF(DEBUG_INFO, "\t#%d: %s VendorID: 0x%0.4X ProductID: 0x%0.4X\n", i, DeviceProperties.deviceName, DeviceProperties.vendorID, DeviceProperties.deviceID);
 
 		// Get the number of queue families for this device
 		vkGetPhysicalDeviceQueueFamilyProperties(DeviceHandles[i], &QueueFamilyCount, VK_NULL_HANDLE);
@@ -779,7 +779,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 
 		if(QueueFamilyProperties==NULL)
 		{
-			DBGPRINTF("Unable to allocate memory for queue family properties.\n");
+			DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for queue family properties.\n");
 			Zone_Free(Zone, DeviceHandles);
 			return VK_FALSE;
 		}
@@ -823,7 +823,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	if(ExtensionProperties==VK_NULL_HANDLE)
 	{
 		Zone_Free(Zone, ExtensionProperties);
-		DBGPRINTF("Failed to allocate memory for extension properties.\n");
+		DBGPRINTF(DEBUG_ERROR, "Failed to allocate memory for extension properties.\n");
 		return VK_FALSE;
 	}
 
@@ -844,7 +844,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 
 	if(!SwapchainExtension||!PushDescriptorExtension)
 	{
-		DBGPRINTF("Missing required device extensions!\n");
+		DBGPRINTF(DEBUG_ERROR, "Missing required device extensions!\n");
 		return VK_FALSE;
 	}
 
@@ -853,7 +853,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	Context->DeviceProperties.pNext=&Context->DeviceProperties2;
 	vkGetPhysicalDeviceProperties2(Context->PhysicalDevice, &Context->DeviceProperties);
 
-	DBGPRINTF("Vulkan device name: %s\nVulkan API version: %d.%d.%d\n",
+	DBGPRINTF(DEBUG_INFO, "Vulkan device name: %s\nVulkan API version: %d.%d.%d\n",
 			  Context->DeviceProperties.properties.deviceName,
 			  VK_API_VERSION_MAJOR(Context->DeviceProperties.properties.apiVersion),
 			  VK_API_VERSION_MINOR(Context->DeviceProperties.properties.apiVersion),
@@ -862,20 +862,20 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	// Get device physical memory properties
 	vkGetPhysicalDeviceMemoryProperties(Context->PhysicalDevice, &Context->DeviceMemProperties);
 
-	DBGPRINTF("Vulkan memory heaps: \n");
+	DBGPRINTF(DEBUG_INFO, "Vulkan memory heaps: \n");
 	for(uint32_t i=0;i<Context->DeviceMemProperties.memoryHeapCount;i++)
-		DBGPRINTF("\t#%d: Size: %0.3fGB\n", i, (float)Context->DeviceMemProperties.memoryHeaps[i].size/1000.0f/1000.0f/1000.0f);
+		DBGPRINTF(DEBUG_INFO, "\t#%d: Size: %0.3fGB\n", i, (float)Context->DeviceMemProperties.memoryHeaps[i].size/1000.0f/1000.0f/1000.0f);
 
-	DBGPRINTF("Vulkan memory types: \n");
+	DBGPRINTF(DEBUG_INFO, "Vulkan memory types: \n");
 	for(uint32_t i=0;i<Context->DeviceMemProperties.memoryTypeCount;i++)
-		DBGPRINTF("\t#%d: Heap index: %d Flags: 0x%X\n", i, Context->DeviceMemProperties.memoryTypes[i].heapIndex, Context->DeviceMemProperties.memoryTypes[i].propertyFlags);
+		DBGPRINTF(DEBUG_INFO, "\t#%d: Heap index: %d Flags: 0x%X\n", i, Context->DeviceMemProperties.memoryTypes[i].heapIndex, Context->DeviceMemProperties.memoryTypes[i].propertyFlags);
 
 	VkPhysicalDeviceFeatures Features;
 	vkGetPhysicalDeviceFeatures(Context->PhysicalDevice, &Features);
 
 	if(!Features.imageCubeArray)
 	{
-		DBGPRINTF("Missing cubemap arrays feature.\n");
+		DBGPRINTF(DEBUG_WARNING, "Missing cubemap arrays feature.\n");
 		return VK_FALSE;
 	}
 
@@ -900,7 +900,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		}
 	}, VK_NULL_HANDLE, &Context->Device)!=VK_SUCCESS)
 	{
-		DBGPRINTF("vkCreateDevice failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "vkCreateDevice failed.\n");
 		return VK_FALSE;
 	}
 

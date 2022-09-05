@@ -13,7 +13,7 @@ MemZone_t *Zone_Init(size_t Size)
 
 	if(Zone==NULL)
 	{
-		DBGPRINTF("Unable to allocate memory for zone.\n");
+		DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for zone.\n");
 		return false;
 	}
 
@@ -32,7 +32,7 @@ MemZone_t *Zone_Init(size_t Size)
 
 	Zone->Size=Size;
 
-	DBGPRINTF("Zone allocated at 0x%p, size: %0.3fMB\n", Zone, (float)Size/1000.0f/1000.0f);
+	DBGPRINTF(DEBUG_INFO, "Zone allocated at 0x%p, size: %0.3fMB\n", Zone, (float)Size/1000.0f/1000.0f);
 	return Zone;
 }
 
@@ -46,7 +46,7 @@ void Zone_Free(MemZone_t *Zone, void *Ptr)
 {
 	if(Ptr==NULL)
 	{
-		DBGPRINTF("Attempting to free NULL pointer\n");
+		DBGPRINTF(DEBUG_ERROR, "Attempting to free NULL pointer\n");
 		return;
 	}
 
@@ -54,7 +54,7 @@ void Zone_Free(MemZone_t *Zone, void *Ptr)
 
 	if(!Block->Free)
 	{
-		DBGPRINTF("Attempting to free already freed pointer.\n");
+		DBGPRINTF(DEBUG_ERROR, "Attempting to free already freed pointer.\n");
 		return;
 	}
 
@@ -133,7 +133,7 @@ void *Zone_Malloc(MemZone_t *Zone, size_t Size)
 	Zone->Current=Base->Next;
 
 #ifdef _DEBUG
-	DBGPRINTF("Zone allocate block - Location: 0x%p Size: %0.3fKB\n", Base, (float)Size/1000.0f);
+	DBGPRINTF(DEBUG_INFO, "Zone allocate block - Location: 0x%p Size: %0.3fKB\n", Base, (float)Size/1000.0f);
 #endif
 	return (void *)((uint8_t *)Base+sizeof(MemBlock_t));
 }
@@ -156,7 +156,7 @@ void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 		assert((Ptr)&&(Size>Block->Size));
 
 #ifdef _DEBUG
-		DBGPRINTF("Zone_Realloc: ");
+		DBGPRINTF(DEBUG_INFO, "Zone_Realloc: ");
 #endif
 		void *New=Zone_Malloc(Zone, Size);
 
@@ -172,11 +172,11 @@ void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 
 void Zone_Print(MemZone_t *Zone)
 {
-	DBGPRINTF("Zone size: %0.2fMB  Location: 0x%p\n", (float)(Zone->Size/1000.0f/1000.0f), Zone);
+	DBGPRINTF(DEBUG_INFO, "Zone size: %0.2fMB  Location: 0x%p\n", (float)(Zone->Size/1000.0f/1000.0f), Zone);
 
 	for(MemBlock_t *Block=Zone->Blocks.Next;;Block=Block->Next)
 	{
-		DBGPRINTF("\tBlock: 0x%p Size: %0.2fKB Block free: %s\n", Block, (float)(Block->Size/1000.0f), Block->Free?"no":"yes");
+		DBGPRINTF(DEBUG_INFO, "\tBlock: 0x%p Size: %0.2fKB Block free: %s\n", Block, (float)(Block->Size/1000.0f), Block->Free?"no":"yes");
 
 		if(Block->Next==&Zone->Blocks)
 			break;

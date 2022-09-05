@@ -802,7 +802,7 @@ void Render(void)
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
 {
-	DBGPRINTF("\n\x1B[91m%s\x1B[97m\n", pCallbackData->pMessage);
+	DBGPRINTF(DEBUG_ERROR, "\n%s\n", pCallbackData->pMessage);
 
 	return VK_FALSE;
 }
@@ -1164,7 +1164,8 @@ void Destroy(void)
 
 	vkDestroySwapchainKHR(Context.Device, Swapchain, VK_NULL_HANDLE);
 
-	DBGPRINTF("Remaining Vulkan memory blocks:\n");
+	DBGPRINTF(DEBUG_INFO"Remaining Vulkan memory blocks:\n");
 	VulkanMem_Print(VkZone);
 	VulkanMem_Destroy(&Context, VkZone);
+	DBGPRINTF(DEBUG_NONE);
 }

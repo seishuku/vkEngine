@@ -330,12 +330,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		SetConsoleMode(hOutput, dwMode|ENABLE_PROCESSED_OUTPUT|ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 	}
 
-	DBGPRINTF("Allocating zone memory...\n");
+	DBGPRINTF(DEBUG_INFO, "Allocating zone memory...\n");
 	Zone=Zone_Init(32*1000*1000);
 
 	if(Zone==NULL)
 	{
-		DBGPRINTF("\t...zone allocation failed!\n");
+		DBGPRINTF(DEBUG_ERROR, "\t...zone allocation failed!\n");
 
 		return -1;
 	}
@@ -364,40 +364,40 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ShowWindow(Context.hWnd, SW_SHOW);
 	SetForegroundWindow(Context.hWnd);
 
-	DBGPRINTF("Creating Vulkan instance...\n");
+	DBGPRINTF(DEBUG_INFO, "Creating Vulkan instance...\n");
 	if(!CreateVulkanInstance(&Instance))
 	{
-		DBGPRINTF("\t...failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
 		return -1;
 	}
 
-	DBGPRINTF("Creating Vulkan context...\n");
+	DBGPRINTF(DEBUG_INFO, "Creating Vulkan context...\n");
 	if(!CreateVulkanContext(Instance, &Context))
 	{
-		DBGPRINTF("\t...failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
 		return -1;
 	}
 
-	DBGPRINTF("Creating swapchain...\n");
+	DBGPRINTF(DEBUG_INFO, "Creating swapchain...\n");
 	vkuCreateSwapchain(&Context, Width, Height, VK_TRUE);
 
-	DBGPRINTF("Initalizing Vulkan resources...\n");
+	DBGPRINTF(DEBUG_INFO, "Initalizing Vulkan resources...\n");
 	if(!Init())
 	{
-		DBGPRINTF("\t...failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
 		return -1;
 	}
 
 	Frequency=GetFrequency();
-	DBGPRINTF("\nCPU freqency: %0.2fGHz\n", (float)Frequency/1000000000);
+	DBGPRINTF(DEBUG_INFO, "\nCPU freqency: %0.2fGHz\n", (float)Frequency/1000000000);
 
-	DBGPRINTF("\nCurrent system zone memory allocations:\n");
+	DBGPRINTF(DEBUG_INFO, "\nCurrent system zone memory allocations:\n");
 	Zone_Print(Zone);
 
-	DBGPRINTF("\nCurrent vulkan zone memory allocations:\n");
+	DBGPRINTF(DEBUG_INFO, "\nCurrent vulkan zone memory allocations:\n");
 	VulkanMem_Print(VkZone);
 
-	DBGPRINTF("\nStarting main loop.\n");
+	DBGPRINTF(DEBUG_INFO, "\nStarting main loop.\n");
 	while(!Done)
 	{
 		MSG msg;
@@ -431,13 +431,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		}
 	}
 
-	DBGPRINTF("Shutting down...\n");
+	DBGPRINTF(DEBUG_INFO, "Shutting down...\n");
 	Destroy();
 	DestroyVulkan(Instance, &Context);
 	vkDestroyInstance(Instance, VK_NULL_HANDLE);
 	DestroyWindow(Context.hWnd);
 
-	DBGPRINTF("Zone remaining block list:\n");
+	DBGPRINTF(DEBUG_INFO, "Zone remaining block list:\n");
 	Zone_Print(Zone);
 	Zone_Destroy(Zone);
 

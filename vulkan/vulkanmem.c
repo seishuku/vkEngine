@@ -46,11 +46,11 @@ VulkanMemZone_t *VulkanMem_Init(VkuContext_t *Context, size_t Size)
 
 	if(Result!=VK_SUCCESS)
 	{
-		DBGPRINTF("Failed to allocate vulakn memory zone (Result=%d).\n", Result);
+		DBGPRINTF(DEBUG_ERROR, "Failed to allocate vulakn memory zone (Result=%d).\n", Result);
 		return NULL;
 	}
 
-	DBGPRINTF("Vulakn memory zone allocated (OBJ: 0x%p), size: %0.3fMB\n", VkZone->DeviceMemory, (float)Size/1000.0f/1000.0f);
+	DBGPRINTF(DEBUG_INFO, "Vulakn memory zone allocated (OBJ: 0x%p), size: %0.3fMB\n", VkZone->DeviceMemory, (float)Size/1000.0f/1000.0f);
 	return VkZone;
 }
 
@@ -75,7 +75,7 @@ void VulkanMem_Free(VulkanMemZone_t *VkZone, VulkanMemBlock_t *Ptr)
 {
 	if(Ptr==NULL)
 	{
-		DBGPRINTF("Attempting to free NULL pointer\n");
+		DBGPRINTF(DEBUG_WARNING, "Attempting to free NULL pointer\n");
 		return;
 	}
 
@@ -83,7 +83,7 @@ void VulkanMem_Free(VulkanMemZone_t *VkZone, VulkanMemBlock_t *Ptr)
 
 	if(!Block->Free)
 	{
-		DBGPRINTF("Attempting to free already freed pointer.\n");
+		DBGPRINTF(DEBUG_WARNING, "Attempting to free already freed pointer.\n");
 		return;
 	}
 
@@ -132,7 +132,7 @@ VulkanMemBlock_t *VulkanMem_Malloc(VulkanMemZone_t *VkZone, size_t Size)
 	{
 		if(Current==Start)
 		{
-			DBGPRINTF("Vulkan mem: Unable to find large enough free block.\n");
+			DBGPRINTF(DEBUG_WARNING, "Vulkan mem: Unable to find large enough free block.\n");
 			return NULL;
 		}
 
@@ -168,18 +168,18 @@ VulkanMemBlock_t *VulkanMem_Malloc(VulkanMemZone_t *VkZone, size_t Size)
 	VkZone->Current=Base->Next;
 
 #ifdef _DEBUG
-	DBGPRINTF("Vulkan mem allocate block - Location offset: %lld Size: %0.3fKB\n", Base->Offset, (float)Base->Size/1000.0f);
+	DBGPRINTF(DEBUG_INFO, "Vulkan mem allocate block - Location offset: %lld Size: %0.3fKB\n", Base->Offset, (float)Base->Size/1000.0f);
 #endif
 	return Base;
 }
 
 void VulkanMem_Print(VulkanMemZone_t *VkZone)
 {
-	DBGPRINTF("Vulkan zone size: %0.2fMB  Location: 0x%p (Vulkan Object Address)\n", (float)(VkZone->Size/1000.0f/1000.0f), VkZone->DeviceMemory);
+	DBGPRINTF(DEBUG_INFO, "Vulkan zone size: %0.2fMB  Location: 0x%p (Vulkan Object Address)\n", (float)(VkZone->Size/1000.0f/1000.0f), VkZone->DeviceMemory);
 
 	for(VulkanMemBlock_t *Block=VkZone->Blocks.Next;;Block=Block->Next)
 	{
-		DBGPRINTF("\tOffset: %0.4fMB Size: %0.4fMB Block free: %s\n", (float)Block->Offset/1000.0f/1000.0f, (float)Block->Size/1000.0f/1000.0f, Block->Free?"no":"yes");
+		DBGPRINTF(DEBUG_INFO, "\tOffset: %0.4fMB Size: %0.4fMB Block free: %s\n", (float)Block->Offset/1000.0f/1000.0f, (float)Block->Size/1000.0f/1000.0f, Block->Free?"no":"yes");
 
 		if(Block->Next==&VkZone->Blocks)
 			break;
