@@ -322,6 +322,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		freopen_s(&fDummy, "CONOUT$", "w", stdout);
 		freopen_s(&fDummy, "CONOUT$", "w", stderr);
 		freopen_s(&fDummy, "CONIN$", "r", stdin);
+		
+		HANDLE hOutput=GetStdHandle(STD_OUTPUT_HANDLE);
+		DWORD dwMode;
+
+		GetConsoleMode(hOutput, &dwMode);
+		SetConsoleMode(hOutput, dwMode|ENABLE_PROCESSED_OUTPUT|ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 	}
 
 	DBGPRINTF("Allocating zone memory...\n");
