@@ -79,7 +79,7 @@ void main()
 		float lAtten=max(0.0, 1.0-length(lPos*Lights[i].Position.w));
 
 		// Shadow map compare, divide the light distance by the radius to match the depth map distance space
-		float Shadow=texture(TexDistance, vec4(-lPos, i), (length(lPos)*Lights[i].Position.w)-0.01);
+		float Shadow=texture(TexDistance, vec4(-lPos, i), (length(lPos)*Lights[i].Position.w)-0.005);
 
 		// Now we can normalize the light position vector
 		lPos=normalize(lPos);

@@ -133,7 +133,7 @@ void *Zone_Malloc(MemZone_t *Zone, size_t Size)
 	Zone->Current=Base->Next;
 
 #ifdef _DEBUG
-	DBGPRINTF(DEBUG_INFO, "Zone allocate block - Location: 0x%p Size: %0.3fKB\n", Base, (float)Size/1000.0f);
+	DBGPRINTF(DEBUG_WARNING, "Zone allocate block - Location: 0x%p Size: %0.3fKB\n", Base, (float)Size/1000.0f);
 #endif
 	return (void *)((uint8_t *)Base+sizeof(MemBlock_t));
 }
@@ -156,7 +156,7 @@ void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 		assert((Ptr)&&(Size>Block->Size));
 
 #ifdef _DEBUG
-		DBGPRINTF(DEBUG_INFO, "Zone_Realloc: ");
+		DBGPRINTF(DEBUG_WARNING, "Zone_Realloc: ");
 #endif
 		void *New=Zone_Malloc(Zone, Size);
 

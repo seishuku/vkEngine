@@ -802,7 +802,22 @@ void Render(void)
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
 {
-	DBGPRINTF(DEBUG_ERROR, "\n%s\n", pCallbackData->pMessage);
+	if(messageSeverity&VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+	{
+		DBGPRINTF(DEBUG_ERROR, "\n%s\n", pCallbackData->pMessage);
+	}
+	else if(messageSeverity&VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+	{
+		DBGPRINTF(DEBUG_WARNING, "\n%s\n", pCallbackData->pMessage);
+	}
+	else if(messageSeverity&VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
+	{
+		DBGPRINTF(DEBUG_INFO, "\n%s\n", pCallbackData->pMessage);
+	}
+	else
+	{
+		DBGPRINTF(DEBUG_WARNING, "\n%s\n", pCallbackData->pMessage);
+	}
 
 	return VK_FALSE;
 }
