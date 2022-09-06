@@ -93,7 +93,7 @@
     <ClCompile Include="image\tga.c">
       <Filter>Source Files\image</Filter>
     </ClCompile>
-    <ClCompile Include="vulkan\vulkan.c">
+    <ClCompile Include="vulkan\vulkan_buffer.c">
       <Filter>Source Files\vulkan</Filter>
     </ClCompile>
     <ClCompile Include="utils\genid.c">
@@ -114,7 +114,19 @@
     <ClCompile Include="utils\memzone.c">
       <Filter>Source Files\utils</Filter>
     </ClCompile>
-    <ClCompile Include="vulkan\vulkanmem.c">
+    <ClCompile Include="vulkan\vulkan_mem.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="vulkan\vulkan_context.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="vulkan\vulkan_instance.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="vulkan\vulkan_descriptorsetlayout.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="vulkan\vulkan_pipeline.c">
       <Filter>Source Files\vulkan</Filter>
     </ClCompile>
   </ItemGroup>
@@ -152,7 +164,7 @@
     <ClInclude Include="utils\memzone.h">
       <Filter>Header Files\utils</Filter>
     </ClInclude>
-    <ClInclude Include="vulkan\vulkanmem.h">
+    <ClInclude Include="vulkan\vulkan_mem.h">
       <Filter>Header Files\vulkan</Filter>
     </ClInclude>
   </ItemGroup>

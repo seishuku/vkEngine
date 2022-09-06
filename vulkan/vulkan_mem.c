@@ -5,7 +5,7 @@
 #include <assert.h>
 #include "../system/system.h"
 #include "vulkan.h"
-#include "vulkanmem.h"
+#include "vulkan_mem.h"
 
 VulkanMemZone_t *VulkanMem_Init(VkuContext_t *Context, size_t Size)
 {

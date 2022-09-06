@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include "system/system.h"
 #include "vulkan/vulkan.h"
-#include "vulkan/vulkanmem.h"
+#include "vulkan/vulkan_mem.h"
 #include "math/math.h"
 #include "camera/camera.h"
 #include "model/3ds.h"

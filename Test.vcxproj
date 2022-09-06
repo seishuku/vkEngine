@@ -47,11 +47,13 @@
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>$(VULKAN_SDK)\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <LibraryPath>$(VULKAN_SDK)\lib;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <ClangTidyChecks>true</ClangTidyChecks>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(VULKAN_SDK)\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <LibraryPath>$(VULKAN_SDK)\lib;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <ClangTidyChecks>true</ClangTidyChecks>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -106,8 +108,12 @@
     <ClCompile Include="utils\genid.c" />
     <ClCompile Include="utils\list.c" />
     <ClCompile Include="utils\memzone.c" />
-    <ClCompile Include="vulkan\vulkan.c" />
-    <ClCompile Include="vulkan\vulkanmem.c" />
+    <ClCompile Include="vulkan\vulkan_buffer.c" />
+    <ClCompile Include="vulkan\vulkan_context.c" />
+    <ClCompile Include="vulkan\vulkan_descriptorsetlayout.c" />
+    <ClCompile Include="vulkan\vulkan_instance.c" />
+    <ClCompile Include="vulkan\vulkan_mem.c" />
+    <ClCompile Include="vulkan\vulkan_pipeline.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera\camera.h" />
@@ -121,7 +127,7 @@
     <ClInclude Include="utils\list.h" />
     <ClInclude Include="utils\memzone.h" />
     <ClInclude Include="vulkan\vulkan.h" />
-    <ClInclude Include="vulkan\vulkanmem.h" />
+    <ClInclude Include="vulkan\vulkan_mem.h" />
   </ItemGroup>
   <ItemGroup>
     <GLSL Include="shaders\distance.frag" />
