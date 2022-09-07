@@ -63,21 +63,8 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 #ifdef _DEBUG
 		else if(strcmp(ExtensionProperties[i].extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)==0)
 		{
-			if((_vkCreateDebugUtilsMessengerEXT=(PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(*Instance, "vkCreateDebugUtilsMessengerEXT"))==VK_NULL_HANDLE)
-			{
-				DBGPRINTF("vkGetInstanceProcAddr failed on vkCreateDebugUtilsMessengerEXT.\n");
-				return VK_FALSE;
-			}
-			else if((_vkDestroyDebugUtilsMessengerEXT=(PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(*Instance, "vkDestroyDebugUtilsMessengerEXT"))==VK_NULL_HANDLE)
-			{
-				DBGPRINTF("vkGetInstanceProcAddr failed on vkDestroyDebugUtilsMessengerEXT.\n");
-				return VK_FALSE;
-			}
-			else
-			{
-				DBGPRINTF(DEBUG_INFO, VK_EXT_DEBUG_UTILS_EXTENSION_NAME" extension is supported!\n");
-				DebugExtension=VK_TRUE;
-			}
+			DBGPRINTF(DEBUG_INFO, VK_EXT_DEBUG_UTILS_EXTENSION_NAME" extension is supported!\n");
+			DebugExtension=VK_TRUE;
 		}
 #endif
 	}
@@ -129,6 +116,20 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 	{
 		DBGPRINTF(DEBUG_ERROR, "vkCreateInstance failed.\n");
 		return VK_FALSE;
+	}
+
+	if(DebugExtension)
+	{
+		if((_vkCreateDebugUtilsMessengerEXT=(PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(*Instance, "vkCreateDebugUtilsMessengerEXT"))==VK_NULL_HANDLE)
+		{
+			DBGPRINTF("vkGetInstanceProcAddr failed on vkCreateDebugUtilsMessengerEXT.\n");
+			return VK_FALSE;
+		}
+		else if((_vkDestroyDebugUtilsMessengerEXT=(PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(*Instance, "vkDestroyDebugUtilsMessengerEXT"))==VK_NULL_HANDLE)
+		{
+			DBGPRINTF("vkGetInstanceProcAddr failed on vkDestroyDebugUtilsMessengerEXT.\n");
+			return VK_FALSE;
+		}
 	}
 
 	return VK_TRUE;

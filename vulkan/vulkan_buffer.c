@@ -12,6 +12,25 @@
 
 extern VulkanMemZone_t *VkZone;
 
+uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask)
+{
+	// Search memtypes to find first index with those properties
+	for(uint32_t i=0;i<memory_properties.memoryTypeCount;i++)
+	{
+		if((typeBits&1)==1)
+		{
+			// Type is available, does it match user properties?
+			if((memory_properties.memoryTypes[i].propertyFlags&requirements_mask)==requirements_mask)
+				return i;
+		}
+
+		typeBits>>=1;
+	}
+
+	// No memory types matched, return failure
+	return 0;
+}
+
 VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, Image_t *Image,
 	VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth,
 	VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags)

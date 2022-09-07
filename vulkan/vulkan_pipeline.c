@@ -42,25 +42,6 @@ VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile)
 	return VK_NULL_HANDLE;
 }
 
-uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask)
-{
-	// Search memtypes to find first index with those properties
-	for(uint32_t i=0;i<memory_properties.memoryTypeCount;i++)
-	{
-		if((typeBits&1)==1)
-		{
-			// Type is available, does it match user properties?
-			if((memory_properties.memoryTypes[i].propertyFlags&requirements_mask)==requirements_mask)
-				return i;
-		}
-
-		typeBits>>=1;
-	}
-
-	// No memory types matched, return failure
-	return 0;
-}
-
 // Adds a vertex binding
 VkBool32 vkuPipeline_AddVertexBinding(VkuPipeline_t *Pipeline, uint32_t Binding, uint32_t Stride, VkVertexInputRate InputRate)
 {
