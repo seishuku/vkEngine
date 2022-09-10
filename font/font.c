@@ -41,8 +41,7 @@ VkuPipeline_t fontPipeline;
 Image_t fontTexture;
 
 // Vertex data handles
-VkDeviceMemory fontVertexBufferMemory;
-VkBuffer fontVertexBuffer;
+VkuBuffer_t fontVertexBuffer;
 
 // Instance data handles
 VkDeviceMemory fontInstanceBufferMemory;
@@ -327,7 +326,7 @@ void _Font_Init(void)
 	}, 0, VK_NULL_HANDLE);
 
 	// Create static vertex data buffer
-	vkuCreateBuffer(&Context, &fontVertexBuffer, &fontVertexBufferMemory, sizeof(float)*4*4,
+	vkuCreateBuffer2(&Context, &fontVertexBuffer, sizeof(float)*4*4,
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	// Create staging buffer, map it, and copy vertex data to it
@@ -364,7 +363,7 @@ void _Font_Init(void)
 
 	vkUnmapMemory(Context.Device, stagingBufferMemory);
 
-	vkuCopyBuffer(&Context, stagingBuffer, fontVertexBuffer, sizeof(float)*4*4);
+	vkuCopyBuffer(&Context, stagingBuffer, fontVertexBuffer.Buffer, sizeof(float)*4*4);
 
 	// Delete staging data
 	vkFreeMemory(Context.Device, stagingBufferMemory, VK_NULL_HANDLE);
@@ -489,7 +488,7 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 	vkCmdPushConstants(cmd, fontPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t)*2, viewport);
 
 	// Bind vertex data buffer
-	vkCmdBindVertexBuffers(cmd, 0, 1, &fontVertexBuffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(cmd, 0, 1, &fontVertexBuffer.Buffer, &(VkDeviceSize) { 0 });
 	// Bind object instance buffer
 	vkCmdBindVertexBuffers(cmd, 1, 1, &fontInstanceBuffer, &(VkDeviceSize) { 0 });
 
@@ -505,8 +504,8 @@ void Font_Destroy(void)
 	vkFreeMemory(Context.Device, fontInstanceBufferMemory, VK_NULL_HANDLE);
 
 	// Vertex data handles
-	vkDestroyBuffer(Context.Device, fontVertexBuffer, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, fontVertexBufferMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(Context.Device, fontVertexBuffer.Buffer, VK_NULL_HANDLE);
+	VulkanMem_Free(VkZone, fontVertexBuffer.Memory);
 
 	// Texture handles
 	vkDestroySampler(Context.Device, fontTexture.Sampler, VK_NULL_HANDLE);

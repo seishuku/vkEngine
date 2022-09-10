@@ -366,8 +366,8 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 			// Bind model data buffers and draw the triangles
 			for(int32_t k=0;k<Model[j].NumMesh;k++)
 			{
-				vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &Model[j].Mesh[k].Buffer, &(VkDeviceSize) { 0 });
-				vkCmdBindIndexBuffer(CommandBuffer, Model[j].Mesh[k].IndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+				vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &Model[j].Mesh[k].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
+				vkCmdBindIndexBuffer(CommandBuffer, Model[j].Mesh[k].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
 				vkCmdDrawIndexed(CommandBuffer, Model[j].Mesh[k].NumFace*3, 1, 0, 0, 0);
 			}
 		}
@@ -541,9 +541,8 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 	for(int32_t i=0;i<Model->NumMesh;i++)
 	{
 		// Vertex data on device memory
-		vkuCreateBuffer(&Context,
-			&Model->Mesh[i].Buffer, &Model->Mesh[i].BufferMemory,
-			sizeof(float)*20*Model->Mesh[i].NumVertex,
+		vkuCreateBuffer2(&Context,
+			&Model->Mesh[i].VertexBuffer, sizeof(float)*20*Model->Mesh[i].NumVertex,
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
@@ -592,14 +591,15 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 		vkUnmapMemory(Context.Device, stagingBufferMemory);
 
 		// Copy to device memory
-		vkuCopyBuffer(&Context, stagingBuffer, Model->Mesh[i].Buffer, sizeof(float)*20*Model->Mesh[i].NumVertex);
+		vkuCopyBuffer(&Context, stagingBuffer, Model->Mesh[i].VertexBuffer.Buffer, sizeof(float)*20*Model->Mesh[i].NumVertex);
 
 		// Delete staging data
 		vkFreeMemory(Context.Device, stagingBufferMemory, VK_NULL_HANDLE);
 		vkDestroyBuffer(Context.Device, stagingBuffer, VK_NULL_HANDLE);
 
 		// Index data
-		vkuCreateBuffer(&Context, &Model->Mesh[i].IndexBuffer, &Model->Mesh[i].IndexBufferMemory, sizeof(uint16_t)*Model->Mesh[i].NumFace*3,
+		vkuCreateBuffer2(&Context,
+			&Model->Mesh[i].IndexBuffer, sizeof(uint16_t)*Model->Mesh[i].NumFace*3,
 			VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		// Staging buffer
@@ -622,7 +622,7 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 
 		vkUnmapMemory(Context.Device, stagingBufferMemory);
 
-		vkuCopyBuffer(&Context, stagingBuffer, Model->Mesh[i].IndexBuffer, sizeof(uint16_t)*Model->Mesh[i].NumFace*3);
+		vkuCopyBuffer(&Context, stagingBuffer, Model->Mesh[i].IndexBuffer.Buffer, sizeof(uint16_t)*Model->Mesh[i].NumFace*3);
 
 		// Delete staging data
 		vkFreeMemory(Context.Device, stagingBufferMemory, VK_NULL_HANDLE);
@@ -760,8 +760,8 @@ void Render(void)
 		// Bind model data buffers and draw the triangles
 		for(int32_t j=0;j<Model[i].NumMesh;j++)
 		{
-			vkCmdBindVertexBuffers(CommandBuffers[Index], 0, 1, &Model[i].Mesh[j].Buffer, &(VkDeviceSize) { 0 });
-			vkCmdBindIndexBuffer(CommandBuffers[Index], Model[i].Mesh[j].IndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+			vkCmdBindVertexBuffers(CommandBuffers[Index], 0, 1, &Model[i].Mesh[j].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
+			vkCmdBindIndexBuffer(CommandBuffers[Index], Model[i].Mesh[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
 			vkCmdDrawIndexed(CommandBuffers[Index], Model[i].Mesh[j].NumFace*3, 1, 0, 0, 0);
 		}
 	}
@@ -1118,7 +1118,6 @@ void Destroy(void)
 	vkDestroySampler(Context.Device, ShadowDepth.Sampler, VK_NULL_HANDLE);
 	vkDestroyImageView(Context.Device, ShadowDepth.View, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, ShadowDepth.Image, VK_NULL_HANDLE);
-//	vkFreeMemory(Context.Device, ShadowDepth.DeviceMemory, VK_NULL_HANDLE);
 	VulkanMem_Free(VkZone, ShadowDepth.DeviceMemory);
 
 	vkDestroyBuffer(Context.Device, shadow_ubo_buffer, VK_NULL_HANDLE);
@@ -1132,7 +1131,6 @@ void Destroy(void)
 		vkDestroySampler(Context.Device, Textures[i].Sampler, VK_NULL_HANDLE);
 		vkDestroyImageView(Context.Device, Textures[i].View, VK_NULL_HANDLE);
 		vkDestroyImage(Context.Device, Textures[i].Image, VK_NULL_HANDLE);
-//		vkFreeMemory(Context.Device, Textures[i].DeviceMemory, VK_NULL_HANDLE);
 		VulkanMem_Free(VkZone, Textures[i].DeviceMemory);
 	}
 
@@ -1140,11 +1138,11 @@ void Destroy(void)
 	{
 		for(uint32_t j=0;j<(uint32_t)Model[i].NumMesh;j++)
 		{
-			vkDestroyBuffer(Context.Device, Model[i].Mesh[j].Buffer, VK_NULL_HANDLE);
-			vkFreeMemory(Context.Device, Model[i].Mesh[j].BufferMemory, VK_NULL_HANDLE);
+			vkDestroyBuffer(Context.Device, Model[i].Mesh[j].VertexBuffer.Buffer, VK_NULL_HANDLE);
+			VulkanMem_Free(VkZone, Model[i].Mesh[j].VertexBuffer.Memory);
 
-			vkDestroyBuffer(Context.Device, Model[i].Mesh[j].IndexBuffer, VK_NULL_HANDLE);
-			vkFreeMemory(Context.Device, Model[i].Mesh[j].IndexBufferMemory, VK_NULL_HANDLE);
+			vkDestroyBuffer(Context.Device, Model[i].Mesh[j].IndexBuffer.Buffer, VK_NULL_HANDLE);
+			VulkanMem_Free(VkZone, Model[i].Mesh[j].IndexBuffer.Memory);
 		}
 
 		Free3DS(&Model[i]);
@@ -1159,7 +1157,6 @@ void Destroy(void)
 
 	vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
-//	vkFreeMemory(Context.Device, DepthImage.DeviceMemory, VK_NULL_HANDLE);
 	VulkanMem_Free(VkZone, DepthImage.DeviceMemory);
 
 	for(uint32_t i=0;i<SwapchainImageCount;i++)

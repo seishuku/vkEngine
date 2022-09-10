@@ -25,11 +25,13 @@ typedef struct
 	uint16_t NumFace;
 	uint16_t *Face;
 
-	VkBuffer Buffer;
-	VkDeviceMemory BufferMemory;
+//	VkBuffer Buffer;
+//	VkDeviceMemory BufferMemory;
 
-	VkBuffer IndexBuffer;
-	VkDeviceMemory IndexBufferMemory;
+//	VkBuffer IndexBuffer;
+//	VkDeviceMemory IndexBufferMemory;
+
+	VkuBuffer_t VertexBuffer, IndexBuffer;
 } Mesh3DS_t;
 
 typedef struct

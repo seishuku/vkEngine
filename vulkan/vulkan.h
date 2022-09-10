@@ -152,12 +152,21 @@ typedef struct
 	VkDescriptorSetLayoutBinding Bindings[VKU_MAX_DESCRIPTORSETLAYOUT_BINDINGS];
 } VkuDescriptorSetLayout_t;
 
+typedef struct
+{
+	size_t Size;
+	VkBuffer Buffer;
+//	VkDeviceMemory Memory;
+	VulkanMemBlock_t *Memory;
+} VkuBuffer_t;
+
 VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile);
 
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask);
 
 VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, Image_t *Image, VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth, VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags);
 VkBool32 vkuCreateBuffer(VkuContext_t *Context, VkBuffer *Buffer, VkDeviceMemory *Memory, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask);
+VkBool32 vkuCreateBuffer2(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask);
 VkBool32 vkuCopyBuffer(VkuContext_t *Context, VkBuffer Src, VkBuffer Dest, uint32_t Size);
 
 VkBool32 vkuPipeline_AddVertexBinding(VkuPipeline_t *Pipeline, uint32_t Binding, uint32_t Stride, VkVertexInputRate InputRate);

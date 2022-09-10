@@ -113,6 +113,43 @@ VkBool32 vkuCreateBuffer(VkuContext_t *Context, VkBuffer *Buffer, VkDeviceMemory
 	return VK_TRUE;
 }
 
+VkBool32 vkuCreateBuffer2(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask)
+{
+	VkMemoryRequirements memoryRequirements;
+
+	VkBufferCreateInfo BufferInfo=
+	{
+		.sType=VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+		.size=Size,
+		.usage=Flags,
+		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
+		.queueFamilyIndexCount=1,
+		.pQueueFamilyIndices=&Context->QueueFamilyIndex,
+	};
+
+	if(vkCreateBuffer(Context->Device, &BufferInfo, NULL, &Buffer->Buffer)!=VK_SUCCESS)
+		return VK_FALSE;
+
+	vkGetBufferMemoryRequirements(Context->Device, Buffer->Buffer, &memoryRequirements);
+
+	VkMemoryAllocateInfo AllocateInfo=
+	{
+		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+		.allocationSize=memoryRequirements.size,
+		.memoryTypeIndex=vkuMemoryTypeFromProperties(Context->DeviceMemProperties, memoryRequirements.memoryTypeBits, RequirementsMask),
+	};
+
+	Buffer->Memory=VulkanMem_Malloc(VkZone, memoryRequirements);
+
+	if(Buffer->Memory==NULL)
+		return VK_FALSE;
+
+	if(vkBindBufferMemory(Context->Device, Buffer->Buffer, VkZone->DeviceMemory, Buffer->Memory->Offset)!=VK_SUCCESS)
+		return VK_FALSE;
+
+	return VK_TRUE;
+}
+
 // Copy from one buffer to another
 VkBool32 vkuCopyBuffer(VkuContext_t *Context, VkBuffer Src, VkBuffer Dest, uint32_t Size)
 {
