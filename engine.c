@@ -1072,7 +1072,7 @@ void RecreateSwapchain(void)
 		// This is basically just the swapchain and frame buffers
 
 		vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
-		vkFreeMemory(Context.Device, DepthImage.DeviceMemory, VK_NULL_HANDLE);
+		VulkanMem_Free(VkZone, DepthImage.DeviceMemory);
 		vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
 
 		for(uint32_t i=0;i<SwapchainImageCount;i++)
@@ -1118,7 +1118,8 @@ void Destroy(void)
 	vkDestroySampler(Context.Device, ShadowDepth.Sampler, VK_NULL_HANDLE);
 	vkDestroyImageView(Context.Device, ShadowDepth.View, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, ShadowDepth.Image, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, ShadowDepth.DeviceMemory, VK_NULL_HANDLE);
+//	vkFreeMemory(Context.Device, ShadowDepth.DeviceMemory, VK_NULL_HANDLE);
+	VulkanMem_Free(VkZone, ShadowDepth.DeviceMemory);
 
 	vkDestroyBuffer(Context.Device, shadow_ubo_buffer, VK_NULL_HANDLE);
 	vkFreeMemory(Context.Device, shadow_ubo_memory, VK_NULL_HANDLE);
@@ -1131,7 +1132,8 @@ void Destroy(void)
 		vkDestroySampler(Context.Device, Textures[i].Sampler, VK_NULL_HANDLE);
 		vkDestroyImageView(Context.Device, Textures[i].View, VK_NULL_HANDLE);
 		vkDestroyImage(Context.Device, Textures[i].Image, VK_NULL_HANDLE);
-		vkFreeMemory(Context.Device, Textures[i].DeviceMemory, VK_NULL_HANDLE);
+//		vkFreeMemory(Context.Device, Textures[i].DeviceMemory, VK_NULL_HANDLE);
+		VulkanMem_Free(VkZone, Textures[i].DeviceMemory);
 	}
 
 	for(uint32_t i=0;i<NUM_MODELS;i++)
@@ -1157,7 +1159,8 @@ void Destroy(void)
 
 	vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, DepthImage.DeviceMemory, VK_NULL_HANDLE);
+//	vkFreeMemory(Context.Device, DepthImage.DeviceMemory, VK_NULL_HANDLE);
+	VulkanMem_Free(VkZone, DepthImage.DeviceMemory);
 
 	for(uint32_t i=0;i<SwapchainImageCount;i++)
 	{

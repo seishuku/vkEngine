@@ -67,14 +67,12 @@ VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, Image_t *Image,
 	};
 
 	// Quick hack: getting it to use the vulkan memory allocator
-	VulkanMemBlock_t *Block=VulkanMem_Malloc(VkZone, memoryRequirements.size+memoryRequirements.alignment);
+	Image->DeviceMemory=VulkanMem_Malloc(VkZone, memoryRequirements);
 
-	if(Block==NULL)
+	if(Image->DeviceMemory==NULL)
 		return VK_FALSE;
 
-	size_t AlignedOffset=(size_t)(ceilf((float)Block->Offset/memoryRequirements.alignment)*memoryRequirements.alignment);
-
-	if(vkBindImageMemory(Context->Device, Image->Image, VkZone->DeviceMemory, AlignedOffset)!=VK_SUCCESS)
+	if(vkBindImageMemory(Context->Device, Image->Image, VkZone->DeviceMemory, Image->DeviceMemory->Offset)!=VK_SUCCESS)
 		return VK_FALSE;
 
 	return VK_TRUE;
@@ -106,34 +104,11 @@ VkBool32 vkuCreateBuffer(VkuContext_t *Context, VkBuffer *Buffer, VkDeviceMemory
 		.memoryTypeIndex=vkuMemoryTypeFromProperties(Context->DeviceMemProperties, memoryRequirements.memoryTypeBits, RequirementsMask),
 	};
 
-	// Quick hack: getting it to use the vulkan memory allocator
-	VulkanMemBlock_t *Block=NULL;
-	size_t AlignedOffset=0;
+	if(vkAllocateMemory(Context->Device, &AllocateInfo, NULL, Memory)!=VK_SUCCESS)
+		return VK_FALSE;
 
-	if(RequirementsMask&VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT&&!(RequirementsMask&VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
-	{
-		Block=VulkanMem_Malloc(VkZone, memoryRequirements.size);
-		AlignedOffset=(size_t)(ceilf((float)Block->Offset/memoryRequirements.alignment)*memoryRequirements.alignment);
-
-		if(Block==NULL)
+	if(vkBindBufferMemory(Context->Device, *Buffer, *Memory, 0)!=VK_SUCCESS)
 			return VK_FALSE;
-	}
-	else
-	{
-		if(vkAllocateMemory(Context->Device, &AllocateInfo, NULL, Memory)!=VK_SUCCESS)
-			return VK_FALSE;
-	}
-
-	if(Block)
-	{
-		if(vkBindBufferMemory(Context->Device, *Buffer, VkZone->DeviceMemory, AlignedOffset)!=VK_SUCCESS)
-			return VK_FALSE;
-	}
-	else
-	{
-		if(vkBindBufferMemory(Context->Device, *Buffer, *Memory, 0)!=VK_SUCCESS)
-			return VK_FALSE;
-	}
 
 	return VK_TRUE;
 }

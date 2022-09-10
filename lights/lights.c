@@ -11,6 +11,8 @@
 
 extern VkuContext_t Context;
 
+extern VulkanMemZone_t *VkZone;
+
 extern VkFramebuffer ShadowFrameBuffer;
 extern Image_t ShadowDepth;
 
@@ -168,7 +170,8 @@ void Lights_UpdateSSBO(Lights_t *Lights)
 			vkDestroyFramebuffer(Context.Device, ShadowFrameBuffer, VK_NULL_HANDLE);
 			vkDestroySampler(Context.Device, ShadowDepth.Sampler, VK_NULL_HANDLE);
 			vkDestroyImageView(Context.Device, ShadowDepth.View, VK_NULL_HANDLE);
-			vkFreeMemory(Context.Device, ShadowDepth.DeviceMemory, VK_NULL_HANDLE);
+//			vkFreeMemory(Context.Device, ShadowDepth.DeviceMemory, VK_NULL_HANDLE);
+			VulkanMem_Free(VkZone, ShadowDepth.DeviceMemory);
 			vkDestroyImage(Context.Device, ShadowDepth.Image, VK_NULL_HANDLE);
 
 			vkFreeMemory(Context.Device, shadow_ubo_memory, VK_NULL_HANDLE);

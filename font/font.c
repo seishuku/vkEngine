@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include "../system/system.h"
 #include "../vulkan/vulkan.h"
+#include "../vulkan/vulkan_mem.h"
 #include "../math/math.h"
 #include "../font/font.h"
 
@@ -20,41 +21,43 @@
 extern VkuContext_t Context;
 extern VkRenderPass RenderPass;
 
+extern VulkanMemZone_t *VkZone;
+
 extern int Width, Height;	// Window width/height from main app.
 // ---
 
 // Vulkan context data unique to this module:
 
 // Descriptors
-VkDescriptorPool fontDescriptorPool=VK_NULL_HANDLE;
-VkDescriptorSet fontDescriptorSet=VK_NULL_HANDLE;
-VkDescriptorSetLayout fontDescriptorSetLayout=VK_NULL_HANDLE;
+VkDescriptorPool fontDescriptorPool;
+VkDescriptorSet fontDescriptorSet;
+VkDescriptorSetLayout fontDescriptorSetLayout;
 
 // Pipeline
-VkPipelineLayout fontPipelineLayout=VK_NULL_HANDLE;
+VkPipelineLayout fontPipelineLayout;
 VkuPipeline_t fontPipeline;
 
 // Texture handles
 Image_t fontTexture;
 
 // Vertex data handles
-VkDeviceMemory fontVertexBufferMemory=VK_NULL_HANDLE;
-VkBuffer fontVertexBuffer=VK_NULL_HANDLE;
+VkDeviceMemory fontVertexBufferMemory;
+VkBuffer fontVertexBuffer;
 
 // Instance data handles
-VkDeviceMemory fontInstanceBufferMemory=VK_NULL_HANDLE;
-VkBuffer fontInstanceBuffer=VK_NULL_HANDLE;
-void *fontInstanceBufferPtr=VK_NULL_HANDLE;
+VkDeviceMemory fontInstanceBufferMemory;
+VkBuffer fontInstanceBuffer;
+void *fontInstanceBufferPtr;
 
 // Initialization flag
 bool Font_Init=false;
 
 void _Font_Init(void)
 {
-	VkBuffer stagingBuffer=VK_NULL_HANDLE;
-	VkDeviceMemory stagingBufferMemory=VK_NULL_HANDLE;
-	VkCommandBuffer copyCmd=VK_NULL_HANDLE;
-	VkFence Fence=VK_NULL_HANDLE;
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	VkCommandBuffer copyCmd;
+	VkFence Fence;
 	void *data=NULL;
 
 	// Create new descriptor sets and pipeline
@@ -509,7 +512,7 @@ void Font_Destroy(void)
 	vkDestroySampler(Context.Device, fontTexture.Sampler, VK_NULL_HANDLE);
 	vkDestroyImageView(Context.Device, fontTexture.View, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, fontTexture.Image, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, fontTexture.DeviceMemory, VK_NULL_HANDLE);
+	VulkanMem_Free(VkZone, fontTexture.DeviceMemory);
 
 	// Pipeline
 	vkDestroyPipelineLayout(Context.Device, fontPipelineLayout, VK_NULL_HANDLE);

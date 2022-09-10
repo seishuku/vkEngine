@@ -1,6 +1,9 @@
 #ifndef __IMAGE_H__
 #define __IMAGE_H__
 
+#include "../vulkan/vulkan.h"
+#include "../vulkan/vulkan_mem.h"
+
 // Image flags
 #define IMAGE_NONE										0x00000000
 #define IMAGE_MIPMAP									0x00000002
@@ -28,7 +31,7 @@ typedef struct
 
 	VkSampler Sampler;
 	VkImage Image;
-	VkDeviceMemory DeviceMemory;
+	VulkanMemBlock_t *DeviceMemory;
 	VkImageView View;
 } Image_t;
 

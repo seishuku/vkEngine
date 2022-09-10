@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include "../system/system.h"
+#include "../math/math.h"
 #include "vulkan.h"
 #include "vulkan_mem.h"
 
@@ -115,14 +116,14 @@ void VulkanMem_Free(VulkanMemZone_t *VkZone, VulkanMemBlock_t *Ptr)
 			VkZone->Current=Block;
 	}
 
-	Zone_Free(Zone, Ptr);
+	Zone_Free(Zone, Next);
 }
 
-VulkanMemBlock_t *VulkanMem_Malloc(VulkanMemZone_t *VkZone, size_t Size)
+VulkanMemBlock_t *VulkanMem_Malloc(VulkanMemZone_t *VkZone, VkMemoryRequirements Requirements)
 {
 	const size_t MinimumBlockSize=64;
 
-	Size=(Size+7)&~7;				// Align to 64bit boundary
+	size_t Size=Requirements.size+Requirements.alignment;
 
 	VulkanMemBlock_t *Base=VkZone->Current;
 	VulkanMemBlock_t *Current=VkZone->Current;
@@ -160,7 +161,7 @@ VulkanMemBlock_t *VulkanMem_Malloc(VulkanMemZone_t *VkZone, size_t Size)
 
 		Base->Next=New;
 		Base->Size=Size;
-		Base->Offset=Base->Prev->Size+Base->Prev->Offset;
+		Base->Offset=(size_t)(ceilf((float)(Base->Prev->Size+Base->Prev->Offset)/Requirements.alignment)*Requirements.alignment);
 	}
 
 	Base->Free=true;
@@ -179,7 +180,7 @@ void VulkanMem_Print(VulkanMemZone_t *VkZone)
 
 	for(VulkanMemBlock_t *Block=VkZone->Blocks.Next;;Block=Block->Next)
 	{
-		DBGPRINTF(DEBUG_WARNING, "\tOffset: %0.4fMB Size: %0.4fMB Block free: %s\n", (float)Block->Offset/1000.0f/1000.0f, (float)Block->Size/1000.0f/1000.0f, Block->Free?"no":"yes");
+		DBGPRINTF(DEBUG_WARNING, "\tPointer: 0x%p Offset: %0.4fMB Size: %0.4fMB Block free: %s\n", Block, (float)Block->Offset/1000.0f/1000.0f, (float)Block->Size/1000.0f/1000.0f, Block->Free?"no":"yes");
 
 		if(Block->Next==&VkZone->Blocks)
 			break;
