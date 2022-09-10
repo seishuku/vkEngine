@@ -14,10 +14,16 @@ OBJS+=math/math.o
 # camera
 OBJS+=camera/camera.o
 
+# Vulkan
+OBJS+=vulkan/vulkan_buffer.o
+OBJS+=vulkan/vulkan_context.o
+OBJS+=vulkan/vulkan_descriptorsetlayout.o
+OBJS+=vulkan/vulkan_instance.o
+OBJS+=vulkan/vulkan_mem.o
+OBJS+=vulkan/vulkan_pipeline.o
+
 # core stuff
 OBJS+=system/linux_x11.o
-OBJS+=vulkan/vulkan.o
-OBJS+=vulkan/vulkanmem.o
 OBJS+=font/font.o
 OBJS+=lights/lights.o
 OBJS+=utils/genid.o
