@@ -315,22 +315,22 @@ void EventLoop(void)
 
 int main(int argc, char **argv)
 {
-	DBGPRINTF("Allocating zone memory...\n");
+	DBGPRINTF(DEBUG_INFO, "Allocating zone memory...\n");
 	Zone=Zone_Init(32*1000*1000);
 
 	if(Zone==NULL)
 	{
-		DBGPRINTF("\t...zone allocation failed!\n");
+		DBGPRINTF(DEBUG_ERROR, "\t...zone allocation failed!\n");
 
 		return -1;
 	}
 
-	DBGPRINTF("Opening X display...\n");
+	DBGPRINTF(DEBUG_INFO, "Opening X display...\n");
 	Context.Dpy=XOpenDisplay(NULL);
 
 	if(Context.Dpy==NULL)
 	{
-		DBGPRINTF("\t...can't open display.\n");
+		DBGPRINTF(DEBUG_ERROR, "\t...can't open display.\n");
 
 		return -1;
 	}
@@ -338,32 +338,32 @@ int main(int argc, char **argv)
 	int32_t Screen=DefaultScreen(Context.Dpy);
 	Window Root=RootWindow(Context.Dpy, Screen);
 
-	DBGPRINTF("Creating X11 Window...\n");
+	DBGPRINTF(DEBUG_INFO, "Creating X11 Window...\n");
 	Context.Win=XCreateSimpleWindow(Context.Dpy, Root, 10, 10, Width, Height, 1, BlackPixel(Context.Dpy, Screen), WhitePixel(Context.Dpy, Screen));
 	XSelectInput(Context.Dpy, Context.Win, StructureNotifyMask|PointerMotionMask|ExposureMask|ButtonPressMask|KeyPressMask|KeyReleaseMask);
 	XStoreName(Context.Dpy, Context.Win, szAppName);
 
-	DBGPRINTF("Creating Vulkan Instance...\n");
+	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Instance...\n");
 	if(!CreateVulkanInstance(&Instance))
 	{
-		DBGPRINTF("...failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "...failed.\n");
 		return -1;
 	}
 
-	DBGPRINTF("Creating Vulkan Context...\n");
+	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Context...\n");
 	if(!CreateVulkanContext(Instance, &Context))
 	{
-		DBGPRINTF("...failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "...failed.\n");
 		return -1;
 	}
 
-	DBGPRINTF("Creating Vulkan Swapchain...\n");
+	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Swapchain...\n");
 	vkuCreateSwapchain(&Context, Width, Height, VK_FALSE);
 
-	DBGPRINTF("Initalizing Vulkan resources...\n");
+	DBGPRINTF(DEBUG_INFO, "Initalizing Vulkan resources...\n");
 	if(!Init())
 	{
-		DBGPRINTF("\t...failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
 
 		DestroyVulkan(Instance, &Context);
 		vkDestroyInstance(Instance, VK_NULL_HANDLE);
@@ -377,18 +377,18 @@ int main(int argc, char **argv)
 	XMapWindow(Context.Dpy, Context.Win);
 
 	Frequency=GetFrequency();
-	DBGPRINTF("\nCPU freqency: %0.2fGHz\n", (float)Frequency/1000000000);
+	DBGPRINTF(DEBUG_INFO, "\nCPU freqency: %0.2fGHz\n", (float)Frequency/1000000000);
 
-	DBGPRINTF("\nCurrent system zone memory allocations:\n");
+	DBGPRINTF(DEBUG_WARNING, "\nCurrent system zone memory allocations:\n");
 	Zone_Print(Zone);
 
-	DBGPRINTF("\nCurrent vulkan zone memory allocations:\n");
+	DBGPRINTF(DEBUG_WARNING, "\nCurrent vulkan zone memory allocations:\n");
 	VulkanMem_Print(VkZone);
 
-	DBGPRINTF("\nStarting main loop.\n");
+	DBGPRINTF(DEBUG_INFO, "\nStarting main loop.\n");
 	EventLoop();
 
-	DBGPRINTF("Shutting down...\n");
+	DBGPRINTF(DEBUG_INFO, "Shutting down...\n");
 	Destroy();
 	DestroyVulkan(Instance, &Context);
 	vkDestroyInstance(Instance, VK_NULL_HANDLE);
@@ -399,11 +399,11 @@ int main(int argc, char **argv)
 	//			Not sure what's going on here.
 	//XCloseDisplay(Context.Dpy);
 
-	DBGPRINTF("Zone remaining block list:\n");
+	DBGPRINTF(DEBUG_WARNING, "Zone remaining block list:\n");
 	Zone_Print(Zone);
 	Zone_Destroy(Zone);
 
-	DBGPRINTF("Exit\n");
+	DBGPRINTF(DEBUG_INFO, "Exit\n");
 
 	return 0;
 }
