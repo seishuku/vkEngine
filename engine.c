@@ -829,6 +829,22 @@ bool Init(void)
 
 	VkZone=VulkanMem_Init(&Context, Context.DeviceProperties2.maxMemoryAllocationSize);
 
+	VkuBuffer_t Buffer[10];
+
+	VulkanMem_Print(VkZone);
+	vkuCreateBuffer2(&Context, &Buffer[0], 1000, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	vkuCreateBuffer2(&Context, &Buffer[1], 1000, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	vkuCreateBuffer2(&Context, &Buffer[2], 1000, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	vkuCreateBuffer2(&Context, &Buffer[3], 1000, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	VulkanMem_Print(VkZone);
+	vkDestroyBuffer(Context.Device, Buffer[0].Buffer, VK_NULL_HANDLE);	VulkanMem_Free(VkZone, Buffer[0].Memory);
+	vkDestroyBuffer(Context.Device, Buffer[1].Buffer, VK_NULL_HANDLE);	VulkanMem_Free(VkZone, Buffer[1].Memory);
+	vkDestroyBuffer(Context.Device, Buffer[2].Buffer, VK_NULL_HANDLE);	VulkanMem_Free(VkZone, Buffer[2].Memory);
+	vkDestroyBuffer(Context.Device, Buffer[3].Buffer, VK_NULL_HANDLE);	VulkanMem_Free(VkZone, Buffer[3].Memory);
+	VulkanMem_Print(VkZone);
+	VulkanMem_Print(VkZone);
+	VulkanMem_Print(VkZone);
+
 	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 100.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
 
 	Lights_Init(&Lights);

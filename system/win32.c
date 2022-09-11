@@ -175,6 +175,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			switch(wParam)
 			{
+				case 'P':
+					VulkanMem_Print(VkZone);
+					break;
+
 				case 'O':
 					for(uint32_t i=0;i<10;i++)
 					{

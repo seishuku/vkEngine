@@ -7,6 +7,9 @@
 #include "../system/system.h"
 #include "memzone.h"
 
+#define CHUNK_SIZE 32
+static const size_t HEADER_SIZE=((sizeof(MemBlock_t)+CHUNK_SIZE-1)&~(CHUNK_SIZE-1));
+
 MemZone_t *Zone_Init(size_t Size)
 {
 	MemZone_t *Zone=(MemZone_t *)malloc(Size);
@@ -50,7 +53,7 @@ void Zone_Free(MemZone_t *Zone, void *Ptr)
 		return;
 	}
 
-	MemBlock_t *Block=(MemBlock_t *)((uint8_t *)Ptr-sizeof(MemBlock_t));
+	MemBlock_t *Block=(MemBlock_t *)((uint8_t *)Ptr-HEADER_SIZE);
 
 	if(!Block->Free)
 	{
@@ -91,8 +94,8 @@ void *Zone_Malloc(MemZone_t *Zone, size_t Size)
 {
 	const size_t MinimumBlockSize=64;
 
-	Size+=sizeof(MemBlock_t);		// Size of block header
-	Size=(Size+7)&~7;				// Align to 64bit boundary
+	Size+=HEADER_SIZE;							// Size of block header
+	Size=(Size+CHUNK_SIZE-1)&~(CHUNK_SIZE-1);	// Align to chunk boundary
 
 	MemBlock_t *Base=Zone->Current;
 	MemBlock_t *Current=Zone->Current;
@@ -135,12 +138,12 @@ void *Zone_Malloc(MemZone_t *Zone, size_t Size)
 #ifdef _DEBUG
 	DBGPRINTF(DEBUG_WARNING, "Zone allocate block - Location: 0x%p Size: %0.3fKB\n", Base, (float)Size/1000.0f);
 #endif
-	return (void *)((uint8_t *)Base+sizeof(MemBlock_t));
+	return (void *)((uint8_t *)Base+HEADER_SIZE);
 }
 
 void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 {
-	MemBlock_t *Block=(MemBlock_t *)((uint8_t *)Ptr-sizeof(MemBlock_t));
+	MemBlock_t *Block=(MemBlock_t *)((uint8_t *)Ptr-HEADER_SIZE);
 
 	if(Size==0)
 	{
