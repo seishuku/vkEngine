@@ -124,6 +124,7 @@ VulkanMemBlock_t *VulkanMem_Malloc(VulkanMemZone_t *VkZone, VkMemoryRequirements
 	const size_t MinimumBlockSize=64;
 
 	size_t Size=Requirements.size+Requirements.alignment;
+	Size=(Size+7)&~7;				// Align to 64bit boundary
 
 	VulkanMemBlock_t *Base=VkZone->Current;
 	VulkanMemBlock_t *Current=VkZone->Current;

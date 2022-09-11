@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "../vulkan/vulkan.h"
+#include "../vulkan/vulkan_mem.h"
 #include "../math/math.h"
 #include "../camera/camera.h"
 #include "../utils/list.h"
