@@ -91,7 +91,7 @@ VkuPipeline_t Pipeline;
 
 VkuDescriptorSetLayout_t DescriptorSetLayout;
 
-VkDescriptorPool DescriptorPool;
+VkDescriptorPool DescriptorPool[MAX_FRAME_COUNT];
 VkDescriptorSet DescriptorSet[MAX_FRAME_COUNT*NUM_MODELS];
 
 VkCommandBuffer CommandBuffers[MAX_FRAME_COUNT];
@@ -253,16 +253,16 @@ bool InitShadowPipeline(void)
 	}, 0, &ShadowPipelineLayout);
 
 	// Shadow maps only need one descriptor set for everything (nothing changes between models), but also need one per render frame (buffered)
-	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
-	{
-		vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-			.descriptorPool=DescriptorPool,
-			.descriptorSetCount=1,
-			.pSetLayouts=&ShadowDescriptorSetLayout.DescriptorSetLayout,
-		}, &ShadowDescriptorSet[i]);
-	}
+	//for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
+	//{
+	//	vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
+	//	{
+	//		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+	//		.descriptorPool=DescriptorPool,
+	//		.descriptorSetCount=1,
+	//		.pSetLayouts=&ShadowDescriptorSetLayout.DescriptorSetLayout,
+	//	}, &ShadowDescriptorSet[i]);
+	//}
 
 	vkuInitPipeline(&ShadowPipeline, &Context);
 
@@ -347,8 +347,30 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 		memcpy(shadow_ubo_ptr, &shadow_ubo, sizeof(shadow_ubo));
 		vkUnmapMemory(Context.Device, shadow_ubo_memory);
 
+		vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+				.descriptorPool=DescriptorPool[FrameIndex],
+				.descriptorSetCount=1,
+				.pSetLayouts=&ShadowDescriptorSetLayout.DescriptorSetLayout,
+		}, &ShadowDescriptorSet[FrameIndex]);
+
+		vkUpdateDescriptorSets(Context.Device, 1, (VkWriteDescriptorSet[])
+		{
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet=ShadowDescriptorSet[FrameIndex],
+					.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, .dstBinding=0,
+					.pBufferInfo=&(VkDescriptorBufferInfo)
+				{
+					shadow_ubo_buffer, 0, sizeof(shadow_ubo)
+				},
+			},
+		}, 0, VK_NULL_HANDLE);
+
 		uint32_t DynamicOffset=sizeof(shadow_ubo)*i;
 		vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ShadowPipelineLayout, 0, 1, &ShadowDescriptorSet[FrameIndex], 1, &DynamicOffset);
+
+		// Push Descriptors:
 		//VkWriteDescriptorSet WriteDescriptorSet[]=
 		//{
 		//	{
@@ -358,7 +380,7 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 		//	},
 		//};
 
-//		vkCmdPushDescriptorSetKHR(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ShadowPipelineLayout, 0, 1, WriteDescriptorSet);
+		//vkCmdPushDescriptorSetKHR(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ShadowPipelineLayout, 0, 1, WriteDescriptorSet);
 
 		// Draw the models
 		for(uint32_t j=0;j<NUM_MODELS;j++)
@@ -493,16 +515,16 @@ bool CreatePipeline(void)
 	}, 0, &PipelineLayout);
 
 	// Need one descriptor set per model (each model has a different texture), but also one per render frame (buffered)
-	for(uint32_t i=0;i<MAX_FRAME_COUNT*NUM_MODELS;i++)
-	{
-		vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-			.descriptorPool=DescriptorPool,
-			.descriptorSetCount=1,
-			.pSetLayouts=&DescriptorSetLayout.DescriptorSetLayout,
-		}, &DescriptorSet[i]);
-	}
+	//for(uint32_t i=0;i<MAX_FRAME_COUNT*NUM_MODELS;i++)
+	//{
+	//	vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
+	//	{
+	//		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+	//		.descriptorPool=DescriptorPool,
+	//		.descriptorSetCount=1,
+	//		.pSetLayouts=&DescriptorSetLayout.DescriptorSetLayout,
+	//	}, &DescriptorSet[i]);
+	//}
 
 	vkuInitPipeline(&Pipeline, &Context);
 
@@ -680,46 +702,7 @@ void Render(void)
 	vkWaitForFences(Context.Device, 1, &FrameFences[Index], VK_TRUE, UINT64_MAX);
 	vkResetFences(Context.Device, 1, &FrameFences[Index]);
 
-	// Update descriptor sets *after* waiting on the fence, to be sure the command buffer is no longer using them,
-	// but also before recording the next command buffer.
-	vkUpdateDescriptorSets(Context.Device, 1, (VkWriteDescriptorSet[])
-	{
-		{
-			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet=ShadowDescriptorSet[Index],
-			.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, .dstBinding=0,
-			.pBufferInfo=&(VkDescriptorBufferInfo)
-			{
-				shadow_ubo_buffer, 0, sizeof(shadow_ubo)
-			},
-		},
-	}, 0, VK_NULL_HANDLE);
-
-	for(uint32_t i=0;i<NUM_MODELS;i++)
-	{
-		vkUpdateDescriptorSets(Context.Device, 4, (VkWriteDescriptorSet[])
-		{
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet=DescriptorSet[NUM_MODELS*Index+i],
-				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .dstBinding=0,
-				.pBufferInfo=&(VkDescriptorBufferInfo) { Lights.StorageBuffer, 0, VK_WHOLE_SIZE },
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet=DescriptorSet[NUM_MODELS*Index+i],
-				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .dstBinding=1,
-				.pImageInfo=&(VkDescriptorImageInfo) { Textures[2*i+0].Sampler, Textures[2*i+0].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet=DescriptorSet[NUM_MODELS*Index+i],
-				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .dstBinding=2,
-				.pImageInfo=&(VkDescriptorImageInfo) { Textures[2*i+1].Sampler, Textures[2*i+1].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet=DescriptorSet[NUM_MODELS*Index+i],
-				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .dstBinding=3,
-				.pImageInfo=&(VkDescriptorImageInfo) { ShadowDepth.Sampler, ShadowDepth.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
-			}
-		}, 0, VK_NULL_HANDLE);
-	}
+	vkResetDescriptorPool(Context.Device, DescriptorPool[Index], 0);
 
 	// Start recording the commands
 	vkBeginCommandBuffer(CommandBuffers[Index], &(VkCommandBufferBeginInfo)
@@ -753,9 +736,39 @@ void Render(void)
 	// Draw the models
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[NUM_MODELS*Index+i], 0, VK_NULL_HANDLE);
+		vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+				.descriptorPool=DescriptorPool[Index],
+				.descriptorSetCount=1,
+				.pSetLayouts=&DescriptorSetLayout.DescriptorSetLayout,
+		}, &DescriptorSet[MAX_FRAME_COUNT*i+Index]);
 
-		//vkCmdPushDescriptorSetKHR(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 4, WriteDescriptorSet);
+		vkUpdateDescriptorSets(Context.Device, 4, (VkWriteDescriptorSet[])
+		{
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet=DescriptorSet[MAX_FRAME_COUNT*i+Index],
+				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .dstBinding=0,
+				.pBufferInfo=&(VkDescriptorBufferInfo) { Lights.StorageBuffer, 0, VK_WHOLE_SIZE },
+			},
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet=DescriptorSet[MAX_FRAME_COUNT*i+Index],
+				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .dstBinding=1,
+				.pImageInfo=&(VkDescriptorImageInfo) { Textures[2*i+0].Sampler, Textures[2*i+0].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+			},
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet=DescriptorSet[MAX_FRAME_COUNT*i+Index],
+				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .dstBinding=2,
+				.pImageInfo=&(VkDescriptorImageInfo) { Textures[2*i+1].Sampler, Textures[2*i+1].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+			},
+			{
+				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet=DescriptorSet[MAX_FRAME_COUNT*i+Index],
+				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .dstBinding=3,
+				.pImageInfo=&(VkDescriptorImageInfo) { ShadowDepth.Sampler, ShadowDepth.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+			}
+		}, 0, VK_NULL_HANDLE);
+
+		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[MAX_FRAME_COUNT*i+Index], 0, VK_NULL_HANDLE);
 
 		// Bind model data buffers and draw the triangles
 		for(int32_t j=0;j<Model[i].NumMesh;j++)
@@ -829,22 +842,6 @@ bool Init(void)
 
 	VkZone=VulkanMem_Init(&Context, Context.DeviceProperties2.maxMemoryAllocationSize);
 
-	VkuBuffer_t Buffer[10];
-
-	VulkanMem_Print(VkZone);
-	vkuCreateBuffer2(&Context, &Buffer[0], 1000, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	vkuCreateBuffer2(&Context, &Buffer[1], 1000, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	vkuCreateBuffer2(&Context, &Buffer[2], 1000, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	vkuCreateBuffer2(&Context, &Buffer[3], 1000, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	VulkanMem_Print(VkZone);
-	vkDestroyBuffer(Context.Device, Buffer[0].Buffer, VK_NULL_HANDLE);	VulkanMem_Free(VkZone, Buffer[0].Memory);
-	vkDestroyBuffer(Context.Device, Buffer[1].Buffer, VK_NULL_HANDLE);	VulkanMem_Free(VkZone, Buffer[1].Memory);
-	vkDestroyBuffer(Context.Device, Buffer[2].Buffer, VK_NULL_HANDLE);	VulkanMem_Free(VkZone, Buffer[2].Memory);
-	vkDestroyBuffer(Context.Device, Buffer[3].Buffer, VK_NULL_HANDLE);	VulkanMem_Free(VkZone, Buffer[3].Memory);
-	VulkanMem_Print(VkZone);
-	VulkanMem_Print(VkZone);
-	VulkanMem_Print(VkZone);
-
 	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 100.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
 
 	Lights_Init(&Lights);
@@ -876,31 +873,34 @@ bool Init(void)
 	Image_Upload(&Context, &Textures[TEXTURE_LEVEL_NORMAL], "./assets/tile_b.tga", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALMAP);
 
 	// Create a large descriptor pool, so I don't have to worry about readjusting for exactly what I have
-	vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
+	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
 	{
-		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-		.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
-		.poolSizeCount=4,
-		.pPoolSizes=(VkDescriptorPoolSize[])
+		vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
 		{
+			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+			.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
+			.poolSizeCount=4,
+			.pPoolSizes=(VkDescriptorPoolSize[])
 			{
-				.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-				.descriptorCount=1024, // Max number of this descriptor type that can be in each descriptor set?
+				{
+					.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+					.descriptorCount=1024, // Max number of this descriptor type that can be in each descriptor set?
+				},
+				{
+					.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+					.descriptorCount=1024,
+				},
+				{
+					.type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+					.descriptorCount=1024,
+				},
+				{
+					.type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+					.descriptorCount=1024,
+				},
 			},
-			{
-				.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-				.descriptorCount=1024,
-			},
-			{
-				.type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-				.descriptorCount=1024,
-			},
-			{
-				.type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.descriptorCount=1024,
-			},
-		},
-	}, VK_NULL_HANDLE, &DescriptorPool);
+		}, VK_NULL_HANDLE, &DescriptorPool[i]);
+	}
 
 	// Create primary frame buffers, depth image, and renderpass
 	CreateFramebuffers();
@@ -1169,7 +1169,8 @@ void Destroy(void)
 	vkDestroyDescriptorSetLayout(Context.Device, DescriptorSetLayout.DescriptorSetLayout, VK_NULL_HANDLE);
 	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);
 
-	vkDestroyDescriptorPool(Context.Device, DescriptorPool, VK_NULL_HANDLE);
+	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
+		vkDestroyDescriptorPool(Context.Device, DescriptorPool[i], VK_NULL_HANDLE);
 
 	vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
