@@ -24,7 +24,8 @@ extern PFN_vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR;
 #define VKU_MAX_PIPELINE_VERTEX_BINDINGS 8
 #define VKU_MAX_PIPELINE_VERTEX_ATTRIBUTES 8
 #define VKU_MAX_PIPELINE_SHADER_STAGES 4
-#define VKU_MAX_DESCRIPTORSETLAYOUT_BINDINGS 16
+
+#define VKU_MAX_DESCRIPTORSET_BINDINGS 16
 
 typedef struct
 {
@@ -147,10 +148,12 @@ typedef struct
 	VkDevice Device;
 
 	VkDescriptorSetLayout DescriptorSetLayout;
+	VkDescriptorSet DescriptorSet;
 
 	uint32_t NumBindings;
-	VkDescriptorSetLayoutBinding Bindings[VKU_MAX_DESCRIPTORSETLAYOUT_BINDINGS];
-} VkuDescriptorSetLayout_t;
+	VkDescriptorSetLayoutBinding Bindings[VKU_MAX_DESCRIPTORSET_BINDINGS];
+	VkWriteDescriptorSet WriteDescriptorSet[VKU_MAX_DESCRIPTORSET_BINDINGS];
+} VkuDescriptorSet_t;
 
 typedef struct
 {
@@ -177,10 +180,14 @@ VkBool32 vkuPipeline_SetPipelineLayout(VkuPipeline_t *Pipeline, VkPipelineLayout
 VkBool32 vkuInitPipeline(VkuPipeline_t *Pipeline, VkuContext_t *Context);
 VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline);
 
-VkBool32 vkuDescriptorSetLayout_AddBinding(VkuDescriptorSetLayout_t *DescriptorSetLayout, uint32_t Binding, VkDescriptorType Type, uint32_t Count, VkShaderStageFlags Stage, const VkSampler *ImmutableSamplers);
-VkBool32 vkuInitDescriptorSetLayout(VkuDescriptorSetLayout_t *DescriptorSetLayout, VkuContext_t *Context);
-VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSetLayout_t *DescriptorSetLayout);
-	
+VkBool32 vkuDescriptorSet_AddImageBinding(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorType Type, VkShaderStageFlags Stage, Image_t *Image);
+VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorImageInfo ImageInfo);
+VkBool32 vkuDescriptorSet_AddBufferBinding(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorType Type, VkShaderStageFlags Stage, VkuBuffer_t *Buffer, VkDeviceSize Offset, VkDeviceSize Range);
+VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorBufferInfo BufferInfo);
+VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *DescriptorSetLayout, VkuContext_t *Context);
+VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSet_t *DescriptorSet);
+VkBool32 vkuAllocateUpdateDescriptorSet(VkuDescriptorSet_t *DescriptorSet, VkDescriptorPool DescriptorPool);
+
 VkBool32 CreateVulkanInstance(VkInstance *Instance);
 VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context);
 void DestroyVulkan(VkInstance Instance, VkuContext_t *Context);

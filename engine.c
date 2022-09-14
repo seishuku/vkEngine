@@ -89,10 +89,8 @@ VkRenderPass RenderPass;
 VkPipelineLayout PipelineLayout;
 VkuPipeline_t Pipeline;
 
-VkuDescriptorSetLayout_t DescriptorSetLayout;
-
 VkDescriptorPool DescriptorPool[MAX_FRAME_COUNT];
-VkDescriptorSet DescriptorSet[MAX_FRAME_COUNT*NUM_MODELS];
+VkuDescriptorSet_t DescriptorSet[MAX_FRAME_COUNT*NUM_MODELS];
 
 VkCommandBuffer CommandBuffers[MAX_FRAME_COUNT];
 
@@ -108,8 +106,7 @@ Image_t ShadowDepth;
 VkFormat ShadowDepthFormat=VK_FORMAT_D32_SFLOAT;
 
 VkuPipeline_t ShadowPipeline;
-VkuDescriptorSetLayout_t ShadowDescriptorSetLayout;
-VkDescriptorSet ShadowDescriptorSet[MAX_FRAME_COUNT];
+VkuDescriptorSet_t ShadowDescriptorSet[MAX_FRAME_COUNT];
 VkPipelineLayout ShadowPipelineLayout;
 VkRenderPass ShadowRenderPass;
 
@@ -241,28 +238,19 @@ bool InitShadowPipeline(void)
 		},
 	}, 0, &ShadowRenderPass);
 
-	vkuInitDescriptorSetLayout(&ShadowDescriptorSetLayout, &Context);
-	vkuDescriptorSetLayout_AddBinding(&ShadowDescriptorSetLayout, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
-	vkuAssembleDescriptorSetLayout(&ShadowDescriptorSetLayout);
+	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
+	{
+		vkuInitDescriptorSet(&ShadowDescriptorSet[i], &Context);
+		vkuDescriptorSet_AddBufferBinding(&ShadowDescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE, 0, 0);
+		vkuAssembleDescriptorSetLayout(&ShadowDescriptorSet[i]);
+	}
 
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
-		.pSetLayouts=&ShadowDescriptorSetLayout.DescriptorSetLayout,
+		.pSetLayouts=&ShadowDescriptorSet[0].DescriptorSetLayout,	// Just use the first one, they're all the same
 	}, 0, &ShadowPipelineLayout);
-
-	// Shadow maps only need one descriptor set for everything (nothing changes between models), but also need one per render frame (buffered)
-	//for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
-	//{
-	//	vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
-	//	{
-	//		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-	//		.descriptorPool=DescriptorPool,
-	//		.descriptorSetCount=1,
-	//		.pSetLayouts=&ShadowDescriptorSetLayout.DescriptorSetLayout,
-	//	}, &ShadowDescriptorSet[i]);
-	//}
 
 	vkuInitPipeline(&ShadowPipeline, &Context);
 
@@ -347,40 +335,11 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 		memcpy(shadow_ubo_ptr, &shadow_ubo, sizeof(shadow_ubo));
 		vkUnmapMemory(Context.Device, shadow_ubo_memory);
 
-		vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-				.descriptorPool=DescriptorPool[FrameIndex],
-				.descriptorSetCount=1,
-				.pSetLayouts=&ShadowDescriptorSetLayout.DescriptorSetLayout,
-		}, &ShadowDescriptorSet[FrameIndex]);
-
-		vkUpdateDescriptorSets(Context.Device, 1, (VkWriteDescriptorSet[])
-		{
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet=ShadowDescriptorSet[FrameIndex],
-					.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, .dstBinding=0,
-					.pBufferInfo=&(VkDescriptorBufferInfo)
-				{
-					shadow_ubo_buffer, 0, sizeof(shadow_ubo)
-				},
-			},
-		}, 0, VK_NULL_HANDLE);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&ShadowDescriptorSet[FrameIndex], 0, (VkDescriptorBufferInfo) { shadow_ubo_buffer, 0, sizeof(shadow_ubo) });
+		vkuAllocateUpdateDescriptorSet(&ShadowDescriptorSet[FrameIndex], DescriptorPool[FrameIndex]);
 
 		uint32_t DynamicOffset=sizeof(shadow_ubo)*i;
-		vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ShadowPipelineLayout, 0, 1, &ShadowDescriptorSet[FrameIndex], 1, &DynamicOffset);
-
-		// Push Descriptors:
-		//VkWriteDescriptorSet WriteDescriptorSet[]=
-		//{
-		//	{
-		//		.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-		//		.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .dstBinding=0,
-		//		.pBufferInfo=&(VkDescriptorBufferInfo) { shadow_ubo_buffer, sizeof(shadow_ubo)*i, sizeof(shadow_ubo) },
-		//	},
-		//};
-
-		//vkCmdPushDescriptorSetKHR(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ShadowPipelineLayout, 0, 1, WriteDescriptorSet);
+		vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ShadowPipelineLayout, 0, 1, &ShadowDescriptorSet[FrameIndex].DescriptorSet, 1, &DynamicOffset);
 
 		// Draw the models
 		for(uint32_t j=0;j<NUM_MODELS;j++)
@@ -491,20 +450,23 @@ bool CreateFramebuffers(void)
 
 bool CreatePipeline(void)
 {
-	vkuInitDescriptorSetLayout(&DescriptorSetLayout, &Context);
+	for(uint32_t i=0;i<MAX_FRAME_COUNT*NUM_MODELS;i++)
+	{
+		vkuInitDescriptorSet(&DescriptorSet[i], &Context);
 
-	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
-	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
-	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
-	vkuDescriptorSetLayout_AddBinding(&DescriptorSetLayout, 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
+		vkuDescriptorSet_AddBufferBinding(&DescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE, 0, 0);
+		vkuDescriptorSet_AddImageBinding(&DescriptorSet[i], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
+		vkuDescriptorSet_AddImageBinding(&DescriptorSet[i], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
+		vkuDescriptorSet_AddImageBinding(&DescriptorSet[i], 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
 
-	vkuAssembleDescriptorSetLayout(&DescriptorSetLayout);
+		vkuAssembleDescriptorSetLayout(&DescriptorSet[i]);
+	}
 
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
-		.pSetLayouts=&DescriptorSetLayout.DescriptorSetLayout,
+		.pSetLayouts=&DescriptorSet[0].DescriptorSetLayout, // Just use the first in the set, they're all the same layout
 		.pushConstantRangeCount=1,
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
@@ -513,18 +475,6 @@ bool CreatePipeline(void)
 			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 	}, 0, &PipelineLayout);
-
-	// Need one descriptor set per model (each model has a different texture), but also one per render frame (buffered)
-	//for(uint32_t i=0;i<MAX_FRAME_COUNT*NUM_MODELS;i++)
-	//{
-	//	vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
-	//	{
-	//		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-	//		.descriptorPool=DescriptorPool,
-	//		.descriptorSetCount=1,
-	//		.pSetLayouts=&DescriptorSetLayout.DescriptorSetLayout,
-	//	}, &DescriptorSet[i]);
-	//}
 
 	vkuInitPipeline(&Pipeline, &Context);
 
@@ -736,39 +686,14 @@ void Render(void)
 	// Draw the models
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-				.descriptorPool=DescriptorPool[Index],
-				.descriptorSetCount=1,
-				.pSetLayouts=&DescriptorSetLayout.DescriptorSetLayout,
-		}, &DescriptorSet[MAX_FRAME_COUNT*i+Index]);
 
-		vkUpdateDescriptorSets(Context.Device, 4, (VkWriteDescriptorSet[])
-		{
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet=DescriptorSet[MAX_FRAME_COUNT*i+Index],
-				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .dstBinding=0,
-				.pBufferInfo=&(VkDescriptorBufferInfo) { Lights.StorageBuffer, 0, VK_WHOLE_SIZE },
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet=DescriptorSet[MAX_FRAME_COUNT*i+Index],
-				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .dstBinding=1,
-				.pImageInfo=&(VkDescriptorImageInfo) { Textures[2*i+0].Sampler, Textures[2*i+0].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet=DescriptorSet[MAX_FRAME_COUNT*i+Index],
-				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .dstBinding=2,
-				.pImageInfo=&(VkDescriptorImageInfo) { Textures[2*i+1].Sampler, Textures[2*i+1].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
-			},
-			{
-				.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet=DescriptorSet[MAX_FRAME_COUNT*i+Index],
-				.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .dstBinding=3,
-				.pImageInfo=&(VkDescriptorImageInfo) { ShadowDepth.Sampler, ShadowDepth.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
-			}
-		}, 0, VK_NULL_HANDLE);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 0, (VkDescriptorBufferInfo) { Lights.StorageBuffer, 0, VK_WHOLE_SIZE });
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 1, (VkDescriptorImageInfo) { Textures[2*i+0].Sampler, Textures[2*i+0].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 2, (VkDescriptorImageInfo) { Textures[2*i+1].Sampler, Textures[2*i+1].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 3, (VkDescriptorImageInfo) { ShadowDepth.Sampler, ShadowDepth.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+		vkuAllocateUpdateDescriptorSet(&DescriptorSet[MAX_FRAME_COUNT*i+Index], DescriptorPool[Index]);
 
-		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[MAX_FRAME_COUNT*i+Index], 0, VK_NULL_HANDLE);
+		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[MAX_FRAME_COUNT*i+Index].DescriptorSet, 0, VK_NULL_HANDLE);
 
 		// Bind model data buffers and draw the triangles
 		for(int32_t j=0;j<Model[i].NumMesh;j++)
@@ -1127,7 +1052,10 @@ void Destroy(void)
 	// Shadow stuff
 	vkDestroyPipeline(Context.Device, ShadowPipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, ShadowPipelineLayout, VK_NULL_HANDLE);
-	vkDestroyDescriptorSetLayout(Context.Device, ShadowDescriptorSetLayout.DescriptorSetLayout, VK_NULL_HANDLE);
+
+	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
+		vkDestroyDescriptorSetLayout(Context.Device, ShadowDescriptorSet[i].DescriptorSetLayout, VK_NULL_HANDLE);
+
 	vkDestroyRenderPass(Context.Device, ShadowRenderPass, VK_NULL_HANDLE);
 
 	vkDestroyFramebuffer(Context.Device, ShadowFrameBuffer, VK_NULL_HANDLE);
@@ -1166,7 +1094,10 @@ void Destroy(void)
 
 	vkDestroyPipeline(Context.Device, Pipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, PipelineLayout, VK_NULL_HANDLE);
-	vkDestroyDescriptorSetLayout(Context.Device, DescriptorSetLayout.DescriptorSetLayout, VK_NULL_HANDLE);
+
+	for(uint32_t i=0;i<MAX_FRAME_COUNT*NUM_MODELS;i++)
+		vkDestroyDescriptorSetLayout(Context.Device, DescriptorSet[i].DescriptorSetLayout, VK_NULL_HANDLE);
+
 	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);
 
 	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)

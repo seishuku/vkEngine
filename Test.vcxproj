@@ -110,7 +110,7 @@
     <ClCompile Include="utils\memzone.c" />
     <ClCompile Include="vulkan\vulkan_buffer.c" />
     <ClCompile Include="vulkan\vulkan_context.c" />
-    <ClCompile Include="vulkan\vulkan_descriptorsetlayout.c" />
+    <ClCompile Include="vulkan\vulkan_descriptorset.c" />
     <ClCompile Include="vulkan\vulkan_instance.c" />
     <ClCompile Include="vulkan\vulkan_mem.c" />
     <ClCompile Include="vulkan\vulkan_pipeline.c" />
