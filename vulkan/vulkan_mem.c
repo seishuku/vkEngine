@@ -72,15 +72,13 @@ void VulkanMem_Destroy(VkuContext_t *Context, VulkanMemZone_t *VkZone)
 	}
 }
 
-void VulkanMem_Free(VulkanMemZone_t *VkZone, VulkanMemBlock_t *Ptr)
+void VulkanMem_Free(VulkanMemZone_t *VkZone, VulkanMemBlock_t *Block)
 {
-	if(Ptr==NULL)
+	if(Block==NULL)
 	{
 		DBGPRINTF(DEBUG_WARNING, "Attempting to free NULL pointer\n");
 		return;
 	}
-
-	VulkanMemBlock_t *Block=Ptr;
 
 	if(!Block->Free)
 	{

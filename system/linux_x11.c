@@ -86,8 +86,8 @@ void EventLoop(void)
 			switch(Event.type)
 			{
 				case MotionNotify:
-					dx=Event.xmotion.x-ox;
-					dy=Event.xmotion.y-oy;
+					dx=ox-Event.xmotion.x;
+					dy=oy-Event.xmotion.y;
 
 					if(Event.xmotion.state&Button1Mask)
 					{
@@ -359,7 +359,7 @@ int main(int argc, char **argv)
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Swapchain...\n");
-	vkuCreateSwapchain(&Context, Width, Height, VK_FALSE);
+	vkuCreateSwapchain(&Context, Width, Height, VK_TRUE);
 
 	DBGPRINTF(DEBUG_INFO, "Initalizing Vulkan resources...\n");
 	if(!Init())
