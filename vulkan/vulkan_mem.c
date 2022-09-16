@@ -88,10 +88,10 @@ void VulkanMem_Free(VulkanMemZone_t *VkZone, VulkanMemBlock_t *Block)
 
 	Block->Free=false;
 
-	VulkanMemBlock_t *Last=Block->Prev;
-
-	if(!Last->Free)
+	if(Block->Prev&&!Block->Prev->Free)
 	{
+		VulkanMemBlock_t *Last=Block->Prev;
+
 		Last->Size+=Block->Size;
 		Last->Next=Block->Next;
 		Last->Next->Prev=Last;
@@ -99,22 +99,23 @@ void VulkanMem_Free(VulkanMemZone_t *VkZone, VulkanMemBlock_t *Block)
 		if(Block==VkZone->Current)
 			VkZone->Current=Last;
 
+		Zone_Free(Zone, Block);
 		Block=Last;
 	}
 
-	VulkanMemBlock_t *Next=Block->Next;
-
-	if(!Next->Free)
+	if(Block->Next&&!Block->Next->Free)
 	{
+		VulkanMemBlock_t *Next=Block->Next;
+
 		Block->Size+=Next->Size;
 		Block->Next=Next->Next;
 		Block->Next->Prev=Block;
 
 		if(Next==VkZone->Current)
 			VkZone->Current=Block;
-	}
 
-	Zone_Free(Zone, Next);
+		Zone_Free(Zone, Next);
+	}
 }
 
 VulkanMemBlock_t *VulkanMem_Malloc(VulkanMemZone_t *VkZone, VkMemoryRequirements Requirements)
