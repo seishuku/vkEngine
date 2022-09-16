@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include "system/system.h"
 #include "vulkan/vulkan.h"
 #include "vulkan/vulkan_mem.h"
@@ -241,7 +242,7 @@ bool InitShadowPipeline(void)
 	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
 	{
 		vkuInitDescriptorSet(&ShadowDescriptorSet[i], &Context);
-		vkuDescriptorSet_AddBufferBinding(&ShadowDescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE, 0, 0);
+		vkuDescriptorSet_AddBinding(&ShadowDescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
 		vkuAssembleDescriptorSetLayout(&ShadowDescriptorSet[i]);
 	}
 
@@ -335,7 +336,7 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 		memcpy(shadow_ubo_ptr, &shadow_ubo, sizeof(shadow_ubo));
 		vkUnmapMemory(Context.Device, shadow_ubo_memory);
 
-		vkuDescriptorSet_UpdateBindingBufferInfo(&ShadowDescriptorSet[FrameIndex], 0, (VkDescriptorBufferInfo) { shadow_ubo_buffer, 0, sizeof(shadow_ubo) });
+		vkuDescriptorSet_UpdateBindingBufferInfo(&ShadowDescriptorSet[FrameIndex], 0, shadow_ubo_buffer, 0, sizeof(shadow_ubo));
 		vkuAllocateUpdateDescriptorSet(&ShadowDescriptorSet[FrameIndex], DescriptorPool[FrameIndex]);
 
 		uint32_t DynamicOffset=sizeof(shadow_ubo)*i;
@@ -454,10 +455,10 @@ bool CreatePipeline(void)
 	{
 		vkuInitDescriptorSet(&DescriptorSet[i], &Context);
 
-		vkuDescriptorSet_AddBufferBinding(&DescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE, 0, 0);
-		vkuDescriptorSet_AddImageBinding(&DescriptorSet[i], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
-		vkuDescriptorSet_AddImageBinding(&DescriptorSet[i], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
-		vkuDescriptorSet_AddImageBinding(&DescriptorSet[i], 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, VK_NULL_HANDLE);
+		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
+		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 
 		vkuAssembleDescriptorSetLayout(&DescriptorSet[i]);
 	}
@@ -604,7 +605,7 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 
 void Render(void)
 {
-	static OldIndex=0;
+	static uint32_t OldIndex=0;
 	uint32_t Index=OldIndex;
 
 	Lights_UpdatePosition(&Lights, 0, (vec3) { sinf(fTime)*150.0f, -25.0f, cosf(fTime)*150.0f });
@@ -687,10 +688,10 @@ void Render(void)
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
 
-		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 0, (VkDescriptorBufferInfo) { Lights.StorageBuffer, 0, VK_WHOLE_SIZE });
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 1, (VkDescriptorImageInfo) { Textures[2*i+0].Sampler, Textures[2*i+0].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 2, (VkDescriptorImageInfo) { Textures[2*i+1].Sampler, Textures[2*i+1].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 3, (VkDescriptorImageInfo) { ShadowDepth.Sampler, ShadowDepth.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 0, Lights.StorageBuffer, 0, VK_WHOLE_SIZE);
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 1, &Textures[2*i+0]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 2, &Textures[2*i+1]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 3, &ShadowDepth);
 		vkuAllocateUpdateDescriptorSet(&DescriptorSet[MAX_FRAME_COUNT*i+Index], DescriptorPool[Index]);
 
 		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[MAX_FRAME_COUNT*i+Index].DescriptorSet, 0, VK_NULL_HANDLE);

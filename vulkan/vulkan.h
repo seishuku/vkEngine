@@ -153,6 +153,8 @@ typedef struct
 	uint32_t NumBindings;
 	VkDescriptorSetLayoutBinding Bindings[VKU_MAX_DESCRIPTORSET_BINDINGS];
 	VkWriteDescriptorSet WriteDescriptorSet[VKU_MAX_DESCRIPTORSET_BINDINGS];
+	VkDescriptorImageInfo ImageInfo[VKU_MAX_DESCRIPTORSET_BINDINGS];
+	VkDescriptorBufferInfo BufferInfo[VKU_MAX_DESCRIPTORSET_BINDINGS];
 } VkuDescriptorSet_t;
 
 typedef struct
@@ -180,10 +182,9 @@ VkBool32 vkuPipeline_SetPipelineLayout(VkuPipeline_t *Pipeline, VkPipelineLayout
 VkBool32 vkuInitPipeline(VkuPipeline_t *Pipeline, VkuContext_t *Context);
 VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline);
 
-VkBool32 vkuDescriptorSet_AddImageBinding(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorType Type, VkShaderStageFlags Stage, Image_t *Image);
-VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorImageInfo ImageInfo);
-VkBool32 vkuDescriptorSet_AddBufferBinding(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorType Type, VkShaderStageFlags Stage, VkuBuffer_t *Buffer, VkDeviceSize Offset, VkDeviceSize Range);
-VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorBufferInfo BufferInfo);
+VkBool32 vkuDescriptorSet_AddBinding(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorType Type, VkShaderStageFlags Stage);
+VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, Image_t *Image);
+VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Range);
 VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *DescriptorSetLayout, VkuContext_t *Context);
 VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSet_t *DescriptorSet);
 VkBool32 vkuAllocateUpdateDescriptorSet(VkuDescriptorSet_t *DescriptorSet, VkDescriptorPool DescriptorPool);

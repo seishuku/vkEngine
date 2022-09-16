@@ -8,7 +8,7 @@
 #include "vulkan.h"
 
 // Add a binding to the descriptor set layout
-VkBool32 vkuDescriptorSet_AddImageBinding(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorType Type, VkShaderStageFlags Stage, Image_t *Image)
+VkBool32 vkuDescriptorSet_AddBinding(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorType Type, VkShaderStageFlags Stage)
 {
 	if(!DescriptorSet)
 		return VK_FALSE;
@@ -30,61 +30,12 @@ VkBool32 vkuDescriptorSet_AddImageBinding(VkuDescriptorSet_t *DescriptorSet, uin
 	VkWriteDescriptorSet WriteDescriptorSet=
 	{
 		.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-		.dstSet=DescriptorSet->DescriptorSet, .dstBinding=Binding,
-		.descriptorCount=1, .descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-	};
-
-	if(Image)
-		WriteDescriptorSet.pImageInfo=&(VkDescriptorImageInfo) { Image->Sampler, Image->View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
-
-	DescriptorSet->WriteDescriptorSet[Binding]=WriteDescriptorSet;
-
-	DescriptorSet->NumBindings++;
-
-	return VK_TRUE;
-}
-
-VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorImageInfo ImageInfo)
-{
-	if(!DescriptorSet)
-		return VK_FALSE;
-
-	if(Binding>=VKU_MAX_DESCRIPTORSET_BINDINGS)
-		return VK_FALSE;
-
-	DescriptorSet->WriteDescriptorSet[Binding].pImageInfo=&ImageInfo;
-
-	return VK_TRUE;
-}
-
-VkBool32 vkuDescriptorSet_AddBufferBinding(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorType Type, VkShaderStageFlags Stage, VkuBuffer_t *Buffer, VkDeviceSize Offset, VkDeviceSize Range)
-{
-	if(!DescriptorSet)
-		return VK_FALSE;
-
-	if(Binding>=VKU_MAX_DESCRIPTORSET_BINDINGS)
-		return VK_FALSE;
-
-	VkDescriptorSetLayoutBinding DescriptorSetLayoutBinding=
-	{
-		.binding=Binding,
-		.descriptorType=Type,
+		.dstBinding=Binding,
 		.descriptorCount=1,
-		.stageFlags=Stage,
-		.pImmutableSamplers=VK_NULL_HANDLE
+		.descriptorType=DescriptorSet->Bindings[Binding].descriptorType,
+		.pBufferInfo=&DescriptorSet->BufferInfo[Binding],
+		.pImageInfo=&DescriptorSet->ImageInfo[Binding],
 	};
-
-	DescriptorSet->Bindings[Binding]=DescriptorSetLayoutBinding;
-
-	VkWriteDescriptorSet WriteDescriptorSet=
-	{
-		.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-		.dstSet=DescriptorSet->DescriptorSet, .dstBinding=Binding,
-		.descriptorCount=1, .descriptorType=Type,
-	};
-
-	if(Buffer)
-		WriteDescriptorSet.pBufferInfo=&(VkDescriptorBufferInfo) { Buffer->Buffer, Offset, Range };
 
 	DescriptorSet->WriteDescriptorSet[Binding]=WriteDescriptorSet;
 
@@ -93,7 +44,7 @@ VkBool32 vkuDescriptorSet_AddBufferBinding(VkuDescriptorSet_t *DescriptorSet, ui
 	return VK_TRUE;
 }
 
-VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorBufferInfo BufferInfo)
+VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, Image_t *Image)
 {
 	if(!DescriptorSet)
 		return VK_FALSE;
@@ -101,7 +52,20 @@ VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *Descriptor
 	if(Binding>=VKU_MAX_DESCRIPTORSET_BINDINGS)
 		return VK_FALSE;
 
-	DescriptorSet->WriteDescriptorSet[Binding].pBufferInfo=&BufferInfo;
+	DescriptorSet->ImageInfo[Binding]=(VkDescriptorImageInfo) { Image->Sampler, Image->View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+
+	return VK_TRUE;
+}
+
+VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Range)
+{
+	if(!DescriptorSet)
+		return VK_FALSE;
+
+	if(Binding>=VKU_MAX_DESCRIPTORSET_BINDINGS)
+		return VK_FALSE;
+
+	DescriptorSet->BufferInfo[Binding]=(VkDescriptorBufferInfo){ Buffer, Offset, Range };
 
 	return VK_TRUE;
 }

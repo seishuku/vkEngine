@@ -17,7 +17,7 @@ OBJS+=camera/camera.o
 # Vulkan
 OBJS+=vulkan/vulkan_buffer.o
 OBJS+=vulkan/vulkan_context.o
-OBJS+=vulkan/vulkan_descriptorsetlayout.o
+OBJS+=vulkan/vulkan_descriptorset.o
 OBJS+=vulkan/vulkan_instance.o
 OBJS+=vulkan/vulkan_mem.o
 OBJS+=vulkan/vulkan_pipeline.o
