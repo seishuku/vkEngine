@@ -6,11 +6,10 @@
 #include <string.h>
 #include "../system/system.h"
 #include "vulkan.h"
-#include "vulkan_mem.h"
 #include "../image/image.h"
 #include "../math/math.h"
 
-extern VulkanMemZone_t *VkZone;
+extern VkuMemZone_t *VkZone;
 
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask)
 {
@@ -31,7 +30,7 @@ uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_pro
 	return 0;
 }
 
-VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, Image_t *Image,
+VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, VkuImage_t *Image,
 	VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth,
 	VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags)
 {
@@ -67,7 +66,7 @@ VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, Image_t *Image,
 	};
 
 	// Quick hack: getting it to use the vulkan memory allocator
-	Image->DeviceMemory=VulkanMem_Malloc(VkZone, memoryRequirements);
+	Image->DeviceMemory=VkuMem_Malloc(VkZone, memoryRequirements);
 
 	if(Image->DeviceMemory==NULL)
 		return VK_FALSE;
@@ -78,42 +77,7 @@ VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, Image_t *Image,
 	return VK_TRUE;
 }
 
-VkBool32 vkuCreateBuffer(VkuContext_t *Context, VkBuffer *Buffer, VkDeviceMemory *Memory, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask)
-{
-	VkMemoryRequirements memoryRequirements;
-
-	VkBufferCreateInfo BufferInfo=
-	{
-		.sType=VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.size=Size,
-		.usage=Flags,
-		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
-		.queueFamilyIndexCount=1,
-		.pQueueFamilyIndices=&Context->QueueFamilyIndex,
-	};
-
-	if(vkCreateBuffer(Context->Device, &BufferInfo, NULL, Buffer)!=VK_SUCCESS)
-		return VK_FALSE;
-
-	vkGetBufferMemoryRequirements(Context->Device, *Buffer, &memoryRequirements);
-
-	VkMemoryAllocateInfo AllocateInfo=
-	{
-		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.allocationSize=memoryRequirements.size,
-		.memoryTypeIndex=vkuMemoryTypeFromProperties(Context->DeviceMemProperties, memoryRequirements.memoryTypeBits, RequirementsMask),
-	};
-
-	if(vkAllocateMemory(Context->Device, &AllocateInfo, NULL, Memory)!=VK_SUCCESS)
-		return VK_FALSE;
-
-	if(vkBindBufferMemory(Context->Device, *Buffer, *Memory, 0)!=VK_SUCCESS)
-			return VK_FALSE;
-
-	return VK_TRUE;
-}
-
-VkBool32 vkuCreateBuffer2(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask)
+VkBool32 vkuCreateHostBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags)
 {
 	VkMemoryRequirements memoryRequirements;
 
@@ -136,10 +100,45 @@ VkBool32 vkuCreateBuffer2(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t S
 	{
 		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.allocationSize=memoryRequirements.size,
-		.memoryTypeIndex=vkuMemoryTypeFromProperties(Context->DeviceMemProperties, memoryRequirements.memoryTypeBits, RequirementsMask),
+		.memoryTypeIndex=vkuMemoryTypeFromProperties(Context->DeviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
 	};
 
-	Buffer->Memory=VulkanMem_Malloc(VkZone, memoryRequirements);
+	if(vkAllocateMemory(Context->Device, &AllocateInfo, NULL, &Buffer->DeviceMemory)!=VK_SUCCESS)
+		return VK_FALSE;
+
+	if(vkBindBufferMemory(Context->Device, Buffer->Buffer, Buffer->DeviceMemory, 0)!=VK_SUCCESS)
+			return VK_FALSE;
+
+	return VK_TRUE;
+}
+
+VkBool32 vkuCreateGPUBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags)
+{
+	VkMemoryRequirements memoryRequirements;
+
+	VkBufferCreateInfo BufferInfo=
+	{
+		.sType=VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+		.size=Size,
+		.usage=Flags,
+		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
+		.queueFamilyIndexCount=1,
+		.pQueueFamilyIndices=&Context->QueueFamilyIndex,
+	};
+
+	if(vkCreateBuffer(Context->Device, &BufferInfo, NULL, &Buffer->Buffer)!=VK_SUCCESS)
+		return VK_FALSE;
+
+	vkGetBufferMemoryRequirements(Context->Device, Buffer->Buffer, &memoryRequirements);
+
+	VkMemoryAllocateInfo AllocateInfo=
+	{
+		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+		.allocationSize=memoryRequirements.size,
+		.memoryTypeIndex=vkuMemoryTypeFromProperties(Context->DeviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
+	};
+
+	Buffer->Memory=VkuMem_Malloc(VkZone, memoryRequirements);
 
 	if(Buffer->Memory==NULL)
 		return VK_FALSE;

@@ -14,7 +14,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include <vulkan/vulkan.h>
 #include "../system/system.h"
 #include "../math/math.h"
 #include "../vulkan/vulkan.h"
@@ -28,7 +27,7 @@
 #define max(a, b) ((a)>(b)?(a):(b))
 #endif
 
-void _MakeNormalMap(Image_t *Image)
+void _MakeNormalMap(VkuImage_t *Image)
 {
 	uint32_t x, y, xx, yy;
 	uint32_t Channels=Image->Depth>>3;
@@ -86,7 +85,7 @@ void _MakeNormalMap(Image_t *Image)
 	Image->Data=(unsigned char *)Buffer;
 }
 
-void _Normalize(Image_t *Image)
+void _Normalize(VkuImage_t *Image)
 {
 	uint32_t i, Channels=Image->Depth>>3;
 	uint16_t *Buffer=NULL;
@@ -129,7 +128,7 @@ void _Normalize(Image_t *Image)
 	Image->Data=(uint8_t *)Buffer;
 }
 
-void _RGBE2Float(Image_t *Image)
+void _RGBE2Float(VkuImage_t *Image)
 {
 	uint32_t i;
 	float *Buffer=NULL;
@@ -174,7 +173,7 @@ void _RGBE2Float(Image_t *Image)
 	Image->Data=(uint8_t *)Buffer;
 }
 
-void _Resample(Image_t *Src, Image_t *Dst)
+void _Resample(VkuImage_t *Src, VkuImage_t *Dst)
 {
 	float fx, fy, hx, hy, lx, ly, sx, sy;
 	float xPercent, yPercent, Percent;
@@ -359,11 +358,11 @@ void _Resample(Image_t *Src, Image_t *Dst)
 	}
 }
 
-void _BuildMipmaps(Image_t *Image, unsigned int Target)
+void _BuildMipmaps(VkuImage_t *Image, unsigned int Target)
 {
 	int i=0, levels;
 	uint32_t MaxSize=UINT32_MAX;
-	Image_t Dst;
+	VkuImage_t Dst;
 
 //	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &MaxSize);
 
@@ -425,7 +424,7 @@ void _BuildMipmaps(Image_t *Image, unsigned int Target)
 	}
 }
 
-void _GetPixelBilinear(Image_t *Image, float x, float y, unsigned char *Out)
+void _GetPixelBilinear(VkuImage_t *Image, float x, float y, unsigned char *Out)
 {
 	uint32_t ix=(int)x, iy=(int)y;
 	uint32_t ox=ix+1, oy=iy+1;
@@ -577,11 +576,11 @@ void _GetXYZFace(float uv[2], float *xyz, int face)
 	}
 }
 
-void _AngularMapFace(Image_t *In, int Face, Image_t *Out)
+void _AngularMapFace(VkuImage_t *In, int Face, VkuImage_t *Out)
 {
 	uint32_t x, y;
 
-	memset(Out, 0, sizeof(Image_t));
+	memset(Out, 0, sizeof(VkuImage_t));
 	Out->Depth=In->Depth;
 	Out->Width=NextPower2(In->Width>>1);
 	Out->Height=NextPower2(In->Height>>1);
@@ -607,7 +606,7 @@ void _AngularMapFace(Image_t *In, int Face, Image_t *Out)
 	}
 }
 
-void RGBtoRGBA(Image_t *Image)
+void RGBtoRGBA(VkuImage_t *Image)
 {
 	if(Image->Depth==96)
 	{
@@ -677,7 +676,7 @@ void RGBtoRGBA(Image_t *Image)
 	}
 }
 
-void GenerateMipmaps(VkCommandBuffer commandBuffer, Image_t *Image, uint32_t mipLevels)
+void GenerateMipmaps(VkCommandBuffer commandBuffer, VkuImage_t *Image, uint32_t mipLevels)
 {
 	uint32_t texWidth=Image->Width;
 	uint32_t texHeight=Image->Height;
@@ -741,7 +740,7 @@ void GenerateMipmaps(VkCommandBuffer commandBuffer, Image_t *Image, uint32_t mip
 	vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &MemoryBarrier);
 }
 
-VkBool32 Image_Upload(VkuContext_t *Context, Image_t *Image, const char *Filename, uint32_t Flags)
+VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *Filename, uint32_t Flags)
 {
 	char *Extension=strrchr(Filename, '.');
 	VkFilter MinFilter=VK_FILTER_LINEAR;
@@ -753,8 +752,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, Image_t *Image, const char *Filenam
 	VkFormat Format=VK_FORMAT_UNDEFINED;
 	VkCommandBuffer CommandBuffer;
 	VkFence Fence;
-	VkBuffer StagingBuffer;
-	VkDeviceMemory StagingBufferMemory;
+	VkuBuffer_t StagingBuffer;
 	void *Data=NULL;
 	uint32_t Size=0;
 
@@ -854,21 +852,17 @@ VkBool32 Image_Upload(VkuContext_t *Context, Image_t *Image, const char *Filenam
 
 	if(Flags&IMAGE_CUBEMAP_ANGULAR)
 	{
-		Image_t Out;
+		VkuImage_t Out;
 		void *Data=NULL;
 
 		// Precalculate each cube face iamge size in bytes
 		Size=(NextPower2(Image->Width>>1)*NextPower2(Image->Height>>1)*(Image->Depth>>3));
 
 		// Create staging buffer
-		vkuCreateBuffer(Context,
-			&StagingBuffer, &StagingBufferMemory,
-			Size*6,
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		vkuCreateHostBuffer(Context, &StagingBuffer, Size*6, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 		// Map image memory and copy data for each cube face
-		vkMapMemory(Context->Device, StagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+		vkMapMemory(Context->Device, StagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
 		for(uint32_t i=0;i<6;i++)
 		{
 			_AngularMapFace(Image, i, &Out);
@@ -879,7 +873,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, Image_t *Image, const char *Filenam
 			memcpy((uint8_t *)Data+(Size*i), Out.Data, Size);
 			Zone_Free(Zone, Out.Data);
 		}
-		vkUnmapMemory(Context->Device, StagingBufferMemory);
+		vkUnmapMemory(Context->Device, StagingBuffer.DeviceMemory);
 
 		Zone_Free(Zone, Image->Data);
 
@@ -944,7 +938,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, Image_t *Image, const char *Filenam
 		}
 
 		// Copy from staging buffer to the texture buffer.
-		vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, BufferCopyRegions);
+		vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer.Buffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, BufferCopyRegions);
 
 		// Now change the image layout from destination optimal to be optimal reading only by shader.
 		vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
@@ -987,8 +981,8 @@ VkBool32 Image_Upload(VkuContext_t *Context, Image_t *Image, const char *Filenam
 		vkFreeCommandBuffers(Context->Device, Context->CommandPool, 1, &CommandBuffer);
 
 		// Delete staging buffers
-		vkFreeMemory(Context->Device, StagingBufferMemory, VK_NULL_HANDLE);
-		vkDestroyBuffer(Context->Device, StagingBuffer, VK_NULL_HANDLE);
+		vkFreeMemory(Context->Device, StagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+		vkDestroyBuffer(Context->Device, StagingBuffer.Buffer, VK_NULL_HANDLE);
 
 		// Create texture sampler object
 		vkCreateSampler(Context->Device, &(VkSamplerCreateInfo)
@@ -1032,15 +1026,12 @@ VkBool32 Image_Upload(VkuContext_t *Context, Image_t *Image, const char *Filenam
 	Size=Image->Width*Image->Height*(Image->Depth>>3);
 
 	// Create staging buffer
-	vkuCreateBuffer(Context,
-		&StagingBuffer, &StagingBufferMemory, Size,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	vkuCreateHostBuffer(Context, &StagingBuffer, Size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 	// Map image memory and copy data
-	vkMapMemory(Context->Device, StagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+	vkMapMemory(Context->Device, StagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
 	memcpy(Data, Image->Data, Size);
-	vkUnmapMemory(Context->Device, StagingBufferMemory);
+	vkUnmapMemory(Context->Device, StagingBuffer.DeviceMemory);
 
 	// Original image data is now in a Vulkan memory object, so no longer need the original data.
 	Zone_Free(Zone, Image->Data);
@@ -1091,7 +1082,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, Image_t *Image, const char *Filenam
 	});
 
 	// Copy from staging buffer to the texture buffer.
-	vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkBufferImageCopy)
+	vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer.Buffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkBufferImageCopy)
 	{
 		.imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 		.imageSubresource.mipLevel=0,
@@ -1150,8 +1141,8 @@ VkBool32 Image_Upload(VkuContext_t *Context, Image_t *Image, const char *Filenam
 	vkFreeCommandBuffers(Context->Device, Context->CommandPool, 1, &CommandBuffer);
 
 	// Delete staging buffers
-	vkFreeMemory(Context->Device, StagingBufferMemory, VK_NULL_HANDLE);
-	vkDestroyBuffer(Context->Device, StagingBuffer, VK_NULL_HANDLE);
+	vkFreeMemory(Context->Device, StagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(Context->Device, StagingBuffer.Buffer, VK_NULL_HANDLE);
 
 	// Create texture sampler object
 	vkCreateSampler(Context->Device, &(VkSamplerCreateInfo)

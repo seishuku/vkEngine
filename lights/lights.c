@@ -11,13 +11,12 @@
 
 extern VkuContext_t Context;
 
-extern VulkanMemZone_t *VkZone;
+extern VkuMemZone_t *VkZone;
 
 extern VkFramebuffer ShadowFrameBuffer;
-extern Image_t ShadowDepth;
+extern VkuImage_t ShadowDepth;
 
-extern VkBuffer shadow_ubo_buffer;
-extern VkDeviceMemory shadow_ubo_memory;
+extern VkuBuffer_t shadow_ubo_buffer;
 
 void InitShadowCubeMap(uint32_t NumMaps);
 
@@ -163,7 +162,7 @@ void Lights_UpdateSSBO(Lights_t *Lights)
 	{
 		oldSize=Lights->Lights.bufSize;
 
-		if(Lights->StorageBuffer&&Lights->StorageMemory)
+		if(Lights->StorageBuffer.Buffer&&Lights->StorageBuffer.DeviceMemory)
 		{
 			vkDeviceWaitIdle(Context.Device);
 
@@ -171,33 +170,32 @@ void Lights_UpdateSSBO(Lights_t *Lights)
 			vkDestroySampler(Context.Device, ShadowDepth.Sampler, VK_NULL_HANDLE);
 			vkDestroyImageView(Context.Device, ShadowDepth.View, VK_NULL_HANDLE);
 //			vkFreeMemory(Context.Device, ShadowDepth.DeviceMemory, VK_NULL_HANDLE);
-			VulkanMem_Free(VkZone, ShadowDepth.DeviceMemory);
+			VkuMem_Free(VkZone, ShadowDepth.DeviceMemory);
 			vkDestroyImage(Context.Device, ShadowDepth.Image, VK_NULL_HANDLE);
 
-			vkFreeMemory(Context.Device, shadow_ubo_memory, VK_NULL_HANDLE);
-			vkDestroyBuffer(Context.Device, shadow_ubo_buffer, VK_NULL_HANDLE);
+			vkFreeMemory(Context.Device, shadow_ubo_buffer.DeviceMemory, VK_NULL_HANDLE);
+			vkDestroyBuffer(Context.Device, shadow_ubo_buffer.Buffer, VK_NULL_HANDLE);
 
-			vkDestroyBuffer(Context.Device, Lights->StorageBuffer, VK_NULL_HANDLE);
-			vkFreeMemory(Context.Device, Lights->StorageMemory, VK_NULL_HANDLE);
+			vkDestroyBuffer(Context.Device, Lights->StorageBuffer.Buffer, VK_NULL_HANDLE);
+			vkFreeMemory(Context.Device, Lights->StorageBuffer.DeviceMemory, VK_NULL_HANDLE);
 
-			vkuCreateBuffer(&Context, &Lights->StorageBuffer, &Lights->StorageMemory,
-							(uint32_t)Lights->Lights.bufSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			vkuCreateHostBuffer(&Context, &Lights->StorageBuffer, (uint32_t)Lights->Lights.bufSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
 			InitShadowCubeMap((uint32_t)(Lights->Lights.bufSize/Lights->Lights.Stride));
 		}
 	}
 
 	// Update buffer
-	if(Lights->StorageMemory)
+	if(Lights->StorageBuffer.DeviceMemory)
 	{
 		void *Data=NULL;
 
-		vkMapMemory(Context.Device, Lights->StorageMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+		vkMapMemory(Context.Device, Lights->StorageBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
 
 		if(Data)
 			memcpy(Data, Lights->Lights.Buffer, Lights->Lights.Size);
 
-		vkUnmapMemory(Context.Device, Lights->StorageMemory);
+		vkUnmapMemory(Context.Device, Lights->StorageBuffer.DeviceMemory);
 	}
 }
 
@@ -205,11 +203,10 @@ bool Lights_Init(Lights_t *Lights)
 {
 	List_Init(&Lights->Lights, sizeof(Light_t), 10, NULL);
 
-	Lights->StorageBuffer=VK_NULL_HANDLE;
-	Lights->StorageMemory=VK_NULL_HANDLE;
+	Lights->StorageBuffer.Buffer=VK_NULL_HANDLE;
+	Lights->StorageBuffer.DeviceMemory=VK_NULL_HANDLE;
 
-	vkuCreateBuffer(&Context, &Lights->StorageBuffer, &Lights->StorageMemory,
-					(uint32_t)Lights->Lights.bufSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	vkuCreateHostBuffer(&Context, &Lights->StorageBuffer, (uint32_t)Lights->Lights.bufSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
 	return true;
 }
@@ -217,8 +214,8 @@ bool Lights_Init(Lights_t *Lights)
 void Lights_Destroy(Lights_t *Lights)
 {
 	// Delete storage buffer and free memory
-	vkDestroyBuffer(Context.Device, Lights->StorageBuffer, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, Lights->StorageMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(Context.Device, Lights->StorageBuffer.Buffer, VK_NULL_HANDLE);
+	vkFreeMemory(Context.Device, Lights->StorageBuffer.DeviceMemory, VK_NULL_HANDLE);
 
 	List_Destroy(&Lights->Lights);
 }

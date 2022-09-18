@@ -34,7 +34,7 @@ uint32_t Int32Swap(const uint32_t l)
 	return ((uint32_t)b1<<24)+((uint32_t)b2<<16)+((uint32_t)b3<<8)+((uint32_t)b4<<0);
 }
 
-bool QOI_Load(const char *Filename, Image_t *Image)
+bool QOI_Load(const char *Filename, VkuImage_t *Image)
 {
 	FILE *stream=NULL;
 	uint32_t magic=0;
@@ -135,7 +135,7 @@ bool QOI_Load(const char *Filename, Image_t *Image)
 	return true;
 }
 
-bool QOI_Write(const char *Filename, Image_t *Image)
+bool QOI_Write(const char *Filename, VkuImage_t *Image)
 {
 	FILE *stream=NULL;
 	uint32_t temp32, i;

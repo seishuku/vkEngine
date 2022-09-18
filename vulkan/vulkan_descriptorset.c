@@ -44,7 +44,7 @@ VkBool32 vkuDescriptorSet_AddBinding(VkuDescriptorSet_t *DescriptorSet, uint32_t
 	return VK_TRUE;
 }
 
-VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, Image_t *Image)
+VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkuImage_t *Image)
 {
 	if(!DescriptorSet)
 		return VK_FALSE;

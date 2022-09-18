@@ -5,7 +5,6 @@
 #include <string.h>
 #include "system/system.h"
 #include "vulkan/vulkan.h"
-#include "vulkan/vulkan_mem.h"
 #include "math/math.h"
 #include "camera/camera.h"
 #include "model/3ds.h"
@@ -19,7 +18,7 @@ uint32_t Width=1280, Height=720;
 VkInstance Instance;
 VkuContext_t Context;
 
-VulkanMemZone_t *VkZone;
+VkuMemZone_t *VkZone;
 
 float RotateX=0.0f, RotateY=0.0f, PanX=0.0f, PanY=0.0f, Zoom=-100.0f;
 
@@ -51,7 +50,7 @@ enum
 	NUM_TEXTURES
 };
 
-Image_t Textures[NUM_TEXTURES];
+VkuImage_t Textures[NUM_TEXTURES];
 
 matrix ModelView, Projection;
 vec4 QuatX, QuatY, Quat;
@@ -84,7 +83,7 @@ VkImageView SwapchainImageView[MAX_FRAME_COUNT];
 VkFramebuffer FrameBuffers[MAX_FRAME_COUNT];
 
 // Depth buffer handles
-Image_t DepthImage;
+VkuImage_t DepthImage;
 
 VkRenderPass RenderPass;
 VkPipelineLayout PipelineLayout;
@@ -103,7 +102,7 @@ VkSemaphore RenderCompleteSemaphores[MAX_FRAME_COUNT];
 int32_t ShadowCubeSize=1024;
 
 VkFramebuffer ShadowFrameBuffer;
-Image_t ShadowDepth;
+VkuImage_t ShadowDepth;
 VkFormat ShadowDepthFormat=VK_FORMAT_D32_SFLOAT;
 
 VkuPipeline_t ShadowPipeline;
@@ -120,8 +119,7 @@ struct
 	int32_t pad[11]; // Need to pad out to the nearest 256 byte
 } shadow_ubo;
 
-VkBuffer shadow_ubo_buffer;
-VkDeviceMemory shadow_ubo_memory;
+VkuBuffer_t shadow_ubo_buffer;
 void *shadow_ubo_ptr;
 
 void RecreateSwapchain(void);
@@ -182,7 +180,7 @@ void InitShadowCubeMap(uint32_t NumMaps)
 		.layers=6*NumMaps,
 	}, 0, &ShadowFrameBuffer);
 
-	vkuCreateBuffer(&Context, &shadow_ubo_buffer, &shadow_ubo_memory, sizeof(shadow_ubo)*NumMaps, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	vkuCreateHostBuffer(&Context, &shadow_ubo_buffer, sizeof(shadow_ubo)*NumMaps, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 }
 
 bool InitShadowPipeline(void)
@@ -332,11 +330,11 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 
 		shadow_ubo.index=i;
 
-		vkMapMemory(Context.Device, shadow_ubo_memory, sizeof(shadow_ubo)*i, sizeof(shadow_ubo), 0, &shadow_ubo_ptr);
+		vkMapMemory(Context.Device, shadow_ubo_buffer.DeviceMemory, sizeof(shadow_ubo)*i, sizeof(shadow_ubo), 0, &shadow_ubo_ptr);
 		memcpy(shadow_ubo_ptr, &shadow_ubo, sizeof(shadow_ubo));
-		vkUnmapMemory(Context.Device, shadow_ubo_memory);
+		vkUnmapMemory(Context.Device, shadow_ubo_buffer.DeviceMemory);
 
-		vkuDescriptorSet_UpdateBindingBufferInfo(&ShadowDescriptorSet[FrameIndex], 0, shadow_ubo_buffer, 0, sizeof(shadow_ubo));
+		vkuDescriptorSet_UpdateBindingBufferInfo(&ShadowDescriptorSet[FrameIndex], 0, shadow_ubo_buffer.Buffer, 0, sizeof(shadow_ubo));
 		vkuAllocateUpdateDescriptorSet(&ShadowDescriptorSet[FrameIndex], DescriptorPool[FrameIndex]);
 
 		uint32_t DynamicOffset=sizeof(shadow_ubo)*i;
@@ -507,26 +505,18 @@ bool CreatePipeline(void)
 
 void BuildMemoryBuffers(Model3DS_t *Model)
 {
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
+	VkuBuffer_t stagingBuffer;
 	void *Data=NULL;
 
 	for(int32_t i=0;i<Model->NumMesh;i++)
 	{
 		// Vertex data on device memory
-		vkuCreateBuffer2(&Context,
-			&Model->Mesh[i].VertexBuffer, sizeof(float)*20*Model->Mesh[i].NumVertex,
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		vkuCreateGPUBuffer(&Context, &Model->Mesh[i].VertexBuffer, sizeof(float)*20*Model->Mesh[i].NumVertex, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
 		// Create staging buffer to transfer from host memory to device memory
-		vkuCreateBuffer(&Context,
-			&stagingBuffer, &stagingBufferMemory,
-			sizeof(float)*20*Model->Mesh[i].NumVertex,
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		vkuCreateHostBuffer(&Context, &stagingBuffer, sizeof(float)*20*Model->Mesh[i].NumVertex, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
-		vkMapMemory(Context.Device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+		vkMapMemory(Context.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
 
 		if(!Data)
 			return;
@@ -561,25 +551,22 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 			*fPtr++=0.0f;
 		}
 
-		vkUnmapMemory(Context.Device, stagingBufferMemory);
+		vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
 
 		// Copy to device memory
-		vkuCopyBuffer(&Context, stagingBuffer, Model->Mesh[i].VertexBuffer.Buffer, sizeof(float)*20*Model->Mesh[i].NumVertex);
+		vkuCopyBuffer(&Context, stagingBuffer.Buffer, Model->Mesh[i].VertexBuffer.Buffer, sizeof(float)*20*Model->Mesh[i].NumVertex);
 
 		// Delete staging data
-		vkFreeMemory(Context.Device, stagingBufferMemory, VK_NULL_HANDLE);
-		vkDestroyBuffer(Context.Device, stagingBuffer, VK_NULL_HANDLE);
+		vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+		vkDestroyBuffer(Context.Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
 
 		// Index data
-		vkuCreateBuffer2(&Context,
-			&Model->Mesh[i].IndexBuffer, sizeof(uint16_t)*Model->Mesh[i].NumFace*3,
-			VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		vkuCreateGPUBuffer(&Context, &Model->Mesh[i].IndexBuffer, sizeof(uint16_t)*Model->Mesh[i].NumFace*3, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
 		// Staging buffer
-		vkuCreateBuffer(&Context, &stagingBuffer, &stagingBufferMemory, sizeof(uint16_t)*Model->Mesh[i].NumFace*3,
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		vkuCreateHostBuffer(&Context, &stagingBuffer, sizeof(uint16_t)*Model->Mesh[i].NumFace*3, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
-		vkMapMemory(Context.Device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+		vkMapMemory(Context.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
 
 		if(!Data)
 			return;
@@ -593,13 +580,13 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 			*sPtr++=Model->Mesh[i].Face[3*j+2];
 		}
 
-		vkUnmapMemory(Context.Device, stagingBufferMemory);
+		vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
 
-		vkuCopyBuffer(&Context, stagingBuffer, Model->Mesh[i].IndexBuffer.Buffer, sizeof(uint16_t)*Model->Mesh[i].NumFace*3);
+		vkuCopyBuffer(&Context, stagingBuffer.Buffer, Model->Mesh[i].IndexBuffer.Buffer, sizeof(uint16_t)*Model->Mesh[i].NumFace*3);
 
 		// Delete staging data
-		vkFreeMemory(Context.Device, stagingBufferMemory, VK_NULL_HANDLE);
-		vkDestroyBuffer(Context.Device, stagingBuffer, VK_NULL_HANDLE);
+		vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+		vkDestroyBuffer(Context.Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
 	}
 }
 
@@ -688,7 +675,7 @@ void Render(void)
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
 
-		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 0, Lights.StorageBuffer, 0, VK_WHOLE_SIZE);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 0, Lights.StorageBuffer.Buffer, 0, VK_WHOLE_SIZE);
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 1, &Textures[2*i+0]);
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 2, &Textures[2*i+1]);
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 3, &ShadowDepth);
@@ -766,7 +753,7 @@ bool Init(void)
 		return false;
 #endif
 
-	VkZone=VulkanMem_Init(&Context, Context.DeviceProperties2.maxMemoryAllocationSize);
+	VkZone=VkuMem_Init(&Context, Context.DeviceProperties2.maxMemoryAllocationSize);
 
 	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 100.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
 
@@ -1014,7 +1001,7 @@ void RecreateSwapchain(void)
 		// This is basically just the swapchain and frame buffers
 
 		vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
-		VulkanMem_Free(VkZone, DepthImage.DeviceMemory);
+		VkuMem_Free(VkZone, DepthImage.DeviceMemory);
 		vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
 
 		for(uint32_t i=0;i<SwapchainImageCount;i++)
@@ -1063,10 +1050,10 @@ void Destroy(void)
 	vkDestroySampler(Context.Device, ShadowDepth.Sampler, VK_NULL_HANDLE);
 	vkDestroyImageView(Context.Device, ShadowDepth.View, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, ShadowDepth.Image, VK_NULL_HANDLE);
-	VulkanMem_Free(VkZone, ShadowDepth.DeviceMemory);
+	VkuMem_Free(VkZone, ShadowDepth.DeviceMemory);
 
-	vkDestroyBuffer(Context.Device, shadow_ubo_buffer, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, shadow_ubo_memory, VK_NULL_HANDLE);
+	vkDestroyBuffer(Context.Device, shadow_ubo_buffer.Buffer, VK_NULL_HANDLE);
+	vkFreeMemory(Context.Device, shadow_ubo_buffer.DeviceMemory, VK_NULL_HANDLE);
 	// ---
 
 	Font_Destroy();
@@ -1076,7 +1063,7 @@ void Destroy(void)
 		vkDestroySampler(Context.Device, Textures[i].Sampler, VK_NULL_HANDLE);
 		vkDestroyImageView(Context.Device, Textures[i].View, VK_NULL_HANDLE);
 		vkDestroyImage(Context.Device, Textures[i].Image, VK_NULL_HANDLE);
-		VulkanMem_Free(VkZone, Textures[i].DeviceMemory);
+		VkuMem_Free(VkZone, Textures[i].DeviceMemory);
 	}
 
 	for(uint32_t i=0;i<NUM_MODELS;i++)
@@ -1084,10 +1071,10 @@ void Destroy(void)
 		for(uint32_t j=0;j<(uint32_t)Model[i].NumMesh;j++)
 		{
 			vkDestroyBuffer(Context.Device, Model[i].Mesh[j].VertexBuffer.Buffer, VK_NULL_HANDLE);
-			VulkanMem_Free(VkZone, Model[i].Mesh[j].VertexBuffer.Memory);
+			VkuMem_Free(VkZone, Model[i].Mesh[j].VertexBuffer.Memory);
 
 			vkDestroyBuffer(Context.Device, Model[i].Mesh[j].IndexBuffer.Buffer, VK_NULL_HANDLE);
-			VulkanMem_Free(VkZone, Model[i].Mesh[j].IndexBuffer.Memory);
+			VkuMem_Free(VkZone, Model[i].Mesh[j].IndexBuffer.Memory);
 		}
 
 		Free3DS(&Model[i]);
@@ -1106,7 +1093,7 @@ void Destroy(void)
 
 	vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
-	VulkanMem_Free(VkZone, DepthImage.DeviceMemory);
+	VkuMem_Free(VkZone, DepthImage.DeviceMemory);
 
 	for(uint32_t i=0;i<SwapchainImageCount;i++)
 	{
@@ -1123,7 +1110,7 @@ void Destroy(void)
 	vkDestroySwapchainKHR(Context.Device, Swapchain, VK_NULL_HANDLE);
 
 	DBGPRINTF(DEBUG_INFO"Remaining Vulkan memory blocks:\n");
-	VulkanMem_Print(VkZone);
-	VulkanMem_Destroy(&Context, VkZone);
+	VkuMem_Print(VkZone);
+	VkuMem_Destroy(&Context, VkZone);
 	DBGPRINTF(DEBUG_NONE);
 }

@@ -13,7 +13,6 @@
 #include <stdbool.h>
 #include "../system/system.h"
 #include "../vulkan/vulkan.h"
-#include "../vulkan/vulkan_mem.h"
 #include "../math/math.h"
 #include "../font/font.h"
 
@@ -21,7 +20,7 @@
 extern VkuContext_t Context;
 extern VkRenderPass RenderPass;
 
-extern VulkanMemZone_t *VkZone;
+extern VkuMemZone_t *VkZone;
 
 extern int Width, Height;	// Window width/height from main app.
 // ---
@@ -38,14 +37,13 @@ VkPipelineLayout fontPipelineLayout;
 VkuPipeline_t fontPipeline;
 
 // Texture handles
-Image_t fontTexture;
+VkuImage_t fontTexture;
 
 // Vertex data handles
 VkuBuffer_t fontVertexBuffer;
 
 // Instance data handles
-VkDeviceMemory fontInstanceBufferMemory;
-VkBuffer fontInstanceBuffer;
+VkuBuffer_t fontInstanceBuffer;
 void *fontInstanceBufferPtr;
 
 // Initialization flag
@@ -53,8 +51,7 @@ bool Font_Init=false;
 
 void _Font_Init(void)
 {
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
+	VkuBuffer_t stagingBuffer;
 	VkCommandBuffer copyCmd;
 	VkFence Fence;
 	void *data=NULL;
@@ -136,9 +133,7 @@ void _Font_Init(void)
 	// ---
 
 	// Create sampler and load texture data
-	vkuCreateBuffer(&Context,
-		&stagingBuffer, &stagingBufferMemory, 16*16*223,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	vkuCreateHostBuffer(&Context, &stagingBuffer, 16*16*223, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 	{
 		FILE *Stream=NULL;
@@ -162,13 +157,13 @@ void _Font_Init(void)
 		fclose(Stream);
 
 		// Map image memory and copy data
-		vkMapMemory(Context.Device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &data);
+		vkMapMemory(Context.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
 		uint8_t *ptr=(uint8_t *)data;
 		uint8_t *FontPtr=(uint8_t *)_FontData;
 
 		for(uint32_t i=0;i<16*16*223;i++)
 			*ptr++=*FontPtr++;
-		vkUnmapMemory(Context.Device, stagingBufferMemory);
+		vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
 
 		Zone_Free(Zone, _FontData);
 	}
@@ -207,7 +202,7 @@ void _Font_Init(void)
 	});
 
 	// Copy from staging buffer to the texture buffer
-	vkCmdCopyBufferToImage(copyCmd, stagingBuffer, fontTexture.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkBufferImageCopy)
+	vkCmdCopyBufferToImage(copyCmd, stagingBuffer.Buffer, fontTexture.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkBufferImageCopy)
 	{
 		.imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 		.imageSubresource.mipLevel=0,
@@ -261,8 +256,8 @@ void _Font_Init(void)
 	vkFreeCommandBuffers(Context.Device, Context.CommandPool, 1, &copyCmd);
 
 	// Done with the staging buffer
-	vkFreeMemory(Context.Device, stagingBufferMemory, VK_NULL_HANDLE);
-	vkDestroyBuffer(Context.Device, stagingBuffer, VK_NULL_HANDLE);
+	vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(Context.Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
 
 	vkCreateSampler(Context.Device, &(VkSamplerCreateInfo)
 	{
@@ -326,15 +321,13 @@ void _Font_Init(void)
 	}, 0, VK_NULL_HANDLE);
 
 	// Create static vertex data buffer
-	vkuCreateBuffer2(&Context, &fontVertexBuffer, sizeof(float)*4*4,
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	vkuCreateGPUBuffer(&Context, &fontVertexBuffer, sizeof(float)*4*4, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
 	// Create staging buffer, map it, and copy vertex data to it
-	vkuCreateBuffer(&Context, &stagingBuffer, &stagingBufferMemory, sizeof(float)*4*4,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	vkuCreateHostBuffer(&Context, &stagingBuffer, sizeof(float)*4*4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 	// Map it
-	vkMapMemory(Context.Device, stagingBufferMemory, 0, VK_WHOLE_SIZE, 0, &data);
+	vkMapMemory(Context.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
 
 	if(!data)
 		return;
@@ -361,20 +354,19 @@ void _Font_Init(void)
 	*Ptr++=1.0f;
 	*Ptr++=0.0f;
 
-	vkUnmapMemory(Context.Device, stagingBufferMemory);
+	vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
 
-	vkuCopyBuffer(&Context, stagingBuffer, fontVertexBuffer.Buffer, sizeof(float)*4*4);
+	vkuCopyBuffer(&Context, stagingBuffer.Buffer, fontVertexBuffer.Buffer, sizeof(float)*4*4);
 
 	// Delete staging data
-	vkFreeMemory(Context.Device, stagingBufferMemory, VK_NULL_HANDLE);
-	vkDestroyBuffer(Context.Device, stagingBuffer, VK_NULL_HANDLE);
+	vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(Context.Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
 	// ---
 
 	// Create instance buffer and map it
-	vkuCreateBuffer(&Context, &fontInstanceBuffer, &fontInstanceBufferMemory, sizeof(float)*7*255,
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	vkuCreateHostBuffer(&Context, &fontInstanceBuffer, sizeof(float)*7*255, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-	vkMapMemory(Context.Device, fontInstanceBufferMemory, 0, VK_WHOLE_SIZE, 0, (void *)&fontInstanceBufferPtr);
+	vkMapMemory(Context.Device, fontInstanceBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void *)&fontInstanceBufferPtr);
 	// ---
 }
 
@@ -490,7 +482,7 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 	// Bind vertex data buffer
 	vkCmdBindVertexBuffers(cmd, 0, 1, &fontVertexBuffer.Buffer, &(VkDeviceSize) { 0 });
 	// Bind object instance buffer
-	vkCmdBindVertexBuffers(cmd, 1, 1, &fontInstanceBuffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(cmd, 1, 1, &fontInstanceBuffer.Buffer, &(VkDeviceSize) { 0 });
 
 	// Draw the number of characters
 	vkCmdDraw(cmd, 4, numchar, 0, 0);
@@ -499,19 +491,19 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 void Font_Destroy(void)
 {
 	// Instance buffer handles
-	vkUnmapMemory(Context.Device, fontInstanceBufferMemory);
-	vkDestroyBuffer(Context.Device, fontInstanceBuffer, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, fontInstanceBufferMemory, VK_NULL_HANDLE);
+	vkUnmapMemory(Context.Device, fontInstanceBuffer.DeviceMemory);
+	vkDestroyBuffer(Context.Device, fontInstanceBuffer.Buffer, VK_NULL_HANDLE);
+	vkFreeMemory(Context.Device, fontInstanceBuffer.DeviceMemory, VK_NULL_HANDLE);
 
 	// Vertex data handles
 	vkDestroyBuffer(Context.Device, fontVertexBuffer.Buffer, VK_NULL_HANDLE);
-	VulkanMem_Free(VkZone, fontVertexBuffer.Memory);
+	VkuMem_Free(VkZone, fontVertexBuffer.Memory);
 
 	// Texture handles
 	vkDestroySampler(Context.Device, fontTexture.Sampler, VK_NULL_HANDLE);
 	vkDestroyImageView(Context.Device, fontTexture.View, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, fontTexture.Image, VK_NULL_HANDLE);
-	VulkanMem_Free(VkZone, fontTexture.DeviceMemory);
+	VkuMem_Free(VkZone, fontTexture.DeviceMemory);
 
 	// Pipeline
 	vkDestroyPipelineLayout(Context.Device, fontPipelineLayout, VK_NULL_HANDLE);

@@ -51,9 +51,6 @@ typedef struct
 	VkCommandPool CommandPool;
 } VkuContext_t;
 
-// Because vulkan stuff here depends on image.h and image.h depends on the VkContext_t struct, annoying.
-#include "../image/image.h"
-
 typedef struct
 {
 	// Handles to dependencies
@@ -157,21 +154,48 @@ typedef struct
 	VkDescriptorBufferInfo BufferInfo[VKU_MAX_DESCRIPTORSET_BINDINGS];
 } VkuDescriptorSet_t;
 
+typedef struct VkuMemBlock_s
+{
+	size_t Offset;
+	size_t Size;
+	bool Free;
+	struct VkuMemBlock_s *Next, *Prev;
+} VkuMemBlock_t;
+
+typedef struct
+{
+	size_t Size;
+	VkuMemBlock_t Blocks;
+	VkuMemBlock_t *Current;
+	VkDeviceMemory DeviceMemory;
+} VkuMemZone_t;
+
 typedef struct
 {
 	size_t Size;
 	VkBuffer Buffer;
-//	VkDeviceMemory Memory;
-	VulkanMemBlock_t *Memory;
+	VkDeviceMemory DeviceMemory;
+	VkuMemBlock_t *Memory;
 } VkuBuffer_t;
+
+typedef struct
+{
+	uint32_t Width, Height, Depth;
+	uint8_t *Data;
+
+	VkSampler Sampler;
+	VkImage Image;
+	VkuMemBlock_t *DeviceMemory;
+	VkImageView View;
+} VkuImage_t;
 
 VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile);
 
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask);
 
-VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, Image_t *Image, VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth, VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags);
-VkBool32 vkuCreateBuffer(VkuContext_t *Context, VkBuffer *Buffer, VkDeviceMemory *Memory, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask);
-VkBool32 vkuCreateBuffer2(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags, VkFlags RequirementsMask);
+VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, VkuImage_t *Image, VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth, VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags);
+VkBool32 vkuCreateHostBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags);
+VkBool32 vkuCreateGPUBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags);
 VkBool32 vkuCopyBuffer(VkuContext_t *Context, VkBuffer Src, VkBuffer Dest, uint32_t Size);
 
 VkBool32 vkuPipeline_AddVertexBinding(VkuPipeline_t *Pipeline, uint32_t Binding, uint32_t Stride, VkVertexInputRate InputRate);
@@ -183,11 +207,17 @@ VkBool32 vkuInitPipeline(VkuPipeline_t *Pipeline, VkuContext_t *Context);
 VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline);
 
 VkBool32 vkuDescriptorSet_AddBinding(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorType Type, VkShaderStageFlags Stage);
-VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, Image_t *Image);
+VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkuImage_t *Image);
 VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Range);
 VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *DescriptorSetLayout, VkuContext_t *Context);
 VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSet_t *DescriptorSet);
 VkBool32 vkuAllocateUpdateDescriptorSet(VkuDescriptorSet_t *DescriptorSet, VkDescriptorPool DescriptorPool);
+
+VkuMemZone_t *VkuMem_Init(VkuContext_t *Context, size_t Size);
+void VkuMem_Destroy(VkuContext_t *Context, VkuMemZone_t *VkZone);
+void VkuMem_Free(VkuMemZone_t *VkZone, VkuMemBlock_t *Ptr);
+VkuMemBlock_t *VkuMem_Malloc(VkuMemZone_t *VkZone, VkMemoryRequirements Requirements);
+void VkuMem_Print(VkuMemZone_t *VkZone);
 
 VkBool32 CreateVulkanInstance(VkInstance *Instance);
 VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context);

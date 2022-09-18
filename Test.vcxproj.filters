@@ -164,9 +164,6 @@
     <ClInclude Include="utils\memzone.h">
       <Filter>Header Files\utils</Filter>
     </ClInclude>
-    <ClInclude Include="vulkan\vulkan_mem.h">
-      <Filter>Header Files\vulkan</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <GLSL Include="shaders\distance.frag">

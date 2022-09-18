@@ -127,7 +127,6 @@
     <ClInclude Include="utils\list.h" />
     <ClInclude Include="utils\memzone.h" />
     <ClInclude Include="vulkan\vulkan.h" />
-    <ClInclude Include="vulkan\vulkan_mem.h" />
   </ItemGroup>
   <ItemGroup>
     <GLSL Include="shaders\distance.frag" />

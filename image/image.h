@@ -1,9 +1,6 @@
 #ifndef __IMAGE_H__
 #define __IMAGE_H__
 
-#include "../vulkan/vulkan.h"
-#include "../vulkan/vulkan_mem.h"
-
 // Image flags
 #define IMAGE_NONE										0x00000000
 #define IMAGE_MIPMAP									0x00000002
@@ -23,25 +20,13 @@
 #define IMAGE_REPEAT_W									0x00010000
 #define IMAGE_REPEAT									(IMAGE_REPEAT_U|IMAGE_REPEAT_V|IMAGE_REPEAT_W)
 
-// Physical image representation as well as Vulkan related handles
-typedef struct
-{
-	uint32_t Width, Height, Depth;
-	uint8_t *Data;
-
-	VkSampler Sampler;
-	VkImage Image;
-	VulkanMemBlock_t *DeviceMemory;
-	VkImageView View;
-} Image_t;
-
 // Image read/write functions
-bool TGA_Load(const char *Filename, Image_t *Image);
-bool TGA_Write(const char *filename, Image_t *Image, bool rle);
-bool QOI_Load(const char *Filename, Image_t *Image);
-bool QOI_Write(const char *filename, Image_t *Image);
+bool TGA_Load(const char *Filename, VkuImage_t *Image);
+bool TGA_Write(const char *filename, VkuImage_t *Image, bool rle);
+bool QOI_Load(const char *Filename, VkuImage_t *Image);
+bool QOI_Write(const char *filename, VkuImage_t *Image);
 
 // Creates texture objects
-VkBool32 Image_Upload(VkuContext_t *Context, Image_t *Image, const char *Filename, uint32_t Flags);
+VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *Filename, uint32_t Flags);
 
 #endif

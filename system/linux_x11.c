@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "../vulkan/vulkan.h"
-#include "../vulkan/vulkan_mem.h"
 #include "../math/math.h"
 #include "../camera/camera.h"
 #include "../utils/list.h"
@@ -24,7 +23,7 @@ bool ToggleFullscreen=true;
 extern VkInstance Instance;
 extern VkuContext_t Context;
 
-extern VulkanMemZone_t *VkZone;
+extern VkuMemZone_t *VkZone;
 
 extern uint32_t Width, Height;
 extern Lights_t Lights;
@@ -384,7 +383,7 @@ int main(int argc, char **argv)
 	Zone_Print(Zone);
 
 	DBGPRINTF(DEBUG_WARNING, "\nCurrent vulkan zone memory allocations:\n");
-	VulkanMem_Print(VkZone);
+	VkuMem_Print(VkZone);
 
 	DBGPRINTF(DEBUG_INFO, "\nStarting main loop.\n");
 	EventLoop();

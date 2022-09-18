@@ -6,11 +6,10 @@
 #include "../system/system.h"
 #include "../math/math.h"
 #include "vulkan.h"
-#include "vulkan_mem.h"
 
-VulkanMemZone_t *VulkanMem_Init(VkuContext_t *Context, size_t Size)
+VkuMemZone_t *VkuMem_Init(VkuContext_t *Context, size_t Size)
 {
-	VulkanMemZone_t *VkZone=(VulkanMemZone_t *)Zone_Malloc(Zone, sizeof(VulkanMemZone_t));
+	VkuMemZone_t *VkZone=(VkuMemZone_t *)Zone_Malloc(Zone, sizeof(VkuMemZone_t));
 
 	if(VkZone==NULL)
 	{
@@ -18,7 +17,7 @@ VulkanMemZone_t *VulkanMem_Init(VkuContext_t *Context, size_t Size)
 		return false;
 	}
 
-	VulkanMemBlock_t *Block=(VulkanMemBlock_t *)Zone_Malloc(Zone, sizeof(VulkanMemBlock_t));
+	VkuMemBlock_t *Block=(VkuMemBlock_t *)Zone_Malloc(Zone, sizeof(VkuMemBlock_t));
 	Block->Prev=&VkZone->Blocks;
 	Block->Next=&VkZone->Blocks;
 	Block->Free=false;
@@ -55,11 +54,11 @@ VulkanMemZone_t *VulkanMem_Init(VkuContext_t *Context, size_t Size)
 	return VkZone;
 }
 
-void VulkanMem_Destroy(VkuContext_t *Context, VulkanMemZone_t *VkZone)
+void VkuMem_Destroy(VkuContext_t *Context, VkuMemZone_t *VkZone)
 {
 	if(VkZone)
 	{
-		for(VulkanMemBlock_t *Block=VkZone->Blocks.Next;;Block=Block->Next)
+		for(VkuMemBlock_t *Block=VkZone->Blocks.Next;;Block=Block->Next)
 		{
 			Zone_Free(Zone, Block);
 
@@ -72,7 +71,7 @@ void VulkanMem_Destroy(VkuContext_t *Context, VulkanMemZone_t *VkZone)
 	}
 }
 
-void VulkanMem_Free(VulkanMemZone_t *VkZone, VulkanMemBlock_t *Block)
+void VkuMem_Free(VkuMemZone_t *VkZone, VkuMemBlock_t *Block)
 {
 	if(Block==NULL)
 	{
@@ -90,7 +89,7 @@ void VulkanMem_Free(VulkanMemZone_t *VkZone, VulkanMemBlock_t *Block)
 
 	if(Block->Prev&&!Block->Prev->Free)
 	{
-		VulkanMemBlock_t *Last=Block->Prev;
+		VkuMemBlock_t *Last=Block->Prev;
 
 		Last->Size+=Block->Size;
 		Last->Next=Block->Next;
@@ -105,7 +104,7 @@ void VulkanMem_Free(VulkanMemZone_t *VkZone, VulkanMemBlock_t *Block)
 
 	if(Block->Next&&!Block->Next->Free)
 	{
-		VulkanMemBlock_t *Next=Block->Next;
+		VkuMemBlock_t *Next=Block->Next;
 
 		Block->Size+=Next->Size;
 		Block->Next=Next->Next;
@@ -118,16 +117,16 @@ void VulkanMem_Free(VulkanMemZone_t *VkZone, VulkanMemBlock_t *Block)
 	}
 }
 
-VulkanMemBlock_t *VulkanMem_Malloc(VulkanMemZone_t *VkZone, VkMemoryRequirements Requirements)
+VkuMemBlock_t *VkuMem_Malloc(VkuMemZone_t *VkZone, VkMemoryRequirements Requirements)
 {
 	const size_t MinimumBlockSize=64;
 
 	size_t Size=Requirements.size+Requirements.alignment;
 	Size=(Size+7)&~7;				// Align to 64bit boundary
 
-	VulkanMemBlock_t *Base=VkZone->Current;
-	VulkanMemBlock_t *Current=VkZone->Current;
-	VulkanMemBlock_t *Start=Base->Prev;
+	VkuMemBlock_t *Base=VkZone->Current;
+	VkuMemBlock_t *Current=VkZone->Current;
+	VkuMemBlock_t *Start=Base->Prev;
 
 	do
 	{
@@ -151,7 +150,7 @@ VulkanMemBlock_t *VulkanMem_Malloc(VulkanMemZone_t *VkZone, VkMemoryRequirements
 
 	if(Extra>MinimumBlockSize)
 	{
-		VulkanMemBlock_t *New=(VulkanMemBlock_t *)Zone_Malloc(Zone, sizeof(VulkanMemBlock_t));
+		VkuMemBlock_t *New=(VkuMemBlock_t *)Zone_Malloc(Zone, sizeof(VkuMemBlock_t));
 		New->Size=Extra;
 		New->Offset=0;
 		New->Free=false;
@@ -174,11 +173,11 @@ VulkanMemBlock_t *VulkanMem_Malloc(VulkanMemZone_t *VkZone, VkMemoryRequirements
 	return Base;
 }
 
-void VulkanMem_Print(VulkanMemZone_t *VkZone)
+void VkuMem_Print(VkuMemZone_t *VkZone)
 {
 	DBGPRINTF(DEBUG_WARNING, "Vulkan zone size: %0.2fMB  Location: 0x%p (Vulkan Object Address)\n", (float)(VkZone->Size/1000.0f/1000.0f), VkZone->DeviceMemory);
 
-	for(VulkanMemBlock_t *Block=VkZone->Blocks.Next;;Block=Block->Next)
+	for(VkuMemBlock_t *Block=VkZone->Blocks.Next;;Block=Block->Next)
 	{
 		DBGPRINTF(DEBUG_WARNING, "\tPointer: 0x%p Offset: %0.4fMB Size: %0.4fMB Block free: %s\n", Block, (float)Block->Offset/1000.0f/1000.0f, (float)Block->Size/1000.0f/1000.0f, Block->Free?"no":"yes");
 

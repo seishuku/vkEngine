@@ -21,9 +21,7 @@ typedef struct
 typedef struct
 {
 	List_t Lights;
-
-	VkBuffer StorageBuffer;
-	VkDeviceMemory StorageMemory;
+	VkuBuffer_t StorageBuffer;
 } Lights_t;
 
 uint32_t Lights_Add(Lights_t *Lights, vec3 Position, float Radius, vec4 Kd);
