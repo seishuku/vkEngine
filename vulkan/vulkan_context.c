@@ -212,10 +212,58 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	// Get device queue
 	vkGetDeviceQueue(Context->Device, Context->QueueFamilyIndex, 0, &Context->Queue);
 
-	vkCreatePipelineCache(Context->Device, &(VkPipelineCacheCreateInfo)
+	FILE *Stream=fopen("pipelinecache.bin", "rb");
+
+	if(Stream)
 	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO
-	}, VK_NULL_HANDLE, &Context->PipelineCache);
+		DBGPRINTF(DEBUG_INFO, "Reading pipeline cache data...\n");
+
+		fseek(Stream, 0, SEEK_END);
+		size_t PipelineCacheSize=ftell(Stream);
+		fseek(Stream, 0, SEEK_SET);
+
+		uint8_t *PipelineCacheData=(uint8_t *)Zone_Malloc(Zone, PipelineCacheSize);
+
+		if(PipelineCacheData)
+		{
+			VkResult Result=vkCreatePipelineCache(Context->Device, &(VkPipelineCacheCreateInfo)
+			{
+				.sType=VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+				.initialDataSize=PipelineCacheSize,
+				.pInitialData=PipelineCacheData,
+			}, VK_NULL_HANDLE, &Context->PipelineCache);
+
+			if(Result!=VK_SUCCESS)
+			{
+				DBGPRINTF(DEBUG_ERROR, "Corrupted pipeline cache data, creating new. (Result=%d)\n", Result);
+
+				vkCreatePipelineCache(Context->Device, &(VkPipelineCacheCreateInfo)
+				{
+					.sType=VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+				}, VK_NULL_HANDLE, &Context->PipelineCache);
+			}
+
+			Zone_Free(Zone, PipelineCacheData);
+		}
+		else
+		{
+			DBGPRINTF(DEBUG_ERROR, "Failed to allocate memory for pipeline cache data, creating new pipeline cache.\n");
+
+			vkCreatePipelineCache(Context->Device, &(VkPipelineCacheCreateInfo)
+			{
+				.sType=VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+			}, VK_NULL_HANDLE, &Context->PipelineCache);
+		}
+	}
+	else
+	{
+		DBGPRINTF(DEBUG_INFO, "No pipeline cache data file found, creating new.\n");
+
+		vkCreatePipelineCache(Context->Device, &(VkPipelineCacheCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+		}, VK_NULL_HANDLE, &Context->PipelineCache);
+	}
 
 	// Create command pool
 	vkCreateCommandPool(Context->Device, &(VkCommandPoolCreateInfo)

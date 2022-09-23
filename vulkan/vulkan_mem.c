@@ -179,7 +179,7 @@ void VkuMem_Print(VkuMemZone_t *VkZone)
 
 	for(VkuMemBlock_t *Block=VkZone->Blocks.Next;;Block=Block->Next)
 	{
-		DBGPRINTF(DEBUG_WARNING, "\tPointer: 0x%p Offset: %0.4fMB Size: %0.4fMB Block free: %s\n", Block, (float)Block->Offset/1000.0f/1000.0f, (float)Block->Size/1000.0f/1000.0f, Block->Free?"no":"yes");
+		DBGPRINTF(DEBUG_WARNING, "\tOffset: %0.4fMB Size: %0.4fMB Block free: %s\n", (float)Block->Offset/1000.0f/1000.0f, (float)Block->Size/1000.0f/1000.0f, Block->Free?"no":"yes");
 
 		if(Block->Next==&VkZone->Blocks)
 			break;

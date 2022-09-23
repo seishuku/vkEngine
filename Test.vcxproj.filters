@@ -129,6 +129,9 @@
     <ClCompile Include="vulkan\vulkan_pipeline.c">
       <Filter>Source Files\vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="model\skybox.c">
+      <Filter>Source Files\model</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
@@ -164,6 +167,9 @@
     <ClInclude Include="utils\memzone.h">
       <Filter>Header Files\utils</Filter>
     </ClInclude>
+    <ClInclude Include="model\skybox.h">
+      <Filter>Header Files\model</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <GLSL Include="shaders\distance.frag">
@@ -185,6 +191,12 @@
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\distance.geom">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\skybox.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\skybox.vert">
       <Filter>Shaders</Filter>
     </GLSL>
   </ItemGroup>

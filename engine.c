@@ -8,6 +8,7 @@
 #include "math/math.h"
 #include "camera/camera.h"
 #include "model/3ds.h"
+#include "model/skybox.h"
 #include "image/image.h"
 #include "font/font.h"
 #include "utils/list.h"
@@ -19,8 +20,6 @@ VkInstance Instance;
 VkuContext_t Context;
 
 VkuMemZone_t *VkZone;
-
-float RotateX=0.0f, RotateY=0.0f, PanX=0.0f, PanY=0.0f, Zoom=-100.0f;
 
 Camera_t Camera;
 
@@ -36,6 +35,7 @@ enum
 };
 
 Model3DS_t Model[NUM_MODELS];
+Model3DS_t Skybox;
 
 enum
 {
@@ -53,7 +53,6 @@ enum
 VkuImage_t Textures[NUM_TEXTURES];
 
 matrix ModelView, Projection;
-vec4 QuatX, QuatY, Quat;
 
 Lights_t Lights;
 
@@ -88,6 +87,9 @@ VkuImage_t DepthImage;
 VkRenderPass RenderPass;
 VkPipelineLayout PipelineLayout;
 VkuPipeline_t Pipeline;
+
+VkPipelineLayout SkyboxPipelineLayout;
+VkuPipeline_t SkyboxPipeline;
 
 VkDescriptorPool DescriptorPool[MAX_FRAME_COUNT];
 VkuDescriptorSet_t DescriptorSet[MAX_FRAME_COUNT*NUM_MODELS];
@@ -296,11 +298,11 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 		.renderArea.extent=(VkExtent2D)	{ ShadowCubeSize, ShadowCubeSize },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
-	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
-	vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ShadowPipeline.Pipeline);
-
 	vkCmdSetViewport(CommandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)ShadowCubeSize, (float)ShadowCubeSize, 0.0f, 1.0f });
 	vkCmdSetScissor(CommandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { ShadowCubeSize, ShadowCubeSize } });
+
+	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
+	vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ShadowPipeline.Pipeline);
 
 	for(uint32_t i=0;i<List_GetCount(&Lights.Lights);i++)
 	{
@@ -503,6 +505,48 @@ bool CreatePipeline(void)
 	return true;
 }
 
+bool CreateSkyboxPipeline(void)
+{
+	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+		.pushConstantRangeCount=1,
+		.pPushConstantRanges=&(VkPushConstantRange)
+		{
+			.offset=0,
+			.size=sizeof(ubo),
+			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
+	}, 0, &SkyboxPipelineLayout);
+
+	vkuInitPipeline(&SkyboxPipeline, &Context);
+
+	vkuPipeline_SetPipelineLayout(&SkyboxPipeline, SkyboxPipelineLayout);
+	vkuPipeline_SetRenderPass(&SkyboxPipeline, RenderPass);
+
+	SkyboxPipeline.DepthTest=VK_TRUE;
+	SkyboxPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+
+	if(!vkuPipeline_AddStage(&SkyboxPipeline, "./shaders/skybox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+		return false;
+
+	if(!vkuPipeline_AddStage(&SkyboxPipeline, "./shaders/skybox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+		return false;
+
+	vkuPipeline_AddVertexBinding(&SkyboxPipeline, 0, sizeof(float)*20, VK_VERTEX_INPUT_RATE_VERTEX);
+
+	vkuPipeline_AddVertexAttribute(&SkyboxPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+	vkuPipeline_AddVertexAttribute(&SkyboxPipeline, 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*4);
+	vkuPipeline_AddVertexAttribute(&SkyboxPipeline, 2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*8);
+	vkuPipeline_AddVertexAttribute(&SkyboxPipeline, 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*12);
+	vkuPipeline_AddVertexAttribute(&SkyboxPipeline, 4, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*16);
+
+	if(!vkuAssemblePipeline(&SkyboxPipeline))
+		return false;
+
+	return true;
+}
+
 void BuildMemoryBuffers(Model3DS_t *Model)
 {
 	VkuBuffer_t stagingBuffer;
@@ -663,35 +707,41 @@ void Render(void)
 		.renderArea.extent=SwapchainExtent,
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
-	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
-	vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
-
 	vkCmdSetViewport(CommandBuffers[Index], 0, 1, &(VkViewport) { 0.0f, 0, (float)SwapchainExtent.width, (float)SwapchainExtent.height, 0.0f, 1.0f });
 	vkCmdSetScissor(CommandBuffers[Index], 0, 1, &(VkRect2D) { { 0, 0 }, SwapchainExtent});
 
-	vkCmdPushConstants(CommandBuffers[Index], PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ubo), &ubo);
+	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
+	//vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 
-	// Draw the models
-	for(uint32_t i=0;i<NUM_MODELS;i++)
-	{
+	//vkCmdPushConstants(CommandBuffers[Index], PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ubo), &ubo);
 
-		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 0, Lights.StorageBuffer.Buffer, 0, VK_WHOLE_SIZE);
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 1, &Textures[2*i+0]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 2, &Textures[2*i+1]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 3, &ShadowDepth);
-		vkuAllocateUpdateDescriptorSet(&DescriptorSet[MAX_FRAME_COUNT*i+Index], DescriptorPool[Index]);
+	//// Draw the models
+	//for(uint32_t i=0;i<NUM_MODELS;i++)
+	//{
 
-		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[MAX_FRAME_COUNT*i+Index].DescriptorSet, 0, VK_NULL_HANDLE);
+	//	vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 0, Lights.StorageBuffer.Buffer, 0, VK_WHOLE_SIZE);
+	//	vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 1, &Textures[2*i+0]);
+	//	vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 2, &Textures[2*i+1]);
+	//	vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 3, &ShadowDepth);
+	//	vkuAllocateUpdateDescriptorSet(&DescriptorSet[MAX_FRAME_COUNT*i+Index], DescriptorPool[Index]);
 
-		// Bind model data buffers and draw the triangles
-		for(int32_t j=0;j<Model[i].NumMesh;j++)
-		{
-			vkCmdBindVertexBuffers(CommandBuffers[Index], 0, 1, &Model[i].Mesh[j].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
-			vkCmdBindIndexBuffer(CommandBuffers[Index], Model[i].Mesh[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
-			vkCmdDrawIndexed(CommandBuffers[Index], Model[i].Mesh[j].NumFace*3, 1, 0, 0, 0);
-		}
-	}
+	//	vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[MAX_FRAME_COUNT*i+Index].DescriptorSet, 0, VK_NULL_HANDLE);
+
+	//	// Bind model data buffers and draw the triangles
+	//	for(int32_t j=0;j<Model[i].NumMesh;j++)
+	//	{
+	//		vkCmdBindVertexBuffers(CommandBuffers[Index], 0, 1, &Model[i].Mesh[j].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
+	//		vkCmdBindIndexBuffer(CommandBuffers[Index], Model[i].Mesh[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
+	//		vkCmdDrawIndexed(CommandBuffers[Index], Model[i].Mesh[j].NumFace*3, 1, 0, 0, 0);
+	//	}
+	//}
 	// ---
+
+	vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipeline.Pipeline);
+	vkCmdPushConstants(CommandBuffers[Index], SkyboxPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ubo), &ubo);
+	vkCmdBindVertexBuffers(CommandBuffers[Index], 0, 1, &Skybox.Mesh->VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindIndexBuffer(CommandBuffers[Index], Skybox.Mesh->IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
+	vkCmdDrawIndexed(CommandBuffers[Index], Skybox.Mesh->NumFace*3, 1, 0, 0, 0);
 
 	// Should UI overlay stuff have it's own render pass?
 	// Maybe even separate thread?
@@ -775,6 +825,8 @@ bool Init(void)
 	if(Load3DS(&Model[MODEL_LEVEL], "./assets/level.3ds"))
 		BuildMemoryBuffers(&Model[MODEL_LEVEL]);
 
+	BuildSkybox(&Skybox);
+
 	// Load textures
 	Image_Upload(&Context, &Textures[TEXTURE_HELLKNIGHT], "./assets/hellknight.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_HELLKNIGHT_NORMAL], "./assets/hellknight_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
@@ -820,6 +872,8 @@ bool Init(void)
 
 	// Create main render pipeline
 	CreatePipeline();
+
+	CreateSkyboxPipeline();
 
 	InitShadowPipeline();
 	InitShadowCubeMap(13);
@@ -1031,6 +1085,33 @@ void Destroy(void)
 {
 	vkDeviceWaitIdle(Context.Device);
 
+	if(Context.PipelineCache)
+	{
+		DBGPRINTF(DEBUG_INFO, "\nWriting pipeline cache to disk...\n");
+
+		size_t PipelineCacheSize=0;
+		vkGetPipelineCacheData(Context.Device, Context.PipelineCache, &PipelineCacheSize, VK_NULL_HANDLE);
+
+		uint8_t *PipelineCacheData=(uint8_t *)Zone_Malloc(Zone, PipelineCacheSize);
+
+		if(PipelineCacheData)
+		{
+			FILE *Stream=fopen("pipelinecache.bin", "wb");
+
+			if(Stream)
+			{
+				vkGetPipelineCacheData(Context.Device, Context.PipelineCache, &PipelineCacheSize, PipelineCacheData);
+				fwrite(PipelineCacheData, 1, PipelineCacheSize, Stream);
+				fclose(Stream);
+				Zone_Free(Zone, PipelineCacheData);
+			}
+			else
+				DBGPRINTF(DEBUG_ERROR, "Failed to open file handle to write pipeline cache data.\n");
+		}
+		else
+			DBGPRINTF(DEBUG_ERROR, "Failed to allocate memory for pipeline cache data.\n");
+	}
+
 #ifdef _DEBUG
 	vkDestroyDebugUtilsMessengerEXT(Instance, debugMessenger, VK_NULL_HANDLE);
 #endif
@@ -1079,6 +1160,14 @@ void Destroy(void)
 
 		Free3DS(&Model[i]);
 	}
+
+	vkDestroyBuffer(Context.Device, Skybox.Mesh->VertexBuffer.Buffer, VK_NULL_HANDLE);
+	VkuMem_Free(VkZone, Skybox.Mesh->VertexBuffer.Memory);
+
+	vkDestroyBuffer(Context.Device, Skybox.Mesh->IndexBuffer.Buffer, VK_NULL_HANDLE);
+	VkuMem_Free(VkZone, Skybox.Mesh->IndexBuffer.Memory);
+
+	Zone_Free(Zone, Skybox.Mesh);
 
 	vkDestroyPipeline(Context.Device, Pipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, PipelineLayout, VK_NULL_HANDLE);

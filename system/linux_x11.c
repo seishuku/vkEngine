@@ -29,8 +29,6 @@ extern uint32_t Width, Height;
 extern Lights_t Lights;
 extern Camera_t Camera;
 
-extern float RotateX, RotateY, PanX, PanY, Zoom;
-
 uint64_t Frequency, StartTime, EndTime;
 float avgfps=0.0f, fps=0.0f, fTimeStep, fTime=0.0f;
 
