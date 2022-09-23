@@ -361,51 +361,6 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 
 bool CreateFramebuffers(void)
 {
-	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-		.attachmentCount=2,
-		.pAttachments=(VkAttachmentDescription[])
-		{
-			{
-				.format=SurfaceFormat.format,
-				.samples=VK_SAMPLE_COUNT_1_BIT,
-				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-			},
-			{
-				.format=DepthFormat,
-				.samples=VK_SAMPLE_COUNT_1_BIT,
-				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-				.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-			},
-		},
-		.subpassCount=1,
-		.pSubpasses=&(VkSubpassDescription)
-		{
-			.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS,
-			.colorAttachmentCount=1,
-			.pColorAttachments=&(VkAttachmentReference)
-			{
-				.attachment=0,
-				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			},
-			.pDepthStencilAttachment=&(VkAttachmentReference)
-			{
-				.attachment=1,
-				.layout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-			},
-		},
-	}, 0, &RenderPass);
-
 	vkuCreateImageBuffer(&Context, &DepthImage,
 		VK_IMAGE_TYPE_2D, DepthFormat, 1, 1, Width, Height, 1,
 		VK_IMAGE_TILING_OPTIMAL,
@@ -451,6 +406,51 @@ bool CreateFramebuffers(void)
 
 bool CreatePipeline(void)
 {
+	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+		.attachmentCount=2,
+		.pAttachments=(VkAttachmentDescription[])
+		{
+			{
+				.format=SurfaceFormat.format,
+				.samples=VK_SAMPLE_COUNT_1_BIT,
+				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
+				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+				.finalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+			},
+			{
+				.format=DepthFormat,
+				.samples=VK_SAMPLE_COUNT_1_BIT,
+				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+				.finalLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			},
+		},
+		.subpassCount=1,
+		.pSubpasses=&(VkSubpassDescription)
+		{
+			.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS,
+			.colorAttachmentCount=1,
+			.pColorAttachments=&(VkAttachmentReference)
+			{
+				.attachment=0,
+				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			},
+			.pDepthStencilAttachment=&(VkAttachmentReference)
+			{
+				.attachment=1,
+				.layout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			},
+		},
+	}, 0, &RenderPass);
+
 	for(uint32_t i=0;i<MAX_FRAME_COUNT*NUM_MODELS;i++)
 	{
 		vkuInitDescriptorSet(&DescriptorSet[i], &Context);
@@ -867,16 +867,16 @@ bool Init(void)
 		}, VK_NULL_HANDLE, &DescriptorPool[i]);
 	}
 
-	// Create primary frame buffers, depth image, and renderpass
-	CreateFramebuffers();
-
-	// Create main render pipeline
+	// Create main render pipeline and renderpass
 	CreatePipeline();
 
 	CreateSkyboxPipeline();
 
 	InitShadowPipeline();
 	InitShadowCubeMap(13);
+
+	// Create primary frame buffers, depth image
+	CreateFramebuffers();
 
 	return true;
 }
@@ -1117,6 +1117,9 @@ void Destroy(void)
 #endif
 
 	Lights_Destroy(&Lights);
+
+	vkDestroyPipeline(Context.Device, SkyboxPipeline.Pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(Context.Device, SkyboxPipelineLayout, VK_NULL_HANDLE);
 
 	// Shadow stuff
 	vkDestroyPipeline(Context.Device, ShadowPipeline.Pipeline, VK_NULL_HANDLE);

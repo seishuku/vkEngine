@@ -112,6 +112,7 @@ void EventLoop(void)
 				case ConfigureNotify:
 					Width=Event.xconfigure.width;
 					Height=Event.xconfigure.height;
+					RecreateSwapchain();
 					break;
 
 				case ButtonPress:

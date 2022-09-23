@@ -80,6 +80,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		case WM_SIZE:
 			Width=max(LOWORD(lParam), 2);
 			Height=max(HIWORD(lParam), 2);
+			RecreateSwapchain();
 			break;
 
 		case WM_LBUTTONDOWN:
