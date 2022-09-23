@@ -2,6 +2,7 @@ TARGET=engine
 
 # model loading/drawing
 OBJS=model/3ds.o
+OBJS+=model/skybox.o
 
 # image loading
 OBJS+=image/qoi.o
@@ -37,6 +38,8 @@ SHADERS+=shaders/font.frag.spv
 SHADERS+=shaders/font.vert.spv
 SHADERS+=shaders/lighting.frag.spv
 SHADERS+=shaders/lighting.vert.spv
+SHADERS+=shaders/skybox.frag.spv
+SHADERS+=shaders/skybox.vert.spv
 
 CC=gcc
 CFLAGS=-Wall -O3 -std=c17 -I/usr/X11/include
