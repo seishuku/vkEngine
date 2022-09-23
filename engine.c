@@ -552,13 +552,9 @@ bool CreateSkyboxPipeline(void)
 	if(!vkuPipeline_AddStage(&SkyboxPipeline, "./shaders/skybox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
-	vkuPipeline_AddVertexBinding(&SkyboxPipeline, 0, sizeof(float)*20, VK_VERTEX_INPUT_RATE_VERTEX);
+	vkuPipeline_AddVertexBinding(&SkyboxPipeline, 0, sizeof(float)*4, VK_VERTEX_INPUT_RATE_VERTEX);
 
 	vkuPipeline_AddVertexAttribute(&SkyboxPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-	vkuPipeline_AddVertexAttribute(&SkyboxPipeline, 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*4);
-	vkuPipeline_AddVertexAttribute(&SkyboxPipeline, 2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*8);
-	vkuPipeline_AddVertexAttribute(&SkyboxPipeline, 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*12);
-	vkuPipeline_AddVertexAttribute(&SkyboxPipeline, 4, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*16);
 
 	if(!vkuAssemblePipeline(&SkyboxPipeline))
 		return false;

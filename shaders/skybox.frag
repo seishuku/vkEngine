@@ -1,8 +1,6 @@
 #version 450
 
 layout (location=0) in vec3 Position;
-layout (location=1) in vec3 UV;
-layout (location=2) in mat3 Tangent;
 
 layout (push_constant) uniform ubo
 {
@@ -138,11 +136,11 @@ void main()
     vec3 Temp=vec3(0.0);
 
     // Nebula mix A
-    Temp+=mix(vec3(0.0), uNebulaAColor.xyz, pow(max(0.0, nebula(normalize(uOffset.xyz+UV))), 2.0));
+    Temp+=mix(vec3(0.0), uNebulaAColor.xyz, pow(max(0.0, nebula(uOffset.xyz+Position)), 2.0));
     // Nebula mix B
-    Temp+=mix(vec3(0.0), uNebulaBColor.xyz, pow(max(0.0, nebula(normalize(uOffset.xyz+UV)+0.5)), 2.0));
+    Temp+=mix(vec3(0.0), uNebulaBColor.xyz, pow(max(0.0, nebula(uOffset.xyz+Position+0.5)), 2.0));
     // Stars
-    float stars=pow(max(0.0, noise(normalize(uOffset.xyz+UV)*uStarsScale)), uStarDensity);
+    float stars=pow(max(0.0, noise(uOffset.xyz+Position*uStarsScale)), uStarDensity);
     Temp+=length(vec2(dFdx(stars), dFdy(stars)));
     // Sun
 	float d=max(0.0, dot(normalize(Position), normalize(uSunPosition.xyz)));

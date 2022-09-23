@@ -9,63 +9,77 @@ extern VkuContext_t Context;
 
 void BuildSkybox(Model3DS_t *Model)
 {
-	float scale=1.0f, w=0.0f, tex_scale=1.0f;
-	vec4 SkyboxVerts[]=
+	float vertices[3*12];
+
+	float phiaa=26.56505f, r=1.0f;
+	float phia=PI*phiaa/180.0f;
+	float theb=PI*36.0f/180.0f;
+	float the72=PI*72.0f/180.0f;
+
+	vertices[3*0+0]=0.0f;
+	vertices[3*0+1]=0.0f;
+	vertices[3*0+2]=r;
+
+	vertices[3*11+0]=0.0f;
+	vertices[3*11+1]=0.0f;
+	vertices[3*11+2]=-r;
+
+	float the=0.0f;
+	for(uint32_t i=1;i<6;i++)
 	{
-		{ +scale, -scale, -scale, w }, { +tex_scale, -tex_scale, -tex_scale, 0.0f }, { 0.0f, 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, //0 Right
-		{ +scale, -scale, +scale, w }, { +tex_scale, -tex_scale, +tex_scale, 0.0f }, { 0.0f, 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, //1
-		{ +scale, +scale, +scale, w }, { +tex_scale, +tex_scale, +tex_scale, 0.0f }, { 0.0f, 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, //2
-		{ +scale, +scale, -scale, w }, { +tex_scale, +tex_scale, -tex_scale, 0.0f }, { 0.0f, 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, //3
+		vertices[3*i+0]=r*cosf(the)*cosf(phia);
+		vertices[3*i+1]=r*sinf(the)*cosf(phia);
+		vertices[3*i+2]=r*sinf(phia);
+		the=the+the72;
+	}
 
-		{ -scale, -scale, +scale, w }, { -tex_scale, -tex_scale, +tex_scale, 0.0f }, { 0.0f, 0.0f,-1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, {-1.0f, 0.0f, 0.0f, 0.0f }, //4 Left
-		{ -scale, -scale, -scale, w }, { -tex_scale, -tex_scale, -tex_scale, 0.0f }, { 0.0f, 0.0f,-1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, {-1.0f, 0.0f, 0.0f, 0.0f }, //5
-		{ -scale, +scale, -scale, w }, { -tex_scale, +tex_scale, -tex_scale, 0.0f }, { 0.0f, 0.0f,-1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, {-1.0f, 0.0f, 0.0f, 0.0f }, //6
-		{ -scale, +scale, +scale, w }, { -tex_scale, +tex_scale, +tex_scale, 0.0f }, { 0.0f, 0.0f,-1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, {-1.0f, 0.0f, 0.0f, 0.0f }, //7
-
-		{ -scale, +scale, -scale, w }, { -tex_scale, +tex_scale, -tex_scale, 0.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f, 0.0f }, { 0.0f,-1.0f, 0.0f, 0.0f }, //8 Top
-		{ +scale, +scale, -scale, w }, { +tex_scale, +tex_scale, -tex_scale, 0.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f, 0.0f }, { 0.0f,-1.0f, 0.0f, 0.0f }, //9
-		{ +scale, +scale, +scale, w }, { +tex_scale, +tex_scale, +tex_scale, 0.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f, 0.0f }, { 0.0f,-1.0f, 0.0f, 0.0f }, //10
-		{ -scale, +scale, +scale, w }, { -tex_scale, +tex_scale, +tex_scale, 0.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f, 0.0f }, { 0.0f,-1.0f, 0.0f, 0.0f }, //11
-
-		{ -scale, -scale, +scale, w }, { -tex_scale, -tex_scale, +tex_scale, 0.0f }, {-1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f,-1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, //12 Bottom
-		{ +scale, -scale, +scale, w }, { +tex_scale, -tex_scale, +tex_scale, 0.0f }, {-1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f,-1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, //13
-		{ +scale, -scale, -scale, w }, { +tex_scale, -tex_scale, -tex_scale, 0.0f }, {-1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f,-1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, //14
-		{ -scale, -scale, -scale, w }, { -tex_scale, -tex_scale, -tex_scale, 0.0f }, {-1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f,-1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, //15
-
-		{ +scale, -scale, +scale, w }, { +tex_scale, -tex_scale, +tex_scale, 0.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f,-1.0f, 0.0f }, //16 Front
-		{ -scale, -scale, +scale, w }, { -tex_scale, -tex_scale, +tex_scale, 0.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f,-1.0f, 0.0f }, //17
-		{ -scale, +scale, +scale, w }, { -tex_scale, +tex_scale, +tex_scale, 0.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f,-1.0f, 0.0f }, //18
-		{ +scale, +scale, +scale, w }, { +tex_scale, +tex_scale, +tex_scale, 0.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f,-1.0f, 0.0f }, //19
-
-		{ -scale, -scale, -scale, w }, { -tex_scale, -tex_scale, -tex_scale, 0.0f }, {-1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f, 0.0f }, //20 Back
-		{ +scale, -scale, -scale, w }, { +tex_scale, -tex_scale, -tex_scale, 0.0f }, {-1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f, 0.0f }, //21
-		{ +scale, +scale, -scale, w }, { +tex_scale, +tex_scale, -tex_scale, 0.0f }, {-1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f, 0.0f }, //22
-		{ -scale, +scale, -scale, w }, { -tex_scale, +tex_scale, -tex_scale, 0.0f }, {-1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f, 0.0f }  //23
-	};
-	uint16_t SkyboxTris[]=
+	the=theb;
+	for(uint32_t i=6;i<11;i++)
 	{
-		 0,  1,  2,  3,  0, 2,	// Right
-		 4,  5,  6,  7,  4, 6,	// Left
-		 8,  9, 10, 11,  8, 10,	// Top
-		12, 13, 14, 15, 12, 14,	// Bottom
-		16, 17, 18, 19, 16, 18, // Front
-		20, 21, 22, 23, 20, 22	// Back
+		vertices[3*i+0]=r*cosf(the)*cosf(-phia);
+		vertices[3*i+1]=r*sinf(the)*cosf(-phia);
+		vertices[3*i+2]=r*sinf(-phia);
+		the=the+the72;
+	}
+
+	uint16_t faces[3*20]=
+	{
+		0, 2, 1,
+		0, 3, 2,
+		0, 4, 3,
+		0, 5, 4,
+		0, 1, 5,
+		11, 6, 7,
+		11, 7, 8,
+		11, 8, 9,
+		11, 9, 10,
+		11, 10, 6,
+		1, 2, 6,
+		2, 3, 7,
+		3, 4, 8,
+		4, 5, 9,
+		5, 1, 10,
+		6, 2, 7,
+		7, 3, 8,
+		8, 4, 9,
+		9, 5, 10,
+		10, 1, 6
 	};
 
 	Model->NumMesh=1;
 	Model->Mesh=(Mesh3DS_t *)Zone_Malloc(Zone, sizeof(Mesh3DS_t));
 
-	Model->Mesh->NumVertex=24;
-	Model->Mesh->NumFace=12;
+	Model->Mesh->NumVertex=12;
+	Model->Mesh->NumFace=20;
 
 	VkuBuffer_t stagingBuffer;
 	void *Data=NULL;
 
 	// Vertex data on device memory
-	vkuCreateGPUBuffer(&Context, &Model->Mesh->VertexBuffer, sizeof(float)*20*Model->Mesh->NumVertex, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+	vkuCreateGPUBuffer(&Context, &Model->Mesh->VertexBuffer, sizeof(float)*4*Model->Mesh->NumVertex, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
 	// Create staging buffer to transfer from host memory to device memory
-	vkuCreateHostBuffer(&Context, &stagingBuffer, sizeof(float)*20*Model->Mesh->NumVertex, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+	vkuCreateHostBuffer(&Context, &stagingBuffer, sizeof(float)*4*Model->Mesh->NumVertex, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 	vkMapMemory(Context.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
 
@@ -76,36 +90,16 @@ void BuildSkybox(Model3DS_t *Model)
 
 	for(int32_t j=0;j<Model->Mesh->NumVertex;j++)
 	{
-		*fPtr++=SkyboxVerts[5*j+0][0];
-		*fPtr++=SkyboxVerts[5*j+0][1];
-		*fPtr++=SkyboxVerts[5*j+0][2];
-		*fPtr++=SkyboxVerts[5*j+0][3];
-
-		*fPtr++=SkyboxVerts[5*j+1][0];
-		*fPtr++=SkyboxVerts[5*j+1][1];
-		*fPtr++=SkyboxVerts[5*j+1][2];
-		*fPtr++=0.0f;
-
-		*fPtr++=SkyboxVerts[5*j+2][0];
-		*fPtr++=SkyboxVerts[5*j+2][1];
-		*fPtr++=SkyboxVerts[5*j+2][2];
-		*fPtr++=0.0f;
-
-		*fPtr++=SkyboxVerts[5*j+3][0];
-		*fPtr++=SkyboxVerts[5*j+3][1];
-		*fPtr++=SkyboxVerts[5*j+3][2];
-		*fPtr++=0.0f;
-
-		*fPtr++=SkyboxVerts[5*j+4][0];
-		*fPtr++=SkyboxVerts[5*j+4][1];
-		*fPtr++=SkyboxVerts[5*j+4][2];
+		*fPtr++=vertices[3*j+0];
+		*fPtr++=vertices[3*j+1];
+		*fPtr++=vertices[3*j+2];
 		*fPtr++=0.0f;
 	}
 
 	vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
 
 	// Copy to device memory
-	vkuCopyBuffer(&Context, stagingBuffer.Buffer, Model->Mesh->VertexBuffer.Buffer, sizeof(float)*20*Model->Mesh->NumVertex);
+	vkuCopyBuffer(&Context, stagingBuffer.Buffer, Model->Mesh->VertexBuffer.Buffer, sizeof(float)*4*Model->Mesh->NumVertex);
 
 	// Delete staging data
 	vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
@@ -126,9 +120,9 @@ void BuildSkybox(Model3DS_t *Model)
 
 	for(int32_t j=0;j<Model->Mesh->NumFace;j++)
 	{
-		*sPtr++=SkyboxTris[3*j+0];
-		*sPtr++=SkyboxTris[3*j+1];
-		*sPtr++=SkyboxTris[3*j+2];
+		*sPtr++=faces[3*j+0];
+		*sPtr++=faces[3*j+1];
+		*sPtr++=faces[3*j+2];
 	}
 
 	vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
