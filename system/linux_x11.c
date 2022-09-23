@@ -151,25 +151,29 @@ void EventLoop(void)
 
 					switch(Keysym)
 					{
-						case 'o':
-							for(uint32_t i=0;i<10;i++)
-							{
-								Lights_Add(&Lights, 
-								(vec3)
-								{
-									(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f,
-									(((float)rand()/RAND_MAX)*2.0f-1.0f)*100.0f,
-									(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f
-								}, 200.0f,
-								(vec4)
-								{
-									(float)rand()/RAND_MAX,
-									(float)rand()/RAND_MAX,
-									(float)rand()/RAND_MAX,
-									1.0f
-								});
-							}
+						case 'p':
+							GenerateSkyParams();
 							break;
+
+						//case 'o':
+						//	for(uint32_t i=0;i<10;i++)
+						//	{
+						//		Lights_Add(&Lights, 
+						//		(vec3)
+						//		{
+						//			(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f,
+						//			(((float)rand()/RAND_MAX)*2.0f-1.0f)*100.0f,
+						//			(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f
+						//		}, 200.0f,
+						//		(vec4)
+						//		{
+						//			(float)rand()/RAND_MAX,
+						//			(float)rand()/RAND_MAX,
+						//			(float)rand()/RAND_MAX,
+						//			1.0f
+						//		});
+						//	}
+						//	break;
 
 						case 'w':
 							Camera.key_w=true;

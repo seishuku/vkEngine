@@ -8,10 +8,21 @@ layout (location=4) in vec4 vNormal;
 
 layout (push_constant) uniform ubo
 {
-    mat4 mvp;
-    vec4 eye;
+	mat4 mvp;
+	vec4 uOffset;
 
-	uint NumLights;
+	vec4 uNebulaAColor;
+	vec4 uNebulaBColor;
+
+	float uStarsScale;
+	float uStarDensity;
+	float pad0[2];
+
+	vec4 uSunPosition;
+	float uSunSize;
+	float uSunFalloff;
+	float pad1[2];
+	vec4 uSunColor;
 };
 
 out gl_PerVertex

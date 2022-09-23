@@ -30,6 +30,7 @@ uint64_t Frequency, StartTime, EndTime;
 float avgfps=0.0f, fps=0.0f, fTimeStep, fTime=0.0f;
 uint32_t Frames=0;
 
+void GenerateSkyParams(void);
 void Render(void);
 bool Init(void);
 void vkuCreateSwapchain(VkuContext_t *Context, uint32_t Width, uint32_t Height, int VSync);
@@ -174,28 +175,28 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			switch(wParam)
 			{
 				case 'P':
-					VkuMem_Print(VkZone);
+					GenerateSkyParams();
 					break;
 
-				case 'O':
-					for(uint32_t i=0;i<10;i++)
-					{
-						Lights_Add(&Lights, 
-						(vec3)
-						{
-							(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f,
-							(((float)rand()/RAND_MAX)*2.0f-1.0f)*100.0f,
-							(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f
-						}, 200.0f,
-						(vec4)
-						{
-							(float)rand()/RAND_MAX,
-							(float)rand()/RAND_MAX,
-							(float)rand()/RAND_MAX,
-							1.0f
-						});
-					}
-					break;
+				//case 'O':
+				//	for(uint32_t i=0;i<10;i++)
+				//	{
+				//		Lights_Add(&Lights, 
+				//		(vec3)
+				//		{
+				//			(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f,
+				//			(((float)rand()/RAND_MAX)*2.0f-1.0f)*100.0f,
+				//			(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f
+				//		}, 200.0f,
+				//		(vec4)
+				//		{
+				//			(float)rand()/RAND_MAX,
+				//			(float)rand()/RAND_MAX,
+				//			(float)rand()/RAND_MAX,
+				//			1.0f
+				//		});
+				//	}
+				//	break;
 
 				case 'W':
 					Camera.key_w=true;
@@ -370,9 +371,9 @@ int main(int argc, char **argv)
 	RECT Rect;
 
 	SetRect(&Rect, 0, 0, Width, Height);
-	AdjustWindowRect(&Rect, WS_OVERLAPPEDWINDOW, FALSE);
+	AdjustWindowRect(&Rect, WS_POPUP, FALSE);
 
-	Context.hWnd=CreateWindow(szAppName, szAppName, WS_OVERLAPPEDWINDOW|WS_CLIPSIBLINGS, CW_USEDEFAULT, CW_USEDEFAULT, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
+	Context.hWnd=CreateWindow(szAppName, szAppName, WS_POPUP|WS_CLIPSIBLINGS, CW_USEDEFAULT, CW_USEDEFAULT, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
 
 	ShowWindow(Context.hWnd, SW_SHOW);
 	SetForegroundWindow(Context.hWnd);

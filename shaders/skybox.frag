@@ -6,10 +6,21 @@ layout (location=2) in mat3 Tangent;
 
 layout (push_constant) uniform ubo
 {
-    mat4 mvp;
-    vec4 eye;
+	mat4 mvp;
+	vec4 uOffset;
 
-	uint NumLights;
+	vec4 uNebulaAColor;
+	vec4 uNebulaBColor;
+
+	float uStarsScale;
+	float uStarDensity;
+	float pad0[2];
+
+	vec4 uSunPosition;
+	float uSunSize;
+	float uSunFalloff;
+	float pad1[2];
+	vec4 uSunColor;
 };
 
 layout (location=0) out vec4 Output;
@@ -122,22 +133,20 @@ float nebula(vec3 p)
     return turb;
 }
 
-const float uSize=1.0/1000.0;
-const vec3 uPosition=vec3(1.0, 1.0, -1.0);
-const float uFalloff=10.0;
-
 void main()
 {
-    Output=vec4(0.0);
+    vec3 Temp=vec3(0.0);
 
     // Nebula mix A
-    Output+=vec4(mix(vec3(0.0), vec3(1.0, 0.5, 0.1), pow(min(1.0, nebula(normalize(UV))), 2.0)), 1.0);
+    Temp+=mix(vec3(0.0), uNebulaAColor.xyz, pow(max(0.0, nebula(normalize(uOffset.xyz+UV))), 2.0));
     // Nebula mix B
-    Output+=vec4(mix(vec3(0.0), vec3(0.5, 1.0, 0.2), pow(min(1.0, nebula(normalize(UV+0.5))), 2.0)), 1.0);
+    Temp+=mix(vec3(0.0), uNebulaBColor.xyz, pow(max(0.0, nebula(normalize(uOffset.xyz+UV)+0.5)), 2.0));
     // Stars
-    float stars=min(1.0, max(0.0, pow(noise(UV*200.0), 16.0)));
-    Output+=vec4(length(vec2(dFdx(stars), dFdy(stars))));
+    float stars=pow(max(0.0, noise(normalize(uOffset.xyz+UV)*uStarsScale)), uStarDensity);
+    Temp+=length(vec2(dFdx(stars), dFdy(stars)));
     // Sun
-	float d=clamp(dot(normalize(Position), normalize(uPosition)), 0.0, 1.0);
-	Output+=vec4(mix(vec3(0.0), vec3(1.0, 0.75, 0.50), smoothstep(1.0-uSize*32.0, 1.0-uSize, d)+pow(d, uFalloff)*0.5), 0.0);
+	float d=max(0.0, dot(normalize(Position), normalize(uSunPosition.xyz)));
+	Temp+=mix(vec3(0.0), uSunColor.xyz, smoothstep(1.0-uSunSize*uSunFalloff, 1.0-uSunSize, d)+pow(d, uSunFalloff)*0.5);
+
+    Output=vec4(max(vec3(0.0), Temp), 1.0);
 }

@@ -144,7 +144,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 
 	Zone_Free(Zone, ExtensionProperties);
 
-	if(!SwapchainExtension||!PushDescriptorExtension)
+	if(!SwapchainExtension)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Missing required device extensions!\n");
 		return VK_FALSE;

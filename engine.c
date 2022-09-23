@@ -88,6 +88,25 @@ VkRenderPass RenderPass;
 VkPipelineLayout PipelineLayout;
 VkuPipeline_t Pipeline;
 
+struct
+{
+	matrix mvp;
+	vec4 uOffset;
+
+	vec4 uNebulaAColor;
+	vec4 uNebulaBColor;
+
+	float uStarsScale;
+	float uStarDensity;
+	float pad0[2];
+
+	vec4 uSunPosition;
+	float uSunSize;
+	float uSunFalloff;
+	float pad1[2];
+	vec4 uSunColor;
+} skybox_ubo;
+
 VkPipelineLayout SkyboxPipelineLayout;
 VkuPipeline_t SkyboxPipeline;
 
@@ -514,7 +533,7 @@ bool CreateSkyboxPipeline(void)
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
 			.offset=0,
-			.size=sizeof(ubo),
+			.size=sizeof(skybox_ubo),
 			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 	}, 0, &SkyboxPipelineLayout);
@@ -634,16 +653,40 @@ void BuildMemoryBuffers(Model3DS_t *Model)
 	}
 }
 
+float RandFloat(void)
+{
+	return (float)rand()/RAND_MAX;
+}
+
+void GenerateSkyParams(void)
+{
+	Vec4_Set(skybox_ubo.uOffset, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
+	Vec3_Normalize(skybox_ubo.uOffset);
+
+	Vec4_Set(skybox_ubo.uNebulaAColor, RandFloat(), RandFloat(), RandFloat(), 0.0f);
+	Vec4_Set(skybox_ubo.uNebulaBColor, RandFloat(), RandFloat(), RandFloat(), 0.0f);
+
+	Vec4_Set(skybox_ubo.uSunPosition, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
+	Vec3_Normalize(skybox_ubo.uSunPosition);
+
+	Vec4_Set(skybox_ubo.uSunColor, RandFloat(), RandFloat(), RandFloat(), 0.0f);
+	skybox_ubo.uSunSize=1.0f/(RandFloat()*1000.0f);
+	skybox_ubo.uSunFalloff=RandFloat()*16.0f+8.0f;
+
+	skybox_ubo.uStarsScale=200.0f;
+	skybox_ubo.uStarDensity=8.0f;
+}
+
 void Render(void)
 {
 	static uint32_t OldIndex=0;
 	uint32_t Index=OldIndex;
 
-	Lights_UpdatePosition(&Lights, 0, (vec3) { sinf(fTime)*150.0f, -25.0f, cosf(fTime)*150.0f });
-	Lights_UpdatePosition(&Lights, 1, (vec3) { cosf(fTime)*100.0f, 50.0f, sinf(fTime)*100.0f });
-	Lights_UpdatePosition(&Lights, 2, (vec3) { cosf(fTime)*100.0f, -80.0f, -15.0f });
-	Lights_UpdatePosition(&Lights, 10, (vec3) { cosf(fTime)*300.0f, 100.0f, sinf(fTime)*300.0f });
-	Lights_UpdateRadius(&Lights, 10, 300.0f);
+	//Lights_UpdatePosition(&Lights, 0, (vec3) { sinf(fTime)*150.0f, -25.0f, cosf(fTime)*150.0f });
+	//Lights_UpdatePosition(&Lights, 1, (vec3) { cosf(fTime)*100.0f, 50.0f, sinf(fTime)*100.0f });
+	//Lights_UpdatePosition(&Lights, 2, (vec3) { cosf(fTime)*100.0f, -80.0f, -15.0f });
+	//Lights_UpdatePosition(&Lights, 10, (vec3) { cosf(fTime)*300.0f, 100.0f, sinf(fTime)*300.0f });
+	//Lights_UpdateRadius(&Lights, 10, 300.0f);
 
 	// Generate the projection matrix
 	MatrixIdentity(Projection);
@@ -670,7 +713,9 @@ void Render(void)
 	// Set number of lights to the shader
 	ubo.NumLights=(uint32_t)List_GetCount(&Lights.Lights);
 
-	Lights_UpdateSSBO(&Lights);
+	//Lights_UpdateSSBO(&Lights);
+
+	memcpy(skybox_ubo.mvp, ubo.mvp, sizeof(matrix));
 
 	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain, UINT64_MAX, PresentCompleteSemaphores[Index], VK_NULL_HANDLE, &OldIndex);
 
@@ -693,7 +738,7 @@ void Render(void)
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 	});
 
-	ShadowUpdateCubemap(CommandBuffers[Index], Index);
+	//ShadowUpdateCubemap(CommandBuffers[Index], Index);
 
 	// Start a render pass and clear the frame/depth buffer
 	vkCmdBeginRenderPass(CommandBuffers[Index], &(VkRenderPassBeginInfo)
@@ -738,14 +783,16 @@ void Render(void)
 	// ---
 
 	vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipeline.Pipeline);
-	vkCmdPushConstants(CommandBuffers[Index], SkyboxPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ubo), &ubo);
+
+	vkCmdPushConstants(CommandBuffers[Index], SkyboxPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(skybox_ubo), &skybox_ubo);
+
 	vkCmdBindVertexBuffers(CommandBuffers[Index], 0, 1, &Skybox.Mesh->VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
 	vkCmdBindIndexBuffer(CommandBuffers[Index], Skybox.Mesh->IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
 	vkCmdDrawIndexed(CommandBuffers[Index], Skybox.Mesh->NumFace*3, 1, 0, 0, 0);
 
 	// Should UI overlay stuff have it's own render pass?
 	// Maybe even separate thread?
-	Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f\n\n\n\nNumber of lights: %d", fps, ubo.NumLights);
+//	Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f\n\n\n\nNumber of lights: %d", fps, ubo.NumLights);
 
 	vkCmdEndRenderPass(CommandBuffers[Index]);
 
@@ -837,6 +884,8 @@ bool Init(void)
 	Image_Upload(&Context, &Textures[TEXTURE_LEVEL], "./assets/tile.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_LEVEL_NORMAL], "./assets/tile_b.tga", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALMAP);
 
+	GenerateSkyParams();
+
 	// Create a large descriptor pool, so I don't have to worry about readjusting for exactly what I have
 	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
 	{
@@ -872,8 +921,8 @@ bool Init(void)
 
 	CreateSkyboxPipeline();
 
-	InitShadowPipeline();
-	InitShadowCubeMap(13);
+//	InitShadowPipeline();
+//	InitShadowCubeMap(13);
 
 	// Create primary frame buffers, depth image
 	CreateFramebuffers();
@@ -1140,7 +1189,7 @@ void Destroy(void)
 	vkFreeMemory(Context.Device, shadow_ubo_buffer.DeviceMemory, VK_NULL_HANDLE);
 	// ---
 
-	Font_Destroy();
+//	Font_Destroy();
 
 	for(uint32_t i=0;i<NUM_TEXTURES;i++)
 	{
