@@ -7,7 +7,7 @@
 #include "vulkan/vulkan.h"
 #include "math/math.h"
 #include "camera/camera.h"
-#include "model/obj.h"
+#include "model/bmodel.h"
 #include "model/skybox.h"
 #include "image/image.h"
 #include "font/font.h"
@@ -34,7 +34,7 @@ enum
 	NUM_MODELS
 };
 
-ModelOBJ_t Model[NUM_MODELS];
+BModel_t Model[NUM_MODELS];
 
 VkuBuffer_t SkyboxVertex, SkyboxIndex;
 
@@ -729,7 +729,7 @@ void Render(void)
 
 		for(uint32_t j=0;j<Model[i].NumMesh;j++)
 		{
-			vkCmdBindIndexBuffer(CommandBuffers[Index], Model[i].Mesh[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
+			vkCmdBindIndexBuffer(CommandBuffers[Index], Model[i].Mesh[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(CommandBuffers[Index], Model[i].Mesh[j].NumFace*3, 1, 0, 0, 0);
 		}
 	}
@@ -813,23 +813,23 @@ bool Init(void)
 	Lights_Add(&Lights, (vec3) { 100.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 0.0f, 0.0f, 1.0f, 1.0f });
 
 	// Load models
-	if(LoadOBJ(&Model[MODEL_ASTEROID1], "./assets/asteroid1.obj"))
-		BuildMemoryBuffersOBJ(&Context, &Model[MODEL_ASTEROID1]);
+	if(LoadBModel(&Model[MODEL_ASTEROID1], "./assets/asteroid1.bmodel"))
+		BuildMemoryBuffersBModel(&Context, &Model[MODEL_ASTEROID1]);
 	else
 		return false;
 
-	if(LoadOBJ(&Model[MODEL_ASTEROID2], "./assets/asteroid2.obj"))
-		BuildMemoryBuffersOBJ(&Context, &Model[MODEL_ASTEROID2]);
+	if(LoadBModel(&Model[MODEL_ASTEROID2], "./assets/asteroid2.bmodel"))
+		BuildMemoryBuffersBModel(&Context, &Model[MODEL_ASTEROID2]);
 	else
 		return false;
 
-	if(LoadOBJ(&Model[MODEL_ASTEROID3], "./assets/asteroid3.obj"))
-		BuildMemoryBuffersOBJ(&Context, &Model[MODEL_ASTEROID3]);
+	if(LoadBModel(&Model[MODEL_ASTEROID3], "./assets/asteroid3.bmodel"))
+		BuildMemoryBuffersBModel(&Context, &Model[MODEL_ASTEROID3]);
 	else
 		return false;
 
-	if(LoadOBJ(&Model[MODEL_ASTEROID4], "./assets/asteroid4.obj"))
-		BuildMemoryBuffersOBJ(&Context, &Model[MODEL_ASTEROID4]);
+	if(LoadBModel(&Model[MODEL_ASTEROID4], "./assets/asteroid4.bmodel"))
+		BuildMemoryBuffersBModel(&Context, &Model[MODEL_ASTEROID4]);
 	else
 		return false;
 
@@ -1171,7 +1171,7 @@ void Destroy(void)
 			VkuMem_Free(VkZone, Model[i].Mesh[j].IndexBuffer.Memory);
 		}
 
-		FreeOBJ(&Model[i]);
+		FreeBModel(&Model[i]);
 	}
 
 	vkDestroyBuffer(Context.Device, SkyboxVertex.Buffer, VK_NULL_HANDLE);

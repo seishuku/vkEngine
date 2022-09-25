@@ -129,7 +129,7 @@
     <ClCompile Include="model\skybox.c">
       <Filter>Source Files\model</Filter>
     </ClCompile>
-    <ClCompile Include="model\obj.c">
+    <ClCompile Include="model\bmodel.c">
       <Filter>Source Files\model</Filter>
     </ClCompile>
   </ItemGroup>
@@ -167,7 +167,7 @@
     <ClInclude Include="model\skybox.h">
       <Filter>Header Files\model</Filter>
     </ClInclude>
-    <ClInclude Include="model\obj.h">
+    <ClInclude Include="model\bmodel.h">
       <Filter>Header Files\model</Filter>
     </ClInclude>
   </ItemGroup>

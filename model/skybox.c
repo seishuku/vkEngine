@@ -3,7 +3,6 @@
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
 #include "../system/system.h"
-#include "3ds.h"
 
 void BuildSkybox(VkuContext_t *Context, VkuBuffer_t *VertexBuffer, VkuBuffer_t *IndexBuffer)
 {

@@ -1,7 +1,7 @@
 TARGET=engine
 
 # model loading/drawing
-OBJS=model/obj.o
+OBJS=model/bmodel.o
 OBJS+=model/skybox.o
 
 # image loading
