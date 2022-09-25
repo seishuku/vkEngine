@@ -121,6 +121,26 @@ bool LoadMTL(ModelOBJ_t *Model, const char *Filename)
 	if(!(fp=fopen(Filename, "r")))
 		return false;
 
+	// First pass, count materials for allocation
+	while(!feof(fp))
+	{
+		// Read line
+		fgets(buff, sizeof(buff), fp);
+
+		if(strncmp(buff, "newmtl ", 7)==0)
+			Model->NumMaterial++;
+	}
+
+	fseek(fp, 0, SEEK_SET);
+
+	Model->Material=(MaterialOBJ_t *)Zone_Malloc(Zone, sizeof(MaterialOBJ_t)*Model->NumMaterial);
+
+	if(Model->Material==NULL)
+		return false;
+
+	Model->NumMaterial=0;
+
+	// Second pass, read materials
 	while(!feof(fp))
 	{
 		// Read line
@@ -130,79 +150,53 @@ bool LoadMTL(ModelOBJ_t *Model, const char *Filename)
 		{
 			Model->NumMaterial++;
 
-			if(!Model->Material)
-				Model->Material=(MaterialOBJ_t *)malloc(sizeof(MaterialOBJ_t));
-			else
-				Model->Material=(MaterialOBJ_t *)realloc(Model->Material, sizeof(MaterialOBJ_t)*Model->NumMaterial);
+			memset(&Model->Material[Model->NumMaterial-1], 0, sizeof(MaterialOBJ_t));
 
-			if(Model->Material)
-			{
-				memset(&Model->Material[Model->NumMaterial-1], 0, sizeof(MaterialOBJ_t));
-
-				if(sscanf(buff, "newmtl %s", Model->Material[Model->NumMaterial-1].Name)!=1)
-					return false;
-			}
+			if(sscanf(buff, "newmtl %s", Model->Material[Model->NumMaterial-1].Name)!=1)
+				return false;
 		}
 		else if(strncmp(buff, "Ka ", 3)==0)
 		{
-			if(Model->Material)
-			{
-				if(sscanf(buff, "Ka %f %f %f",
-					&Model->Material[Model->NumMaterial-1].Ambient[0],
-					&Model->Material[Model->NumMaterial-1].Ambient[1],
-					&Model->Material[Model->NumMaterial-1].Ambient[2])!=3)
-					return false;
-			}
+			if(sscanf(buff, "Ka %f %f %f",
+				&Model->Material[Model->NumMaterial-1].Ambient[0],
+				&Model->Material[Model->NumMaterial-1].Ambient[1],
+				&Model->Material[Model->NumMaterial-1].Ambient[2])!=3)
+				return false;
 		}
 		else if(strncmp(buff, "Kd ", 3)==0)
 		{
-			if(Model->Material)
-			{
-				if(sscanf(buff, "Kd %f %f %f",
-					&Model->Material[Model->NumMaterial-1].Diffuse[0],
-					&Model->Material[Model->NumMaterial-1].Diffuse[1],
-					&Model->Material[Model->NumMaterial-1].Diffuse[2])!=3)
-					return false;
-			}
+			if(sscanf(buff, "Kd %f %f %f",
+				&Model->Material[Model->NumMaterial-1].Diffuse[0],
+				&Model->Material[Model->NumMaterial-1].Diffuse[1],
+				&Model->Material[Model->NumMaterial-1].Diffuse[2])!=3)
+				return false;
 		}
 		else if(strncmp(buff, "Ks ", 3)==0)
 		{
-			if(Model->Material)
-			{
-				if(sscanf(buff, "Ks %f %f %f",
-					&Model->Material[Model->NumMaterial-1].Specular[0],
-					&Model->Material[Model->NumMaterial-1].Specular[1],
-					&Model->Material[Model->NumMaterial-1].Specular[2])!=3)
-					return false;
-			}
+			if(sscanf(buff, "Ks %f %f %f",
+				&Model->Material[Model->NumMaterial-1].Specular[0],
+				&Model->Material[Model->NumMaterial-1].Specular[1],
+				&Model->Material[Model->NumMaterial-1].Specular[2])!=3)
+				return false;
 		}
 		else if(strncmp(buff, "Ke ", 3)==0)
 		{
-			if(Model->Material)
-			{
-				if(sscanf(buff, "Ke %f %f %f",
-					&Model->Material[Model->NumMaterial-1].Emission[0],
-					&Model->Material[Model->NumMaterial-1].Emission[1],
-					&Model->Material[Model->NumMaterial-1].Emission[2])!=3)
-					return false;
-			}
+			if(sscanf(buff, "Ke %f %f %f",
+				&Model->Material[Model->NumMaterial-1].Emission[0],
+				&Model->Material[Model->NumMaterial-1].Emission[1],
+				&Model->Material[Model->NumMaterial-1].Emission[2])!=3)
+				return false;
 		}
 		else if(strncmp(buff, "Ns ", 3)==0)
 		{
-			if(Model->Material)
-			{
-				if(sscanf(buff, "Ns %f",
-					&Model->Material[Model->NumMaterial-1].Shininess)!=1)
-					return false;
-			}
+			if(sscanf(buff, "Ns %f",
+				&Model->Material[Model->NumMaterial-1].Shininess)!=1)
+				return false;
 		}
 		else if(strncmp(buff, "map_Kd ", 7)==0)
 		{
-			if(Model->Material)
-			{
-				if(sscanf(buff, "map_Kd %s", Model->Material[Model->NumMaterial-1].Texture)!=1)
-					return false;
-			}
+			if(sscanf(buff, "map_Kd %s", Model->Material[Model->NumMaterial-1].Texture)!=1)
+				return false;
 		}
 	}
 
@@ -253,6 +247,46 @@ bool LoadOBJ(ModelOBJ_t *Model, const char *Filename)
 
 	memset(Model, 0, sizeof(ModelOBJ_t));
 
+	// Multiple passes, not a huge fan of this.
+
+	// First pass, count number of meshes (objects) and vertices
+	while(!feof(fp))
+	{
+		// Read line
+		fgets(buff, sizeof(buff), fp);
+
+		if(strncmp(buff, "o ", 2)==0)
+			Model->NumMesh++;
+		else if(strncmp(buff, "v ", 2)==0)
+			Model->NumVertex++;
+		else if(strncmp(buff, "vt ", 3)==0)
+			NumUV++;
+	}
+
+	Model->Mesh=(MeshOBJ_t *)Zone_Malloc(Zone, sizeof(MeshOBJ_t)*Model->NumMesh);
+
+	if(Model->Mesh==NULL)
+		return false;
+
+	Model->NumMesh=0;
+
+	Model->Vertex=(float *)Zone_Malloc(Zone, sizeof(float)*3*Model->NumVertex);
+
+	if(Model->Vertex==NULL)
+		return false;
+
+	Model->NumVertex=0;
+
+	Model->UV=(float *)Zone_Malloc(Zone, sizeof(float)*2*NumUV);
+
+	if(Model->UV==NULL)
+		return false;
+
+	NumUV=0;
+
+	fseek(fp, 0, SEEK_SET);
+
+	// Second pass, count faces, resetting on each object to split into different meshes, also read in object names and assigned material names
 	while(!feof(fp))
 	{
 		// Read line
@@ -262,18 +296,10 @@ bool LoadOBJ(ModelOBJ_t *Model, const char *Filename)
 		{
 			Model->NumMesh++;
 
-			if(!Model->Mesh)
-				Model->Mesh=(MeshOBJ_t *)malloc(sizeof(MeshOBJ_t));
-			else
-				Model->Mesh=(MeshOBJ_t *)realloc(Model->Mesh, sizeof(MeshOBJ_t)*Model->NumMesh);
+			memset(&Model->Mesh[Model->NumMesh-1], 0, sizeof(MeshOBJ_t));
 
-			if(Model->Mesh)
-			{
-				memset(&Model->Mesh[Model->NumMesh-1], 0, sizeof(MeshOBJ_t));
-
-				if(sscanf(buff, "o %s", Model->Mesh[Model->NumMesh-1].Name)!=1)
-					return false;
-			}
+			if(sscanf(buff, "o %s", Model->Mesh[Model->NumMesh-1].Name)!=1)
+				return false;
 		}
 		else if(strncmp(buff, "usemtl ", 7)==0)
 		{
@@ -282,6 +308,31 @@ bool LoadOBJ(ModelOBJ_t *Model, const char *Filename)
 				if(sscanf(buff, "usemtl %s", Model->Mesh[Model->NumMesh-1].MaterialName)!=1)
 					return false;
 			}
+		}
+		else if(strncmp(buff, "f ", 2)==0)
+			Model->Mesh[Model->NumMesh-1].NumFace++;
+	}
+
+	Model->NumMesh=0;
+
+	fseek(fp, 0, SEEK_SET);
+
+	// Third pass, read faces, vertex data, and anything else remaining
+	while(!feof(fp))
+	{
+		// Read line
+		fgets(buff, sizeof(buff), fp);
+
+		if(strncmp(buff, "o ", 2)==0)
+		{
+			Model->NumMesh++;
+
+			Model->Mesh[Model->NumMesh-1].Face=(uint32_t *)Zone_Malloc(Zone, sizeof(uint32_t)*3*Model->Mesh[Model->NumMesh-1].NumFace);
+
+			if(Model->Mesh[Model->NumMesh-1].Face==NULL)
+				return false;
+
+			Model->Mesh[Model->NumMesh-1].NumFace=0;
 		}
 		else if(strncmp(buff, "mtllib ", 7)==0)
 		{
@@ -292,85 +343,61 @@ bool LoadOBJ(ModelOBJ_t *Model, const char *Filename)
 		{
 			Model->NumVertex++;
 
-			if(!Model->Vertex)
-				Model->Vertex=(float *)malloc(sizeof(float)*3);
-			else
-				Model->Vertex=(float *)realloc(Model->Vertex, sizeof(float)*3*Model->NumVertex);
-			
-			if(Model->Vertex)
-			{
-				if(sscanf(buff, "v %f %f %f",
-					&Model->Vertex[3*(Model->NumVertex-1)+0],
-					&Model->Vertex[3*(Model->NumVertex-1)+1],
-					&Model->Vertex[3*(Model->NumVertex-1)+2])!=3)
-					return false;
-			}
+			if(sscanf(buff, "v %f %f %f",
+				&Model->Vertex[3*(Model->NumVertex-1)+0],
+				&Model->Vertex[3*(Model->NumVertex-1)+1],
+				&Model->Vertex[3*(Model->NumVertex-1)+2])!=3)
+				return false;
 		}
 		else if(strncmp(buff, "vt ", 3)==0)
 		{
 			NumUV++;
 
-			if(!Model->UV)
-				Model->UV=(float *)malloc(sizeof(float)*2);
-			else
-				Model->UV=(float *)realloc(Model->UV, sizeof(float)*2*NumUV);
-
-			if(Model->UV)
-			{
-				if(sscanf(buff, "vt %f %f",
-					&Model->UV[2*(NumUV-1)+0],
-					&Model->UV[2*(NumUV-1)+1])!=2)
-					return false;
-			}
+			if(sscanf(buff, "vt %f %f",
+				&Model->UV[2*(NumUV-1)+0],
+				&Model->UV[2*(NumUV-1)+1])!=2)
+				return false;
 		}
 		else if(strncmp(buff, "f ", 2)==0)
 		{
-			if(Model->Mesh)
+			if(Model->Mesh&&Model->Mesh[Model->NumMesh-1].Face)
 			{
 				Model->Mesh[Model->NumMesh-1].NumFace++;
 
-				if(!Model->Mesh[Model->NumMesh-1].Face)
-					Model->Mesh[Model->NumMesh-1].Face=(uint32_t *)malloc(sizeof(uint32_t)*3);
-				else
-					Model->Mesh[Model->NumMesh-1].Face=(uint32_t *)realloc(Model->Mesh[Model->NumMesh-1].Face, sizeof(uint32_t)*3*Model->Mesh[Model->NumMesh-1].NumFace);
-
-				if(Model->Mesh[Model->NumMesh-1].Face)
+				// So... Alias Wavefront models allow a different index buffer for vertices, normals, and UV
+				// But, I'm ignoring that and only using the vertex indices for everything and hope that
+				// whatever exported the model used the same index for all attribs.
+				//
+				// Maybe add in a index unifier layer?
+				//
+				if(sscanf(buff, "f %d/%d/%d %d/%d/%d %d/%d/%d",
+					&vi[0], &ti[0], &ni[0],
+					&vi[1], &ti[1],	&ni[1],
+					&vi[2], &ti[2], &ni[2])!=9)
 				{
-					// So... Alias Wavefront models allow a different index buffer for vertices, normals, and UV
-					// But, I'm ignoring that and only using the vertex indices for everything and hope that
-					// whatever exported the model used the same index for all attribs.
-					//
-					// Maybe add in a index unifier layer?
-					//
-					if(sscanf(buff, "f %d/%d/%d %d/%d/%d %d/%d/%d",
-						&vi[0], &ti[0], &ni[0],
-						&vi[1], &ti[1],	&ni[1],
-						&vi[2], &ti[2], &ni[2])!=9)
+					if(sscanf(buff, "f %d/%d %d/%d %d/%d",
+						&vi[0], &ti[0],
+						&vi[1], &ti[1],
+						&vi[2], &ti[2])!=6)
 					{
-						if(sscanf(buff, "f %d/%d %d/%d %d/%d",
-							&vi[0], &ti[0],
-							&vi[1], &ti[1],
-							&vi[2], &ti[2])!=6)
+						if(sscanf(buff, "f %d//%d %d//%d %d//%d",
+							&vi[0], &ni[0],
+							&vi[1], &ni[1],
+							&vi[2], &ni[2])!=6)
 						{
-							if(sscanf(buff, "f %d//%d %d//%d %d//%d",
-								&vi[0], &ni[0],
-								&vi[1], &ni[1],
-								&vi[2], &ni[2])!=6)
-							{
-								if(sscanf(buff, "f %d %d %d",
-									&vi[0],
-									&vi[1],
-									&vi[2])!=3)
-									return false;
-							}
+							if(sscanf(buff, "f %d %d %d",
+								&vi[0],
+								&vi[1],
+								&vi[2])!=3)
+								return false;
 						}
 					}
-
-					// Alias Wavefront models have face indices that start on 1, not 0
-					Model->Mesh[Model->NumMesh-1].Face[3*(Model->Mesh[Model->NumMesh-1].NumFace-1)+0]=vi[0]-1;
-					Model->Mesh[Model->NumMesh-1].Face[3*(Model->Mesh[Model->NumMesh-1].NumFace-1)+1]=vi[1]-1;
-					Model->Mesh[Model->NumMesh-1].Face[3*(Model->Mesh[Model->NumMesh-1].NumFace-1)+2]=vi[2]-1;
 				}
+
+				// Alias Wavefront models have face indices that start on 1, not 0
+				Model->Mesh[Model->NumMesh-1].Face[3*(Model->Mesh[Model->NumMesh-1].NumFace-1)+0]=vi[0]-1;
+				Model->Mesh[Model->NumMesh-1].Face[3*(Model->Mesh[Model->NumMesh-1].NumFace-1)+1]=vi[1]-1;
+				Model->Mesh[Model->NumMesh-1].Face[3*(Model->Mesh[Model->NumMesh-1].NumFace-1)+2]=vi[2]-1;
 			}
 		}
 	}
@@ -398,8 +425,8 @@ bool LoadOBJ(ModelOBJ_t *Model, const char *Filename)
 // Free memory allocated for the model
 void FreeOBJ(ModelOBJ_t *Model)
 {
-	free(Model->Vertex);
-	free(Model->UV);
+	Zone_Free(Zone, Model->Vertex);
+	Zone_Free(Zone, Model->UV);
 	Zone_Free(Zone, Model->Normal);
 	Zone_Free(Zone, Model->Tangent);
 	Zone_Free(Zone, Model->Binormal);
@@ -408,12 +435,12 @@ void FreeOBJ(ModelOBJ_t *Model)
 	{
 		/* Free mesh data */
 		for(uint32_t i=0;i<Model->NumMesh;i++)
-			free(Model->Mesh[i].Face);
+			Zone_Free(Zone, Model->Mesh[i].Face);
 
-		free(Model->Mesh);
+		Zone_Free(Zone, Model->Mesh);
 	}
 
-	free(Model->Material);
+	Zone_Free(Zone, Model->Material);
 }
 
 void BuildMemoryBuffersOBJ(VkuContext_t *Context, ModelOBJ_t *Model)

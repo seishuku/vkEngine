@@ -97,8 +97,10 @@ struct
 	matrix mvp;
 	vec4 uOffset;
 
-	vec4 uNebulaAColor;
-	vec4 uNebulaBColor;
+	vec3 uNebulaAColor;
+	float uNebulaADensity;
+	vec3 uNebulaBColor;
+	float uNebulaBDensity;
 
 	float uStarsScale;
 	float uStarDensity;
@@ -577,8 +579,10 @@ void GenerateSkyParams(void)
 	Vec4_Set(skybox_ubo.uOffset, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
 	Vec3_Normalize(skybox_ubo.uOffset);
 
-	Vec4_Set(skybox_ubo.uNebulaAColor, RandFloat(), RandFloat(), RandFloat(), 0.0f);
-	Vec4_Set(skybox_ubo.uNebulaBColor, RandFloat(), RandFloat(), RandFloat(), 0.0f);
+	Vec3_Set(skybox_ubo.uNebulaAColor, RandFloat(), RandFloat(), RandFloat());
+	skybox_ubo.uNebulaADensity=RandFloat()*2.0f;
+	Vec3_Set(skybox_ubo.uNebulaBColor, RandFloat(), RandFloat(), RandFloat());
+	skybox_ubo.uNebulaBDensity=RandFloat()*2.0f;
 
 	Vec4_Set(skybox_ubo.uSunPosition, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
 	Vec3_Normalize(skybox_ubo.uSunPosition);

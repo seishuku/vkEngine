@@ -7,7 +7,7 @@
 #include "../system/system.h"
 #include "memzone.h"
 
-static const size_t CHUNK_SIZE=32;
+static const size_t CHUNK_SIZE=8;
 static const size_t HEADER_SIZE=sizeof(MemBlock_t);
 
 MemZone_t *Zone_Init(size_t Size)
@@ -94,8 +94,7 @@ void *Zone_Malloc(MemZone_t *Zone, size_t Size)
 {
 	const size_t MinimumBlockSize=64;
 
-	Size+=HEADER_SIZE;							// Size of block header
-	Size=(Size+CHUNK_SIZE-1)&~(CHUNK_SIZE-1);	// Align to chunk boundary
+	Size+=(HEADER_SIZE+CHUNK_SIZE-1)&~(CHUNK_SIZE-1);	// Align to chunk boundary
 
 	MemBlock_t *Base=Zone->Current;
 	MemBlock_t *Current=Zone->Current;
@@ -147,6 +146,7 @@ void *Zone_Malloc(MemZone_t *Zone, size_t Size)
 void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 {
 	MemBlock_t *Block=(MemBlock_t *)((uint8_t *)Ptr-HEADER_SIZE);
+	size_t PreviousSize=Block->Size-HEADER_SIZE;
 
 	if(Size==0)
 	{
@@ -155,11 +155,11 @@ void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 	}
 	else if(!Ptr)
 		return Zone_Malloc(Zone, Size);
-	else if(Size<=Block->Size)
+	else if(Size<=PreviousSize)
 		return Ptr;
 	else
 	{
-		assert((Ptr)&&(Size>Block->Size));
+		assert((Ptr)&&(Size>PreviousSize));
 
 #ifdef _DEBUG
 		DBGPRINTF(DEBUG_WARNING, "Zone_Realloc: ");
@@ -168,7 +168,7 @@ void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 
 		if(New)
 		{
-			memcpy(New, Ptr, Block->Size);
+			memcpy(New, Ptr, PreviousSize);
 			Zone_Free(Zone, Ptr);
 		}
 

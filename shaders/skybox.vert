@@ -7,12 +7,13 @@ layout (push_constant) uniform ubo
 	mat4 mvp;
 	vec4 uOffset;
 
-	vec4 uNebulaAColor;
-	vec4 uNebulaBColor;
+	vec3 uNebulaAColor;
+	float uNebulaADensity;
+	vec3 uNebulaBColor;
+	float uNebulaBDensity;
 
 	float uStarsScale;
 	float uStarDensity;
-	float pad0[2];
 
 	vec4 uSunPosition;
 	float uSunSize;

@@ -345,7 +345,7 @@ int main(int argc, char **argv)
 #endif
 
 	DBGPRINTF(DEBUG_INFO, "Allocating zone memory...\n");
-	Zone=Zone_Init(64*1000*1000);
+	Zone=Zone_Init(256*1000*1000);
 
 	if(Zone==NULL)
 	{
