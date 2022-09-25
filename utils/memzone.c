@@ -7,8 +7,8 @@
 #include "../system/system.h"
 #include "memzone.h"
 
-#define CHUNK_SIZE 32
-static const size_t HEADER_SIZE=((sizeof(MemBlock_t)+CHUNK_SIZE-1)&~(CHUNK_SIZE-1));
+static const size_t CHUNK_SIZE=32;
+static const size_t HEADER_SIZE=sizeof(MemBlock_t);
 
 MemZone_t *Zone_Init(size_t Size)
 {
@@ -104,7 +104,10 @@ void *Zone_Malloc(MemZone_t *Zone, size_t Size)
 	do
 	{
 		if(Current==Start)
+		{
+			DBGPRINTF(DEBUG_ERROR, "Out of zone memory, unable to allocate block.\n");
 			return NULL;
+		}
 
 		if(Current->Free)
 		{

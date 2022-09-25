@@ -319,7 +319,7 @@ void EventLoop(void)
 int main(int argc, char **argv)
 {
 	DBGPRINTF(DEBUG_INFO, "Allocating zone memory...\n");
-	Zone=Zone_Init(32*1000*1000);
+	Zone=Zone_Init(64*1000*1000);
 
 	if(Zone==NULL)
 	{

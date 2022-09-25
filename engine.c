@@ -7,7 +7,7 @@
 #include "vulkan/vulkan.h"
 #include "math/math.h"
 #include "camera/camera.h"
-#include "model/3ds.h"
+#include "model/obj.h"
 #include "model/skybox.h"
 #include "image/image.h"
 #include "font/font.h"
@@ -27,26 +27,27 @@ extern float fps, fTimeStep, fTime;
 
 enum
 {
-	MODEL_HELLKNIGHT,
-	MODEL_PINKY,
-	MODEL_FATTY,
-	MODEL_LEVEL,
+	MODEL_ASTEROID1,
+	MODEL_ASTEROID2,
+	MODEL_ASTEROID3,
+	MODEL_ASTEROID4,
 	NUM_MODELS
 };
 
-Model3DS_t Model[NUM_MODELS];
-Model3DS_t Skybox;
+ModelOBJ_t Model[NUM_MODELS];
+
+VkuBuffer_t SkyboxVertex, SkyboxIndex;
 
 enum
 {
-	TEXTURE_HELLKNIGHT,
-	TEXTURE_HELLKNIGHT_NORMAL,
-	TEXTURE_PINKY,
-	TEXTURE_PINKY_NORMAL,
-	TEXTURE_FATTY,
-	TEXTURE_FATTY_NORMAL,
-	TEXTURE_LEVEL,
-	TEXTURE_LEVEL_NORMAL,
+	TEXTURE_ASTEROID1,
+	TEXTURE_ASTEROID1_NORMAL,
+	TEXTURE_ASTEROID2,
+	TEXTURE_ASTEROID2_NORMAL,
+	TEXTURE_ASTEROID3,
+	TEXTURE_ASTEROID3_NORMAL,
+	TEXTURE_ASTEROID4,
+	TEXTURE_ASTEROID4_NORMAL,
 	NUM_TEXTURES
 };
 
@@ -59,7 +60,10 @@ Lights_t Lights;
 struct
 {
 	matrix mvp;
+	matrix local;
 	vec4 eye;
+	vec4 light_color;
+	vec4 light_direction;
 
 	uint32_t NumLights;
 } ubo;
@@ -365,9 +369,10 @@ void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 		for(uint32_t j=0;j<NUM_MODELS;j++)
 		{
 			// Bind model data buffers and draw the triangles
-			for(int32_t k=0;k<Model[j].NumMesh;k++)
+			vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &Model[j].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
+
+			for(uint32_t k=0;k<Model[j].NumMesh;k++)
 			{
-				vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &Model[j].Mesh[k].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
 				vkCmdBindIndexBuffer(CommandBuffer, Model[j].Mesh[k].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
 				vkCmdDrawIndexed(CommandBuffer, Model[j].Mesh[k].NumFace*3, 1, 0, 0, 0);
 			}
@@ -477,7 +482,7 @@ bool CreatePipeline(void)
 		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
 		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+//		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 
 		vkuAssembleDescriptorSetLayout(&DescriptorSet[i]);
 	}
@@ -562,93 +567,6 @@ bool CreateSkyboxPipeline(void)
 	return true;
 }
 
-void BuildMemoryBuffers(Model3DS_t *Model)
-{
-	VkuBuffer_t stagingBuffer;
-	void *Data=NULL;
-
-	for(int32_t i=0;i<Model->NumMesh;i++)
-	{
-		// Vertex data on device memory
-		vkuCreateGPUBuffer(&Context, &Model->Mesh[i].VertexBuffer, sizeof(float)*20*Model->Mesh[i].NumVertex, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-
-		// Create staging buffer to transfer from host memory to device memory
-		vkuCreateHostBuffer(&Context, &stagingBuffer, sizeof(float)*20*Model->Mesh[i].NumVertex, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-
-		vkMapMemory(Context.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
-
-		if(!Data)
-			return;
-
-		float *fPtr=Data;
-
-		for(int32_t j=0;j<Model->Mesh[i].NumVertex;j++)
-		{
-			*fPtr++=Model->Mesh[i].Vertex[3*j+0];
-			*fPtr++=Model->Mesh[i].Vertex[3*j+1];
-			*fPtr++=Model->Mesh[i].Vertex[3*j+2];
-			*fPtr++=1.0f;
-
-			*fPtr++=Model->Mesh[i].UV[2*j+0];
-			*fPtr++=1.0f-Model->Mesh[i].UV[2*j+1];
-			*fPtr++=0.0f;
-			*fPtr++=0.0f;
-
-			*fPtr++=Model->Mesh[i].Tangent[3*j+0];
-			*fPtr++=Model->Mesh[i].Tangent[3*j+1];
-			*fPtr++=Model->Mesh[i].Tangent[3*j+2];
-			*fPtr++=0.0f;
-
-			*fPtr++=Model->Mesh[i].Binormal[3*j+0];
-			*fPtr++=Model->Mesh[i].Binormal[3*j+1];
-			*fPtr++=Model->Mesh[i].Binormal[3*j+2];
-			*fPtr++=0.0f;
-
-			*fPtr++=Model->Mesh[i].Normal[3*j+0];
-			*fPtr++=Model->Mesh[i].Normal[3*j+1];
-			*fPtr++=Model->Mesh[i].Normal[3*j+2];
-			*fPtr++=0.0f;
-		}
-
-		vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
-
-		// Copy to device memory
-		vkuCopyBuffer(&Context, stagingBuffer.Buffer, Model->Mesh[i].VertexBuffer.Buffer, sizeof(float)*20*Model->Mesh[i].NumVertex);
-
-		// Delete staging data
-		vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
-		vkDestroyBuffer(Context.Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
-
-		// Index data
-		vkuCreateGPUBuffer(&Context, &Model->Mesh[i].IndexBuffer, sizeof(uint16_t)*Model->Mesh[i].NumFace*3, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-
-		// Staging buffer
-		vkuCreateHostBuffer(&Context, &stagingBuffer, sizeof(uint16_t)*Model->Mesh[i].NumFace*3, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-
-		vkMapMemory(Context.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
-
-		if(!Data)
-			return;
-
-		uint16_t *sPtr=Data;
-
-		for(int32_t j=0;j<Model->Mesh[i].NumFace;j++)
-		{
-			*sPtr++=Model->Mesh[i].Face[3*j+0];
-			*sPtr++=Model->Mesh[i].Face[3*j+1];
-			*sPtr++=Model->Mesh[i].Face[3*j+2];
-		}
-
-		vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
-
-		vkuCopyBuffer(&Context, stagingBuffer.Buffer, Model->Mesh[i].IndexBuffer.Buffer, sizeof(uint16_t)*Model->Mesh[i].NumFace*3);
-
-		// Delete staging data
-		vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
-		vkDestroyBuffer(Context.Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
-	}
-}
-
 float RandFloat(void)
 {
 	return (float)rand()/RAND_MAX;
@@ -665,7 +583,7 @@ void GenerateSkyParams(void)
 	Vec4_Set(skybox_ubo.uSunPosition, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
 	Vec3_Normalize(skybox_ubo.uSunPosition);
 
-	Vec4_Set(skybox_ubo.uSunColor, RandFloat(), RandFloat(), RandFloat(), 0.0f);
+	Vec4_Set(skybox_ubo.uSunColor, min(1.0f, RandFloat()+0.5f), min(1.0f, RandFloat()+0.5f), min(1.0f, RandFloat()+0.5f), 0.0f);
 	skybox_ubo.uSunSize=1.0f/(RandFloat()*1000.0f);
 	skybox_ubo.uSunFalloff=RandFloat()*16.0f+8.0f;
 
@@ -705,6 +623,9 @@ void Render(void)
 
 	// Generate a modelview+projection matrix
 	MatrixMult(ModelView, Projection, ubo.mvp);
+
+	Vec3_Setv(ubo.light_color, skybox_ubo.uSunColor);
+	Vec3_Setv(ubo.light_direction, skybox_ubo.uSunPosition);
 
 	// Set number of lights to the shader
 	ubo.NumLights=(uint32_t)List_GetCount(&Lights.Lights);
@@ -752,39 +673,71 @@ void Render(void)
 	vkCmdSetScissor(CommandBuffers[Index], 0, 1, &(VkRect2D) { { 0, 0 }, SwapchainExtent});
 
 	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
-	//vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
+	vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 
-	//vkCmdPushConstants(CommandBuffers[Index], PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ubo), &ubo);
+	// Draw the models
+	for(uint32_t i=0;i<NUM_MODELS;i++)
+	{
+		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 0, Lights.StorageBuffer.Buffer, 0, VK_WHOLE_SIZE);
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 1, &Textures[2*i+0]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 2, &Textures[2*i+1]);
+//		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 3, &ShadowDepth);
+		vkuAllocateUpdateDescriptorSet(&DescriptorSet[MAX_FRAME_COUNT*i+Index], DescriptorPool[Index]);
 
-	//// Draw the models
-	//for(uint32_t i=0;i<NUM_MODELS;i++)
-	//{
+		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[MAX_FRAME_COUNT*i+Index].DescriptorSet, 0, VK_NULL_HANDLE);
 
-	//	vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 0, Lights.StorageBuffer.Buffer, 0, VK_WHOLE_SIZE);
-	//	vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 1, &Textures[2*i+0]);
-	//	vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 2, &Textures[2*i+1]);
-	//	vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 3, &ShadowDepth);
-	//	vkuAllocateUpdateDescriptorSet(&DescriptorSet[MAX_FRAME_COUNT*i+Index], DescriptorPool[Index]);
+		MatrixIdentity(ubo.local);
 
-	//	vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[MAX_FRAME_COUNT*i+Index].DescriptorSet, 0, VK_NULL_HANDLE);
+		if(i==0)
+		{
+			MatrixTranslate(-100.0f, 100.0f, 0.0f, ubo.local);
+			MatrixRotate(fTime*0.75f, 1.0f, 0.0f, 0.0f, ubo.local);
+			MatrixRotate(fTime, 0.0f, 1.0f, 0.0f, ubo.local);
+		}
 
-	//	// Bind model data buffers and draw the triangles
-	//	for(int32_t j=0;j<Model[i].NumMesh;j++)
-	//	{
-	//		vkCmdBindVertexBuffers(CommandBuffers[Index], 0, 1, &Model[i].Mesh[j].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
-	//		vkCmdBindIndexBuffer(CommandBuffers[Index], Model[i].Mesh[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
-	//		vkCmdDrawIndexed(CommandBuffers[Index], Model[i].Mesh[j].NumFace*3, 1, 0, 0, 0);
-	//	}
-	//}
+		if(i==1)
+		{
+			MatrixTranslate(100.0f, 100.0f, 0.0f, ubo.local);
+			MatrixRotate(fTime, 1.0f, 0.0f, 0.0f, ubo.local);
+			MatrixRotate(fTime*0.75f, 0.0f, 1.0f, 0.0f, ubo.local);
+		}
+
+		if(i==2)
+		{
+			MatrixTranslate(-100.0f, -100.0f, 0.0f, ubo.local);
+			MatrixRotate(fTime, 1.0f, 0.0f, 0.0f, ubo.local);
+			MatrixRotate(fTime*1.75f, 0.0f, 1.0f, 0.0f, ubo.local);
+		}
+
+		if(i==3)
+		{
+			MatrixTranslate(100.0f, -100.0f, 0.0f, ubo.local);
+			MatrixRotate(fTime, 1.0f, 0.0f, 0.0f, ubo.local);
+			MatrixRotate(fTime, 0.0f, 1.0f, 0.0f, ubo.local);
+		}
+
+		MatrixScale(50.0f, 50.0f, 50.0f, ubo.local);
+
+		vkCmdPushConstants(CommandBuffers[Index], PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ubo), &ubo);
+
+		// Bind model data buffers and draw the triangles
+		vkCmdBindVertexBuffers(CommandBuffers[Index], 0, 1, &Model[i].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
+
+		for(uint32_t j=0;j<Model[i].NumMesh;j++)
+		{
+			vkCmdBindIndexBuffer(CommandBuffers[Index], Model[i].Mesh[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
+			vkCmdDrawIndexed(CommandBuffers[Index], Model[i].Mesh[j].NumFace*3, 1, 0, 0, 0);
+		}
+	}
 	// ---
 
 	vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipeline.Pipeline);
 
 	vkCmdPushConstants(CommandBuffers[Index], SkyboxPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(skybox_ubo), &skybox_ubo);
 
-	vkCmdBindVertexBuffers(CommandBuffers[Index], 0, 1, &Skybox.Mesh->VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
-	vkCmdBindIndexBuffer(CommandBuffers[Index], Skybox.Mesh->IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
-	vkCmdDrawIndexed(CommandBuffers[Index], Skybox.Mesh->NumFace*3, 1, 0, 0, 0);
+	vkCmdBindVertexBuffers(CommandBuffers[Index], 0, 1, &SkyboxVertex.Buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindIndexBuffer(CommandBuffers[Index], SkyboxIndex.Buffer, 0, VK_INDEX_TYPE_UINT16);
+	vkCmdDrawIndexed(CommandBuffers[Index], 20*3, 1, 0, 0, 0);
 
 	// Should UI overlay stuff have it's own render pass?
 	// Maybe even separate thread?
@@ -848,7 +801,7 @@ bool Init(void)
 
 	VkZone=VkuMem_Init(&Context, Context.DeviceProperties2.maxMemoryAllocationSize);
 
-	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 100.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
+	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 200.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
 
 	Lights_Init(&Lights);
 	Lights_Add(&Lights, (vec3) { 0.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 1.0f, 0.0f, 0.0f, 1.0f });
@@ -856,29 +809,37 @@ bool Init(void)
 	Lights_Add(&Lights, (vec3) { 100.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 0.0f, 0.0f, 1.0f, 1.0f });
 
 	// Load models
-	if(Load3DS(&Model[MODEL_HELLKNIGHT], "./assets/hellknight.3ds"))
-		BuildMemoryBuffers(&Model[MODEL_HELLKNIGHT]);
+	if(LoadOBJ(&Model[MODEL_ASTEROID1], "./assets/asteroid1.obj"))
+		BuildMemoryBuffersOBJ(&Context, &Model[MODEL_ASTEROID1]);
+	else
+		return false;
 
-	if(Load3DS(&Model[MODEL_PINKY], "./assets/pinky.3ds"))
-		BuildMemoryBuffers(&Model[MODEL_PINKY]);
+	if(LoadOBJ(&Model[MODEL_ASTEROID2], "./assets/asteroid2.obj"))
+		BuildMemoryBuffersOBJ(&Context, &Model[MODEL_ASTEROID2]);
+	else
+		return false;
 
-	if(Load3DS(&Model[MODEL_FATTY], "./assets/fatty.3ds"))
-		BuildMemoryBuffers(&Model[MODEL_FATTY]);
+	if(LoadOBJ(&Model[MODEL_ASTEROID3], "./assets/asteroid3.obj"))
+		BuildMemoryBuffersOBJ(&Context, &Model[MODEL_ASTEROID3]);
+	else
+		return false;
 
-	if(Load3DS(&Model[MODEL_LEVEL], "./assets/level.3ds"))
-		BuildMemoryBuffers(&Model[MODEL_LEVEL]);
+	if(LoadOBJ(&Model[MODEL_ASTEROID4], "./assets/asteroid4.obj"))
+		BuildMemoryBuffersOBJ(&Context, &Model[MODEL_ASTEROID4]);
+	else
+		return false;
 
-	BuildSkybox(&Skybox);
+	BuildSkybox(&Context, &SkyboxVertex, &SkyboxIndex);
 
 	// Load textures
-	Image_Upload(&Context, &Textures[TEXTURE_HELLKNIGHT], "./assets/hellknight.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_HELLKNIGHT_NORMAL], "./assets/hellknight_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	Image_Upload(&Context, &Textures[TEXTURE_PINKY], "./assets/pinky.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_PINKY_NORMAL], "./assets/pinky_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	Image_Upload(&Context, &Textures[TEXTURE_FATTY], "./assets/fatty.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_FATTY_NORMAL], "./assets/fatty_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	Image_Upload(&Context, &Textures[TEXTURE_LEVEL], "./assets/tile.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_LEVEL_NORMAL], "./assets/tile_b.tga", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALMAP);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1], "./assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1_NORMAL], "./assets/asteroid1_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID2], "./assets/asteroid2.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID2_NORMAL], "./assets/asteroid2_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID3], "./assets/asteroid3.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID3_NORMAL], "./assets/asteroid3_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4], "./assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4_NORMAL], "./assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 
 	GenerateSkyParams();
 
@@ -1167,22 +1128,22 @@ void Destroy(void)
 	vkDestroyPipelineLayout(Context.Device, SkyboxPipelineLayout, VK_NULL_HANDLE);
 
 	// Shadow stuff
-	vkDestroyPipeline(Context.Device, ShadowPipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(Context.Device, ShadowPipelineLayout, VK_NULL_HANDLE);
+	//vkDestroyPipeline(Context.Device, ShadowPipeline.Pipeline, VK_NULL_HANDLE);
+	//vkDestroyPipelineLayout(Context.Device, ShadowPipelineLayout, VK_NULL_HANDLE);
 
-	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
-		vkDestroyDescriptorSetLayout(Context.Device, ShadowDescriptorSet[i].DescriptorSetLayout, VK_NULL_HANDLE);
+	//for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
+	//	vkDestroyDescriptorSetLayout(Context.Device, ShadowDescriptorSet[i].DescriptorSetLayout, VK_NULL_HANDLE);
 
-	vkDestroyRenderPass(Context.Device, ShadowRenderPass, VK_NULL_HANDLE);
+	//vkDestroyRenderPass(Context.Device, ShadowRenderPass, VK_NULL_HANDLE);
 
-	vkDestroyFramebuffer(Context.Device, ShadowFrameBuffer, VK_NULL_HANDLE);
-	vkDestroySampler(Context.Device, ShadowDepth.Sampler, VK_NULL_HANDLE);
-	vkDestroyImageView(Context.Device, ShadowDepth.View, VK_NULL_HANDLE);
-	vkDestroyImage(Context.Device, ShadowDepth.Image, VK_NULL_HANDLE);
-	VkuMem_Free(VkZone, ShadowDepth.DeviceMemory);
+	//vkDestroyFramebuffer(Context.Device, ShadowFrameBuffer, VK_NULL_HANDLE);
+	//vkDestroySampler(Context.Device, ShadowDepth.Sampler, VK_NULL_HANDLE);
+	//vkDestroyImageView(Context.Device, ShadowDepth.View, VK_NULL_HANDLE);
+	//vkDestroyImage(Context.Device, ShadowDepth.Image, VK_NULL_HANDLE);
+	//VkuMem_Free(VkZone, ShadowDepth.DeviceMemory);
 
-	vkDestroyBuffer(Context.Device, shadow_ubo_buffer.Buffer, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, shadow_ubo_buffer.DeviceMemory, VK_NULL_HANDLE);
+	//vkDestroyBuffer(Context.Device, shadow_ubo_buffer.Buffer, VK_NULL_HANDLE);
+	//vkFreeMemory(Context.Device, shadow_ubo_buffer.DeviceMemory, VK_NULL_HANDLE);
 	// ---
 
 //	Font_Destroy();
@@ -1197,25 +1158,23 @@ void Destroy(void)
 
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
+		vkDestroyBuffer(Context.Device, Model[i].VertexBuffer.Buffer, VK_NULL_HANDLE);
+		VkuMem_Free(VkZone, Model[i].VertexBuffer.Memory);
+
 		for(uint32_t j=0;j<(uint32_t)Model[i].NumMesh;j++)
 		{
-			vkDestroyBuffer(Context.Device, Model[i].Mesh[j].VertexBuffer.Buffer, VK_NULL_HANDLE);
-			VkuMem_Free(VkZone, Model[i].Mesh[j].VertexBuffer.Memory);
-
 			vkDestroyBuffer(Context.Device, Model[i].Mesh[j].IndexBuffer.Buffer, VK_NULL_HANDLE);
 			VkuMem_Free(VkZone, Model[i].Mesh[j].IndexBuffer.Memory);
 		}
 
-		Free3DS(&Model[i]);
+		FreeOBJ(&Model[i]);
 	}
 
-	vkDestroyBuffer(Context.Device, Skybox.Mesh->VertexBuffer.Buffer, VK_NULL_HANDLE);
-	VkuMem_Free(VkZone, Skybox.Mesh->VertexBuffer.Memory);
+	vkDestroyBuffer(Context.Device, SkyboxVertex.Buffer, VK_NULL_HANDLE);
+	VkuMem_Free(VkZone, SkyboxVertex.Memory);
 
-	vkDestroyBuffer(Context.Device, Skybox.Mesh->IndexBuffer.Buffer, VK_NULL_HANDLE);
-	VkuMem_Free(VkZone, Skybox.Mesh->IndexBuffer.Memory);
-
-	Zone_Free(Zone, Skybox.Mesh);
+	vkDestroyBuffer(Context.Device, SkyboxIndex.Buffer, VK_NULL_HANDLE);
+	VkuMem_Free(VkZone, SkyboxIndex.Memory);
 
 	vkDestroyPipeline(Context.Device, Pipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, PipelineLayout, VK_NULL_HANDLE);

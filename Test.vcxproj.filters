@@ -81,9 +81,6 @@
     <ClCompile Include="font\font.c">
       <Filter>Source Files\font</Filter>
     </ClCompile>
-    <ClCompile Include="model\3ds.c">
-      <Filter>Source Files\model</Filter>
-    </ClCompile>
     <ClCompile Include="image\image.c">
       <Filter>Source Files\image</Filter>
     </ClCompile>
@@ -132,6 +129,9 @@
     <ClCompile Include="model\skybox.c">
       <Filter>Source Files\model</Filter>
     </ClCompile>
+    <ClCompile Include="model\obj.c">
+      <Filter>Source Files\model</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
@@ -139,9 +139,6 @@
     </ClInclude>
     <ClInclude Include="font\font.h">
       <Filter>Header Files\font</Filter>
-    </ClInclude>
-    <ClInclude Include="model\3ds.h">
-      <Filter>Header Files\model</Filter>
     </ClInclude>
     <ClInclude Include="image\image.h">
       <Filter>Header Files\image</Filter>
@@ -168,6 +165,9 @@
       <Filter>Header Files\utils</Filter>
     </ClInclude>
     <ClInclude Include="model\skybox.h">
+      <Filter>Header Files\model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\obj.h">
       <Filter>Header Files\model</Filter>
     </ClInclude>
   </ItemGroup>

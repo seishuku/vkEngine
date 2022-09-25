@@ -7,7 +7,10 @@ layout (location=2) in mat3 Tangent;
 layout (push_constant) uniform ubo
 {
     mat4 mvp;
+	mat4 local;
     vec4 eye;
+	vec4 light_color;
+	vec4 light_direction;
 
 	uint NumLights;
 };
@@ -58,45 +61,45 @@ void main()
 {
 	vec4 Base=texture(TexBase, UV);
 	vec3 Specular=vec3(1.0);
-	vec3 n=normalize(Tangent*(2*texture(TexNormal, UV)-1).xyz);
+	vec3 n=normalize(local*vec4(Tangent*(2*texture(TexNormal, UV)-1).xyz, 0.0)).xyz;
 	vec3 uE=eye.xyz-Position;
 	vec3 e=normalize(uE);
 	vec3 r=reflect(-e, n);
 
-	vec3 temp=vec3(0.0);
+//	vec3 temp=vec3(0.0);
+//
+//	for(int i=0;i<NumLights;i++)
+//	{
+//		vec3 lPos=Lights[i].Position.xyz-Position;
+//
+//		// Light volume, distance attenuation, and shadows need to be done before light and eye vector normalization
+//
+//		// Volume
+//		vec4 lVolume=vec4(clamp(dot(lPos, uE)/dot(uE, uE), 0.0, 1.0)*uE-lPos, 0.0);
+//		lVolume.w=1.0/(pow(Lights[i].Position.w*0.5*dot(lVolume.xyz, lVolume.xyz), 2.0)+1.0);
+//
+//		// Attenuation = 1.0-(Light_Position*(1/Light_Radius))^2
+//		float lAtten=max(0.0, 1.0-length(lPos*Lights[i].Position.w));
+//
+//		// Shadow map compare, divide the light distance by the radius to match the depth map distance space
+//		float Shadow=texture(TexDistance, vec4(-lPos, i), (length(lPos)*Lights[i].Position.w)-0.005);
+//
+//		// Now we can normalize the light position vector
+//		lPos=normalize(lPos);
+//
+//		// Diffuse = Kd*(N.L)
+//		vec3 lDiffuse=Lights[i].Kd.rgb*max(0.0, dot(lPos, n));
+//
+//		// Specular = Ks*((R.L)^n)*(N.L)*Gloss
+//		vec3 lSpecular=Lights[i].Kd.rgb*max(0.0, pow(dot(lPos, r), 16.0)*dot(lPos, n));
+//
+//		// Multiply spotlight with attenuation, so it mixes in with everything else correctly
+//		// The light is only a spotlight if the outer cone is greater than 0
+//		lAtten*=SpotLight(lPos, Lights[i].SpotDirection.xyz, Lights[i].SpotParams.x, Lights[i].SpotParams.y, Lights[i].SpotParams.z);
+//
+//		// I=(base*diffuse+specular)*shadow*attenuation*lightvolumeatten+volumelight
+//		temp+=(Base.xyz*lDiffuse+(lSpecular*Specular))*Shadow*lAtten*(1.0-lVolume.w)+(lVolume.w*Lights[i].Kd.xyz);
+//	}
 
-	for(int i=0;i<NumLights;i++)
-	{
-		vec3 lPos=Lights[i].Position.xyz-Position;
-
-		// Light volume, distance attenuation, and shadows need to be done before light and eye vector normalization
-
-		// Volume
-		vec4 lVolume=vec4(clamp(dot(lPos, uE)/dot(uE, uE), 0.0, 1.0)*uE-lPos, 0.0);
-		lVolume.w=1.0/(pow(Lights[i].Position.w*0.5*dot(lVolume.xyz, lVolume.xyz), 2.0)+1.0);
-
-		// Attenuation = 1.0-(Light_Position*(1/Light_Radius))^2
-		float lAtten=max(0.0, 1.0-length(lPos*Lights[i].Position.w));
-
-		// Shadow map compare, divide the light distance by the radius to match the depth map distance space
-		float Shadow=texture(TexDistance, vec4(-lPos, i), (length(lPos)*Lights[i].Position.w)-0.005);
-
-		// Now we can normalize the light position vector
-		lPos=normalize(lPos);
-
-		// Diffuse = Kd*(N.L)
-		vec3 lDiffuse=Lights[i].Kd.rgb*max(0.0, dot(lPos, n));
-
-		// Specular = Ks*((R.L)^n)*(N.L)*Gloss
-		vec3 lSpecular=Lights[i].Kd.rgb*max(0.0, pow(dot(lPos, r), 16.0)*dot(lPos, n));
-
-		// Multiply spotlight with attenuation, so it mixes in with everything else correctly
-		// The light is only a spotlight if the outer cone is greater than 0
-		lAtten*=SpotLight(lPos, Lights[i].SpotDirection.xyz, Lights[i].SpotParams.x, Lights[i].SpotParams.y, Lights[i].SpotParams.z);
-
-		// I=(base*diffuse+specular)*shadow*attenuation*lightvolumeatten+volumelight
-		temp+=(Base.xyz*lDiffuse+(lSpecular*Specular))*Shadow*lAtten*(1.0-lVolume.w)+(lVolume.w*Lights[i].Kd.xyz);
-	}
-
-	Output=vec4(temp, 1.0);
+	Output=vec4(Base.xyz*light_color.xyz*dot(light_direction.xyz, n), 1.0);
 }

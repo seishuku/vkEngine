@@ -103,7 +103,7 @@
     <ClCompile Include="image\tga.c" />
     <ClCompile Include="lights\lights.c" />
     <ClCompile Include="math\math.c" />
-    <ClCompile Include="model\3ds.c" />
+    <ClCompile Include="model\obj.c" />
     <ClCompile Include="model\skybox.c" />
     <ClCompile Include="system\win32.c" />
     <ClCompile Include="utils\genid.c" />
@@ -122,7 +122,7 @@
     <ClInclude Include="image\image.h" />
     <ClInclude Include="lights\lights.h" />
     <ClInclude Include="math\math.h" />
-    <ClInclude Include="model\3ds.h" />
+    <ClInclude Include="model\obj.h" />
     <ClInclude Include="model\skybox.h" />
     <ClInclude Include="system\system.h" />
     <ClInclude Include="utils\genid.h" />

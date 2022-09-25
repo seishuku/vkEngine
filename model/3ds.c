@@ -443,3 +443,90 @@ void Free3DS(Model3DS_t *Model)
 
 	Zone_Free(Zone, Model->Material);
 }
+
+void BuildMemoryBuffers3DS(Model3DS_t *Model)
+{
+	VkuBuffer_t stagingBuffer;
+	void *Data=NULL;
+
+	for(int32_t i=0;i<Model->NumMesh;i++)
+	{
+		// Vertex data on device memory
+		vkuCreateGPUBuffer(&Context, &Model->Mesh[i].VertexBuffer, sizeof(float)*20*Model->Mesh[i].NumVertex, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+		// Create staging buffer to transfer from host memory to device memory
+		vkuCreateHostBuffer(&Context, &stagingBuffer, sizeof(float)*20*Model->Mesh[i].NumVertex, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+		vkMapMemory(Context.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+
+		if(!Data)
+			return;
+
+		float *fPtr=Data;
+
+		for(int32_t j=0;j<Model->Mesh[i].NumVertex;j++)
+		{
+			*fPtr++=Model->Mesh[i].Vertex[3*j+0];
+			*fPtr++=Model->Mesh[i].Vertex[3*j+1];
+			*fPtr++=Model->Mesh[i].Vertex[3*j+2];
+			*fPtr++=1.0f;
+
+			*fPtr++=Model->Mesh[i].UV[2*j+0];
+			*fPtr++=1.0f-Model->Mesh[i].UV[2*j+1];
+			*fPtr++=0.0f;
+			*fPtr++=0.0f;
+
+			*fPtr++=Model->Mesh[i].Tangent[3*j+0];
+			*fPtr++=Model->Mesh[i].Tangent[3*j+1];
+			*fPtr++=Model->Mesh[i].Tangent[3*j+2];
+			*fPtr++=0.0f;
+
+			*fPtr++=Model->Mesh[i].Binormal[3*j+0];
+			*fPtr++=Model->Mesh[i].Binormal[3*j+1];
+			*fPtr++=Model->Mesh[i].Binormal[3*j+2];
+			*fPtr++=0.0f;
+
+			*fPtr++=Model->Mesh[i].Normal[3*j+0];
+			*fPtr++=Model->Mesh[i].Normal[3*j+1];
+			*fPtr++=Model->Mesh[i].Normal[3*j+2];
+			*fPtr++=0.0f;
+		}
+
+		vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
+
+		// Copy to device memory
+		vkuCopyBuffer(&Context, stagingBuffer.Buffer, Model->Mesh[i].VertexBuffer.Buffer, sizeof(float)*20*Model->Mesh[i].NumVertex);
+
+		// Delete staging data
+		vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+		vkDestroyBuffer(Context.Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
+
+		// Index data
+		vkuCreateGPUBuffer(&Context, &Model->Mesh[i].IndexBuffer, sizeof(uint16_t)*Model->Mesh[i].NumFace*3, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+		// Staging buffer
+		vkuCreateHostBuffer(&Context, &stagingBuffer, sizeof(uint16_t)*Model->Mesh[i].NumFace*3, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+		vkMapMemory(Context.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+
+		if(!Data)
+			return;
+
+		uint16_t *sPtr=Data;
+
+		for(int32_t j=0;j<Model->Mesh[i].NumFace;j++)
+		{
+			*sPtr++=Model->Mesh[i].Face[3*j+0];
+			*sPtr++=Model->Mesh[i].Face[3*j+1];
+			*sPtr++=Model->Mesh[i].Face[3*j+2];
+		}
+
+		vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
+
+		vkuCopyBuffer(&Context, stagingBuffer.Buffer, Model->Mesh[i].IndexBuffer.Buffer, sizeof(uint16_t)*Model->Mesh[i].NumFace*3);
+
+		// Delete staging data
+		vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+		vkDestroyBuffer(Context.Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
+	}
+}

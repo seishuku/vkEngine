@@ -75,13 +75,13 @@ void VkuMem_Free(VkuMemZone_t *VkZone, VkuMemBlock_t *Block)
 {
 	if(Block==NULL)
 	{
-		DBGPRINTF(DEBUG_WARNING, "Attempting to free NULL pointer\n");
+		DBGPRINTF(DEBUG_WARNING, "VkuMem_Free: Attempting to free NULL pointer\n");
 		return;
 	}
 
 	if(!Block->Free)
 	{
-		DBGPRINTF(DEBUG_WARNING, "Attempting to free already freed pointer.\n");
+		DBGPRINTF(DEBUG_WARNING, "VkuMem_Free: Attempting to free already freed pointer.\n");
 		return;
 	}
 

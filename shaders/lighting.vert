@@ -9,7 +9,10 @@ layout (location=4) in vec3 vNormal;
 layout (push_constant) uniform ubo
 {
     mat4 mvp;
+	mat4 local;
     vec4 eye;
+	vec4 light_color;
+	vec4 light_direction;
 
 	uint NumLights;
 };
@@ -25,7 +28,7 @@ layout (location=2) out mat3 Tangent;
 
 void main()
 {
-	gl_Position=mvp*vec4(vPosition, 1.0);
+	gl_Position=mvp*local*vec4(vPosition, 1.0);
 
 	Position=vPosition;
 	UV=vUV;

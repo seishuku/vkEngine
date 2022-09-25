@@ -5,9 +5,7 @@
 #include "../system/system.h"
 #include "3ds.h"
 
-extern VkuContext_t Context;
-
-void BuildSkybox(Model3DS_t *Model)
+void BuildSkybox(VkuContext_t *Context, VkuBuffer_t *VertexBuffer, VkuBuffer_t *IndexBuffer)
 {
 	float vertices[3*12];
 
@@ -66,29 +64,26 @@ void BuildSkybox(Model3DS_t *Model)
 		10, 1, 6
 	};
 
-	Model->NumMesh=1;
-	Model->Mesh=(Mesh3DS_t *)Zone_Malloc(Zone, sizeof(Mesh3DS_t));
-
-	Model->Mesh->NumVertex=12;
-	Model->Mesh->NumFace=20;
+	uint32_t NumVertex=12;
+	uint32_t NumFace=20;
 
 	VkuBuffer_t stagingBuffer;
 	void *Data=NULL;
 
 	// Vertex data on device memory
-	vkuCreateGPUBuffer(&Context, &Model->Mesh->VertexBuffer, sizeof(float)*4*Model->Mesh->NumVertex, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+	vkuCreateGPUBuffer(Context, VertexBuffer, sizeof(float)*4*NumVertex, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
 	// Create staging buffer to transfer from host memory to device memory
-	vkuCreateHostBuffer(&Context, &stagingBuffer, sizeof(float)*4*Model->Mesh->NumVertex, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+	vkuCreateHostBuffer(Context, &stagingBuffer, sizeof(float)*4*NumVertex, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
-	vkMapMemory(Context.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+	vkMapMemory(Context->Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
 
 	if(!Data)
 		return;
 
 	float *fPtr=Data;
 
-	for(int32_t j=0;j<Model->Mesh->NumVertex;j++)
+	for(uint32_t j=0;j<NumVertex;j++)
 	{
 		*fPtr++=vertices[3*j+0];
 		*fPtr++=vertices[3*j+1];
@@ -96,40 +91,40 @@ void BuildSkybox(Model3DS_t *Model)
 		*fPtr++=0.0f;
 	}
 
-	vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
+	vkUnmapMemory(Context->Device, stagingBuffer.DeviceMemory);
 
 	// Copy to device memory
-	vkuCopyBuffer(&Context, stagingBuffer.Buffer, Model->Mesh->VertexBuffer.Buffer, sizeof(float)*4*Model->Mesh->NumVertex);
+	vkuCopyBuffer(Context, stagingBuffer.Buffer, VertexBuffer->Buffer, sizeof(float)*4*NumVertex);
 
 	// Delete staging data
-	vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
-	vkDestroyBuffer(Context.Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
+	vkFreeMemory(Context->Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(Context->Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
 
 	// Index data
-	vkuCreateGPUBuffer(&Context, &Model->Mesh->IndexBuffer, sizeof(uint16_t)*Model->Mesh->NumFace*3, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+	vkuCreateGPUBuffer(Context, IndexBuffer, sizeof(uint16_t)*NumFace*3, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
 	// Staging buffer
-	vkuCreateHostBuffer(&Context, &stagingBuffer, sizeof(uint16_t)*Model->Mesh->NumFace*3, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+	vkuCreateHostBuffer(Context, &stagingBuffer, sizeof(uint16_t)*NumFace*3, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
-	vkMapMemory(Context.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+	vkMapMemory(Context->Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
 
 	if(!Data)
 		return;
 
 	uint16_t *sPtr=Data;
 
-	for(int32_t j=0;j<Model->Mesh->NumFace;j++)
+	for(uint32_t j=0;j<NumFace;j++)
 	{
 		*sPtr++=faces[3*j+0];
 		*sPtr++=faces[3*j+1];
 		*sPtr++=faces[3*j+2];
 	}
 
-	vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
+	vkUnmapMemory(Context->Device, stagingBuffer.DeviceMemory);
 
-	vkuCopyBuffer(&Context, stagingBuffer.Buffer, Model->Mesh->IndexBuffer.Buffer, sizeof(uint16_t)*Model->Mesh->NumFace*3);
+	vkuCopyBuffer(Context, stagingBuffer.Buffer, IndexBuffer->Buffer, sizeof(uint16_t)*NumFace*3);
 
 	// Delete staging data
-	vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
-	vkDestroyBuffer(Context.Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
+	vkFreeMemory(Context->Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(Context->Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
 }
