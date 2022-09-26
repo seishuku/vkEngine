@@ -26,7 +26,7 @@ OBJS+=vulkan/vulkan_pipeline.o
 # core stuff
 OBJS+=system/linux_x11.o
 OBJS+=font/font.o
-OBJS+=lights/lights.o
+#OBJS+=lights/lights.o
 OBJS+=utils/genid.o
 OBJS+=utils/list.o
 OBJS+=utils/memzone.o

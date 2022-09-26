@@ -99,9 +99,6 @@
     <ClCompile Include="utils\list.c">
       <Filter>Source Files\utils</Filter>
     </ClCompile>
-    <ClCompile Include="lights\lights.c">
-      <Filter>Source Files\lights</Filter>
-    </ClCompile>
     <ClCompile Include="system\win32.c">
       <Filter>Source Files\system</Filter>
     </ClCompile>

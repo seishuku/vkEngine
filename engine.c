@@ -55,8 +55,6 @@ VkuImage_t Textures[NUM_TEXTURES];
 
 matrix ModelView, Projection;
 
-Lights_t Lights;
-
 struct
 {
 	matrix mvp;
@@ -64,8 +62,6 @@ struct
 	vec4 eye;
 	vec4 light_color;
 	vec4 light_direction;
-
-	uint32_t NumLights;
 } ubo;
 
 VkDebugUtilsMessengerEXT debugMessenger;
@@ -125,265 +121,7 @@ VkFence FrameFences[MAX_FRAME_COUNT];
 VkSemaphore PresentCompleteSemaphores[MAX_FRAME_COUNT];
 VkSemaphore RenderCompleteSemaphores[MAX_FRAME_COUNT];
 
-// Shadow cubemap stuff
-int32_t ShadowCubeSize=1024;
-
-VkFramebuffer ShadowFrameBuffer;
-VkuImage_t ShadowDepth;
-VkFormat ShadowDepthFormat=VK_FORMAT_D32_SFLOAT;
-
-VkuPipeline_t ShadowPipeline;
-VkuDescriptorSet_t ShadowDescriptorSet[MAX_FRAME_COUNT];
-VkPipelineLayout ShadowPipelineLayout;
-VkRenderPass ShadowRenderPass;
-
-struct
-{
-	matrix mv[6];
-	matrix proj;
-	vec4 Light_Pos;
-	int32_t index;
-	int32_t pad[11]; // Need to pad out to the nearest 256 byte
-} shadow_ubo;
-
-VkuBuffer_t shadow_ubo_buffer;
-void *shadow_ubo_ptr;
-
 void RecreateSwapchain(void);
-
-void InitShadowCubeMap(uint32_t NumMaps)
-{
-	// Cubemap depth render target
-	vkuCreateImageBuffer(&Context, &ShadowDepth,
-		VK_IMAGE_TYPE_2D, ShadowDepthFormat, 1, 6*NumMaps, ShadowCubeSize, ShadowCubeSize, 1,
-		VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT|VK_IMAGE_USAGE_SAMPLED_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
-
-	// Cube color sampler
-	vkCreateSampler(Context.Device, &(VkSamplerCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-		.maxAnisotropy=1.0f,
-		.magFilter=VK_FILTER_LINEAR,
-		.minFilter=VK_FILTER_LINEAR,
-		.mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR,
-		.addressModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.mipLodBias=0.0f,
-		.compareOp=VK_COMPARE_OP_LESS_OR_EQUAL,
-		.compareEnable=VK_TRUE,
-		.minLod=0.0f,
-		.maxLod=1.0f,
-		.maxAnisotropy=1.0,
-		.anisotropyEnable=VK_FALSE,
-		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-	}, VK_NULL_HANDLE, &ShadowDepth.Sampler);
-
-	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.viewType=VK_IMAGE_VIEW_TYPE_CUBE_ARRAY,
-		.format=ShadowDepthFormat,
-		.components.r={ VK_COMPONENT_SWIZZLE_R },
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.baseArrayLayer=0,
-		.subresourceRange.layerCount=6*NumMaps,
-		.subresourceRange.levelCount=1,
-		.image=ShadowDepth.Image,
-	}, VK_NULL_HANDLE, &ShadowDepth.View);
-
-	vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-		.renderPass=ShadowRenderPass,
-		.attachmentCount=1,
-		.pAttachments=(VkImageView[]){ ShadowDepth.View },
-		.width=ShadowCubeSize,
-		.height=ShadowCubeSize,
-		.layers=6*NumMaps,
-	}, 0, &ShadowFrameBuffer);
-
-	vkuCreateHostBuffer(&Context, &shadow_ubo_buffer, sizeof(shadow_ubo)*NumMaps, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-}
-
-bool InitShadowPipeline(void)
-{
-	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-		.dependencyCount=2,
-		.pDependencies=(VkSubpassDependency[])
-		{
-			{
-				.srcSubpass=VK_SUBPASS_EXTERNAL,
-				.dstSubpass=0,
-				.srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				.dstStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
-				.dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
-			},
-			{
-
-				.srcSubpass=0,
-				.dstSubpass=VK_SUBPASS_EXTERNAL,
-				.srcStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				.srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
-			}
-		},
-		.attachmentCount=1,
-		.pAttachments=(VkAttachmentDescription[])
-		{
-			{
-				.format=ShadowDepthFormat,
-				.samples=VK_SAMPLE_COUNT_1_BIT,
-				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			},
-		},
-		.subpassCount=1,
-		.pSubpasses=&(VkSubpassDescription)
-		{
-			.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS,
-			.pDepthStencilAttachment=&(VkAttachmentReference)
-			{
-				.attachment=0,
-				.layout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-			},
-		},
-	}, 0, &ShadowRenderPass);
-
-	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
-	{
-		vkuInitDescriptorSet(&ShadowDescriptorSet[i], &Context);
-		vkuDescriptorSet_AddBinding(&ShadowDescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
-		vkuAssembleDescriptorSetLayout(&ShadowDescriptorSet[i]);
-	}
-
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=1,
-		.pSetLayouts=&ShadowDescriptorSet[0].DescriptorSetLayout,	// Just use the first one, they're all the same
-	}, 0, &ShadowPipelineLayout);
-
-	vkuInitPipeline(&ShadowPipeline, &Context);
-
-	vkuPipeline_SetPipelineLayout(&ShadowPipeline, ShadowPipelineLayout);
-	vkuPipeline_SetRenderPass(&ShadowPipeline, ShadowRenderPass);
-
-	// Add in vertex shader
-	if(!vkuPipeline_AddStage(&ShadowPipeline, "./shaders/distance.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
-		return false;
-
-	// Add in geometry shader
-	if(!vkuPipeline_AddStage(&ShadowPipeline, "./shaders/distance.geom.spv", VK_SHADER_STAGE_GEOMETRY_BIT))
-		return false;
-
-	// Add in fragment shader
-	if(!vkuPipeline_AddStage(&ShadowPipeline, "./shaders/distance.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-		return false;
-
-	// Set states that are different than defaults
-	ShadowPipeline.CullMode=VK_CULL_MODE_FRONT_BIT;
-	ShadowPipeline.DepthTest=VK_TRUE;
-
-	// Add vertex binding and attrib parameters
-	vkuPipeline_AddVertexBinding(&ShadowPipeline, 0, sizeof(float)*20, VK_VERTEX_INPUT_RATE_VERTEX);
-	vkuPipeline_AddVertexAttribute(&ShadowPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-
-	// Assemble the pipeline
-	if(!vkuAssemblePipeline(&ShadowPipeline))
-		return false;
-
-	return true;
-}
-
-void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
-{
-	vkCmdBeginRenderPass(CommandBuffer, &(VkRenderPassBeginInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-		.renderPass=ShadowRenderPass,
-		.framebuffer=ShadowFrameBuffer,
-		.clearValueCount=1,
-		.pClearValues=(VkClearValue[]) { { 1.0f, 0 } },
-		.renderArea.offset=(VkOffset2D) { 0, 0 },
-		.renderArea.extent=(VkExtent2D)	{ ShadowCubeSize, ShadowCubeSize },
-	}, VK_SUBPASS_CONTENTS_INLINE);
-
-	vkCmdSetViewport(CommandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)ShadowCubeSize, (float)ShadowCubeSize, 0.0f, 1.0f });
-	vkCmdSetScissor(CommandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { ShadowCubeSize, ShadowCubeSize } });
-
-	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
-	vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ShadowPipeline.Pipeline);
-
-	for(uint32_t i=0;i<List_GetCount(&Lights.Lights);i++)
-	{
-		Light_t *Light=List_GetPointer(&Lights.Lights, i);
-
-		vec4 LightPositionRadius;
-		Vec3_Setv(LightPositionRadius, Light->Position);
-		LightPositionRadius[3]=Light->Radius;
-
-		MatrixIdentity(shadow_ubo.proj);
-		MatrixInfPerspective(90.0f, 1.0f, 0.01f, false, shadow_ubo.proj);
-
-		MatrixIdentity(shadow_ubo.mv[0]);
-		MatrixLookAt(LightPositionRadius, (vec3) { LightPositionRadius[0]+1.0f, LightPositionRadius[1]+0.0f, LightPositionRadius[2]+0.0f }, (vec3) { 0.0f, -1.0f, 0.0f }, shadow_ubo.mv[0]);
-		MatrixIdentity(shadow_ubo.mv[1]);
-		MatrixLookAt(LightPositionRadius, (vec3) { LightPositionRadius[0]-1.0f, LightPositionRadius[1]+0.0f, LightPositionRadius[2]+0.0f }, (vec3) { 0.0f, -1.0f, 0.0f }, shadow_ubo.mv[1]);
-		MatrixIdentity(shadow_ubo.mv[2]);
-		MatrixLookAt(LightPositionRadius, (vec3) { LightPositionRadius[0]+0.0f, LightPositionRadius[1]+1.0f, LightPositionRadius[2]+0.0f }, (vec3) { 0.0f, 0.0f, 1.0f }, shadow_ubo.mv[2]);
-		MatrixIdentity(shadow_ubo.mv[3]);
-		MatrixLookAt(LightPositionRadius, (vec3) { LightPositionRadius[0]+0.0f, LightPositionRadius[1]-1.0f, LightPositionRadius[2]+0.0f }, (vec3) { 0.0f, 0.0f, -1.0f }, shadow_ubo.mv[3]);
-		MatrixIdentity(shadow_ubo.mv[4]);
-		MatrixLookAt(LightPositionRadius, (vec3) { LightPositionRadius[0]+0.0f, LightPositionRadius[1]+0.0f, LightPositionRadius[2]+1.0f }, (vec3) { 0.0f, -1.0f, 0.0f }, shadow_ubo.mv[4]);
-		MatrixIdentity(shadow_ubo.mv[5]);
-		MatrixLookAt(LightPositionRadius, (vec3) { LightPositionRadius[0]+0.0f, LightPositionRadius[1]+0.0f, LightPositionRadius[2]-1.0f }, (vec3) { 0.0f, -1.0f, 0.0f }, shadow_ubo.mv[5]);
-
-		Vec4_Setv(shadow_ubo.Light_Pos, LightPositionRadius);
-
-		shadow_ubo.index=i;
-
-		vkMapMemory(Context.Device, shadow_ubo_buffer.DeviceMemory, sizeof(shadow_ubo)*i, sizeof(shadow_ubo), 0, &shadow_ubo_ptr);
-		memcpy(shadow_ubo_ptr, &shadow_ubo, sizeof(shadow_ubo));
-		vkUnmapMemory(Context.Device, shadow_ubo_buffer.DeviceMemory);
-
-		vkuDescriptorSet_UpdateBindingBufferInfo(&ShadowDescriptorSet[FrameIndex], 0, shadow_ubo_buffer.Buffer, 0, sizeof(shadow_ubo));
-		vkuAllocateUpdateDescriptorSet(&ShadowDescriptorSet[FrameIndex], DescriptorPool[FrameIndex]);
-
-		uint32_t DynamicOffset=sizeof(shadow_ubo)*i;
-		vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ShadowPipelineLayout, 0, 1, &ShadowDescriptorSet[FrameIndex].DescriptorSet, 1, &DynamicOffset);
-
-		// Draw the models
-		for(uint32_t j=0;j<NUM_MODELS;j++)
-		{
-			// Bind model data buffers and draw the triangles
-			vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &Model[j].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
-
-			for(uint32_t k=0;k<Model[j].NumMesh;k++)
-			{
-				vkCmdBindIndexBuffer(CommandBuffer, Model[j].Mesh[k].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
-				vkCmdDrawIndexed(CommandBuffer, Model[j].Mesh[k].NumFace*3, 1, 0, 0, 0);
-			}
-		}
-	}
-
-	vkCmdEndRenderPass(CommandBuffer);
-}
-// ---
 
 bool CreateFramebuffers(void)
 {
@@ -481,10 +219,8 @@ bool CreatePipeline(void)
 	{
 		vkuInitDescriptorSet(&DescriptorSet[i], &Context);
 
-		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
+		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-//		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 
 		vkuAssembleDescriptorSetLayout(&DescriptorSet[i]);
 	}
@@ -517,13 +253,18 @@ bool CreatePipeline(void)
 	if(!vkuPipeline_AddStage(&Pipeline, "./shaders/lighting.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
-	vkuPipeline_AddVertexBinding(&Pipeline, 0, sizeof(float)*20, VK_VERTEX_INPUT_RATE_VERTEX);
+	vkuPipeline_AddVertexBinding(&Pipeline, 0, sizeof(vec4)*5, VK_VERTEX_INPUT_RATE_VERTEX);
+	vkuPipeline_AddVertexAttribute(&Pipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
+	vkuPipeline_AddVertexAttribute(&Pipeline, 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*1);
+	vkuPipeline_AddVertexAttribute(&Pipeline, 2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*2);
+	vkuPipeline_AddVertexAttribute(&Pipeline, 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*3);
+	vkuPipeline_AddVertexAttribute(&Pipeline, 4, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*4);
 
-	vkuPipeline_AddVertexAttribute(&Pipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*4);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*8);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*12);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 4, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float)*16);
+	vkuPipeline_AddVertexBinding(&Pipeline, 1, sizeof(matrix), VK_VERTEX_INPUT_RATE_INSTANCE);
+	vkuPipeline_AddVertexAttribute(&Pipeline, 5, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
+	vkuPipeline_AddVertexAttribute(&Pipeline, 6, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*1);
+	vkuPipeline_AddVertexAttribute(&Pipeline, 7, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*2);
+	vkuPipeline_AddVertexAttribute(&Pipeline, 8, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*3);
 
 	if(!vkuAssemblePipeline(&Pipeline))
 		return false;
@@ -560,7 +301,6 @@ bool CreateSkyboxPipeline(void)
 		return false;
 
 	vkuPipeline_AddVertexBinding(&SkyboxPipeline, 0, sizeof(float)*4, VK_VERTEX_INPUT_RATE_VERTEX);
-
 	vkuPipeline_AddVertexAttribute(&SkyboxPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
 
 	if(!vkuAssemblePipeline(&SkyboxPipeline))
@@ -574,8 +314,12 @@ float RandFloat(void)
 	return (float)rand()/RAND_MAX;
 }
 
+VkuBuffer_t Asteroid1_Instance;
+
 void GenerateSkyParams(void)
 {
+	vkDeviceWaitIdle(Context.Device);
+
 	Vec4_Set(skybox_ubo.uOffset, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
 	Vec3_Normalize(skybox_ubo.uOffset);
 
@@ -593,6 +337,33 @@ void GenerateSkyParams(void)
 
 	skybox_ubo.uStarsScale=200.0f;
 	skybox_ubo.uStarDensity=8.0f;
+
+	float *Data=NULL;
+
+	if(Asteroid1_Instance.Buffer)
+	{
+		vkDestroyBuffer(Context.Device, Asteroid1_Instance.Buffer, VK_NULL_HANDLE);
+		vkFreeMemory(Context.Device, Asteroid1_Instance.DeviceMemory, VK_NULL_HANDLE);
+	}
+
+	vkuCreateHostBuffer(&Context, &Asteroid1_Instance, sizeof(matrix)*1000, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+	vkMapMemory(Context.Device, Asteroid1_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+
+	for(uint32_t i=0;i<1000;i++)
+	{
+		vec3 RandomVec;
+		Vec3_Set(RandomVec, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
+		Vec3_Normalize(RandomVec);
+
+		MatrixIdentity(&Data[16*i]);
+		MatrixTranslate(RandomVec[0]*2000.0f, RandomVec[1]*2000.0f, RandomVec[2]*2000.0f, &Data[16*i]);
+		MatrixRotate(RandFloat()*PI*2.0f, 1.0f, 0.0f, 0.0f, &Data[16*i]);
+		MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 1.0f, 0.0f, &Data[16*i]);
+		MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 0.0f, 1.0f, &Data[16*i]);
+	}
+
+	vkUnmapMemory(Context.Device, Asteroid1_Instance.DeviceMemory);
 }
 
 void Render(void)
@@ -600,24 +371,12 @@ void Render(void)
 	static uint32_t OldIndex=0;
 	uint32_t Index=OldIndex;
 
-	//Lights_UpdatePosition(&Lights, 0, (vec3) { sinf(fTime)*150.0f, -25.0f, cosf(fTime)*150.0f });
-	//Lights_UpdatePosition(&Lights, 1, (vec3) { cosf(fTime)*100.0f, 50.0f, sinf(fTime)*100.0f });
-	//Lights_UpdatePosition(&Lights, 2, (vec3) { cosf(fTime)*100.0f, -80.0f, -15.0f });
-	//Lights_UpdatePosition(&Lights, 10, (vec3) { cosf(fTime)*300.0f, 100.0f, sinf(fTime)*300.0f });
-	//Lights_UpdateRadius(&Lights, 10, 300.0f);
-
 	// Generate the projection matrix
 	MatrixIdentity(Projection);
 	MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, true, Projection);
 
 	// Set up the modelview matrix
 	MatrixIdentity(ModelView);
-	//MatrixTranslate(PanX, PanY, Zoom, ModelView);
-
-	//QuatAngle(RotateX, 0.0f, 1.0f, 0.0f, QuatX);
-	//QuatAngle(RotateY, 1.0f, 0.0f, 0.0f, QuatY);
-	//QuatMultiply(QuatY, QuatX, Quat);
-	//QuatMatrix(Quat, ModelView);
 	CameraUpdate(&Camera, fTimeStep, ModelView);
 
 	// Generate an inverse modelview matrix (only really need the last 3 from the calculation)
@@ -630,11 +389,6 @@ void Render(void)
 
 	Vec3_Setv(ubo.light_color, skybox_ubo.uSunColor);
 	Vec3_Setv(ubo.light_direction, skybox_ubo.uSunPosition);
-
-	// Set number of lights to the shader
-	ubo.NumLights=(uint32_t)List_GetCount(&Lights.Lights);
-
-	//Lights_UpdateSSBO(&Lights);
 
 	memcpy(skybox_ubo.mvp, ubo.mvp, sizeof(matrix));
 
@@ -659,8 +413,6 @@ void Render(void)
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 	});
 
-	//ShadowUpdateCubemap(CommandBuffers[Index], Index);
-
 	// Start a render pass and clear the frame/depth buffer
 	vkCmdBeginRenderPass(CommandBuffers[Index], &(VkRenderPassBeginInfo)
 	{
@@ -680,46 +432,19 @@ void Render(void)
 	vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 
 	// Draw the models
+	vkCmdBindVertexBuffers(CommandBuffers[Index], 1, 1, &Asteroid1_Instance.Buffer, &(VkDeviceSize) { 0 });
+	
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 0, Lights.StorageBuffer.Buffer, 0, VK_WHOLE_SIZE);
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 1, &Textures[2*i+0]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 2, &Textures[2*i+1]);
-//		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 3, &ShadowDepth);
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 0, &Textures[2*i+0]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 1, &Textures[2*i+1]);
 		vkuAllocateUpdateDescriptorSet(&DescriptorSet[MAX_FRAME_COUNT*i+Index], DescriptorPool[Index]);
 
 		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[MAX_FRAME_COUNT*i+Index].DescriptorSet, 0, VK_NULL_HANDLE);
 
 		MatrixIdentity(ubo.local);
-
-		if(i==0)
-		{
-			MatrixTranslate(-100.0f, 100.0f, 0.0f, ubo.local);
-			MatrixRotate(fTime*0.75f, 1.0f, 0.0f, 0.0f, ubo.local);
-			MatrixRotate(fTime, 0.0f, 1.0f, 0.0f, ubo.local);
-		}
-
-		if(i==1)
-		{
-			MatrixTranslate(100.0f, 100.0f, 0.0f, ubo.local);
-			MatrixRotate(fTime, 1.0f, 0.0f, 0.0f, ubo.local);
-			MatrixRotate(fTime*0.75f, 0.0f, 1.0f, 0.0f, ubo.local);
-		}
-
-		if(i==2)
-		{
-			MatrixTranslate(-100.0f, -100.0f, 0.0f, ubo.local);
-			MatrixRotate(fTime, 1.0f, 0.0f, 0.0f, ubo.local);
-			MatrixRotate(fTime*1.75f, 0.0f, 1.0f, 0.0f, ubo.local);
-		}
-
-		if(i==3)
-		{
-			MatrixTranslate(100.0f, -100.0f, 0.0f, ubo.local);
-			MatrixRotate(fTime, 1.0f, 0.0f, 0.0f, ubo.local);
-			MatrixRotate(fTime, 0.0f, 1.0f, 0.0f, ubo.local);
-		}
-
+		MatrixRotate(fTime, 1.0f, 0.0f, 0.0f, ubo.local);
+		MatrixRotate(fTime, 0.0f, 1.0f, 0.0f, ubo.local);
 		MatrixScale(50.0f, 50.0f, 50.0f, ubo.local);
 
 		vkCmdPushConstants(CommandBuffers[Index], PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ubo), &ubo);
@@ -730,7 +455,7 @@ void Render(void)
 		for(uint32_t j=0;j<Model[i].NumMesh;j++)
 		{
 			vkCmdBindIndexBuffer(CommandBuffers[Index], Model[i].Mesh[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(CommandBuffers[Index], Model[i].Mesh[j].NumFace*3, 1, 0, 0, 0);
+			vkCmdDrawIndexed(CommandBuffers[Index], Model[i].Mesh[j].NumFace*3, 1000/NUM_MODELS, 0, 0, (1000/NUM_MODELS)*i);
 		}
 	}
 	// ---
@@ -807,11 +532,6 @@ bool Init(void)
 
 	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 200.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
 
-	Lights_Init(&Lights);
-	Lights_Add(&Lights, (vec3) { 0.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 1.0f, 0.0f, 0.0f, 1.0f });
-	Lights_Add(&Lights, (vec3) { -100.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 0.0f, 1.0f, 0.0f, 1.0f });
-	Lights_Add(&Lights, (vec3) { 100.0f, 0.0f, 0.0f }, 256.0f, (vec4) { 0.0f, 0.0f, 1.0f, 1.0f });
-
 	// Load models
 	if(LoadBModel(&Model[MODEL_ASTEROID1], "./assets/asteroid1.bmodel"))
 		BuildMemoryBuffersBModel(&Context, &Model[MODEL_ASTEROID1]);
@@ -880,10 +600,8 @@ bool Init(void)
 	// Create main render pipeline and renderpass
 	CreatePipeline();
 
+	// Create skybox pipeline (uses renderpass from main pipeline)
 	CreateSkyboxPipeline();
-
-//	InitShadowPipeline();
-//	InitShadowCubeMap(13);
 
 	// Create primary frame buffers, depth image
 	CreateFramebuffers();
@@ -1126,29 +844,11 @@ void Destroy(void)
 	vkDestroyDebugUtilsMessengerEXT(Instance, debugMessenger, VK_NULL_HANDLE);
 #endif
 
-	Lights_Destroy(&Lights);
+	vkDestroyBuffer(Context.Device, Asteroid1_Instance.Buffer, VK_NULL_HANDLE);
+	vkFreeMemory(Context.Device, Asteroid1_Instance.DeviceMemory, VK_NULL_HANDLE);
 
 	vkDestroyPipeline(Context.Device, SkyboxPipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, SkyboxPipelineLayout, VK_NULL_HANDLE);
-
-	// Shadow stuff
-	//vkDestroyPipeline(Context.Device, ShadowPipeline.Pipeline, VK_NULL_HANDLE);
-	//vkDestroyPipelineLayout(Context.Device, ShadowPipelineLayout, VK_NULL_HANDLE);
-
-	//for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
-	//	vkDestroyDescriptorSetLayout(Context.Device, ShadowDescriptorSet[i].DescriptorSetLayout, VK_NULL_HANDLE);
-
-	//vkDestroyRenderPass(Context.Device, ShadowRenderPass, VK_NULL_HANDLE);
-
-	//vkDestroyFramebuffer(Context.Device, ShadowFrameBuffer, VK_NULL_HANDLE);
-	//vkDestroySampler(Context.Device, ShadowDepth.Sampler, VK_NULL_HANDLE);
-	//vkDestroyImageView(Context.Device, ShadowDepth.View, VK_NULL_HANDLE);
-	//vkDestroyImage(Context.Device, ShadowDepth.Image, VK_NULL_HANDLE);
-	//VkuMem_Free(VkZone, ShadowDepth.DeviceMemory);
-
-	//vkDestroyBuffer(Context.Device, shadow_ubo_buffer.Buffer, VK_NULL_HANDLE);
-	//vkFreeMemory(Context.Device, shadow_ubo_buffer.DeviceMemory, VK_NULL_HANDLE);
-	// ---
 
 //	Font_Destroy();
 

@@ -21,8 +21,8 @@ extern PFN_vkDestroyDebugUtilsMessengerEXT _vkDestroyDebugUtilsMessengerEXT;
 #define vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR
 extern PFN_vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR;
 
-#define VKU_MAX_PIPELINE_VERTEX_BINDINGS 8
-#define VKU_MAX_PIPELINE_VERTEX_ATTRIBUTES 8
+#define VKU_MAX_PIPELINE_VERTEX_BINDINGS 4
+#define VKU_MAX_PIPELINE_VERTEX_ATTRIBUTES 16
 #define VKU_MAX_PIPELINE_SHADER_STAGES 4
 
 #define VKU_MAX_DESCRIPTORSET_BINDINGS 16

@@ -101,7 +101,6 @@
     <ClCompile Include="image\image.c" />
     <ClCompile Include="image\qoi.c" />
     <ClCompile Include="image\tga.c" />
-    <ClCompile Include="lights\lights.c" />
     <ClCompile Include="math\math.c" />
     <ClCompile Include="model\bmodel.c" />
     <ClCompile Include="model\skybox.c" />

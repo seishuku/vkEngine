@@ -22,7 +22,6 @@ extern VkuContext_t Context;
 extern VkuMemZone_t *VkZone;
 
 extern uint32_t Width, Height;
-extern Lights_t Lights;
 
 extern Camera_t Camera;
 
@@ -125,17 +124,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				case MK_LBUTTON:
 					Camera.Yaw-=(float)delta.x/800.0f;
 					Camera.Pitch+=(float)delta.y/800.0f;
-					//RotateX+=(delta.x*0.01f);
-					//RotateY-=(delta.y*0.01f);
 					break;
 
 				case MK_MBUTTON:
-					//PanX+=delta.x;
-					//PanY+=delta.y;
 					break;
 
 				case MK_RBUTTON:
-					//Zoom+=delta.y;
 					break;
 			}
 			break;
@@ -177,26 +171,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				case 'P':
 					GenerateSkyParams();
 					break;
-
-				//case 'O':
-				//	for(uint32_t i=0;i<10;i++)
-				//	{
-				//		Lights_Add(&Lights, 
-				//		(vec3)
-				//		{
-				//			(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f,
-				//			(((float)rand()/RAND_MAX)*2.0f-1.0f)*100.0f,
-				//			(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f
-				//		}, 200.0f,
-				//		(vec4)
-				//		{
-				//			(float)rand()/RAND_MAX,
-				//			(float)rand()/RAND_MAX,
-				//			(float)rand()/RAND_MAX,
-				//			1.0f
-				//		});
-				//	}
-				//	break;
 
 				case 'W':
 					Camera.key_w=true;
