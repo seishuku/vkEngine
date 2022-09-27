@@ -22,6 +22,7 @@ typedef struct
 	bool key_q, key_e;
 	bool key_up, key_down;
 	bool key_left, key_right;
+	bool shift;
 } Camera_t;
 
 typedef struct

@@ -257,6 +257,9 @@ void CameraUpdate(Camera_t *Camera, float Time, matrix out)
 	if(!out)
 		return;
 
+	if(Camera->shift)
+		speed*=4.0f;
+
 	if(Camera->key_d)
 		Camera->Velocity[0]+=Time;
 

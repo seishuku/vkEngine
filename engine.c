@@ -314,7 +314,28 @@ float RandFloat(void)
 	return (float)rand()/RAND_MAX;
 }
 
-VkuBuffer_t Asteroid1_Instance;
+VkuBuffer_t Asteroid_Instance;
+
+typedef struct
+{
+	vec3 Position;
+	float Radius;
+	vec3 Rotate;
+} Asteroid_t;
+
+#define NUM_ASTEROIDS 1000
+Asteroid_t Asteroids[NUM_ASTEROIDS];
+
+bool SphereSphereIntersect(vec3 PositionA, float RadiusA, vec3 PositionB, float RadiusB)
+{
+	const float distance=sqrtf(
+		(PositionA[0]-PositionB[0])*(PositionA[0]-PositionB[0])+
+		(PositionA[1]-PositionB[1])*(PositionA[1]-PositionB[1])+
+		(PositionA[2]-PositionB[2])*(PositionA[2]-PositionB[2])
+	);
+
+	return distance<RadiusA+RadiusB;
+}
 
 void GenerateSkyParams(void)
 {
@@ -325,6 +346,7 @@ void GenerateSkyParams(void)
 
 	Vec3_Set(skybox_ubo.uNebulaAColor, RandFloat(), RandFloat(), RandFloat());
 	skybox_ubo.uNebulaADensity=RandFloat()*2.0f;
+
 	Vec3_Set(skybox_ubo.uNebulaBColor, RandFloat(), RandFloat(), RandFloat());
 	skybox_ubo.uNebulaBDensity=RandFloat()*2.0f;
 
@@ -340,30 +362,54 @@ void GenerateSkyParams(void)
 
 	float *Data=NULL;
 
-	if(Asteroid1_Instance.Buffer)
-	{
-		vkDestroyBuffer(Context.Device, Asteroid1_Instance.Buffer, VK_NULL_HANDLE);
-		vkFreeMemory(Context.Device, Asteroid1_Instance.DeviceMemory, VK_NULL_HANDLE);
-	}
+	if(!Asteroid_Instance.Buffer)
+		vkuCreateHostBuffer(&Context, &Asteroid_Instance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-	vkuCreateHostBuffer(&Context, &Asteroid1_Instance, sizeof(matrix)*1000, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	vkMapMemory(Context.Device, Asteroid_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
 
-	vkMapMemory(Context.Device, Asteroid1_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+	uint32_t i=0, tries=0;
 
-	for(uint32_t i=0;i<1000;i++)
+	memset(Asteroids, 0, sizeof(Asteroid_t)*NUM_ASTEROIDS);
+
+	while(i<NUM_ASTEROIDS)
 	{
 		vec3 RandomVec;
 		Vec3_Set(RandomVec, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
 		Vec3_Normalize(RandomVec);
 
-		MatrixIdentity(&Data[16*i]);
-		MatrixTranslate(RandomVec[0]*2000.0f, RandomVec[1]*2000.0f, RandomVec[2]*2000.0f, &Data[16*i]);
-		MatrixRotate(RandFloat()*PI*2.0f, 1.0f, 0.0f, 0.0f, &Data[16*i]);
-		MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 1.0f, 0.0f, &Data[16*i]);
-		MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 0.0f, 1.0f, &Data[16*i]);
+		Asteroid_t Asteroid;
+		Vec3_Set(Asteroid.Position, RandomVec[0]*(RandFloat()*10000.0f+500.0f), RandomVec[1]*(RandFloat()*10000.0f+500.0f), RandomVec[2]*(RandFloat()*10000.0f+500.0f));
+		Vec3_Set(Asteroid.Rotate, RandFloat()*PI*2.0f, RandFloat()*PI*2.0f, RandFloat()*PI*2.0f);
+		Asteroid.Radius=(RandFloat()*1000.0f+10.0f)*2.0f;
+
+		bool overlapping=false;
+
+		for(uint32_t j=0;j<i;j++)
+		{
+			if(SphereSphereIntersect(Asteroid.Position, Asteroid.Radius, Asteroids[j].Position, Asteroids[j].Radius))
+				overlapping=true;
+		}
+
+		if(!overlapping)
+			Asteroids[i++]=Asteroid;
+
+		tries++;
+
+		if(tries>NUM_ASTEROIDS*NUM_ASTEROIDS)
+			break;
 	}
 
-	vkUnmapMemory(Context.Device, Asteroid1_Instance.DeviceMemory);
+	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
+	{
+		MatrixIdentity(&Data[16*i]);
+		MatrixTranslatev(Asteroids[i].Position, &Data[16*i]);
+		MatrixRotate(Asteroids[i].Rotate[0], 1.0f, 0.0f, 0.0f, &Data[16*i]);
+		MatrixRotate(Asteroids[i].Rotate[1], 0.0f, 1.0f, 0.0f, &Data[16*i]);
+		MatrixRotate(Asteroids[i].Rotate[2], 0.0f, 0.0f, 1.0f, &Data[16*i]);
+		MatrixScale(Asteroids[i].Radius/2.0f, Asteroids[i].Radius/2.0f, Asteroids[i].Radius/2.0f, &Data[16*i]);
+	}
+
+	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
 }
 
 void Render(void)
@@ -432,7 +478,7 @@ void Render(void)
 	vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 
 	// Draw the models
-	vkCmdBindVertexBuffers(CommandBuffers[Index], 1, 1, &Asteroid1_Instance.Buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(CommandBuffers[Index], 1, 1, &Asteroid_Instance.Buffer, &(VkDeviceSize) { 0 });
 	
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
@@ -445,7 +491,6 @@ void Render(void)
 		MatrixIdentity(ubo.local);
 		MatrixRotate(fTime, 1.0f, 0.0f, 0.0f, ubo.local);
 		MatrixRotate(fTime, 0.0f, 1.0f, 0.0f, ubo.local);
-		MatrixScale(50.0f, 50.0f, 50.0f, ubo.local);
 
 		vkCmdPushConstants(CommandBuffers[Index], PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ubo), &ubo);
 
@@ -455,7 +500,7 @@ void Render(void)
 		for(uint32_t j=0;j<Model[i].NumMesh;j++)
 		{
 			vkCmdBindIndexBuffer(CommandBuffers[Index], Model[i].Mesh[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(CommandBuffers[Index], Model[i].Mesh[j].NumFace*3, 1000/NUM_MODELS, 0, 0, (1000/NUM_MODELS)*i);
+			vkCmdDrawIndexed(CommandBuffers[Index], Model[i].Mesh[j].NumFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*i);
 		}
 	}
 	// ---
@@ -470,7 +515,7 @@ void Render(void)
 
 	// Should UI overlay stuff have it's own render pass?
 	// Maybe even separate thread?
-//	Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f\n\n\n\nNumber of lights: %d", fps, ubo.NumLights);
+	//Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f\t%d", fps, Camera.shift);
 
 	vkCmdEndRenderPass(CommandBuffers[Index]);
 
@@ -844,8 +889,8 @@ void Destroy(void)
 	vkDestroyDebugUtilsMessengerEXT(Instance, debugMessenger, VK_NULL_HANDLE);
 #endif
 
-	vkDestroyBuffer(Context.Device, Asteroid1_Instance.Buffer, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, Asteroid1_Instance.DeviceMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(Context.Device, Asteroid_Instance.Buffer, VK_NULL_HANDLE);
+	vkFreeMemory(Context.Device, Asteroid_Instance.DeviceMemory, VK_NULL_HANDLE);
 
 	vkDestroyPipeline(Context.Device, SkyboxPipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, SkyboxPipelineLayout, VK_NULL_HANDLE);

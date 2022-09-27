@@ -164,7 +164,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			break;
 
 		case WM_KEYDOWN:
-			Key[wParam]=1;
+			Key[wParam]=true;
 
 			switch(wParam)
 			{
@@ -220,6 +220,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					Camera.key_right=true;
 					break;
 
+				case VK_SHIFT:
+					Camera.shift=true;
+					break;
+
 				case VK_ESCAPE:
 					PostQuitMessage(0);
 					break;
@@ -230,7 +234,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			break;
 
 		case WM_KEYUP:
-			Key[wParam]=0;
+			Key[wParam]=false;
 
 			switch(wParam)
 			{
@@ -280,6 +284,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 				case VK_RIGHT:
 					Camera.key_right=false;
+					break;
+
+				case VK_SHIFT:
+					Camera.shift=false;
 					break;
 
 				default:
