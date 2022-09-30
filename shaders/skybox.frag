@@ -148,5 +148,5 @@ void main()
 	float d=max(0.0, dot(normalize(Position), normalize(uSunPosition.xyz)));
 	Temp+=mix(vec3(0.0), uSunColor.xyz, smoothstep(1.0-uSunSize*uSunFalloff, 1.0-uSunSize, d)+pow(d, uSunFalloff)*0.5);
 
-    Output=vec4(max(vec3(0.0), Temp), 1.0);
+    Output=vec4(max(vec3(0.0), sqrt(Temp)), 1.0);
 }

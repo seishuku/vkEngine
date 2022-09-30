@@ -880,7 +880,10 @@ bool Init(void)
 		return false;
 #endif
 
-	VkZone=VkuMem_Init(&Context, Context.DeviceProperties2.maxMemoryAllocationSize);
+	VkZone=VkuMem_Init(&Context, (size_t)(Context.DeviceProperties2.maxMemoryAllocationSize*0.8f));
+
+	if(VkZone==NULL)
+		return false;
 
 	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 200.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
 
