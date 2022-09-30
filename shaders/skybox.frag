@@ -2,7 +2,7 @@
 
 layout (location=0) in vec3 Position;
 
-layout (push_constant) uniform ubo
+layout (binding=0) uniform ubo
 {
 	mat4 mvp;
 	vec4 uOffset;

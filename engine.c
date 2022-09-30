@@ -119,7 +119,11 @@ struct
 	float uSunFalloff;
 	float pad1[2];
 	vec4 uSunColor;
-} skybox_ubo;
+} *Skybox_UBO;
+
+VkuBuffer_t Skybox_UBO_Buffer;
+
+VkuDescriptorSet_t SkyboxDescriptorSet[MAX_FRAME_COUNT];
 
 VkPipelineLayout SkyboxPipelineLayout;
 VkuPipeline_t SkyboxPipeline;
@@ -338,7 +342,7 @@ void ShadowUpdateMap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 	MatrixIdentity(ModelView);
 
 	vec3 Position;
-	Vec3_Setv(Position, skybox_ubo.uSunPosition);
+	Vec3_Setv(Position, Skybox_UBO->uSunPosition);
 	Vec3_Muls(Position, 20000.0f);
 
 	MatrixLookAt(Position, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.0f, 1.0f, 0.0f }, ModelView);
@@ -523,16 +527,19 @@ bool CreatePipeline(void)
 
 bool CreateSkyboxPipeline(void)
 {
+	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
+	{
+		vkuInitDescriptorSet(&SkyboxDescriptorSet[i], &Context);
+		vkuDescriptorSet_AddBinding(&SkyboxDescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
+		vkuAssembleDescriptorSetLayout(&SkyboxDescriptorSet[i]);
+	}
+
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.pushConstantRangeCount=1,
-		.pPushConstantRanges=&(VkPushConstantRange)
-		{
-			.offset=0,
-			.size=sizeof(skybox_ubo),
-			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
-		},
+		.setLayoutCount=1,
+		.pSetLayouts=&SkyboxDescriptorSet[0].DescriptorSetLayout,
+		.pushConstantRangeCount=0,
 	}, 0, &SkyboxPipelineLayout);
 
 	vkuInitPipeline(&SkyboxPipeline, &Context);
@@ -554,6 +561,9 @@ bool CreateSkyboxPipeline(void)
 
 	if(!vkuAssemblePipeline(&SkyboxPipeline))
 		return false;
+
+	vkuCreateHostBuffer(&Context, &Skybox_UBO_Buffer, sizeof(*Skybox_UBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	vkMapMemory(Context.Device, Skybox_UBO_Buffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Skybox_UBO);
 
 	return true;
 }
@@ -614,24 +624,24 @@ void GenerateSkyParams(void)
 {
 	vkDeviceWaitIdle(Context.Device);
 
-	Vec4_Set(skybox_ubo.uOffset, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
-	Vec3_Normalize(skybox_ubo.uOffset);
+	Vec4_Set(Skybox_UBO->uOffset, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
+	Vec3_Normalize(Skybox_UBO->uOffset);
 
-	Vec3_Set(skybox_ubo.uNebulaAColor, RandFloat(), RandFloat(), RandFloat());
-	skybox_ubo.uNebulaADensity=RandFloat()*2.0f;
+	Vec3_Set(Skybox_UBO->uNebulaAColor, RandFloat(), RandFloat(), RandFloat());
+	Skybox_UBO->uNebulaADensity=RandFloat()*2.0f;
 
-	Vec3_Set(skybox_ubo.uNebulaBColor, RandFloat(), RandFloat(), RandFloat());
-	skybox_ubo.uNebulaBDensity=RandFloat()*2.0f;
+	Vec3_Set(Skybox_UBO->uNebulaBColor, RandFloat(), RandFloat(), RandFloat());
+	Skybox_UBO->uNebulaBDensity=RandFloat()*2.0f;
 
-	Vec4_Set(skybox_ubo.uSunPosition, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
-	Vec3_Normalize(skybox_ubo.uSunPosition);
+	Vec4_Set(Skybox_UBO->uSunPosition, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
+	Vec3_Normalize(Skybox_UBO->uSunPosition);
 
-	Vec4_Set(skybox_ubo.uSunColor, min(1.0f, RandFloat()+0.5f), min(1.0f, RandFloat()+0.5f), min(1.0f, RandFloat()+0.5f), 0.0f);
-	skybox_ubo.uSunSize=1.0f/(RandFloat()*1000.0f);
-	skybox_ubo.uSunFalloff=RandFloat()*16.0f+8.0f;
+	Vec4_Set(Skybox_UBO->uSunColor, min(1.0f, RandFloat()+0.5f), min(1.0f, RandFloat()+0.5f), min(1.0f, RandFloat()+0.5f), 0.0f);
+	Skybox_UBO->uSunSize=1.0f/(RandFloat()*1000.0f);
+	Skybox_UBO->uSunFalloff=RandFloat()*16.0f+8.0f;
 
-	skybox_ubo.uStarsScale=200.0f;
-	skybox_ubo.uStarDensity=8.0f;
+	Skybox_UBO->uStarsScale=200.0f;
+	Skybox_UBO->uStarDensity=8.0f;
 
 	float *Data=NULL;
 
@@ -704,10 +714,10 @@ void Render(void)
 	MatrixIdentity(ubo->modelview);
 	CameraUpdate(&Camera, fTimeStep, ubo->modelview);
 
-	Vec3_Setv(ubo->light_color, skybox_ubo.uSunColor);
-	Vec3_Setv(ubo->light_direction, skybox_ubo.uSunPosition);
+	Vec3_Setv(ubo->light_color, Skybox_UBO->uSunColor);
+	Vec3_Setv(ubo->light_direction, Skybox_UBO->uSunPosition);
 
-	MatrixMult(ubo->modelview, ubo->projection, skybox_ubo.mvp);
+	MatrixMult(ubo->modelview, ubo->projection, Skybox_UBO->mvp);
 	memcpy(ubo->light_mvp, shadow_ubo.mvp, sizeof(matrix));
 
 	//float *Data=NULL;
@@ -789,7 +799,10 @@ void Render(void)
 	// Skybox
 	vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipeline.Pipeline);
 
-	vkCmdPushConstants(CommandBuffers[Index], SkyboxPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(skybox_ubo), &skybox_ubo);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&SkyboxDescriptorSet[Index], 0, Skybox_UBO_Buffer.Buffer, 0, VK_WHOLE_SIZE);
+	vkuAllocateUpdateDescriptorSet(&SkyboxDescriptorSet[Index], DescriptorPool[Index]);
+
+	vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipelineLayout, 0, 1, &SkyboxDescriptorSet[Index].DescriptorSet, 0, VK_NULL_HANDLE);
 
 	vkCmdBindVertexBuffers(CommandBuffers[Index], 0, 1, &SkyboxVertex.Buffer, &(VkDeviceSize) { 0 });
 	vkCmdBindIndexBuffer(CommandBuffers[Index], SkyboxIndex.Buffer, 0, VK_INDEX_TYPE_UINT16);
@@ -805,7 +818,7 @@ void Render(void)
 
 	//MatrixMult(ubo->modelview, ubo->projection, line_ubo.mvp);
 	//Vec4_Set(line_ubo.start, 0.0f, 0.0f, 0.0f, 1.0f);
-	//Vec3_Setv(line_ubo.end, skybox_ubo.uSunPosition);
+	//Vec3_Setv(line_ubo.end, Skybox_UBO->uSunPosition);
 	//Vec3_Muls(line_ubo.end, 10000.0f+(500.0f*2.0f));
 	//line_ubo.end[3]=1.0f;
 
@@ -911,8 +924,6 @@ bool Init(void)
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4], "./assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4_NORMAL], "./assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 
-	GenerateSkyParams();
-
 	// Create a large descriptor pool, so I don't have to worry about readjusting for exactly what I have
 	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
 	{
@@ -948,6 +959,7 @@ bool Init(void)
 
 	// Create skybox pipeline (uses renderpass from main pipeline)
 	CreateSkyboxPipeline();
+	GenerateSkyParams();
 
 	// Create debug line pipeline
 	CreateLinePipeline();

@@ -119,7 +119,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			SetCursorPos(old.x, old.y);
 
-			switch(wParam)
+			switch(LOWORD(wParam))
 			{
 				case MK_LBUTTON:
 					Camera.Yaw-=(float)delta.x/800.0f;
