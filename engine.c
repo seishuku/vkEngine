@@ -522,6 +522,9 @@ bool CreatePipeline(void)
 	if(!vkuAssemblePipeline(&Pipeline))
 		return false;
 
+	vkuCreateHostBuffer(&Context, &uboBuffer, sizeof(*ubo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	vkMapMemory(Context.Device, uboBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &ubo);
+
 	return true;
 }
 
@@ -699,12 +702,6 @@ void Render(void)
 {
 	static uint32_t OldIndex=0;
 	uint32_t Index=OldIndex;
-
-	if(!uboBuffer.Buffer)
-	{
-		vkuCreateHostBuffer(&Context, &uboBuffer, sizeof(ubo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		vkMapMemory(Context.Device, uboBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void *)&ubo);
-	}
 
 	// Generate the projection matrix
 	MatrixIdentity(ubo->projection);
