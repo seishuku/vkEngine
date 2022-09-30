@@ -169,9 +169,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <GLSL Include="shaders\distance.frag">
-      <Filter>Shaders</Filter>
-    </GLSL>
     <GLSL Include="shaders\font.frag">
       <Filter>Shaders</Filter>
     </GLSL>
@@ -187,13 +184,16 @@
     <GLSL Include="shaders\lighting.vert">
       <Filter>Shaders</Filter>
     </GLSL>
-    <GLSL Include="shaders\distance.geom">
-      <Filter>Shaders</Filter>
-    </GLSL>
     <GLSL Include="shaders\skybox.frag">
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\skybox.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\line.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\line.vert">
       <Filter>Shaders</Filter>
     </GLSL>
   </ItemGroup>

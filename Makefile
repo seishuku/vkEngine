@@ -32,8 +32,7 @@ OBJS+=utils/list.o
 OBJS+=utils/memzone.o
 OBJS+=engine.o
 
-SHADERS=shaders/distance.frag.spv
-SHADERS+=shaders/distance.vert.spv
+SHADERS=shaders/distance.vert.spv
 SHADERS+=shaders/font.frag.spv
 SHADERS+=shaders/font.vert.spv
 SHADERS+=shaders/lighting.frag.spv

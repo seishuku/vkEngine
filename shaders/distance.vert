@@ -1,10 +1,20 @@
 #version 450
 
 layout (location=0) in vec4 vPosition;
+layout (location=1) in mat4 iPosition;
 
-layout (location=0) out vec4 gPosition;
+layout (push_constant) uniform ubo
+{
+    mat4 mvp;
+    mat4 local;
+};
+
+out gl_PerVertex
+{
+    vec4 gl_Position;
+};
 
 void main()
 {
-	gPosition=vPosition;
+	gl_Position=mvp*iPosition*local*vec4(vPosition.xyz, 1.0);
 }

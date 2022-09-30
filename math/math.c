@@ -828,24 +828,42 @@ void MatrixOrtho(const float left, const float right, const float bottom, const 
 {
 	if(out)
 	{
-		matrix m;
+		matrix m=
+		{
+			2.0f/(right-left),
+			0.0f,
+			0.0f,
+			0.0f,
+			0.0f,
+			2.0f/(bottom-top),
+			0.0f,
+			0.0f,
+			0.0f,
+			0.0f,
+			1.0f/(zNear-zFar),
+			0.0f,
+			-(right+left)/(right-left),
+			-(bottom+top)/(bottom-top),
+			zNear/(zNear-zFar),
+			1.0f
+		};
 
-		m[0]=2/(right-left);
-		m[1]=0.0f;
-		m[2]=0.0f;
-		m[3]=0.0f;
-		m[4]=0.0f;
-		m[5]=2/(top-bottom);
-		m[6]=0.0f;
-		m[7]=0.0f;
-		m[8]=0.0f;
-		m[9]=0.0f;
-		m[10]=-2/(zFar-zNear);
-		m[11]=0.0f;
-		m[12]=-(right+left)/(right-left);
-		m[13]=-(top+bottom)/(top-bottom);
-		m[14]=-(zFar+zNear)/(zFar-zNear);
-		m[15]=1.0f;
+		//m[0]=2.0f/(right-left);
+		//m[1]=0.0f;
+		//m[2]=0.0f;
+		//m[3]=0.0f;
+		//m[4]=0.0f;
+		//m[5]=2.0f/(top-bottom);
+		//m[6]=0.0f;
+		//m[7]=0.0f;
+		//m[8]=0.0f;
+		//m[9]=0.0f;
+		//m[10]=-2.0f/(zFar-zNear);
+		//m[11]=0.0f;
+		//m[12]=-(right+left)/(right-left);
+		//m[13]=-(top+bottom)/(top-bottom);
+		//m[14]=-(zFar+zNear)/(zFar-zNear);
+		//m[15]=1.0f;
 
 		MatrixMult(m, out, out);
 	}

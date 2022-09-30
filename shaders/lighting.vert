@@ -8,13 +8,18 @@ layout (location=4) in vec4 vNormal;
 
 layout (location=5) in mat4 iPosition;
 
-layout (push_constant) uniform ubo
+layout (binding=3) uniform ubo
 {
-    mat4 mvp;
-	mat4 local;
-    vec4 eye;
+	mat4 projection;
+    mat4 modelview;
+	mat4 light_mvp;
 	vec4 light_color;
 	vec4 light_direction;
+};
+
+layout (push_constant) uniform ubo_pc
+{
+	mat4 local;
 };
 
 out gl_PerVertex
@@ -26,14 +31,23 @@ layout (location=0) out vec3 Position;
 layout (location=1) out vec2 UV;
 layout (location=2) out mat3 Tangent;
 layout (location=5) out mat4 iMatrix;
+layout (location=9) out vec4 Shadow;
+
+const mat4 biasMat = mat4( 
+	0.5, 0.0, 0.0, 0.0,
+	0.0, 0.5, 0.0, 0.0,
+	0.0, 0.0, 1.0, 0.0,
+	0.5, 0.5, 0.0, 1.0 );
 
 void main()
 {
-	gl_Position=mvp*iPosition*local*vec4(vPosition.xyz, 1.0);
+	gl_Position=projection*modelview*iPosition*local*vec4(vPosition.xyz, 1.0);
 
 	Position=vPosition.xyz;
 	UV=vUV.xy;
 
 	Tangent=mat3(vTangent.xyz, vBinormal.xyz, vNormal.xyz);
 	iMatrix=iPosition;
+
+	Shadow=biasMat*light_mvp*iPosition*local*vec4(vPosition.xyz, 1.0);
 }

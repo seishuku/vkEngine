@@ -130,13 +130,13 @@
     <ClInclude Include="vulkan\vulkan.h" />
   </ItemGroup>
   <ItemGroup>
-    <GLSL Include="shaders\distance.frag" />
-    <GLSL Include="shaders\distance.geom" />
     <GLSL Include="shaders\distance.vert" />
     <GLSL Include="shaders\font.frag" />
     <GLSL Include="shaders\font.vert" />
     <GLSL Include="shaders\lighting.frag" />
     <GLSL Include="shaders\lighting.vert" />
+    <GLSL Include="shaders\line.frag" />
+    <GLSL Include="shaders\line.vert" />
     <GLSL Include="shaders\skybox.frag" />
     <GLSL Include="shaders\skybox.vert" />
   </ItemGroup>
