@@ -145,7 +145,7 @@ struct
 {
 	matrix mvp;
 	matrix local;
-} shadow_ubo;
+} Shadow_UBO;
 
 VkDescriptorPool DescriptorPool[MAX_FRAME_COUNT];
 VkuDescriptorSet_t DescriptorSet[MAX_FRAME_COUNT*NUM_MODELS];
@@ -276,7 +276,7 @@ bool InitShadowPipeline(void)
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
 			.offset=0,
-			.size=sizeof(shadow_ubo),
+			.size=sizeof(Shadow_UBO),
 			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 	}, 0, &ShadowPipelineLayout);
@@ -347,18 +347,18 @@ void ShadowUpdateMap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 
 	MatrixLookAt(Position, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.0f, 1.0f, 0.0f }, ModelView);
 
-	MatrixMult(ModelView, Projection, shadow_ubo.mvp);
+	MatrixMult(ModelView, Projection, Shadow_UBO.mvp);
 
 	vkCmdBindVertexBuffers(CommandBuffer, 1, 1, &Asteroid_Instance.Buffer, &(VkDeviceSize) { 0 });
 
 	// Draw the models
 	for(uint32_t j=0;j<NUM_MODELS;j++)
 	{
-		MatrixIdentity(shadow_ubo.local);
-		MatrixRotate(fTime, 1.0f, 0.0f, 0.0f, shadow_ubo.local);
-		MatrixRotate(fTime, 0.0f, 1.0f, 0.0f, shadow_ubo.local);
+		MatrixIdentity(Shadow_UBO.local);
+		MatrixRotate(fTime, 1.0f, 0.0f, 0.0f, Shadow_UBO.local);
+		MatrixRotate(fTime, 0.0f, 1.0f, 0.0f, Shadow_UBO.local);
 
-		vkCmdPushConstants(CommandBuffer, ShadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shadow_ubo), &shadow_ubo);
+		vkCmdPushConstants(CommandBuffer, ShadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Shadow_UBO), &Shadow_UBO);
 
 		// Bind model data buffers and draw the triangles
 		vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &Model[j].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
@@ -715,11 +715,7 @@ void Render(void)
 	Vec3_Setv(ubo->light_direction, Skybox_UBO->uSunPosition);
 
 	MatrixMult(ubo->modelview, ubo->projection, Skybox_UBO->mvp);
-	memcpy(ubo->light_mvp, shadow_ubo.mvp, sizeof(matrix));
-
-	//float *Data=NULL;
-	//memcpy(Data, &ubo, sizeof(ubo));
-	//vkUnmapMemory(Context.Device, uboBuffer.DeviceMemory);
+	memcpy(ubo->light_mvp, Shadow_UBO.mvp, sizeof(matrix));
 
 	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain, UINT64_MAX, PresentCompleteSemaphores[Index], VK_NULL_HANDLE, &OldIndex);
 
@@ -807,26 +803,26 @@ void Render(void)
 	//////
 
 	////// DEBUG LINE FROM ORIGIN TO LIGHT DIRECTION
-	struct
-	{
-		matrix mvp;
-		vec4 start, end;
-	} line_ubo;
+	//struct
+	//{
+	//	matrix mvp;
+	//	vec4 start, end;
+	//} line_ubo;
 
-	MatrixMult(ubo->modelview, ubo->projection, line_ubo.mvp);
-	Vec4_Set(line_ubo.start, 0.0f, 0.0f, 0.0f, 1.0f);
-	Vec3_Setv(line_ubo.end, Skybox_UBO->uSunPosition);
-	Vec3_Muls(line_ubo.end, 10000.0f+(500.0f*2.0f));
-	line_ubo.end[3]=1.0f;
+	//MatrixMult(ubo->modelview, ubo->projection, line_ubo.mvp);
+	//Vec4_Set(line_ubo.start, 0.0f, 0.0f, 0.0f, 1.0f);
+	//Vec3_Setv(line_ubo.end, Skybox_UBO->uSunPosition);
+	//Vec3_Muls(line_ubo.end, 10000.0f+(500.0f*2.0f));
+	//line_ubo.end[3]=1.0f;
 
-	vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, LinePipeline.Pipeline);
-	vkCmdPushConstants(CommandBuffers[Index], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
-	vkCmdDraw(CommandBuffers[Index], 2, 1, 0, 0);
+	//vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, LinePipeline.Pipeline);
+	//vkCmdPushConstants(CommandBuffers[Index], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
+	//vkCmdDraw(CommandBuffers[Index], 2, 1, 0, 0);
 	//////
 
 	// Should UI overlay stuff have it's own render pass?
 	// Maybe even separate thread?
-	Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f\t%d", fps, Camera.shift);
+	//Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f\t%d", fps, Camera.shift);
 
 	vkCmdEndRenderPass(CommandBuffers[Index]);
 
