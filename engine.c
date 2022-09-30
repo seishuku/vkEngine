@@ -566,7 +566,7 @@ bool CreateSkyboxPipeline(void)
 		return false;
 
 	vkuCreateHostBuffer(&Context, &Skybox_UBO_Buffer, sizeof(*Skybox_UBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-	vkMapMemory(Context.Device, Skybox_UBO_Buffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Skybox_UBO);
+	vkMapMemory(Context.Device, Skybox_UBO_Buffer.DeviceMemory, 0, sizeof(*Skybox_UBO), 0, &Skybox_UBO);
 
 	return true;
 }
@@ -807,26 +807,26 @@ void Render(void)
 	//////
 
 	////// DEBUG LINE FROM ORIGIN TO LIGHT DIRECTION
-	//struct
-	//{
-	//	matrix mvp;
-	//	vec4 start, end;
-	//} line_ubo;
+	struct
+	{
+		matrix mvp;
+		vec4 start, end;
+	} line_ubo;
 
-	//MatrixMult(ubo->modelview, ubo->projection, line_ubo.mvp);
-	//Vec4_Set(line_ubo.start, 0.0f, 0.0f, 0.0f, 1.0f);
-	//Vec3_Setv(line_ubo.end, Skybox_UBO->uSunPosition);
-	//Vec3_Muls(line_ubo.end, 10000.0f+(500.0f*2.0f));
-	//line_ubo.end[3]=1.0f;
+	MatrixMult(ubo->modelview, ubo->projection, line_ubo.mvp);
+	Vec4_Set(line_ubo.start, 0.0f, 0.0f, 0.0f, 1.0f);
+	Vec3_Setv(line_ubo.end, Skybox_UBO->uSunPosition);
+	Vec3_Muls(line_ubo.end, 10000.0f+(500.0f*2.0f));
+	line_ubo.end[3]=1.0f;
 
-	//vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, LinePipeline.Pipeline);
-	//vkCmdPushConstants(CommandBuffers[Index], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
-	//vkCmdDraw(CommandBuffers[Index], 2, 1, 0, 0);
+	vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, LinePipeline.Pipeline);
+	vkCmdPushConstants(CommandBuffers[Index], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
+	vkCmdDraw(CommandBuffers[Index], 2, 1, 0, 0);
 	//////
 
 	// Should UI overlay stuff have it's own render pass?
 	// Maybe even separate thread?
-	//Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f\t%d", fps, Camera.shift);
+	Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f\t%d", fps, Camera.shift);
 
 	vkCmdEndRenderPass(CommandBuffers[Index]);
 

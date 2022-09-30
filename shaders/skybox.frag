@@ -14,11 +14,12 @@ layout (binding=0) uniform ubo
 
 	float uStarsScale;
 	float uStarDensity;
+	vec2 pad0;
 
 	vec4 uSunPosition;
 	float uSunSize;
 	float uSunFalloff;
-	float pad1[2];
+	vec2 pad1;
 	vec4 uSunColor;
 };
 
