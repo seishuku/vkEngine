@@ -129,6 +129,9 @@
     <ClCompile Include="model\bmodel.c">
       <Filter>Source Files\model</Filter>
     </ClCompile>
+    <ClCompile Include="utils\event.c">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
@@ -166,6 +169,9 @@
     </ClInclude>
     <ClInclude Include="model\bmodel.h">
       <Filter>Header Files\model</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\event.h">
+      <Filter>Header Files\utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

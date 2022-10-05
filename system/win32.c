@@ -8,6 +8,7 @@
 #include "../camera/camera.h"
 #include "../utils/list.h"
 #include "../lights/lights.h"
+#include "../utils/event.h"
 
 MemZone_t *Zone;
 
@@ -20,6 +21,8 @@ extern VkInstance Instance;
 extern VkuContext_t Context;
 
 extern VkuMemZone_t *VkZone;
+
+extern bool TestFence;
 
 extern uint32_t Width, Height;
 
@@ -119,7 +122,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			SetCursorPos(old.x, old.y);
 
-			switch(LOWORD(wParam))
+			switch(LOWORD(wParam)&(MK_LBUTTON|MK_MBUTTON|MK_RBUTTON))
 			{
 				case MK_LBUTTON:
 					Camera.Yaw-=(float)delta.x/800.0f;
@@ -164,135 +167,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			break;
 
 		case WM_KEYDOWN:
-			Key[wParam]=true;
+			if(wParam==VK_ESCAPE)
+				PostQuitMessage(0);
 
-			switch(wParam)
-			{
-				case 'P':
-					GenerateSkyParams();
-					break;
-
-				case 'W':
-					Camera.key_w=true;
-					break;
-
-				case 'S':
-					Camera.key_s=true;
-					break;
-
-				case 'A':
-					Camera.key_a=true;
-					break;
-
-				case 'D':
-					Camera.key_d=true;
-					break;
-
-				case 'V':
-					Camera.key_v=true;
-					break;
-
-				case 'C':
-					Camera.key_c=true;
-					break;
-
-				case 'Q':
-					Camera.key_q=true;
-					break;
-
-				case 'E':
-					Camera.key_e=true;
-					break;
-
-				case VK_UP:
-					Camera.key_up=true;
-					break;
-
-				case VK_DOWN:
-					Camera.key_down=true;
-					break;
-
-				case VK_LEFT:
-					Camera.key_left=true;
-					break;
-
-				case VK_RIGHT:
-					Camera.key_right=true;
-					break;
-
-				case VK_SHIFT:
-					Camera.shift=true;
-					break;
-
-				case VK_ESCAPE:
-					PostQuitMessage(0);
-					break;
-
-				default:
-					break;
-			}
+			Event_Trigger(EVENT_KEYDOWN, (void *)&wParam);
 			break;
 
 		case WM_KEYUP:
-			Key[wParam]=false;
-
-			switch(wParam)
-			{
-				case 'W':
-					Camera.key_w=false;
-					break;
-
-				case 'S':
-					Camera.key_s=false;
-					break;
-
-				case 'A':
-					Camera.key_a=false;
-					break;
-
-				case 'D':
-					Camera.key_d=false;
-					break;
-
-				case 'V':
-					Camera.key_v=false;
-					break;
-
-				case 'C':
-					Camera.key_c=false;
-					break;
-
-				case 'Q':
-					Camera.key_q=false;
-					break;
-
-				case 'E':
-					Camera.key_e=false;
-					break;
-
-				case VK_UP:
-					Camera.key_up=false;
-					break;
-
-				case VK_DOWN:
-					Camera.key_down=false;
-					break;
-
-				case VK_LEFT:
-					Camera.key_left=false;
-					break;
-
-				case VK_RIGHT:
-					Camera.key_right=false;
-					break;
-
-				case VK_SHIFT:
-					Camera.shift=false;
-					break;
-
-				default:
-					break;
-			}
+			Event_Trigger(EVENT_KEYUP, (void *)&wParam);
 			break;
 	}
 

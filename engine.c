@@ -13,6 +13,7 @@
 #include "font/font.h"
 #include "utils/list.h"
 #include "lights/lights.h"
+#include "utils/event.h"
 
 uint32_t Width=1280, Height=720;
 
@@ -625,8 +626,6 @@ bool SphereSphereIntersect(vec3 PositionA, float RadiusA, vec3 PositionB, float 
 
 void GenerateSkyParams(void)
 {
-	vkDeviceWaitIdle(Context.Device);
-
 	Vec4_Set(Skybox_UBO->uOffset, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
 	Vec3_Normalize(Skybox_UBO->uOffset);
 
@@ -822,7 +821,7 @@ void Render(void)
 
 	// Should UI overlay stuff have it's own render pass?
 	// Maybe even separate thread?
-	//Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f\t%d", fps, Camera.shift);
+	Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f", fps);
 
 	vkCmdEndRenderPass(CommandBuffers[Index]);
 
@@ -867,8 +866,137 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 	return VK_FALSE;
 }
 
+void Event_KeyDown(void *Arg)
+{
+	switch(*((uint32_t *)Arg))
+	{
+		case 'P':
+			GenerateSkyParams();
+			break;
+
+		case 'W':
+			Camera.key_w=true;
+			break;
+
+		case 'S':
+			Camera.key_s=true;
+			break;
+
+		case 'A':
+			Camera.key_a=true;
+			break;
+
+		case 'D':
+			Camera.key_d=true;
+			break;
+
+		case 'V':
+			Camera.key_v=true;
+			break;
+
+		case 'C':
+			Camera.key_c=true;
+			break;
+
+		case 'Q':
+			Camera.key_q=true;
+			break;
+
+		case 'E':
+			Camera.key_e=true;
+			break;
+
+		case VK_UP:
+			Camera.key_up=true;
+			break;
+
+		case VK_DOWN:
+			Camera.key_down=true;
+			break;
+
+		case VK_LEFT:
+			Camera.key_left=true;
+			break;
+
+		case VK_RIGHT:
+			Camera.key_right=true;
+			break;
+
+		case VK_SHIFT:
+			Camera.shift=true;
+			break;
+
+		default:
+			break;
+	}
+}
+
+void Event_KeyUp(void *Arg)
+{
+	switch(*((uint32_t *)Arg))
+	{
+		case 'W':
+			Camera.key_w=false;
+			break;
+
+		case 'S':
+			Camera.key_s=false;
+			break;
+
+		case 'A':
+			Camera.key_a=false;
+			break;
+
+		case 'D':
+			Camera.key_d=false;
+			break;
+
+		case 'V':
+			Camera.key_v=false;
+			break;
+
+		case 'C':
+			Camera.key_c=false;
+			break;
+
+		case 'Q':
+			Camera.key_q=false;
+			break;
+
+		case 'E':
+			Camera.key_e=false;
+			break;
+
+		case VK_UP:
+			Camera.key_up=false;
+			break;
+
+		case VK_DOWN:
+			Camera.key_down=false;
+			break;
+
+		case VK_LEFT:
+			Camera.key_left=false;
+			break;
+
+		case VK_RIGHT:
+			Camera.key_right=false;
+			break;
+
+		case VK_SHIFT:
+			Camera.shift=false;
+			break;
+
+		default:
+			break;
+	}
+}
+
 bool Init(void)
 {
+	Event_Add(EVENT_KEYDOWN, Event_KeyDown);
+	Event_Add(EVENT_KEYUP, Event_KeyUp);
+
 #ifdef _DEBUG
 	if(vkCreateDebugUtilsMessengerEXT(Instance, &(VkDebugUtilsMessengerCreateInfoEXT)
 	{

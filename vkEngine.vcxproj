@@ -16,6 +16,7 @@
     <ProjectGuid>{c9a498c0-ca5f-48d7-a8fe-bda95e328bdf}</ProjectGuid>
     <RootNamespace>Test</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>vkEngine</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -105,6 +106,7 @@
     <ClCompile Include="model\bmodel.c" />
     <ClCompile Include="model\skybox.c" />
     <ClCompile Include="system\win32.c" />
+    <ClCompile Include="utils\event.c" />
     <ClCompile Include="utils\genid.c" />
     <ClCompile Include="utils\list.c" />
     <ClCompile Include="utils\memzone.c" />
@@ -124,6 +126,7 @@
     <ClInclude Include="model\bmodel.h" />
     <ClInclude Include="model\skybox.h" />
     <ClInclude Include="system\system.h" />
+    <ClInclude Include="utils\event.h" />
     <ClInclude Include="utils\genid.h" />
     <ClInclude Include="utils\list.h" />
     <ClInclude Include="utils\memzone.h" />
