@@ -73,7 +73,7 @@
     <Filter Include="Source Files\particle">
       <UniqueIdentifier>{237e06da-cd03-467a-8255-1071fa686f32}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Resource Files\particle">
+    <Filter Include="Header Files\particle">
       <UniqueIdentifier>{9255b643-7629-435f-9497-137b09de4498}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -183,7 +183,7 @@
       <Filter>Header Files\utils</Filter>
     </ClInclude>
     <ClInclude Include="particle\particle.h">
-      <Filter>Resource Files\particle</Filter>
+      <Filter>Header Files\particle</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

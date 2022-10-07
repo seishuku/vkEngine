@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <hidusage.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -14,7 +15,7 @@ MemZone_t *Zone;
 
 char szAppName[]="Vulkan";
 
-bool Done=0, Key[256];
+bool Done=false;
 bool ToggleFullscreen=true;
 
 extern VkInstance Instance;
@@ -166,19 +167,172 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			}
 			break;
 
-		case WM_KEYDOWN:
-			if(wParam==VK_ESCAPE)
-				PostQuitMessage(0);
+		case WM_INPUT:
+		{
+			UINT dwSize=0;
+			BYTE bRawMessage[64];
 
-			Event_Trigger(EVENT_KEYDOWN, (void *)&wParam);
-			break;
+			GetRawInputData((HRAWINPUT)lParam, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
+			GetRawInputData((HRAWINPUT)lParam, RID_INPUT, bRawMessage, &dwSize, sizeof(RAWINPUTHEADER));
 
-		case WM_KEYUP:
-			Event_Trigger(EVENT_KEYUP, (void *)&wParam);
+			RAWINPUT *input=(RAWINPUT *)bRawMessage;
+
+			switch(input->header.dwType)
+			{
+				case RIM_TYPEKEYBOARD:
+				{
+					if(input->data.keyboard.VKey==0xFF)
+						break;
+
+					// Specific case for escape key to quit application
+					if(input->data.keyboard.VKey==VK_ESCAPE)
+					{
+						PostQuitMessage(0);
+						return 0;
+					}
+
+					// Specific case to remap the shift virtual key
+					if(input->data.keyboard.VKey==VK_SHIFT)
+						input->data.keyboard.VKey=MapVirtualKey(input->data.keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
+
+					if(input->data.keyboard.VKey==VK_CONTROL)
+						input->data.keyboard.VKey=MapVirtualKey(input->data.keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
+
+					if(input->data.keyboard.VKey==VK_MENU)
+						input->data.keyboard.VKey=MapVirtualKey(input->data.keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
+
+					// Remap from Windows virtual keys to application key enums
+					// (will probably reformat this later)
+					uint32_t code=KB_UNKNOWN;
+
+					switch(input->data.keyboard.VKey)
+					{
+						case VK_BACK:		code=KB_BACKSPACE;				break;	// Backspace
+						case VK_TAB:		code=KB_TAB;					break;	// Tab
+						case VK_RETURN:		if(input->data.keyboard.Flags&RI_KEY_E0)
+												code=KB_NP_ENTER;					// Numpad enter
+											else
+												code=KB_ENTER;						// Enter
+											break;
+						case VK_PAUSE:		code=KB_PAUSE;					break;	// Pause
+						case VK_CAPITAL:	code=KB_CAPS_LOCK;				break;	// Caps Lock
+						case VK_ESCAPE:		code=KB_ESCAPE;					break;	// Esc
+						case VK_SPACE:		code=KB_SPACE;					break;	// Space
+						case VK_PRIOR:		code=KB_PAGE_UP;				break;	// Page Up
+						case VK_NEXT:		code=KB_PAGE_DOWN;				break;	// Page Down
+						case VK_END:		code=KB_END;					break;	// End
+						case VK_HOME:		code=KB_HOME;					break;	// Home
+						case VK_LEFT:		code=KB_LEFT;					break;	// Left
+						case VK_UP:			code=KB_UP;						break;	// Up
+						case VK_RIGHT:		code=KB_RIGHT;					break;	// Right
+						case VK_DOWN:		code=KB_DOWN;					break;	// Down
+						case VK_SNAPSHOT:	code=KB_PRINT_SCREEN;			break;	// Prnt Scrn
+						case VK_INSERT:		code=KB_INSERT;					break;	// Insert
+						case VK_DELETE:		code=KB_DEL;					break;	// Delete
+						case VK_LWIN:		code=KB_LSUPER;					break;	// Left Windows
+						case VK_RWIN:		code=KB_RSUPER;					break;	// Right Windows
+						case VK_APPS:		code=KB_MENU;					break;	// Application
+						case VK_NUMPAD0:	code=KB_NP_0;					break;	// Num 0
+						case VK_NUMPAD1:	code=KB_NP_1;					break;	// Num 1
+						case VK_NUMPAD2:	code=KB_NP_2;					break;	// Num 2
+						case VK_NUMPAD3:	code=KB_NP_3;					break;	// Num 3
+						case VK_NUMPAD4:	code=KB_NP_4;					break;	// Num 4
+						case VK_NUMPAD5:	code=KB_NP_5;					break;	// Num 5
+						case VK_NUMPAD6:	code=KB_NP_6;					break;	// Num 6
+						case VK_NUMPAD7:	code=KB_NP_7;					break;	// Num 7
+						case VK_NUMPAD8:	code=KB_NP_8;					break;	// Num 8
+						case VK_NUMPAD9:	code=KB_NP_9;					break;	// Num 9
+						case VK_MULTIPLY:	code=KB_NP_MULTIPLY;			break;	// Num *
+						case VK_ADD:		code=KB_NP_ADD;					break;	// Num +
+						case VK_SUBTRACT:	code=KB_NP_SUBTRACT;			break;	// Num -
+						case VK_DECIMAL:	code=KB_NP_DECIMAL;				break;	// Num Del
+						case VK_DIVIDE:		code=KB_NP_DIVIDE;				break;	// Num /
+						case VK_F1:			code=KB_F1;						break;	// F1
+						case VK_F2:			code=KB_F2;						break;	// F2
+						case VK_F3:			code=KB_F3;						break;	// F3
+						case VK_F4:			code=KB_F4;						break;	// F4
+						case VK_F5:			code=KB_F5;						break;	// F5
+						case VK_F6:			code=KB_F6;						break;	// F6
+						case VK_F7:			code=KB_F7;						break;	// F7
+						case VK_F8:			code=KB_F8;						break;	// F8
+						case VK_F9:			code=KB_F9;						break;	// F9
+						case VK_F10:		code=KB_F10;					break;	// F10
+						case VK_F11:		code=KB_F11;					break;	// F11
+						case VK_F12:		code=KB_F12;					break;	// F12
+						case VK_NUMLOCK:	code=KB_NUM_LOCK;				break;	// Num Lock
+						case VK_SCROLL:		code=KB_SCROLL_LOCK;			break;	// Scroll Lock
+						case VK_LSHIFT:		code=KB_LSHIFT;					break;	// Shift
+						case VK_RSHIFT:		code=KB_RSHIFT;					break;	// Right Shift
+						case VK_OEM_PLUS:	code=KB_EQUAL;					break;	// =
+						case VK_OEM_MINUS:	code=KB_MINUS;					break;	// -
+						case VK_OEM_PERIOD:	code=KB_PERIOD;					break;	// .
+						case VK_OEM_1:		code=KB_SEMICOLON;				break;	// ;
+						case VK_OEM_2:		code=KB_SLASH;					break;	// Frontslash
+						case VK_OEM_3:		code=KB_GRAVE_ACCENT;			break;	// `
+						case VK_OEM_4:		code=KB_LEFT_BRACKET;			break;	// [
+						case VK_OEM_5:		code=KB_BACKSLASH;				break;	// Backslash
+						case VK_OEM_6:		code=KB_RIGHT_BRACKET;			break;	// ]
+						case VK_OEM_7:		code=KB_APOSTROPHE;				break;	// '
+						case VK_LCONTROL:	if(input->data.keyboard.Flags&RI_KEY_E0)
+												code=KB_RCTRL;						// Right control
+											 else
+												code=KB_LCTRL;						// Left control
+											break;
+						case VK_LMENU:		if(input->data.keyboard.Flags&RI_KEY_E0)
+												code=KB_RALT;						// Right alt
+											 else
+												code=KB_LALT;						// Left alt
+											break;
+						default:			code=input->data.keyboard.VKey;	break;	// All others
+					}
+
+					if(input->data.keyboard.Flags&RI_KEY_BREAK)
+						Event_Trigger(EVENT_KEYUP, &code);
+					else
+						Event_Trigger(EVENT_KEYDOWN, &code);
+				}
+				break;
+
+				default:
+					break;
+			}
+		}
+
+		default:
 			break;
 	}
 
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
+}
+
+bool RegisterRawInput(HWND hWnd)
+{
+	RAWINPUTDEVICE devices[2];
+
+	// Keyboard
+	devices[0].usUsagePage=HID_USAGE_PAGE_GENERIC;
+	devices[0].usUsage=HID_USAGE_GENERIC_KEYBOARD;
+	devices[0].dwFlags=0; // RIDEV_NOLEGACY ?
+	devices[0].hwndTarget=hWnd;
+
+	// Mouse
+	//devices[1].usUsagePage=HID_USAGE_PAGE_GENERIC;
+	//devices[1].usUsage=HID_USAGE_GENERIC_MOUSE;
+	//devices[1].dwFlags=RIDEV_NOLEGACY;
+	//devices[1].hwndTarget=hWnd;
+
+	DBGPRINTF(DEBUG_INFO, "Registering raw input devices...\n");
+
+	if(RegisterRawInputDevices(devices, 1, sizeof(RAWINPUTDEVICE)))
+	{
+		DBGPRINTF(DEBUG_INFO, "\t...registered raw input devices.\n");
+		return true;
+	}
+	else
+	{
+		DBGPRINTF(DEBUG_ERROR, "\t...failed to register raw input devices.\n");
+		return false;
+	}
 }
 
 #ifndef _CONSOLE
@@ -238,6 +392,8 @@ int main(int argc, char **argv)
 	AdjustWindowRect(&Rect, WS_POPUP, FALSE);
 
 	Context.hWnd=CreateWindow(szAppName, szAppName, WS_POPUP|WS_CLIPSIBLINGS, CW_USEDEFAULT, CW_USEDEFAULT, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
+
+	RegisterRawInput(Context.hWnd);
 
 	ShowWindow(Context.hWnd, SW_SHOW);
 	SetForegroundWindow(Context.hWnd);

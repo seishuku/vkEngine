@@ -874,61 +874,64 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 
 void Event_KeyDown(void *Arg)
 {
-	switch(*((uint32_t *)Arg))
+	uint32_t Key=*((uint32_t *)Arg);
+
+	switch(Key)
 	{
-		case 'P':
+		case KB_P:
 			GenerateSkyParams();
 			break;
 
-		case 'W':
+		case KB_W:
 			Camera.key_w=true;
 			break;
 
-		case 'S':
+		case KB_S:
 			Camera.key_s=true;
 			break;
 
-		case 'A':
+		case KB_A:
 			Camera.key_a=true;
 			break;
 
-		case 'D':
+		case KB_D:
 			Camera.key_d=true;
 			break;
 
-		case 'V':
+		case KB_V:
 			Camera.key_v=true;
 			break;
 
-		case 'C':
+		case KB_C:
 			Camera.key_c=true;
 			break;
 
-		case 'Q':
+		case KB_Q:
 			Camera.key_q=true;
 			break;
 
-		case 'E':
+		case KB_E:
 			Camera.key_e=true;
 			break;
 
-		case VK_UP:
+		case KB_UP:
 			Camera.key_up=true;
 			break;
 
-		case VK_DOWN:
+		case KB_DOWN:
 			Camera.key_down=true;
 			break;
 
-		case VK_LEFT:
+		case KB_LEFT:
 			Camera.key_left=true;
 			break;
 
-		case VK_RIGHT:
+		case KB_RIGHT:
 			Camera.key_right=true;
 			break;
 
-		case VK_SHIFT:
+		case KB_LSHIFT:
+		case KB_RSHIFT:
 			Camera.shift=true;
 			break;
 
@@ -939,57 +942,60 @@ void Event_KeyDown(void *Arg)
 
 void Event_KeyUp(void *Arg)
 {
-	switch(*((uint32_t *)Arg))
+	uint32_t Key=*((uint32_t *)Arg);
+
+	switch(Key)
 	{
-		case 'W':
+		case KB_W:
 			Camera.key_w=false;
 			break;
 
-		case 'S':
+		case KB_S:
 			Camera.key_s=false;
 			break;
 
-		case 'A':
+		case KB_A:
 			Camera.key_a=false;
 			break;
 
-		case 'D':
+		case KB_D:
 			Camera.key_d=false;
 			break;
 
-		case 'V':
+		case KB_V:
 			Camera.key_v=false;
 			break;
 
-		case 'C':
+		case KB_C:
 			Camera.key_c=false;
 			break;
 
-		case 'Q':
+		case KB_Q:
 			Camera.key_q=false;
 			break;
 
-		case 'E':
+		case KB_E:
 			Camera.key_e=false;
 			break;
 
-		case VK_UP:
+		case KB_UP:
 			Camera.key_up=false;
 			break;
 
-		case VK_DOWN:
+		case KB_DOWN:
 			Camera.key_down=false;
 			break;
 
-		case VK_LEFT:
+		case KB_LEFT:
 			Camera.key_left=false;
 			break;
 
-		case VK_RIGHT:
+		case KB_RIGHT:
 			Camera.key_right=false;
 			break;
 
-		case VK_SHIFT:
+		case KB_LSHIFT:
+		case KB_RSHIFT:
 			Camera.shift=false;
 			break;
 
