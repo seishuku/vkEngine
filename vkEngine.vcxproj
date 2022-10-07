@@ -105,6 +105,7 @@
     <ClCompile Include="math\math.c" />
     <ClCompile Include="model\bmodel.c" />
     <ClCompile Include="model\skybox.c" />
+    <ClCompile Include="particle\particle.c" />
     <ClCompile Include="system\win32.c" />
     <ClCompile Include="utils\event.c" />
     <ClCompile Include="utils\genid.c" />
@@ -125,6 +126,7 @@
     <ClInclude Include="math\math.h" />
     <ClInclude Include="model\bmodel.h" />
     <ClInclude Include="model\skybox.h" />
+    <ClInclude Include="particle\particle.h" />
     <ClInclude Include="system\system.h" />
     <ClInclude Include="utils\event.h" />
     <ClInclude Include="utils\genid.h" />
@@ -133,13 +135,16 @@
     <ClInclude Include="vulkan\vulkan.h" />
   </ItemGroup>
   <ItemGroup>
-    <GLSL Include="shaders\distance.vert" />
+    <GLSL Include="shaders\shadow.vert" />
     <GLSL Include="shaders\font.frag" />
     <GLSL Include="shaders\font.vert" />
     <GLSL Include="shaders\lighting.frag" />
     <GLSL Include="shaders\lighting.vert" />
     <GLSL Include="shaders\line.frag" />
     <GLSL Include="shaders\line.vert" />
+    <GLSL Include="shaders\particle.frag" />
+    <GLSL Include="shaders\particle.geom" />
+    <GLSL Include="shaders\particle.vert" />
     <GLSL Include="shaders\skybox.frag" />
     <GLSL Include="shaders\skybox.vert" />
   </ItemGroup>

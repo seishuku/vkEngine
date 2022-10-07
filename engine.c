@@ -14,6 +14,7 @@
 #include "utils/list.h"
 #include "lights/lights.h"
 #include "utils/event.h"
+#include "particle/particle.h"
 
 uint32_t Width=1280, Height=720;
 
@@ -25,6 +26,8 @@ VkuMemZone_t *VkZone;
 Camera_t Camera;
 
 extern float fps, fTimeStep, fTime;
+
+ParticleSystem_t ParticleSystem;
 
 enum
 {
@@ -288,7 +291,7 @@ bool InitShadowPipeline(void)
 	vkuPipeline_SetRenderPass(&ShadowPipeline, ShadowRenderPass);
 
 	// Add in vertex shader
-	if(!vkuPipeline_AddStage(&ShadowPipeline, "./shaders/distance.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&ShadowPipeline, "./shaders/shadow.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
 	// Set states that are different than defaults
@@ -819,6 +822,9 @@ void Render(void)
 	//vkCmdDraw(CommandBuffers[Index], 2, 1, 0, 0);
 	//////
 
+	ParticleSystem_Step(&ParticleSystem, fTimeStep);
+	ParticleSystem_Draw(&ParticleSystem, CommandBuffers[Index], DescriptorPool[Index]);
+
 	// Should UI overlay stuff have it's own render pass?
 	// Maybe even separate thread?
 	Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f", fps);
@@ -992,6 +998,18 @@ void Event_KeyUp(void *Arg)
 	}
 }
 
+void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle)
+{
+	Vec3_Sets(Particle->pos, 0.0f);
+
+	// Simple -1.0 to 1.0 random spherical pattern, scaled by 100, fairly short lifespan.
+	Vec3_Set(Particle->vel, ((float)rand()/RAND_MAX)*2.0f-1.0f, ((float)rand()/RAND_MAX)*2.0f-1.0f, ((float)rand()/RAND_MAX)*2.0f-1.0f);
+	Vec3_Normalize(Particle->vel);
+	Vec3_Muls(Particle->vel, 500.0f);
+
+	Particle->life=((float)rand()/RAND_MAX)*0.5f+0.01f;
+}
+
 bool Init(void)
 {
 	Event_Add(EVENT_KEYDOWN, Event_KeyDown);
@@ -1090,6 +1108,11 @@ bool Init(void)
 
 	InitShadowPipeline();
 	InitShadowMap();
+
+	if(!ParticleSystem_Init(&ParticleSystem))
+		return false;
+
+	ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.2f, 0.2f, 0.2f }, (vec3) { 1.0f, 0.5f, 0.2f }, 50.0f, 1000, false, EmitterCallback);
 
 	// Create primary frame buffers, depth image
 	CreateFramebuffers();

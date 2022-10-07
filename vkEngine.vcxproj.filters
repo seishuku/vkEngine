@@ -70,6 +70,12 @@
     <Filter Include="Source Files\camera">
       <UniqueIdentifier>{3c6294bb-196d-4d97-a5e5-63e2e9019398}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\particle">
+      <UniqueIdentifier>{237e06da-cd03-467a-8255-1071fa686f32}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files\particle">
+      <UniqueIdentifier>{9255b643-7629-435f-9497-137b09de4498}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="engine.c">
@@ -132,6 +138,9 @@
     <ClCompile Include="utils\event.c">
       <Filter>Source Files\utils</Filter>
     </ClCompile>
+    <ClCompile Include="particle\particle.c">
+      <Filter>Source Files\particle</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
@@ -173,15 +182,15 @@
     <ClInclude Include="utils\event.h">
       <Filter>Header Files\utils</Filter>
     </ClInclude>
+    <ClInclude Include="particle\particle.h">
+      <Filter>Resource Files\particle</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <GLSL Include="shaders\font.frag">
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\lighting.frag">
-      <Filter>Shaders</Filter>
-    </GLSL>
-    <GLSL Include="shaders\distance.vert">
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\font.vert">
@@ -200,6 +209,18 @@
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\line.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\particle.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\particle.geom">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\particle.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\shadow.vert">
       <Filter>Shaders</Filter>
     </GLSL>
   </ItemGroup>
