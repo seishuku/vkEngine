@@ -826,19 +826,14 @@ void Render(void)
 	//vkCmdDraw(CommandBuffers[Index], 2, 1, 0, 0);
 	//////
 
-	// Get a pointer to the emitter that's providing the positions
-	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, Emitters[0]);
+	for(uint32_t i=1;i<List_GetCount(&ParticleSystem.Emitters);i++)
+	{
+		// Get a pointer to the emitter that's providing the positions
+		ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
 
-	// Get those positions and set the other emitter's positions to those
-	vec3 ParticlePosition;
-	Vec3_Setv(ParticlePosition, Emitter->Particles[0].pos);
-	ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitters[1], ParticlePosition);
-
-	Vec3_Setv(ParticlePosition, Emitter->Particles[1].pos);
-	ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitters[2], ParticlePosition);
-
-	Vec3_Setv(ParticlePosition, Emitter->Particles[2].pos);
-	ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitters[3], ParticlePosition);
+		// Get those positions and set the other emitter's positions to those
+		ParticleSystem_SetEmitterPosition(&ParticleSystem, i, Emitter->Particles[i].pos);
+	}
 
 	ParticleSystem_Step(&ParticleSystem, fTimeStep);
 	ParticleSystem_Draw(&ParticleSystem, CommandBuffers[Index], DescriptorPool[Index]);
@@ -899,7 +894,7 @@ void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle
 	Vec3_Normalize(Particle->vel);
 	Vec3_Muls(Particle->vel, 100.0f);
 
-	Particle->life=((float)rand()/RAND_MAX)*0.5f+0.01f;
+	Particle->life=((float)rand()/RAND_MAX)*2.5f+0.01f;
 }
 
 bool Init(void)
@@ -1005,10 +1000,7 @@ bool Init(void)
 	if(!ParticleSystem_Init(&ParticleSystem))
 		return false;
 
-	Emitters[0]=ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 1.0f, 1.0f, 1.0f }, (vec3) { 1.0f, 1.0f, 1.0f }, 0.0f, 3, false, EmitterCallback);
-	Emitters[1]=ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.2f, 0.2f, 0.2f }, (vec3) { 1.0f, 0.5f, 0.2f }, 10.0f, 500, false, EmitterCallback);
-	Emitters[2]=ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.2f, 0.2f, 0.2f }, (vec3) { 0.5f, 1.0f, 0.2f }, 10.0f, 500, false, EmitterCallback);
-	Emitters[3]=ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.2f, 0.2f, 0.2f }, (vec3) { 0.2f, 0.5f, 1.0f }, 10.0f, 500, false, EmitterCallback);
+	ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 1.0f, 1.0f, 1.0f }, (vec3) { 1.0f, 1.0f, 1.0f }, 0.0f, 100, true, NULL);
 
 	// Create primary frame buffers, depth image
 	CreateFramebuffers();

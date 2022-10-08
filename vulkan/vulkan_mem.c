@@ -34,14 +34,24 @@ VkuMemZone_t *vkuMem_Init(VkuContext_t *Context, size_t Size)
 
 	VkZone->Size=Size;
 
+	// Set up create info with slab size
 	VkMemoryAllocateInfo AllocateInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.allocationSize=Size,
-		.memoryTypeIndex=vkuMemoryTypeFromProperties(Context->DeviceMemProperties, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT|VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
 	};
 
-	// Why does this only work with uncached bit memory typed heaps?
+	// Search for the first memory type on the local memory heap and set it
+	for(uint32_t Index=0;Index<Context->DeviceMemProperties.memoryTypeCount;Index++)
+	{
+		if(Context->DeviceMemProperties.memoryTypes[Index].propertyFlags&(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT|VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD))
+		{
+			AllocateInfo.memoryTypeIndex=Index;
+			break;
+		}
+	}
+
+	// Attempt to allocate it
 	VkResult Result=vkAllocateMemory(Context->Device, &AllocateInfo, VK_NULL_HANDLE, &VkZone->DeviceMemory);
 
 	if(Result!=VK_SUCCESS)

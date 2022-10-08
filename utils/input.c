@@ -13,8 +13,25 @@
 void GenerateSkyParams(void);
 extern Camera_t Camera;
 extern ParticleSystem_t ParticleSystem;
-extern uint32_t Emitters[2];
+void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle);
+float RandFloat(void);
 //////////////////////////////
+
+// Launch a "missle"
+void FireParticleEmitter(uint32_t Index, vec3 Position, vec3 Direction)
+{
+	if(Index>=100)
+		return;
+
+	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
+	Vec3_Setv(Emitter->Particles[Index].pos, Position);
+
+	Vec3_Setv(Emitter->Particles[Index].vel, Direction);
+	Vec3_Normalize(Emitter->Particles[Index].vel);
+	Vec3_Muls(Emitter->Particles[Index].vel, 1000.0f);
+
+	Emitter->Particles[Index].life=10.0f;
+}
 
 void Event_KeyDown(void *Arg)
 {
@@ -22,7 +39,10 @@ void Event_KeyDown(void *Arg)
 
 	switch(*Key)
 	{
-		case KB_SPACE:	ParticleSystem_ResetEmitter(&ParticleSystem, Emitters[0]);	break;
+		case KB_SPACE:
+						uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 1.0f, 1.0f, 1.0f }, (vec3) { RandFloat(), RandFloat(), RandFloat() }, 10.0f, 500, false, EmitterCallback);
+						FireParticleEmitter(ID, Camera.Position, Camera.Forward);
+						break;
 		case KB_P:		GenerateSkyParams();	break;
 		case KB_W:		Camera.key_w=true;		break;
 		case KB_S:		Camera.key_s=true;		break;
