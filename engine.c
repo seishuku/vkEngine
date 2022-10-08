@@ -30,6 +30,8 @@ extern float fps, fTimeStep, fTime;
 
 ParticleSystem_t ParticleSystem;
 
+uint32_t Emitters[4];
+
 enum
 {
 	MODEL_ASTEROID1,
@@ -136,7 +138,7 @@ VkuPipeline_t SkyboxPipeline;
 VkPipelineLayout LinePipelineLayout;
 VkuPipeline_t LinePipeline;
 
-const uint32_t ShadowSize=8192;
+const uint32_t ShadowSize=2048;
 
 VkFramebuffer ShadowFrameBuffer;
 VkuImage_t ShadowDepth;
@@ -643,7 +645,7 @@ void GenerateSkyParams(void)
 	Vec3_Normalize(Skybox_UBO->uSunPosition);
 
 	Vec4_Set(Skybox_UBO->uSunColor, min(1.0f, RandFloat()+0.5f), min(1.0f, RandFloat()+0.5f), min(1.0f, RandFloat()+0.5f), 0.0f);
-	Skybox_UBO->uSunSize=1.0f/(RandFloat()*1000.0f);
+	Skybox_UBO->uSunSize=1.0f/(RandFloat()*1000.0f+100.0f);
 	Skybox_UBO->uSunFalloff=RandFloat()*16.0f+8.0f;
 
 	Skybox_UBO->uStarsScale=200.0f;
@@ -716,6 +718,7 @@ void Render(void)
 
 	Vec3_Setv(ubo->light_color, Skybox_UBO->uSunColor);
 	Vec3_Setv(ubo->light_direction, Skybox_UBO->uSunPosition);
+	ubo->light_direction[3]=Skybox_UBO->uSunSize;
 
 	MatrixMult(ubo->modelview, ubo->projection, Skybox_UBO->mvp);
 	memcpy(ubo->light_mvp, Shadow_UBO.mvp, sizeof(matrix));
@@ -823,6 +826,20 @@ void Render(void)
 	//vkCmdDraw(CommandBuffers[Index], 2, 1, 0, 0);
 	//////
 
+	// Get a pointer to the emitter that's providing the positions
+	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, Emitters[0]);
+
+	// Get those positions and set the other emitter's positions to those
+	vec3 ParticlePosition;
+	Vec3_Setv(ParticlePosition, Emitter->Particles[0].pos);
+	ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitters[1], ParticlePosition);
+
+	Vec3_Setv(ParticlePosition, Emitter->Particles[1].pos);
+	ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitters[2], ParticlePosition);
+
+	Vec3_Setv(ParticlePosition, Emitter->Particles[2].pos);
+	ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitters[3], ParticlePosition);
+
 	ParticleSystem_Step(&ParticleSystem, fTimeStep);
 	ParticleSystem_Draw(&ParticleSystem, CommandBuffers[Index], DescriptorPool[Index]);
 
@@ -880,7 +897,7 @@ void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle
 	// Simple -1.0 to 1.0 random spherical pattern, scaled by 100, fairly short lifespan.
 	Vec3_Set(Particle->vel, ((float)rand()/RAND_MAX)*2.0f-1.0f, ((float)rand()/RAND_MAX)*2.0f-1.0f, ((float)rand()/RAND_MAX)*2.0f-1.0f);
 	Vec3_Normalize(Particle->vel);
-	Vec3_Muls(Particle->vel, 500.0f);
+	Vec3_Muls(Particle->vel, 100.0f);
 
 	Particle->life=((float)rand()/RAND_MAX)*0.5f+0.01f;
 }
@@ -980,7 +997,7 @@ bool Init(void)
 	GenerateSkyParams();
 
 	// Create debug line pipeline
-//	CreateLinePipeline();
+	//CreateLinePipeline();
 
 	InitShadowPipeline();
 	InitShadowMap();
@@ -988,7 +1005,10 @@ bool Init(void)
 	if(!ParticleSystem_Init(&ParticleSystem))
 		return false;
 
-	ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.2f, 0.2f, 0.2f }, (vec3) { 1.0f, 0.5f, 0.2f }, 50.0f, 1000, false, EmitterCallback);
+	Emitters[0]=ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 1.0f, 1.0f, 1.0f }, (vec3) { 1.0f, 1.0f, 1.0f }, 0.0f, 3, false, EmitterCallback);
+	Emitters[1]=ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.2f, 0.2f, 0.2f }, (vec3) { 1.0f, 0.5f, 0.2f }, 10.0f, 500, false, EmitterCallback);
+	Emitters[2]=ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.2f, 0.2f, 0.2f }, (vec3) { 0.5f, 1.0f, 0.2f }, 10.0f, 500, false, EmitterCallback);
+	Emitters[3]=ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.2f, 0.2f, 0.2f }, (vec3) { 0.2f, 0.5f, 1.0f }, 10.0f, 500, false, EmitterCallback);
 
 	// Create primary frame buffers, depth image
 	CreateFramebuffers();

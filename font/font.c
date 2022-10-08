@@ -491,7 +491,9 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 void Font_Destroy(void)
 {
 	// Instance buffer handles
-	vkUnmapMemory(Context.Device, fontInstanceBuffer.DeviceMemory);
+	if(fontInstanceBuffer.DeviceMemory)
+		vkUnmapMemory(Context.Device, fontInstanceBuffer.DeviceMemory);
+
 	vkuDestroyBuffer(&Context, &fontInstanceBuffer);
 
 	// Vertex data handles

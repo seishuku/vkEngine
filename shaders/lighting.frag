@@ -15,7 +15,7 @@ layout (binding=3) uniform ubo
 	vec4 light_direction;
 };
 
-layout (push_constant) uniform ubo_pc
+layout (push_constant) uniform pc
 {
 	mat4 local;
 };
@@ -26,10 +26,30 @@ layout (binding=2) uniform sampler2DShadow TexShadow;
 
 layout (location=0) out vec4 Output;
 
+float ShadowPCF(vec4 Coords)
+{
+	vec2 delta=(light_direction.w*500.0)*(1.0/vec2(textureSize(TexShadow, 0)));
+
+	float shadow=0.0;
+	int count=0;
+	int range=5;
+	
+	for(int x=-range;x<range;x++)
+	{
+		for(int y=-range;y<range;y++)
+		{
+			shadow+=texture(TexShadow, (Coords.xyz+vec3(delta*vec2(x, y), 0.0))/Coords.w);
+			count++;
+		}
+	}
+
+	return shadow/count;
+}
+
 void main()
 {
 	vec4 Base=texture(TexBase, UV);
 	vec3 n=normalize(iMatrix*local*vec4(Tangent*(2*texture(TexNormal, UV)-1).xyz, 0.0)).xyz;
 
-	Output=vec4(sqrt(Base.xyz*light_color.xyz*max(0.05, dot(n, light_direction.xyz)*texture(TexShadow, Shadow.xyz/Shadow.w).x)), 1.0);
+	Output=vec4(sqrt(Base.xyz*light_color.xyz*max(0.045, dot(n, light_direction.xyz)*ShadowPCF(Shadow))), 1.0);
 }

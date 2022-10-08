@@ -124,7 +124,7 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *System, vec3 Position, vec3
 // Removes a particle emitter from the system
 void ParticleSystem_DeleteEmitter(ParticleSystem_t *System, uint32_t ID)
 {
-	if(System==NULL||ID!=UINT32_MAX)
+	if(System==NULL||ID==UINT32_MAX)
 		return;
 
 	for(uint32_t i=0;i<List_GetCount(&System->Emitters);i++)
@@ -145,7 +145,7 @@ void ParticleSystem_DeleteEmitter(ParticleSystem_t *System, uint32_t ID)
 // Resets the emitter to the initial parameters (mostly for a "burst" trigger)
 void ParticleSystem_ResetEmitter(ParticleSystem_t *System, uint32_t ID)
 {
-	if(System==NULL||ID!=UINT32_MAX)
+	if(System==NULL||ID==UINT32_MAX)
 		return;
 
 	for(uint32_t i=0;i<List_GetCount(&System->Emitters);i++)
@@ -192,7 +192,7 @@ void ParticleSystem_ResetEmitter(ParticleSystem_t *System, uint32_t ID)
 
 void ParticleSystem_SetEmitterPosition(ParticleSystem_t *System, uint32_t ID, vec3 Position)
 {
-	if(System==NULL||ID!=UINT32_MAX)
+	if(System==NULL||ID==UINT32_MAX)
 		return;
 
 	for(uint32_t i=0;i<List_GetCount(&System->Emitters);i++)
