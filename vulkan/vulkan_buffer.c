@@ -34,6 +34,9 @@ VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, VkuImage_t *Image,
 	VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth,
 	VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags)
 {
+	if(Context==NULL||Image==NULL)
+		return false;
+
 	VkImageCreateInfo ImageInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -66,7 +69,7 @@ VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, VkuImage_t *Image,
 	};
 
 	// Quick hack: getting it to use the vulkan memory allocator
-	Image->DeviceMemory=VkuMem_Malloc(VkZone, memoryRequirements);
+	Image->DeviceMemory=vkuMem_Malloc(VkZone, memoryRequirements);
 
 	if(Image->DeviceMemory==NULL)
 		return VK_FALSE;
@@ -77,8 +80,24 @@ VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, VkuImage_t *Image,
 	return VK_TRUE;
 }
 
+void vkuDestroyImageBuffer(VkuContext_t *Context, VkuImage_t *Image)
+{
+	if(Context==NULL||Image==NULL)
+		return;
+
+	vkDestroySampler(Context->Device, Image->Sampler, VK_NULL_HANDLE);
+	vkDestroyImageView(Context->Device, Image->View, VK_NULL_HANDLE);
+	vkDestroyImage(Context->Device, Image->Image, VK_NULL_HANDLE);
+	vkuMem_Free(VkZone, Image->DeviceMemory);
+}
+
 VkBool32 vkuCreateHostBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags)
 {
+	if(Context==NULL||Buffer==NULL)
+		return false;
+
+	memset(Buffer, 0, sizeof(VkuBuffer_t));
+
 	VkMemoryRequirements memoryRequirements;
 
 	VkBufferCreateInfo BufferInfo=
@@ -114,6 +133,11 @@ VkBool32 vkuCreateHostBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_
 
 VkBool32 vkuCreateGPUBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags)
 {
+	if(Context==NULL||Buffer==NULL)
+		return false;
+
+	memset(Buffer, 0, sizeof(VkuBuffer_t));
+
 	VkMemoryRequirements memoryRequirements;
 
 	VkBufferCreateInfo BufferInfo=
@@ -138,7 +162,7 @@ VkBool32 vkuCreateGPUBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t
 		.memoryTypeIndex=vkuMemoryTypeFromProperties(Context->DeviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
 	};
 
-	Buffer->Memory=VkuMem_Malloc(VkZone, memoryRequirements);
+	Buffer->Memory=vkuMem_Malloc(VkZone, memoryRequirements);
 
 	if(Buffer->Memory==NULL)
 		return VK_FALSE;
@@ -147,6 +171,20 @@ VkBool32 vkuCreateGPUBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t
 		return VK_FALSE;
 
 	return VK_TRUE;
+}
+
+void vkuDestroyBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer)
+{
+	if(Context==NULL||Buffer==NULL)
+		return;
+
+	vkDestroyBuffer(Context->Device, Buffer->Buffer, VK_NULL_HANDLE);
+
+	if(Buffer->DeviceMemory)
+		vkFreeMemory(Context->Device, Buffer->DeviceMemory, VK_NULL_HANDLE);
+
+	if(Buffer->Memory)
+		vkuMem_Free(VkZone, Buffer->Memory);
 }
 
 // Copy from one buffer to another

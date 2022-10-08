@@ -492,18 +492,13 @@ void Font_Destroy(void)
 {
 	// Instance buffer handles
 	vkUnmapMemory(Context.Device, fontInstanceBuffer.DeviceMemory);
-	vkDestroyBuffer(Context.Device, fontInstanceBuffer.Buffer, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, fontInstanceBuffer.DeviceMemory, VK_NULL_HANDLE);
+	vkuDestroyBuffer(&Context, &fontInstanceBuffer);
 
 	// Vertex data handles
-	vkDestroyBuffer(Context.Device, fontVertexBuffer.Buffer, VK_NULL_HANDLE);
-	VkuMem_Free(VkZone, fontVertexBuffer.Memory);
+	vkuDestroyBuffer(&Context, &fontVertexBuffer);
 
 	// Texture handles
-	vkDestroySampler(Context.Device, fontTexture.Sampler, VK_NULL_HANDLE);
-	vkDestroyImageView(Context.Device, fontTexture.View, VK_NULL_HANDLE);
-	vkDestroyImage(Context.Device, fontTexture.Image, VK_NULL_HANDLE);
-	VkuMem_Free(VkZone, fontTexture.DeviceMemory);
+	vkuDestroyImageBuffer(&Context, &fontTexture);
 
 	// Pipeline
 	vkDestroyPipelineLayout(Context.Device, fontPipelineLayout, VK_NULL_HANDLE);

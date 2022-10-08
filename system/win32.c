@@ -10,6 +10,7 @@
 #include "../utils/list.h"
 #include "../lights/lights.h"
 #include "../utils/event.h"
+#include "../utils/input.h"
 
 MemZone_t *Zone;
 
@@ -66,9 +67,6 @@ unsigned __int64 GetFrequency(void)
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	static POINT old;
-	POINT pos, delta;
-
 	switch(uMsg)
 	{
 		case WM_CREATE:
@@ -85,57 +83,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			Width=max(LOWORD(lParam), 2);
 			Height=max(HIWORD(lParam), 2);
 			RecreateSwapchain();
-			break;
-
-		case WM_LBUTTONDOWN:
-		case WM_MBUTTONDOWN:
-		case WM_RBUTTONDOWN:
-			SetCapture(hWnd);
-			ShowCursor(FALSE);
-
-			GetCursorPos(&pos);
-			old.x=pos.x;
-			old.y=pos.y;
-			break;
-
-		case WM_LBUTTONUP:
-		case WM_MBUTTONUP:
-		case WM_RBUTTONUP:
-			ShowCursor(TRUE);
-			ReleaseCapture();
-			break;
-
-		case WM_MOUSEMOVE:
-			GetCursorPos(&pos);
-
-			if(!wParam)
-			{
-				old.x=pos.x;
-				old.y=pos.y;
-				break;
-			}
-
-			delta.x=pos.x-old.x;
-			delta.y=old.y-pos.y;
-
-			if(!delta.x&&!delta.y)
-				break;
-
-			SetCursorPos(old.x, old.y);
-
-			switch(LOWORD(wParam)&(MK_LBUTTON|MK_MBUTTON|MK_RBUTTON))
-			{
-				case MK_LBUTTON:
-					Camera.Yaw-=(float)delta.x/800.0f;
-					Camera.Pitch+=(float)delta.y/800.0f;
-					break;
-
-				case MK_MBUTTON:
-					break;
-
-				case MK_RBUTTON:
-					break;
-			}
 			break;
 
 		case WM_SYSKEYUP:
@@ -175,41 +122,43 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			GetRawInputData((HRAWINPUT)lParam, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
 			GetRawInputData((HRAWINPUT)lParam, RID_INPUT, bRawMessage, &dwSize, sizeof(RAWINPUTHEADER));
 
-			RAWINPUT *input=(RAWINPUT *)bRawMessage;
+			RAWINPUT *Input=(RAWINPUT *)bRawMessage;
 
-			switch(input->header.dwType)
+			switch(Input->header.dwType)
 			{
 				case RIM_TYPEKEYBOARD:
 				{
-					if(input->data.keyboard.VKey==0xFF)
+					RAWKEYBOARD Keyboard=Input->data.keyboard;
+
+					if(Keyboard.VKey==0xFF)
 						break;
 
 					// Specific case for escape key to quit application
-					if(input->data.keyboard.VKey==VK_ESCAPE)
+					if(Keyboard.VKey==VK_ESCAPE)
 					{
 						PostQuitMessage(0);
 						return 0;
 					}
 
-					// Specific case to remap the shift virtual key
-					if(input->data.keyboard.VKey==VK_SHIFT)
-						input->data.keyboard.VKey=MapVirtualKey(input->data.keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
+					// Specific case to remap the shift/control/alt virtual keys
+					if(Keyboard.VKey==VK_SHIFT)
+						Keyboard.VKey=MapVirtualKey(Keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
 
-					if(input->data.keyboard.VKey==VK_CONTROL)
-						input->data.keyboard.VKey=MapVirtualKey(input->data.keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
+					if(Keyboard.VKey==VK_CONTROL)
+						Keyboard.VKey=MapVirtualKey(Keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
 
-					if(input->data.keyboard.VKey==VK_MENU)
-						input->data.keyboard.VKey=MapVirtualKey(input->data.keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
+					if(Keyboard.VKey==VK_MENU)
+						Keyboard.VKey=MapVirtualKey(Keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
 
 					// Remap from Windows virtual keys to application key enums
 					// (will probably reformat this later)
 					uint32_t code=KB_UNKNOWN;
 
-					switch(input->data.keyboard.VKey)
+					switch(Keyboard.VKey)
 					{
 						case VK_BACK:		code=KB_BACKSPACE;				break;	// Backspace
 						case VK_TAB:		code=KB_TAB;					break;	// Tab
-						case VK_RETURN:		if(input->data.keyboard.Flags&RI_KEY_E0)
+						case VK_RETURN:		if(Keyboard.Flags&RI_KEY_E0)
 												code=KB_NP_ENTER;					// Numpad enter
 											else
 												code=KB_ENTER;						// Enter
@@ -273,25 +222,77 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						case VK_OEM_5:		code=KB_BACKSLASH;				break;	// Backslash
 						case VK_OEM_6:		code=KB_RIGHT_BRACKET;			break;	// ]
 						case VK_OEM_7:		code=KB_APOSTROPHE;				break;	// '
-						case VK_LCONTROL:	if(input->data.keyboard.Flags&RI_KEY_E0)
+						case VK_LCONTROL:	if(Keyboard.Flags&RI_KEY_E0)
 												code=KB_RCTRL;						// Right control
 											 else
 												code=KB_LCTRL;						// Left control
 											break;
-						case VK_LMENU:		if(input->data.keyboard.Flags&RI_KEY_E0)
+						case VK_LMENU:		if(Keyboard.Flags&RI_KEY_E0)
 												code=KB_RALT;						// Right alt
 											 else
 												code=KB_LALT;						// Left alt
 											break;
-						default:			code=input->data.keyboard.VKey;	break;	// All others
+						default:			code=Keyboard.VKey;	break;	// All others
 					}
 
-					if(input->data.keyboard.Flags&RI_KEY_BREAK)
+					if(Keyboard.Flags&RI_KEY_BREAK)
 						Event_Trigger(EVENT_KEYUP, &code);
 					else
 						Event_Trigger(EVENT_KEYDOWN, &code);
+
+					break;
 				}
-				break;
+
+				case RIM_TYPEMOUSE:
+                {
+//					SetCursorPos(100, 100);
+//					SetCursor(NULL);
+					
+					RAWMOUSE Mouse=Input->data.mouse;
+					static MouseEvent_t MouseEvent={ 0, 0, 0 };
+
+					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_1_DOWN)
+						MouseEvent.button|=MOUSE_BUTTON_1;
+
+					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_1_UP)
+						MouseEvent.button&=~MOUSE_BUTTON_1;
+
+					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_2_DOWN)
+						MouseEvent.button|=MOUSE_BUTTON_2;
+
+					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_2_UP)
+						MouseEvent.button&=~MOUSE_BUTTON_2;
+
+					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_3_DOWN)
+						MouseEvent.button|=MOUSE_BUTTON_3;
+
+					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_3_UP)
+						MouseEvent.button&=~MOUSE_BUTTON_3;
+
+					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_4_DOWN)
+						MouseEvent.button|=MOUSE_BUTTON_4;
+
+					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_4_UP)
+						MouseEvent.button&=~MOUSE_BUTTON_4;
+
+					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_5_DOWN)
+						MouseEvent.button|=MOUSE_BUTTON_5;
+
+					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_5_UP)
+						MouseEvent.button&=~MOUSE_BUTTON_5;
+
+					if(Mouse.usButtonFlags&RI_MOUSE_WHEEL)
+						MouseEvent.dz=Mouse.usButtonData;
+
+					if(Mouse.lLastX!=0||Mouse.lLastY!=0)
+					{
+						MouseEvent.dx=Mouse.lLastX;
+						MouseEvent.dy=Mouse.lLastY;
+					}
+
+					Event_Trigger(EVENT_MOUSE, &MouseEvent);
+					break;
+				}
 
 				default:
 					break;
@@ -316,14 +317,14 @@ bool RegisterRawInput(HWND hWnd)
 	devices[0].hwndTarget=hWnd;
 
 	// Mouse
-	//devices[1].usUsagePage=HID_USAGE_PAGE_GENERIC;
-	//devices[1].usUsage=HID_USAGE_GENERIC_MOUSE;
-	//devices[1].dwFlags=RIDEV_NOLEGACY;
-	//devices[1].hwndTarget=hWnd;
+	devices[1].usUsagePage=HID_USAGE_PAGE_GENERIC;
+	devices[1].usUsage=HID_USAGE_GENERIC_MOUSE;
+	devices[1].dwFlags=RIDEV_NOLEGACY;
+	devices[1].hwndTarget=hWnd;
 
 	DBGPRINTF(DEBUG_INFO, "Registering raw input devices...\n");
 
-	if(RegisterRawInputDevices(devices, 1, sizeof(RAWINPUTDEVICE)))
+	if(RegisterRawInputDevices(devices, 2, sizeof(RAWINPUTDEVICE)))
 	{
 		DBGPRINTF(DEBUG_INFO, "\t...registered raw input devices.\n");
 		return true;
@@ -429,7 +430,7 @@ int main(int argc, char **argv)
 	Zone_Print(Zone);
 
 	DBGPRINTF(DEBUG_INFO, "\nCurrent vulkan zone memory allocations:\n");
-	VkuMem_Print(VkZone);
+	vkuMem_Print(VkZone);
 
 	DBGPRINTF(DEBUG_INFO, "\nStarting main loop.\n");
 	while(!Done)

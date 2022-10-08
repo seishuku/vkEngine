@@ -58,12 +58,6 @@
     <Filter Include="Header Files\utils">
       <UniqueIdentifier>{5dae7961-ad06-42ae-b7bb-61b2a0a167bd}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\lights">
-      <UniqueIdentifier>{cdffb61b-69f2-4b32-b2eb-5885f31cf64f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\lights">
-      <UniqueIdentifier>{b0d9988b-18d0-49bf-9714-0f81f8de27fa}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\camera">
       <UniqueIdentifier>{fd66522e-6afb-4e25-8589-38fa9a318e95}</UniqueIdentifier>
     </Filter>
@@ -141,6 +135,9 @@
     <ClCompile Include="particle\particle.c">
       <Filter>Source Files\particle</Filter>
     </ClCompile>
+    <ClCompile Include="utils\input.c">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
@@ -164,9 +161,6 @@
     <ClInclude Include="utils\list.h">
       <Filter>Header Files\utils</Filter>
     </ClInclude>
-    <ClInclude Include="lights\lights.h">
-      <Filter>Header Files\lights</Filter>
-    </ClInclude>
     <ClInclude Include="camera\camera.h">
       <Filter>Header Files\camera</Filter>
     </ClInclude>
@@ -184,6 +178,9 @@
     </ClInclude>
     <ClInclude Include="particle\particle.h">
       <Filter>Header Files\particle</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\input.h">
+      <Filter>Header Files\utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

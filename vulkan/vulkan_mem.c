@@ -7,7 +7,7 @@
 #include "../math/math.h"
 #include "vulkan.h"
 
-VkuMemZone_t *VkuMem_Init(VkuContext_t *Context, size_t Size)
+VkuMemZone_t *vkuMem_Init(VkuContext_t *Context, size_t Size)
 {
 	VkuMemZone_t *VkZone=(VkuMemZone_t *)Zone_Malloc(Zone, sizeof(VkuMemZone_t));
 
@@ -54,7 +54,7 @@ VkuMemZone_t *VkuMem_Init(VkuContext_t *Context, size_t Size)
 	return VkZone;
 }
 
-void VkuMem_Destroy(VkuContext_t *Context, VkuMemZone_t *VkZone)
+void vkuMem_Destroy(VkuContext_t *Context, VkuMemZone_t *VkZone)
 {
 	if(VkZone)
 	{
@@ -71,7 +71,7 @@ void VkuMem_Destroy(VkuContext_t *Context, VkuMemZone_t *VkZone)
 	}
 }
 
-void VkuMem_Free(VkuMemZone_t *VkZone, VkuMemBlock_t *Block)
+void vkuMem_Free(VkuMemZone_t *VkZone, VkuMemBlock_t *Block)
 {
 	if(Block==NULL)
 	{
@@ -117,7 +117,7 @@ void VkuMem_Free(VkuMemZone_t *VkZone, VkuMemBlock_t *Block)
 	}
 }
 
-VkuMemBlock_t *VkuMem_Malloc(VkuMemZone_t *VkZone, VkMemoryRequirements Requirements)
+VkuMemBlock_t *vkuMem_Malloc(VkuMemZone_t *VkZone, VkMemoryRequirements Requirements)
 {
 	const size_t MinimumBlockSize=64;
 
@@ -173,7 +173,7 @@ VkuMemBlock_t *VkuMem_Malloc(VkuMemZone_t *VkZone, VkMemoryRequirements Requirem
 	return Base;
 }
 
-void VkuMem_Print(VkuMemZone_t *VkZone)
+void vkuMem_Print(VkuMemZone_t *VkZone)
 {
 	DBGPRINTF(DEBUG_WARNING, "Vulkan zone size: %0.2fMB  Location: 0x%p (Vulkan Object Address)\n", (float)(VkZone->Size/1000.0f/1000.0f), VkZone->DeviceMemory);
 

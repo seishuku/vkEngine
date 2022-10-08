@@ -109,6 +109,7 @@
     <ClCompile Include="system\win32.c" />
     <ClCompile Include="utils\event.c" />
     <ClCompile Include="utils\genid.c" />
+    <ClCompile Include="utils\input.c" />
     <ClCompile Include="utils\list.c" />
     <ClCompile Include="utils\memzone.c" />
     <ClCompile Include="vulkan\vulkan_buffer.c" />
@@ -122,7 +123,6 @@
     <ClInclude Include="camera\camera.h" />
     <ClInclude Include="font\font.h" />
     <ClInclude Include="image\image.h" />
-    <ClInclude Include="lights\lights.h" />
     <ClInclude Include="math\math.h" />
     <ClInclude Include="model\bmodel.h" />
     <ClInclude Include="model\skybox.h" />
@@ -130,6 +130,7 @@
     <ClInclude Include="system\system.h" />
     <ClInclude Include="utils\event.h" />
     <ClInclude Include="utils\genid.h" />
+    <ClInclude Include="utils\input.h" />
     <ClInclude Include="utils\list.h" />
     <ClInclude Include="utils\memzone.h" />
     <ClInclude Include="vulkan\vulkan.h" />

@@ -194,8 +194,12 @@ VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile);
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask);
 
 VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, VkuImage_t *Image, VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth, VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags);
+void vkuDestroyImageBuffer(VkuContext_t *Context, VkuImage_t *Image);
+
 VkBool32 vkuCreateHostBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags);
 VkBool32 vkuCreateGPUBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags);
+void vkuDestroyBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer);
+
 VkBool32 vkuCopyBuffer(VkuContext_t *Context, VkBuffer Src, VkBuffer Dest, uint32_t Size);
 
 VkBool32 vkuPipeline_AddVertexBinding(VkuPipeline_t *Pipeline, uint32_t Binding, uint32_t Stride, VkVertexInputRate InputRate);
@@ -213,11 +217,11 @@ VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *DescriptorSetLayout, VkuContex
 VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSet_t *DescriptorSet);
 VkBool32 vkuAllocateUpdateDescriptorSet(VkuDescriptorSet_t *DescriptorSet, VkDescriptorPool DescriptorPool);
 
-VkuMemZone_t *VkuMem_Init(VkuContext_t *Context, size_t Size);
-void VkuMem_Destroy(VkuContext_t *Context, VkuMemZone_t *VkZone);
-void VkuMem_Free(VkuMemZone_t *VkZone, VkuMemBlock_t *Ptr);
-VkuMemBlock_t *VkuMem_Malloc(VkuMemZone_t *VkZone, VkMemoryRequirements Requirements);
-void VkuMem_Print(VkuMemZone_t *VkZone);
+VkuMemZone_t *vkuMem_Init(VkuContext_t *Context, size_t Size);
+void vkuMem_Destroy(VkuContext_t *Context, VkuMemZone_t *VkZone);
+void vkuMem_Free(VkuMemZone_t *VkZone, VkuMemBlock_t *Ptr);
+VkuMemBlock_t *vkuMem_Malloc(VkuMemZone_t *VkZone, VkMemoryRequirements Requirements);
+void vkuMem_Print(VkuMemZone_t *VkZone);
 
 VkBool32 CreateVulkanInstance(VkInstance *Instance);
 VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context);

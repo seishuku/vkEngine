@@ -14,6 +14,7 @@
 #include "utils/list.h"
 #include "lights/lights.h"
 #include "utils/event.h"
+#include "utils/input.h"
 #include "particle/particle.h"
 
 uint32_t Width=1280, Height=720;
@@ -872,138 +873,6 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 	return VK_FALSE;
 }
 
-void Event_KeyDown(void *Arg)
-{
-	uint32_t Key=*((uint32_t *)Arg);
-
-	switch(Key)
-	{
-		case KB_P:
-			GenerateSkyParams();
-			break;
-
-		case KB_W:
-			Camera.key_w=true;
-			break;
-
-		case KB_S:
-			Camera.key_s=true;
-			break;
-
-		case KB_A:
-			Camera.key_a=true;
-			break;
-
-		case KB_D:
-			Camera.key_d=true;
-			break;
-
-		case KB_V:
-			Camera.key_v=true;
-			break;
-
-		case KB_C:
-			Camera.key_c=true;
-			break;
-
-		case KB_Q:
-			Camera.key_q=true;
-			break;
-
-		case KB_E:
-			Camera.key_e=true;
-			break;
-
-		case KB_UP:
-			Camera.key_up=true;
-			break;
-
-		case KB_DOWN:
-			Camera.key_down=true;
-			break;
-
-		case KB_LEFT:
-			Camera.key_left=true;
-			break;
-
-		case KB_RIGHT:
-			Camera.key_right=true;
-			break;
-
-		case KB_LSHIFT:
-		case KB_RSHIFT:
-			Camera.shift=true;
-			break;
-
-		default:
-			break;
-	}
-}
-
-void Event_KeyUp(void *Arg)
-{
-	uint32_t Key=*((uint32_t *)Arg);
-
-	switch(Key)
-	{
-		case KB_W:
-			Camera.key_w=false;
-			break;
-
-		case KB_S:
-			Camera.key_s=false;
-			break;
-
-		case KB_A:
-			Camera.key_a=false;
-			break;
-
-		case KB_D:
-			Camera.key_d=false;
-			break;
-
-		case KB_V:
-			Camera.key_v=false;
-			break;
-
-		case KB_C:
-			Camera.key_c=false;
-			break;
-
-		case KB_Q:
-			Camera.key_q=false;
-			break;
-
-		case KB_E:
-			Camera.key_e=false;
-			break;
-
-		case KB_UP:
-			Camera.key_up=false;
-			break;
-
-		case KB_DOWN:
-			Camera.key_down=false;
-			break;
-
-		case KB_LEFT:
-			Camera.key_left=false;
-			break;
-
-		case KB_RIGHT:
-			Camera.key_right=false;
-			break;
-
-		case KB_LSHIFT:
-		case KB_RSHIFT:
-			Camera.shift=false;
-			break;
-
-		default:
-			break;
-	}
-}
-
 void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle)
 {
 	Vec3_Sets(Particle->pos, 0.0f);
@@ -1020,6 +889,7 @@ bool Init(void)
 {
 	Event_Add(EVENT_KEYDOWN, Event_KeyDown);
 	Event_Add(EVENT_KEYUP, Event_KeyUp);
+	Event_Add(EVENT_MOUSE, Event_Mouse);
 
 #ifdef _DEBUG
 	if(vkCreateDebugUtilsMessengerEXT(Instance, &(VkDebugUtilsMessengerCreateInfoEXT)
@@ -1032,7 +902,7 @@ bool Init(void)
 		return false;
 #endif
 
-	VkZone=VkuMem_Init(&Context, (size_t)(Context.DeviceProperties2.maxMemoryAllocationSize*0.8f));
+	VkZone=vkuMem_Init(&Context, (size_t)(Context.DeviceProperties2.maxMemoryAllocationSize*0.8f));
 
 	if(VkZone==NULL)
 		return false;
@@ -1110,7 +980,7 @@ bool Init(void)
 	GenerateSkyParams();
 
 	// Create debug line pipeline
-	CreateLinePipeline();
+//	CreateLinePipeline();
 
 	InitShadowPipeline();
 	InitShadowMap();
@@ -1300,8 +1170,8 @@ void RecreateSwapchain(void)
 		// This is basically just the swapchain and frame buffers
 
 		vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
-		VkuMem_Free(VkZone, DepthImage.DeviceMemory);
 		vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
+		vkuMem_Free(VkZone, DepthImage.DeviceMemory);
 
 		for(uint32_t i=0;i<SwapchainImageCount;i++)
 		{
@@ -1357,45 +1227,61 @@ void Destroy(void)
 			DBGPRINTF(DEBUG_ERROR, "Failed to allocate memory for pipeline cache data.\n");
 	}
 
-#ifdef _DEBUG
-	vkDestroyDebugUtilsMessengerEXT(Instance, debugMessenger, VK_NULL_HANDLE);
-#endif
+	// Particle system destruction
+	ParticleSystem_Destroy(&ParticleSystem);
+	//////////
 
-	vkDestroyBuffer(Context.Device, Asteroid_Instance.Buffer, VK_NULL_HANDLE);
-	vkFreeMemory(Context.Device, Asteroid_Instance.DeviceMemory, VK_NULL_HANDLE);
+	// Skybox destruction
+	vkUnmapMemory(Context.Device, Skybox_UBO_Buffer.DeviceMemory);
+	vkuDestroyBuffer(&Context, &Skybox_UBO_Buffer);
+
+	vkuDestroyBuffer(&Context, &SkyboxVertex);
+	vkuDestroyBuffer(&Context, &SkyboxIndex);
+
+	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
+		vkDestroyDescriptorSetLayout(Context.Device, SkyboxDescriptorSet[i].DescriptorSetLayout, VK_NULL_HANDLE);
 
 	vkDestroyPipeline(Context.Device, SkyboxPipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, SkyboxPipelineLayout, VK_NULL_HANDLE);
+	//////////
 
-//	Font_Destroy();
+	// Font destruction
+	Font_Destroy();
+	//////////
 
+	// Asteroid instance buffer destruction
+	vkuDestroyBuffer(&Context, &Asteroid_Instance);
+	//////////
+
+	// Textures destruction
 	for(uint32_t i=0;i<NUM_TEXTURES;i++)
-	{
-		vkDestroySampler(Context.Device, Textures[i].Sampler, VK_NULL_HANDLE);
-		vkDestroyImageView(Context.Device, Textures[i].View, VK_NULL_HANDLE);
-		vkDestroyImage(Context.Device, Textures[i].Image, VK_NULL_HANDLE);
-		VkuMem_Free(VkZone, Textures[i].DeviceMemory);
-	}
+		vkuDestroyImageBuffer(&Context, &Textures[i]);
+	//////////
 
+	// 3D Model destruction
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		vkDestroyBuffer(Context.Device, Model[i].VertexBuffer.Buffer, VK_NULL_HANDLE);
-		VkuMem_Free(VkZone, Model[i].VertexBuffer.Memory);
+		vkuDestroyBuffer(&Context, &Model[i].VertexBuffer);
 
 		for(uint32_t j=0;j<(uint32_t)Model[i].NumMesh;j++)
-		{
-			vkDestroyBuffer(Context.Device, Model[i].Mesh[j].IndexBuffer.Buffer, VK_NULL_HANDLE);
-			VkuMem_Free(VkZone, Model[i].Mesh[j].IndexBuffer.Memory);
-		}
+			vkuDestroyBuffer(&Context, &Model[i].Mesh[j].IndexBuffer);
 
 		FreeBModel(&Model[i]);
 	}
+	//////////
 
-	vkDestroyBuffer(Context.Device, SkyboxVertex.Buffer, VK_NULL_HANDLE);
-	VkuMem_Free(VkZone, SkyboxVertex.Memory);
+	// Shadow map destruction
+	vkuDestroyImageBuffer(&Context, &ShadowDepth);
 
-	vkDestroyBuffer(Context.Device, SkyboxIndex.Buffer, VK_NULL_HANDLE);
-	VkuMem_Free(VkZone, SkyboxIndex.Memory);
+	vkDestroyPipeline(Context.Device, ShadowPipeline.Pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(Context.Device, ShadowPipelineLayout, VK_NULL_HANDLE);
+	vkDestroyRenderPass(Context.Device, ShadowRenderPass, VK_NULL_HANDLE);
+
+	vkDestroyFramebuffer(Context.Device, ShadowFrameBuffer, VK_NULL_HANDLE);
+	//////////
+
+	// Main render destruction
+	vkuDestroyBuffer(&Context, &uboBuffer);
 
 	vkDestroyPipeline(Context.Device, Pipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, PipelineLayout, VK_NULL_HANDLE);
@@ -1404,13 +1290,17 @@ void Destroy(void)
 		vkDestroyDescriptorSetLayout(Context.Device, DescriptorSet[i].DescriptorSetLayout, VK_NULL_HANDLE);
 
 	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);
+	//////////
 
+	// Descriptor pool destruction
 	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
 		vkDestroyDescriptorPool(Context.Device, DescriptorPool[i], VK_NULL_HANDLE);
+	//////////
 
+	// Swapchain destruction
 	vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
-	VkuMem_Free(VkZone, DepthImage.DeviceMemory);
+	vkuMem_Free(VkZone, DepthImage.DeviceMemory);
 
 	for(uint32_t i=0;i<SwapchainImageCount;i++)
 	{
@@ -1425,9 +1315,14 @@ void Destroy(void)
 	}
 
 	vkDestroySwapchainKHR(Context.Device, Swapchain, VK_NULL_HANDLE);
+	//////////
 
 	DBGPRINTF(DEBUG_INFO"Remaining Vulkan memory blocks:\n");
-	VkuMem_Print(VkZone);
-	VkuMem_Destroy(&Context, VkZone);
+	vkuMem_Print(VkZone);
+	vkuMem_Destroy(&Context, VkZone);
 	DBGPRINTF(DEBUG_NONE);
+
+#ifdef _DEBUG
+	vkDestroyDebugUtilsMessengerEXT(Instance, debugMessenger, VK_NULL_HANDLE);
+#endif
 }

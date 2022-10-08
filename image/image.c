@@ -19,14 +19,6 @@
 #include "../vulkan/vulkan.h"
 #include "image.h"
 
-#ifndef min
-#define min(a, b) ((a)<(b)?(a):(b))
-#endif
-
-#ifndef max
-#define max(a, b) ((a)>(b)?(a):(b))
-#endif
-
 void _MakeNormalMap(VkuImage_t *Image)
 {
 	uint32_t x, y, xx, yy;

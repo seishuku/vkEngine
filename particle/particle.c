@@ -13,6 +13,7 @@
 // External data from engine.c
 extern VkuContext_t Context;
 extern VkRenderPass RenderPass;
+extern VkuMemZone_t *VkZone;
 
 extern struct
 {
@@ -94,10 +95,12 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *System, vec3 Position, vec3
 
 	// Set number of particles and allocate memory
 	Emitter.NumParticles=NumParticles;
-	Emitter.Particles=calloc(NumParticles, sizeof(Particle_t));
+	Emitter.Particles=Zone_Malloc(Zone, NumParticles*sizeof(Particle_t));
 
 	if(Emitter.Particles==NULL)
 		return UINT32_MAX;
+
+	memset(Emitter.Particles, 0, NumParticles*sizeof(Particle_t));
 
 	// Set emitter position (used when resetting/recycling particles when they die)
 	Vec3_Setv(Emitter.Position, Position);
@@ -336,14 +339,14 @@ void ParticleSystem_Draw(ParticleSystem_t *System, VkCommandBuffer CommandBuffer
 	if(System==NULL)
 		return;
 
-	uint32_t Count=0;
-
 	vkMapMemory(Context.Device, System->ParticleBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &System->ParticleArray);
 
 	float *Array=System->ParticleArray;
 
 	if(Array==NULL)
 		return;
+
+	uint32_t Count=0;
 
 	for(uint32_t i=0;i<List_GetCount(&System->Emitters);i++)
 	{
@@ -394,21 +397,20 @@ void ParticleSystem_Destroy(ParticleSystem_t *System)
 	if(System==NULL)
 		return;
 
-	//glDeleteProgram(PartShader);
+	vkuDestroyBuffer(&Context, &System->ParticleBuffer);
 
-	//glDeleteTextures(1, &PartTexture);
+	vkuDestroyImageBuffer(&Context, &ParticleTexture);
 
-	//glDeleteBuffers(1, &System->PartVBO);
-	//glDeleteVertexArrays(1, &System->PartVAO);
+	vkDestroyPipeline(Context.Device, ParticlePipeline.Pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(Context.Device, ParticlePipelineLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(Context.Device, ParticleDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
 
 	for(uint32_t i=0;i<List_GetCount(&System->Emitters);i++)
 	{
 		ParticleEmitter_t *Emitter=List_GetPointer(&System->Emitters, i);
 
-		free(Emitter->Particles);
+		Zone_Free(Zone, Emitter->Particles);
 	}
 
 	List_Destroy(&System->Emitters);
-
-	free(System->ParticleArray);
 }
