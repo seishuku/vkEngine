@@ -6,18 +6,18 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "../system/system.h"
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
 #include "../camera/camera.h"
 #include "../utils/list.h"
-#include "../lights/lights.h"
-#include "system.h"
+#include "../utils/event.h"
+#include "../utils/input.h"
 
 MemZone_t *Zone;
 
 char szAppName[]="Vulkan";
 
-bool Key[65536];
 bool ToggleFullscreen=true;
 
 extern VkInstance Instance;
@@ -26,7 +26,6 @@ extern VkuContext_t Context;
 extern VkuMemZone_t *VkZone;
 
 extern uint32_t Width, Height;
-extern Lights_t Lights;
 extern Camera_t Camera;
 
 uint64_t Frequency, StartTime, EndTime;
@@ -66,9 +65,11 @@ unsigned long long GetFrequency(void)
 
 void EventLoop(void)
 {
-	int32_t Keysym;
+	KeySym Keysym, temp;
+	uint32_t code;
 	XEvent Event;
-	int32_t ox, oy, dx, dy;
+	MouseEvent_t MouseEvent={ 0, 0, 0, 0 };
+	int32_t ox, oy;
 	bool Done=false;
 
 	while(!Done)
@@ -83,28 +84,28 @@ void EventLoop(void)
 			switch(Event.type)
 			{
 				case MotionNotify:
-					dx=ox-Event.xmotion.x;
-					dy=oy-Event.xmotion.y;
+				{
+					MouseEvent.dx=Event.xmotion.x-ox;
+					MouseEvent.dy=Event.xmotion.y-oy;
 
 					if(Event.xmotion.state&Button1Mask)
-					{
-						Camera.Yaw+=(float)dx/800.0f;
-						Camera.Pitch+=(float)dy/800.0f;
-						//RotateX+=(dx*0.01f);
-						//RotateY+=(dy*0.01f);
-					}
+						MouseEvent.button|=MOUSE_BUTTON_1;
+					else
+						MouseEvent.button&=~MOUSE_BUTTON_1;
 
 					if(Event.xmotion.state&Button2Mask)
-					{
-						//PanX+=dx;
-						//PanY-=dy;
-					}
+						MouseEvent.button|=MOUSE_BUTTON_3;
+					else
+						MouseEvent.button&=~MOUSE_BUTTON_3;
 
 					if(Event.xmotion.state&Button3Mask)
-					{
-						//Zoom-=dy;
-					}
+						MouseEvent.button|=MOUSE_BUTTON_2;
+					else
+						MouseEvent.button&=~MOUSE_BUTTON_2;
+
+					Event_Trigger(EVENT_MOUSE, &MouseEvent);
 					break;
+				}
 
 				case Expose:
 					break;
@@ -119,8 +120,7 @@ void EventLoop(void)
 					break;
 
 				case KeyPress:
-					Keysym=XLookupKeysym(&Event.xkey, 0);
-					Key[Keysym]=true;
+					XConvertCase(XLookupKeysym(&Event.xkey, 0), &temp, &Keysym);
 
 					if(Keysym==XK_Return&&Event.xkey.state&Mod1Mask)
 					{
@@ -149,146 +149,139 @@ void EventLoop(void)
 						}
 					}
 
+					if(Keysym==XK_Escape)
+					{
+						Done=true;
+						break;
+					}
+
 					switch(Keysym)
 					{
-						case 'p':
-							GenerateSkyParams();
-							break;
-
-						//case 'o':
-						//	for(uint32_t i=0;i<10;i++)
-						//	{
-						//		Lights_Add(&Lights, 
-						//		(vec3)
-						//		{
-						//			(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f,
-						//			(((float)rand()/RAND_MAX)*2.0f-1.0f)*100.0f,
-						//			(((float)rand()/RAND_MAX)*2.0f-1.0f)*400.0f
-						//		}, 200.0f,
-						//		(vec4)
-						//		{
-						//			(float)rand()/RAND_MAX,
-						//			(float)rand()/RAND_MAX,
-						//			(float)rand()/RAND_MAX,
-						//			1.0f
-						//		});
-						//	}
-						//	break;
-
-						case 'w':
-							Camera.key_w=true;
-							break;
-
-						case 's':
-							Camera.key_s=true;
-							break;
-
-						case 'a':
-							Camera.key_a=true;
-							break;
-
-						case 'd':
-							Camera.key_d=true;
-							break;
-
-						case 'v':
-							Camera.key_v=true;
-							break;
-
-						case 'c':
-							Camera.key_c=true;
-							break;
-
-						case 'q':
-							Camera.key_q=true;
-							break;
-
-						case 'e':
-							Camera.key_e=true;
-							break;
-
-						case XK_Up:
-							Camera.key_up=true;
-							break;
-
-						case XK_Down:
-							Camera.key_down=true;
-							break;
-
-						case XK_Left:
-							Camera.key_left=true;
-							break;
-
-						case XK_Right:
-							Camera.key_right=true;
-							break;
-
-						case XK_Escape:
-							Done=true;
-							break;
-
-						default:
-							break;
+						case XK_BackSpace:	code=KB_BACKSPACE;				break;	// Backspace
+						case XK_Tab:		code=KB_TAB;					break;	// Tab
+						case XK_Return:		code=KB_ENTER;					break;	// Enter
+						case XK_Pause:		code=KB_PAUSE;					break;	// Pause
+						case XK_Caps_Lock:	code=KB_CAPS_LOCK;				break;	// Caps Lock
+						case XK_Escape:		code=KB_ESCAPE;					break;	// Esc
+						case XK_Prior:		code=KB_PAGE_UP;				break;	// Page Up
+						case XK_Next:		code=KB_PAGE_DOWN;				break;	// Page Down
+						case XK_End:		code=KB_END;					break;	// End
+						case XK_Home:		code=KB_HOME;					break;	// Home
+						case XK_Left:		code=KB_LEFT;					break;	// Left
+						case XK_Up:			code=KB_UP;						break;	// Up
+						case XK_Right:		code=KB_RIGHT;					break;	// Right
+						case XK_Down:		code=KB_DOWN;					break;	// Down
+						case XK_Print:		code=KB_PRINT_SCREEN;			break;	// Prnt Scrn
+						case XK_Insert:		code=KB_INSERT;					break;	// Insert
+						case XK_Delete:		code=KB_DEL;					break;	// Delete
+						case XK_Super_L:	code=KB_LSUPER;					break;	// Left Windows
+						case XK_Super_R:	code=KB_RSUPER;					break;	// Right Windows
+						case XK_Menu:		code=KB_MENU;					break;	// Application
+						case XK_KP_0:		code=KB_NP_0;					break;	// Num 0
+						case XK_KP_1:		code=KB_NP_1;					break;	// Num 1
+						case XK_KP_2:		code=KB_NP_2;					break;	// Num 2
+						case XK_KP_3:		code=KB_NP_3;					break;	// Num 3
+						case XK_KP_4:		code=KB_NP_4;					break;	// Num 4
+						case XK_KP_5:		code=KB_NP_5;					break;	// Num 5
+						case XK_KP_6:		code=KB_NP_6;					break;	// Num 6
+						case XK_KP_7:		code=KB_NP_7;					break;	// Num 7
+						case XK_KP_8:		code=KB_NP_8;					break;	// Num 8
+						case XK_KP_9:		code=KB_NP_9;					break;	// Num 9
+						case XK_KP_Multiply:code=KB_NP_MULTIPLY;			break;	// Num *
+						case XK_KP_Add:		code=KB_NP_ADD;					break;	// Num +
+						case XK_KP_Subtract:code=KB_NP_SUBTRACT;			break;	// Num -
+						case XK_KP_Decimal:	code=KB_NP_DECIMAL;				break;	// Num Del
+						case XK_KP_Divide:	code=KB_NP_DIVIDE;				break;	// Num /
+						case XK_F1:			code=KB_F1;						break;	// F1
+						case XK_F2:			code=KB_F2;						break;	// F2
+						case XK_F3:			code=KB_F3;						break;	// F3
+						case XK_F4:			code=KB_F4;						break;	// F4
+						case XK_F5:			code=KB_F5;						break;	// F5
+						case XK_F6:			code=KB_F6;						break;	// F6
+						case XK_F7:			code=KB_F7;						break;	// F7
+						case XK_F8:			code=KB_F8;						break;	// F8
+						case XK_F9:			code=KB_F9;						break;	// F9
+						case XK_F10:		code=KB_F10;					break;	// F10
+						case XK_F11:		code=KB_F11;					break;	// F11
+						case XK_F12:		code=KB_F12;					break;	// F12
+						case XK_Num_Lock:	code=KB_NUM_LOCK;				break;	// Num Lock
+						case XK_Scroll_Lock:code=KB_SCROLL_LOCK;			break;	// Scroll Lock
+						case XK_Shift_L:	code=KB_LSHIFT;					break;	// Shift
+						case XK_Shift_R:	code=KB_RSHIFT;					break;	// Right Shift
+						case XK_Control_L:	code=KB_LCTRL;					break;	// Left control
+						case XK_Control_R:	code=KB_RCTRL;					break;	// Right control
+						case XK_Alt_L:		code=KB_LALT;					break;	// Left alt
+						case XK_Alt_R:		code=KB_RALT;					break;	// Left alt
+						default:			code=Keysym;					break;	// All others
 					}
+
+					Event_Trigger(EVENT_KEYDOWN, &code);
 					break;
 
 				case KeyRelease:
-					Keysym=XLookupKeysym(&Event.xkey, 0);
-					Key[Keysym]=false;
+					XConvertCase(XLookupKeysym(&Event.xkey, 0), &temp, &Keysym);
 
 					switch(Keysym)
 					{
-						case 'w':
-							Camera.key_w=false;
-							break;
-
-						case 's':
-							Camera.key_s=false;
-							break;
-
-						case 'a':
-							Camera.key_a=false;
-							break;
-
-						case 'd':
-							Camera.key_d=false;
-							break;
-
-						case 'v':
-							Camera.key_v=false;
-							break;
-
-						case 'c':
-							Camera.key_c=false;
-							break;
-
-						case 'q':
-							Camera.key_q=false;
-							break;
-
-						case 'e':
-							Camera.key_e=false;
-							break;
-
-						case XK_Up:
-							Camera.key_up=false;
-							break;
-
-						case XK_Down:
-							Camera.key_down=false;
-							break;
-
-						case XK_Left:
-							Camera.key_left=false;
-							break;
-
-						case XK_Right:
-							Camera.key_right=false;
-							break;
-
-						default:
-							break;
+						case XK_BackSpace:	code=KB_BACKSPACE;				break;	// Backspace
+						case XK_Tab:		code=KB_TAB;					break;	// Tab
+						case XK_Return:		code=KB_ENTER;					break;	// Enter
+						case XK_Pause:		code=KB_PAUSE;					break;	// Pause
+						case XK_Caps_Lock:	code=KB_CAPS_LOCK;				break;	// Caps Lock
+						case XK_Escape:		code=KB_ESCAPE;					break;	// Esc
+						case XK_Prior:		code=KB_PAGE_UP;				break;	// Page Up
+						case XK_Next:		code=KB_PAGE_DOWN;				break;	// Page Down
+						case XK_End:		code=KB_END;					break;	// End
+						case XK_Home:		code=KB_HOME;					break;	// Home
+						case XK_Left:		code=KB_LEFT;					break;	// Left
+						case XK_Up:			code=KB_UP;						break;	// Up
+						case XK_Right:		code=KB_RIGHT;					break;	// Right
+						case XK_Down:		code=KB_DOWN;					break;	// Down
+						case XK_Print:		code=KB_PRINT_SCREEN;			break;	// Prnt Scrn
+						case XK_Insert:		code=KB_INSERT;					break;	// Insert
+						case XK_Delete:		code=KB_DEL;					break;	// Delete
+						case XK_Super_L:	code=KB_LSUPER;					break;	// Left Windows
+						case XK_Super_R:	code=KB_RSUPER;					break;	// Right Windows
+						case XK_Menu:		code=KB_MENU;					break;	// Application
+						case XK_KP_0:		code=KB_NP_0;					break;	// Num 0
+						case XK_KP_1:		code=KB_NP_1;					break;	// Num 1
+						case XK_KP_2:		code=KB_NP_2;					break;	// Num 2
+						case XK_KP_3:		code=KB_NP_3;					break;	// Num 3
+						case XK_KP_4:		code=KB_NP_4;					break;	// Num 4
+						case XK_KP_5:		code=KB_NP_5;					break;	// Num 5
+						case XK_KP_6:		code=KB_NP_6;					break;	// Num 6
+						case XK_KP_7:		code=KB_NP_7;					break;	// Num 7
+						case XK_KP_8:		code=KB_NP_8;					break;	// Num 8
+						case XK_KP_9:		code=KB_NP_9;					break;	// Num 9
+						case XK_KP_Multiply:code=KB_NP_MULTIPLY;			break;	// Num *
+						case XK_KP_Add:		code=KB_NP_ADD;					break;	// Num +
+						case XK_KP_Subtract:code=KB_NP_SUBTRACT;			break;	// Num -
+						case XK_KP_Decimal:	code=KB_NP_DECIMAL;				break;	// Num Del
+						case XK_KP_Divide:	code=KB_NP_DIVIDE;				break;	// Num /
+						case XK_F1:			code=KB_F1;						break;	// F1
+						case XK_F2:			code=KB_F2;						break;	// F2
+						case XK_F3:			code=KB_F3;						break;	// F3
+						case XK_F4:			code=KB_F4;						break;	// F4
+						case XK_F5:			code=KB_F5;						break;	// F5
+						case XK_F6:			code=KB_F6;						break;	// F6
+						case XK_F7:			code=KB_F7;						break;	// F7
+						case XK_F8:			code=KB_F8;						break;	// F8
+						case XK_F9:			code=KB_F9;						break;	// F9
+						case XK_F10:		code=KB_F10;					break;	// F10
+						case XK_F11:		code=KB_F11;					break;	// F11
+						case XK_F12:		code=KB_F12;					break;	// F12
+						case XK_Num_Lock:	code=KB_NUM_LOCK;				break;	// Num Lock
+						case XK_Scroll_Lock:code=KB_SCROLL_LOCK;			break;	// Scroll Lock
+						case XK_Shift_L:	code=KB_LSHIFT;					break;	// Shift
+						case XK_Shift_R:	code=KB_RSHIFT;					break;	// Right Shift
+						case XK_Control_L:	code=KB_LCTRL;					break;	// Left control
+						case XK_Control_R:	code=KB_RCTRL;					break;	// Right control
+						case XK_Alt_L:		code=KB_LALT;					break;	// Left alt
+						case XK_Alt_R:		code=KB_RALT;					break;	// Left alt
+						default:			code=Keysym;					break;	// All others
 					}
+
+					Event_Trigger(EVENT_KEYUP, &code);
 					break;
 			}
 		}
@@ -319,7 +312,7 @@ void EventLoop(void)
 int main(int argc, char **argv)
 {
 	DBGPRINTF(DEBUG_INFO, "Allocating zone memory...\n");
-	Zone=Zone_Init(64*1000*1000);
+	Zone=Zone_Init(256*1000*1000);
 
 	if(Zone==NULL)
 	{
@@ -386,7 +379,7 @@ int main(int argc, char **argv)
 	Zone_Print(Zone);
 
 	DBGPRINTF(DEBUG_WARNING, "\nCurrent vulkan zone memory allocations:\n");
-	VkuMem_Print(VkZone);
+	vkuMem_Print(VkZone);
 
 	DBGPRINTF(DEBUG_INFO, "\nStarting main loop.\n");
 	EventLoop();

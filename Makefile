@@ -1,4 +1,4 @@
-TARGET=engine
+TARGET=vkEngine
 
 # model loading/drawing
 OBJS=model/bmodel.o
@@ -11,6 +11,9 @@ OBJS+=image/image.o
 
 # math
 OBJS+=math/math.o
+
+# particle
+OBJS+=particle/particle.o
 
 # camera
 OBJS+=camera/camera.o
@@ -26,13 +29,17 @@ OBJS+=vulkan/vulkan_pipeline.o
 # core stuff
 OBJS+=system/linux_x11.o
 OBJS+=font/font.o
-#OBJS+=lights/lights.o
+OBJS+=utils/input.o
+OBJS+=utils/event.o
 OBJS+=utils/genid.o
 OBJS+=utils/list.o
 OBJS+=utils/memzone.o
 OBJS+=engine.o
 
-SHADERS=shaders/distance.vert.spv
+SHADERS=shaders/shadow.vert.spv
+SHADERS+=shaders/particle.vert.spv
+SHADERS+=shaders/particle.geom.spv
+SHADERS+=shaders/particle.frag.spv
 SHADERS+=shaders/font.frag.spv
 SHADERS+=shaders/font.vert.spv
 SHADERS+=shaders/lighting.frag.spv
@@ -42,7 +49,7 @@ SHADERS+=shaders/skybox.vert.spv
 
 CC=gcc
 CFLAGS=-Wall -O3 -std=c17 -I/usr/X11/include
-LDFLAGS=-L/usr/X11/lib -lvulkan -lX11 -lm
+LDFLAGS=-Wold-style-definition -L/usr/X11/lib -lvulkan -lX11 -lm
 
 all: $(TARGET) $(SHADERS)
 

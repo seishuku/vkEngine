@@ -1,7 +1,7 @@
 #ifndef __INPUT_H__
 #define __INPUT_H__
 
-enum
+typedef enum
 {
 	KB_UNKNOWN=0,
 	KB_SPACE=32,
@@ -116,9 +116,9 @@ enum
 	KB_RALT=346,
 	KB_RSUPER=347,
 	KB_MENU=348,
-} Keycodes;
+} Keycodes_t;
 
-enum
+typedef enum
 {
 	MOUSE_BUTTON_1=0x00000001,
 	MOUSE_BUTTON_2=0x00000002,
@@ -128,7 +128,7 @@ enum
 	MOUSE_BUTTON_LEFT=MOUSE_BUTTON_1,
 	MOUSE_BUTTON_RIGHT=MOUSE_BUTTON_2,
 	MOUSE_BUTTON_MIDDLE=MOUSE_BUTTON_3,
-} Mousecodes;
+} Mousecodes_t;
 
 typedef struct
 {
