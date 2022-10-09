@@ -108,6 +108,7 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *System, vec3 Position, vec3
 	// Set initial particle position and life to -1.0 (dead)
 	for(uint32_t i=0;i<Emitter.NumParticles;i++)
 	{
+		Emitter.Particles[i].ID=ID;
 		Vec3_Setv(Emitter.Particles[i].pos, Position);
 		Emitter.Particles[i].life=-1.0f;
 	}
@@ -133,6 +134,7 @@ void ParticleSystem_DeleteEmitter(ParticleSystem_t *System, uint32_t ID)
 
 		if(Emitter->ID==ID)
 		{
+			Zone_Free(Zone, Emitter->Particles);
 			List_Del(&System->Emitters, i);
 
 			// Resize vertex buffers (both system memory and OpenGL buffer)

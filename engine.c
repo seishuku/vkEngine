@@ -104,7 +104,7 @@ typedef struct
 	vec3 Rotate;
 } Asteroid_t;
 
-#define NUM_ASTEROIDS 1000
+#define NUM_ASTEROIDS 600
 Asteroid_t Asteroids[NUM_ASTEROIDS];
 
 struct
@@ -137,6 +137,9 @@ VkuPipeline_t SkyboxPipeline;
 
 VkPipelineLayout LinePipelineLayout;
 VkuPipeline_t LinePipeline;
+
+VkPipelineLayout SpherePipelineLayout;
+VkuPipeline_t SpherePipeline;
 
 const uint32_t ShadowSize=2048;
 
@@ -613,6 +616,41 @@ bool CreateLinePipeline(void)
 	return true;
 }
 
+bool CreateSpherePipeline(void)
+{
+	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+		.pushConstantRangeCount=1,
+		.pPushConstantRanges=&(VkPushConstantRange)
+		{
+			.offset=0,
+			.size=sizeof(matrix)+sizeof(vec4),
+			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
+	}, 0, &SpherePipelineLayout);
+
+	vkuInitPipeline(&SpherePipeline, &Context);
+
+	vkuPipeline_SetPipelineLayout(&SpherePipeline, SpherePipelineLayout);
+	vkuPipeline_SetRenderPass(&SpherePipeline, RenderPass);
+
+	SpherePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	SpherePipeline.DepthTest=VK_TRUE;
+	SpherePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+	SpherePipeline.PolygonMode=VK_POLYGON_MODE_LINE;
+
+	if(!vkuPipeline_AddStage(&SpherePipeline, "./shaders/sphere.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+		return false;
+
+	if(!vkuPipeline_AddStage(&SpherePipeline, "./shaders/sphere.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+		return false;
+
+	if(!vkuAssemblePipeline(&SpherePipeline))
+		return false;
+
+	return true;
+}
 
 float RandFloat(void)
 {
@@ -826,20 +864,53 @@ void Render(void)
 	//vkCmdDraw(CommandBuffers[Index], 2, 1, 0, 0);
 	//////
 
-	for(uint32_t i=1;i<List_GetCount(&ParticleSystem.Emitters);i++)
+	////// DRAW ASTEROID BOUNDING SPHERE
+#if 0
+	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
 	{
-		// Get a pointer to the emitter that's providing the positions
-		ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
+		struct
+		{
+			matrix mvp;
+			vec4 color;
+		} sphere_ubo;
 
-		// Get those positions and set the other emitter's positions to those
-		ParticleSystem_SetEmitterPosition(&ParticleSystem, i, Emitter->Particles[i].pos);
+		matrix local;
+
+		MatrixIdentity(local);
+		MatrixTranslatev(Asteroids[i].Position, local);
+		MatrixScale(Asteroids[i].Radius, Asteroids[i].Radius, Asteroids[i].Radius, local);
+
+		MatrixMult(local, ubo->modelview, local);
+		MatrixMult(local, ubo->projection, sphere_ubo.mvp);
+
+		Vec4_Set(sphere_ubo.color, 1.0f, 0.0f, 0.0f, 1.0f);
+
+		vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, SpherePipeline.Pipeline);
+		vkCmdPushConstants(CommandBuffers[Index], SpherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(sphere_ubo), &sphere_ubo);
+		vkCmdDraw(CommandBuffers[Index], 60, 1, 0, 0);
+	}
+#endif
+	//////
+
+	// Get a pointer to the emitter that's providing the positions
+	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
+
+	for(uint32_t i=0;i<Emitter->NumParticles;i++)
+	{
+		if(Emitter->Particles[i].ID!=Emitter->ID)
+		{
+			// Get those positions and set the other emitter's positions to those
+			ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitter->Particles[i].ID, Emitter->Particles[i].pos);
+
+			// If this particle is dead, delete that emitter's ID
+			if(Emitter->Particles[i].life<0.0f)
+				ParticleSystem_DeleteEmitter(&ParticleSystem, Emitter->Particles[i].ID);
+		}
 	}
 
 	ParticleSystem_Step(&ParticleSystem, fTimeStep);
 	ParticleSystem_Draw(&ParticleSystem, CommandBuffers[Index], DescriptorPool[Index]);
 
-	// Should UI overlay stuff have it's own render pass?
-	// Maybe even separate thread?
 	Font_Print(CommandBuffers[Index], 0.0f, 16.0f, "FPS: %0.1f", fps);
 
 	vkCmdEndRenderPass(CommandBuffers[Index]);
@@ -992,7 +1063,10 @@ bool Init(void)
 	GenerateSkyParams();
 
 	// Create debug line pipeline
-	//CreateLinePipeline();
+	CreateLinePipeline();
+
+	// Create debug sphere pipeline
+	CreateSpherePipeline();
 
 	InitShadowPipeline();
 	InitShadowMap();
@@ -1000,7 +1074,8 @@ bool Init(void)
 	if(!ParticleSystem_Init(&ParticleSystem))
 		return false;
 
-	ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 1.0f, 1.0f, 1.0f }, (vec3) { 1.0f, 1.0f, 1.0f }, 0.0f, 100, true, NULL);
+	vec3 Zero={ 0.0f, 0.0f, 0.0f };
+	ParticleSystem_AddEmitter(&ParticleSystem, Zero, Zero, Zero, 0.0f, 100, true, NULL);
 
 	// Create primary frame buffers, depth image
 	CreateFramebuffers();

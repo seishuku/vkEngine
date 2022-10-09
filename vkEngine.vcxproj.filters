@@ -138,6 +138,9 @@
     <ClCompile Include="utils\input.c">
       <Filter>Source Files\utils</Filter>
     </ClCompile>
+    <ClCompile Include="model\sphere.c">
+      <Filter>Source Files\model</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
@@ -218,6 +221,12 @@
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\shadow.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\sphere.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\sphere.frag">
       <Filter>Shaders</Filter>
     </GLSL>
   </ItemGroup>

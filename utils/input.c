@@ -18,19 +18,36 @@ float RandFloat(void);
 //////////////////////////////
 
 // Launch a "missle"
-void FireParticleEmitter(uint32_t Index, vec3 Position, vec3 Direction)
+// This is basically the same as an emitter callback, but done manually by working on the particle array directly.
+void FireParticleEmitter(vec3 Position, vec3 Direction)
 {
-	if(Index>=100)
-		return;
-
+	// Get pointer to the emitter that's being used to drive the other emitters
 	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
-	Vec3_Setv(Emitter->Particles[Index].pos, Position);
 
-	Vec3_Setv(Emitter->Particles[Index].vel, Direction);
-	Vec3_Normalize(Emitter->Particles[Index].vel);
-	Vec3_Muls(Emitter->Particles[Index].vel, 1000.0f);
+	// Create a new particle emitter
+	vec3 RandVec={ RandFloat(), RandFloat(), RandFloat() };
+	Vec3_Normalize(RandVec);
+	uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.2f, 0.2f, 0.2f }, RandVec, 10.0f, 500, false, EmitterCallback);
 
-	Emitter->Particles[Index].life=10.0f;
+	// Search list for first dead particle
+	for(uint32_t i=0;i<Emitter->NumParticles;i++)
+	{
+		// When found, assign the new emitter ID to that particle, set position/direction/life and break out
+		if(Emitter->Particles[i].life<0.0f)
+		{
+			Emitter->Particles[i].ID=ID;
+
+			Vec3_Setv(Emitter->Particles[i].pos, Position);
+
+			Vec3_Setv(Emitter->Particles[i].vel, Direction);
+			Vec3_Normalize(Emitter->Particles[i].vel);
+			Vec3_Muls(Emitter->Particles[i].vel, 1000.0f);
+
+			Emitter->Particles[i].life=10.0f;
+
+			break;
+		}
+	}
 }
 
 void Event_KeyDown(void *Arg)
@@ -40,8 +57,7 @@ void Event_KeyDown(void *Arg)
 	switch(*Key)
 	{
 		case KB_SPACE:
-						uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 1.0f, 1.0f, 1.0f }, (vec3) { RandFloat(), RandFloat(), RandFloat() }, 10.0f, 500, false, EmitterCallback);
-						FireParticleEmitter(ID, Camera.Position, Camera.Forward);
+						FireParticleEmitter(Camera.Position, Camera.Forward);
 						break;
 		case KB_P:		GenerateSkyParams();	break;
 		case KB_W:		Camera.key_w=true;		break;

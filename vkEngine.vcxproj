@@ -105,6 +105,7 @@
     <ClCompile Include="math\math.c" />
     <ClCompile Include="model\bmodel.c" />
     <ClCompile Include="model\skybox.c" />
+    <ClCompile Include="model\sphere.c" />
     <ClCompile Include="particle\particle.c" />
     <ClCompile Include="system\win32.c" />
     <ClCompile Include="utils\event.c" />
@@ -148,6 +149,8 @@
     <GLSL Include="shaders\particle.vert" />
     <GLSL Include="shaders\skybox.frag" />
     <GLSL Include="shaders\skybox.vert" />
+    <GLSL Include="shaders\sphere.frag" />
+    <GLSL Include="shaders\sphere.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

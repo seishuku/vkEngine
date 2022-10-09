@@ -3,6 +3,7 @@
 
 typedef struct
 {
+	uint32_t ID;
 	float life;
 	vec3 pos, vel;
 } Particle_t;
