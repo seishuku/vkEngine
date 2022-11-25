@@ -75,7 +75,10 @@ out gl_PerVertex
     vec4 gl_Position;
 };
 
+layout(location=0) out vec4 Color;
+
 void main()
 {
 	gl_Position=mvp*vec4(ico[gl_VertexIndex], 1.0);
+	Color=color;
 }

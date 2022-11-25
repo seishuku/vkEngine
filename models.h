@@ -1,0 +1,15 @@
+#ifndef __MODELS_H__
+#define __MODELS_H__
+
+enum
+{
+	MODEL_ASTEROID1,
+	MODEL_ASTEROID2,
+	MODEL_ASTEROID3,
+	MODEL_ASTEROID4,
+	NUM_MODELS
+};
+
+extern BModel_t Model[NUM_MODELS];
+
+#endif

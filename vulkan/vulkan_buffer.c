@@ -61,13 +61,6 @@ VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, VkuImage_t *Image,
 	VkMemoryRequirements memoryRequirements;
 	vkGetImageMemoryRequirements(Context->Device, Image->Image, &memoryRequirements);
 
-	VkMemoryAllocateInfo AllocateInfo=
-	{
-		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.allocationSize=memoryRequirements.size,
-		.memoryTypeIndex=vkuMemoryTypeFromProperties(Context->DeviceMemProperties, memoryRequirements.memoryTypeBits, RequirementsMask),
-	};
-
 	// Quick hack: getting it to use the vulkan memory allocator
 	Image->DeviceMemory=vkuMem_Malloc(VkZone, memoryRequirements);
 
@@ -154,13 +147,6 @@ VkBool32 vkuCreateGPUBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t
 		return VK_FALSE;
 
 	vkGetBufferMemoryRequirements(Context->Device, Buffer->Buffer, &memoryRequirements);
-
-	VkMemoryAllocateInfo AllocateInfo=
-	{
-		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.allocationSize=memoryRequirements.size,
-		.memoryTypeIndex=vkuMemoryTypeFromProperties(Context->DeviceMemProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
-	};
 
 	Buffer->Memory=vkuMem_Malloc(VkZone, memoryRequirements);
 

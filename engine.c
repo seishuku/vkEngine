@@ -8,7 +8,6 @@
 #include "math/math.h"
 #include "camera/camera.h"
 #include "model/bmodel.h"
-#include "model/skybox.h"
 #include "image/image.h"
 #include "font/font.h"
 #include "utils/list.h"
@@ -16,6 +15,10 @@
 #include "utils/event.h"
 #include "utils/input.h"
 #include "particle/particle.h"
+#include "models.h"
+#include "textures.h"
+#include "skybox.h"
+#include "shadow.h"
 
 uint32_t Width=1280, Height=720;
 
@@ -24,57 +27,21 @@ VkuContext_t Context;
 
 VkuMemZone_t *VkZone;
 
+#ifdef _DEBUG
+VkDebugUtilsMessengerEXT debugMessenger;
+#endif
+
 Camera_t Camera;
 
 extern float fps, fTimeStep, fTime;
 
 ParticleSystem_t ParticleSystem;
 
-uint32_t Emitters[4];
-
-enum
-{
-	MODEL_ASTEROID1,
-	MODEL_ASTEROID2,
-	MODEL_ASTEROID3,
-	MODEL_ASTEROID4,
-	NUM_MODELS
-};
-
 BModel_t Model[NUM_MODELS];
-
-VkuBuffer_t SkyboxVertex, SkyboxIndex;
-
-enum
-{
-	TEXTURE_ASTEROID1,
-	TEXTURE_ASTEROID1_NORMAL,
-	TEXTURE_ASTEROID2,
-	TEXTURE_ASTEROID2_NORMAL,
-	TEXTURE_ASTEROID3,
-	TEXTURE_ASTEROID3_NORMAL,
-	TEXTURE_ASTEROID4,
-	TEXTURE_ASTEROID4_NORMAL,
-	NUM_TEXTURES
-};
-
 VkuImage_t Textures[NUM_TEXTURES];
 
-struct
-{
-	matrix projection;
-	matrix modelview;
-	matrix light_mvp;
-	vec4 light_color;
-	vec4 light_direction;
-} *ubo;
-
-VkuBuffer_t uboBuffer;
-
-VkDebugUtilsMessengerEXT debugMessenger;
-
 // Swapchain
-#define MAX_FRAME_COUNT 3
+#define MAX_FRAME_COUNT 2
 
 VkSwapchainKHR Swapchain;
 
@@ -82,19 +49,38 @@ VkExtent2D SwapchainExtent;
 VkSurfaceFormatKHR SurfaceFormat;
 VkFormat DepthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
 
-uint32_t SwapchainImageCount=0;
-
 VkImage SwapchainImage[MAX_FRAME_COUNT];
 VkImageView SwapchainImageView[MAX_FRAME_COUNT];
-VkFramebuffer FrameBuffers[MAX_FRAME_COUNT];
+//////
 
-// Depth buffer handles
+// Depth buffer image
 VkuImage_t DepthImage;
 
+// Primary framebuffers
+VkFramebuffer FrameBuffers[MAX_FRAME_COUNT];
+
+// Primary PenderPass
 VkRenderPass RenderPass;
+
+// Primary rendering pipeline stuff
 VkPipelineLayout PipelineLayout;
 VkuPipeline_t Pipeline;
 
+typedef struct
+{
+	matrix projection;
+	matrix modelview;
+	matrix light_mvp;
+	vec4 light_color;
+	vec4 light_direction;
+} UBO_t;
+
+UBO_t *ubo;
+
+VkuBuffer_t uboBuffer;
+//////
+
+// Asteroid data
 VkuBuffer_t Asteroid_Instance;
 
 typedef struct
@@ -106,56 +92,15 @@ typedef struct
 
 #define NUM_ASTEROIDS 600
 Asteroid_t Asteroids[NUM_ASTEROIDS];
+//////
 
-struct
-{
-	matrix mvp;
-	vec4 uOffset;
-
-	vec3 uNebulaAColor;
-	float uNebulaADensity;
-	vec3 uNebulaBColor;
-	float uNebulaBDensity;
-
-	float uStarsScale;
-	float uStarDensity;
-	float pad0[2];
-
-	vec4 uSunPosition;
-	float uSunSize;
-	float uSunFalloff;
-	float pad1[2];
-	vec4 uSunColor;
-} *Skybox_UBO;
-
-VkuBuffer_t Skybox_UBO_Buffer;
-
-VkuDescriptorSet_t SkyboxDescriptorSet[MAX_FRAME_COUNT];
-
-VkPipelineLayout SkyboxPipelineLayout;
-VkuPipeline_t SkyboxPipeline;
-
+// Some debugging object pipelines
 VkPipelineLayout LinePipelineLayout;
 VkuPipeline_t LinePipeline;
 
 VkPipelineLayout SpherePipelineLayout;
 VkuPipeline_t SpherePipeline;
-
-const uint32_t ShadowSize=2048;
-
-VkFramebuffer ShadowFrameBuffer;
-VkuImage_t ShadowDepth;
-VkFormat ShadowDepthFormat=VK_FORMAT_D32_SFLOAT;
-
-VkuPipeline_t ShadowPipeline;
-VkPipelineLayout ShadowPipelineLayout;
-VkRenderPass ShadowRenderPass;
-
-struct
-{
-	matrix mvp;
-	matrix local;
-} Shadow_UBO;
+//////
 
 VkDescriptorPool DescriptorPool[MAX_FRAME_COUNT];
 VkuDescriptorSet_t DescriptorSet[MAX_FRAME_COUNT*NUM_MODELS];
@@ -167,222 +112,6 @@ VkSemaphore PresentCompleteSemaphores[MAX_FRAME_COUNT];
 VkSemaphore RenderCompleteSemaphores[MAX_FRAME_COUNT];
 
 void RecreateSwapchain(void);
-
-void InitShadowMap(void)
-{
-	// Cubemap depth render target
-	vkuCreateImageBuffer(&Context, &ShadowDepth,
-						 VK_IMAGE_TYPE_2D, ShadowDepthFormat, 1, 1, ShadowSize, ShadowSize, 1,
-						 VK_IMAGE_TILING_OPTIMAL,
-						 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT|VK_IMAGE_USAGE_SAMPLED_BIT,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
-
-	// Cube color sampler
-	vkCreateSampler(Context.Device, &(VkSamplerCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-		.maxAnisotropy=1.0f,
-		.magFilter=VK_FILTER_LINEAR,
-		.minFilter=VK_FILTER_LINEAR,
-		.mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR,
-		.addressModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.mipLodBias=0.0f,
-		.compareOp=VK_COMPARE_OP_LESS_OR_EQUAL,
-		.compareEnable=VK_TRUE,
-		.minLod=0.0f,
-		.maxLod=1.0f,
-		.maxAnisotropy=1.0,
-		.anisotropyEnable=VK_FALSE,
-		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-	}, VK_NULL_HANDLE, &ShadowDepth.Sampler);
-
-	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.viewType=VK_IMAGE_VIEW_TYPE_2D,
-		.format=ShadowDepthFormat,
-		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.baseArrayLayer=0,
-		.subresourceRange.layerCount=1,
-		.subresourceRange.levelCount=1,
-		.image=ShadowDepth.Image,
-	}, VK_NULL_HANDLE, &ShadowDepth.View);
-
-	vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-		.renderPass=ShadowRenderPass,
-		.attachmentCount=1,
-		.pAttachments=(VkImageView[]){ ShadowDepth.View },
-		.width=ShadowSize,
-		.height=ShadowSize,
-		.layers=1,
-	}, 0, &ShadowFrameBuffer);
-}
-
-bool InitShadowPipeline(void)
-{
-	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-		.dependencyCount=2,
-		.pDependencies=(VkSubpassDependency[])
-		{
-			{
-				.srcSubpass=VK_SUBPASS_EXTERNAL,
-				.dstSubpass=0,
-				.srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				.dstStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
-				.dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
-			},
-			{
-
-				.srcSubpass=0,
-				.dstSubpass=VK_SUBPASS_EXTERNAL,
-				.srcStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				.srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
-			}
-		},
-		.attachmentCount=1,
-		.pAttachments=(VkAttachmentDescription[])
-		{
-			{
-				.format=ShadowDepthFormat,
-				.samples=VK_SAMPLE_COUNT_1_BIT,
-				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			},
-		},
-		.subpassCount=1,
-		.pSubpasses=&(VkSubpassDescription)
-		{
-			.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS,
-			.pDepthStencilAttachment=&(VkAttachmentReference)
-			{
-				.attachment=0,
-				.layout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-			},
-		},
-	}, 0, &ShadowRenderPass);
-
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=0,
-		.pushConstantRangeCount=1,
-		.pPushConstantRanges=&(VkPushConstantRange)
-		{
-			.offset=0,
-			.size=sizeof(Shadow_UBO),
-			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
-		},
-	}, 0, &ShadowPipelineLayout);
-
-	vkuInitPipeline(&ShadowPipeline, &Context);
-
-	vkuPipeline_SetPipelineLayout(&ShadowPipeline, ShadowPipelineLayout);
-	vkuPipeline_SetRenderPass(&ShadowPipeline, ShadowRenderPass);
-
-	// Add in vertex shader
-	if(!vkuPipeline_AddStage(&ShadowPipeline, "./shaders/shadow.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
-		return false;
-
-	// Set states that are different than defaults
-	ShadowPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
-	ShadowPipeline.DepthTest=VK_TRUE;
-
-	ShadowPipeline.DepthBias=VK_TRUE;
-	ShadowPipeline.DepthBiasConstantFactor=1.25f;
-	ShadowPipeline.DepthBiasSlopeFactor=1.75f;
-
-	// Add vertex binding and attrib parameters
-	vkuPipeline_AddVertexBinding(&ShadowPipeline, 0, sizeof(float)*20, VK_VERTEX_INPUT_RATE_VERTEX);
-	vkuPipeline_AddVertexAttribute(&ShadowPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-
-	vkuPipeline_AddVertexBinding(&ShadowPipeline, 1, sizeof(matrix), VK_VERTEX_INPUT_RATE_INSTANCE);
-	vkuPipeline_AddVertexAttribute(&ShadowPipeline, 1, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
-	vkuPipeline_AddVertexAttribute(&ShadowPipeline, 2, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*1);
-	vkuPipeline_AddVertexAttribute(&ShadowPipeline, 3, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*2);
-	vkuPipeline_AddVertexAttribute(&ShadowPipeline, 4, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*3);
-
-	// Assemble the pipeline
-	if(!vkuAssemblePipeline(&ShadowPipeline))
-		return false;
-
-	return true;
-}
-
-void ShadowUpdateMap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
-{
-	vkCmdBeginRenderPass(CommandBuffer, &(VkRenderPassBeginInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-		.renderPass=ShadowRenderPass,
-		.framebuffer=ShadowFrameBuffer,
-		.clearValueCount=1,
-		.pClearValues=(VkClearValue[]){ { 1.0f, 0 } },
-		.renderArea.offset=(VkOffset2D){ 0, 0 },
-		.renderArea.extent=(VkExtent2D){ ShadowSize, ShadowSize },
-	}, VK_SUBPASS_CONTENTS_INLINE);
-
-	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
-	vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ShadowPipeline.Pipeline);
-
-	vkCmdSetViewport(CommandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)ShadowSize, (float)ShadowSize, 0.0f, 1.0f });
-	vkCmdSetScissor(CommandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { ShadowSize, ShadowSize } });
-
-	matrix Projection;
-	MatrixIdentity(Projection);
-	MatrixOrtho(-12500.0f, 12500.0f, -12500.0f, 12500.0f, 0.1f, 30000.0f, Projection);
-
-	matrix ModelView;
-	MatrixIdentity(ModelView);
-
-	vec3 Position;
-	Vec3_Setv(Position, Skybox_UBO->uSunPosition);
-	Vec3_Muls(Position, 20000.0f);
-
-	MatrixLookAt(Position, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.0f, 1.0f, 0.0f }, ModelView);
-
-	MatrixMult(ModelView, Projection, Shadow_UBO.mvp);
-
-	vkCmdBindVertexBuffers(CommandBuffer, 1, 1, &Asteroid_Instance.Buffer, &(VkDeviceSize) { 0 });
-
-	// Draw the models
-	for(uint32_t j=0;j<NUM_MODELS;j++)
-	{
-		MatrixIdentity(Shadow_UBO.local);
-		MatrixRotate(fTime, 1.0f, 0.0f, 0.0f, Shadow_UBO.local);
-		MatrixRotate(fTime, 0.0f, 1.0f, 0.0f, Shadow_UBO.local);
-
-		vkCmdPushConstants(CommandBuffer, ShadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Shadow_UBO), &Shadow_UBO);
-
-		// Bind model data buffers and draw the triangles
-		vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &Model[j].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
-
-		for(uint32_t k=0;k<Model[j].NumMesh;k++)
-		{
-			vkCmdBindIndexBuffer(CommandBuffer, Model[j].Mesh[k].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(CommandBuffer, Model[j].Mesh[k].NumFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*j);
-		}
-	}
-
-	vkCmdEndRenderPass(CommandBuffer);
-}
-// ---
 
 bool CreateFramebuffers(void)
 {
@@ -412,7 +141,7 @@ bool CreateFramebuffers(void)
 		.flags=0,
 	}, NULL, &DepthImage.View);
 
-	for(uint32_t i=0;i<SwapchainImageCount;i++)
+	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
 	{
 		vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
 		{
@@ -532,51 +261,8 @@ bool CreatePipeline(void)
 	if(!vkuAssemblePipeline(&Pipeline))
 		return false;
 
-	vkuCreateHostBuffer(&Context, &uboBuffer, sizeof(*ubo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-	vkMapMemory(Context.Device, uboBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &ubo);
-
-	return true;
-}
-
-bool CreateSkyboxPipeline(void)
-{
-	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
-	{
-		vkuInitDescriptorSet(&SkyboxDescriptorSet[i], &Context);
-		vkuDescriptorSet_AddBinding(&SkyboxDescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
-		vkuAssembleDescriptorSetLayout(&SkyboxDescriptorSet[i]);
-	}
-
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=1,
-		.pSetLayouts=&SkyboxDescriptorSet[0].DescriptorSetLayout,
-		.pushConstantRangeCount=0,
-	}, 0, &SkyboxPipelineLayout);
-
-	vkuInitPipeline(&SkyboxPipeline, &Context);
-
-	vkuPipeline_SetPipelineLayout(&SkyboxPipeline, SkyboxPipelineLayout);
-	vkuPipeline_SetRenderPass(&SkyboxPipeline, RenderPass);
-
-	SkyboxPipeline.DepthTest=VK_TRUE;
-	SkyboxPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
-
-	if(!vkuPipeline_AddStage(&SkyboxPipeline, "./shaders/skybox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
-		return false;
-
-	if(!vkuPipeline_AddStage(&SkyboxPipeline, "./shaders/skybox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-		return false;
-
-	vkuPipeline_AddVertexBinding(&SkyboxPipeline, 0, sizeof(float)*4, VK_VERTEX_INPUT_RATE_VERTEX);
-	vkuPipeline_AddVertexAttribute(&SkyboxPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-
-	if(!vkuAssemblePipeline(&SkyboxPipeline))
-		return false;
-
-	vkuCreateHostBuffer(&Context, &Skybox_UBO_Buffer, sizeof(*Skybox_UBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-	vkMapMemory(Context.Device, Skybox_UBO_Buffer.DeviceMemory, 0, sizeof(*Skybox_UBO), 0, &Skybox_UBO);
+	vkuCreateHostBuffer(&Context, &uboBuffer, sizeof(UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	vkMapMemory(Context.Device, uboBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&ubo);
 
 	return true;
 }
@@ -694,7 +380,7 @@ void GenerateSkyParams(void)
 	if(!Asteroid_Instance.Buffer)
 		vkuCreateHostBuffer(&Context, &Asteroid_Instance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-	vkMapMemory(Context.Device, Asteroid_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+	vkMapMemory(Context.Device, Asteroid_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Data);
 
 	uint32_t i=0, tries=0;
 
@@ -834,16 +520,7 @@ void Render(void)
 	// ---
 
 	// Skybox
-	vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipeline.Pipeline);
-
-	vkuDescriptorSet_UpdateBindingBufferInfo(&SkyboxDescriptorSet[Index], 0, Skybox_UBO_Buffer.Buffer, 0, VK_WHOLE_SIZE);
-	vkuAllocateUpdateDescriptorSet(&SkyboxDescriptorSet[Index], DescriptorPool[Index]);
-
-	vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipelineLayout, 0, 1, &SkyboxDescriptorSet[Index].DescriptorSet, 0, VK_NULL_HANDLE);
-
-	vkCmdBindVertexBuffers(CommandBuffers[Index], 0, 1, &SkyboxVertex.Buffer, &(VkDeviceSize) { 0 });
-	vkCmdBindIndexBuffer(CommandBuffers[Index], SkyboxIndex.Buffer, 0, VK_INDEX_TYPE_UINT16);
-	vkCmdDrawIndexed(CommandBuffers[Index], 20*3, 1, 0, 0, 0);
+	DrawSkybox(CommandBuffers[Index], Index);
 	//////
 
 	////// DEBUG LINE FROM ORIGIN TO LIGHT DIRECTION
@@ -942,6 +619,7 @@ void Render(void)
 	});
 }
 
+#ifdef _DEBUG
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
 {
 	if(messageSeverity&VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
@@ -955,6 +633,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 
 	return VK_FALSE;
 }
+#endif
 
 void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle)
 {
@@ -1013,8 +692,6 @@ bool Init(void)
 	else
 		return false;
 
-	BuildSkybox(&Context, &SkyboxVertex, &SkyboxIndex);
-
 	// Load textures
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1], "./assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1_NORMAL], "./assets/asteroid1_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
@@ -1055,7 +732,7 @@ bool Init(void)
 		}, VK_NULL_HANDLE, &DescriptorPool[i]);
 	}
 
-	// Create main render pipeline and renderpass
+	// Create primary pipeline and renderpass
 	CreatePipeline();
 
 	// Create skybox pipeline (uses renderpass from main pipeline)
@@ -1063,10 +740,10 @@ bool Init(void)
 	GenerateSkyParams();
 
 	// Create debug line pipeline
-	CreateLinePipeline();
+	//CreateLinePipeline();
 
 	// Create debug sphere pipeline
-	CreateSpherePipeline();
+	//CreateSpherePipeline();
 
 	InitShadowPipeline();
 	InitShadowMap();
@@ -1078,6 +755,7 @@ bool Init(void)
 	ParticleSystem_AddEmitter(&ParticleSystem, Zero, Zero, Zero, 0.0f, 100, true, NULL);
 
 	// Create primary frame buffers, depth image
+	// This needs to be done after the render pass is created
 	CreateFramebuffers();
 
 	return true;
@@ -1200,6 +878,7 @@ void vkuCreateSwapchain(VkuContext_t *Context, uint32_t Width, uint32_t Height, 
 	}, VK_NULL_HANDLE, &Swapchain);
 
 	// Get swap chain image count
+	uint32_t SwapchainImageCount=0;
 	vkGetSwapchainImagesKHR(Context->Device, Swapchain, &SwapchainImageCount, VK_NULL_HANDLE);
 
 	// TODO: Allocate swapchain frame related stuff here (image, imageview, fences, semaphores, etc)
@@ -1260,7 +939,7 @@ void RecreateSwapchain(void)
 		vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
 		vkuMem_Free(VkZone, DepthImage.DeviceMemory);
 
-		for(uint32_t i=0;i<SwapchainImageCount;i++)
+		for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
 		{
 			vkDestroyFramebuffer(Context.Device, FrameBuffers[i], VK_NULL_HANDLE);
 
@@ -1319,17 +998,7 @@ void Destroy(void)
 	//////////
 
 	// Skybox destruction
-	vkUnmapMemory(Context.Device, Skybox_UBO_Buffer.DeviceMemory);
-	vkuDestroyBuffer(&Context, &Skybox_UBO_Buffer);
-
-	vkuDestroyBuffer(&Context, &SkyboxVertex);
-	vkuDestroyBuffer(&Context, &SkyboxIndex);
-
-	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
-		vkDestroyDescriptorSetLayout(Context.Device, SkyboxDescriptorSet[i].DescriptorSetLayout, VK_NULL_HANDLE);
-
-	vkDestroyPipeline(Context.Device, SkyboxPipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(Context.Device, SkyboxPipelineLayout, VK_NULL_HANDLE);
+	DestroySkybox();
 	//////////
 
 	// Font destruction
@@ -1358,13 +1027,7 @@ void Destroy(void)
 	//////////
 
 	// Shadow map destruction
-	vkuDestroyImageBuffer(&Context, &ShadowDepth);
-
-	vkDestroyPipeline(Context.Device, ShadowPipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(Context.Device, ShadowPipelineLayout, VK_NULL_HANDLE);
-	vkDestroyRenderPass(Context.Device, ShadowRenderPass, VK_NULL_HANDLE);
-
-	vkDestroyFramebuffer(Context.Device, ShadowFrameBuffer, VK_NULL_HANDLE);
+	DestroyShadow();
 	//////////
 
 	// Main render destruction
@@ -1389,7 +1052,7 @@ void Destroy(void)
 	vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
 	vkuMem_Free(VkZone, DepthImage.DeviceMemory);
 
-	for(uint32_t i=0;i<SwapchainImageCount;i++)
+	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
 	{
 		vkDestroyFramebuffer(Context.Device, FrameBuffers[i], VK_NULL_HANDLE);
 

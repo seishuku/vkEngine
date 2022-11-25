@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include "../system/system.h"
 #include "../vulkan/vulkan.h"
 #include "../image/image.h"
@@ -59,11 +60,13 @@ bool ParticleSystem_ResizeBuffer(ParticleSystem_t *System)
 
 	if(System->ParticleBuffer.Buffer)
 	{
+		vkUnmapMemory(Context.Device, System->ParticleBuffer.DeviceMemory);
 		vkDestroyBuffer(Context.Device, System->ParticleBuffer.Buffer, VK_NULL_HANDLE);
 		vkFreeMemory(Context.Device, System->ParticleBuffer.DeviceMemory, VK_NULL_HANDLE);
 	}
 
 	vkuCreateHostBuffer(&Context, &System->ParticleBuffer, sizeof(vec4)*2*Count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	vkMapMemory(Context.Device, System->ParticleBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&System->ParticleArray);
 
 	return true;
 }
@@ -341,8 +344,6 @@ void ParticleSystem_Draw(ParticleSystem_t *System, VkCommandBuffer CommandBuffer
 	if(System==NULL)
 		return;
 
-	vkMapMemory(Context.Device, System->ParticleBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &System->ParticleArray);
-
 	float *Array=System->ParticleArray;
 
 	if(Array==NULL)
@@ -375,8 +376,6 @@ void ParticleSystem_Draw(ParticleSystem_t *System, VkCommandBuffer CommandBuffer
 			}
 		}
 	}
-
-	vkUnmapMemory(Context.Device, System->ParticleBuffer.DeviceMemory);
 
 	MatrixMult(ubo->modelview, ubo->projection, ParticlePC.mvp);
 	Vec4_Set(ParticlePC.Right, ubo->modelview[0], ubo->modelview[4], ubo->modelview[8], ubo->modelview[12]);

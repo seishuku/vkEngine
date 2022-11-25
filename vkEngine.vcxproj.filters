@@ -123,9 +123,6 @@
     <ClCompile Include="vulkan\vulkan_pipeline.c">
       <Filter>Source Files\vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="model\skybox.c">
-      <Filter>Source Files\model</Filter>
-    </ClCompile>
     <ClCompile Include="model\bmodel.c">
       <Filter>Source Files\model</Filter>
     </ClCompile>
@@ -138,8 +135,11 @@
     <ClCompile Include="utils\input.c">
       <Filter>Source Files\utils</Filter>
     </ClCompile>
-    <ClCompile Include="model\sphere.c">
-      <Filter>Source Files\model</Filter>
+    <ClCompile Include="shadow.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="skybox.c">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -170,9 +170,6 @@
     <ClInclude Include="utils\memzone.h">
       <Filter>Header Files\utils</Filter>
     </ClInclude>
-    <ClInclude Include="model\skybox.h">
-      <Filter>Header Files\model</Filter>
-    </ClInclude>
     <ClInclude Include="model\bmodel.h">
       <Filter>Header Files\model</Filter>
     </ClInclude>
@@ -184,6 +181,18 @@
     </ClInclude>
     <ClInclude Include="utils\input.h">
       <Filter>Header Files\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="shadow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="skybox.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="models.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="textures.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

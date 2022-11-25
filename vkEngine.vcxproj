@@ -104,9 +104,9 @@
     <ClCompile Include="image\tga.c" />
     <ClCompile Include="math\math.c" />
     <ClCompile Include="model\bmodel.c" />
-    <ClCompile Include="model\skybox.c" />
-    <ClCompile Include="model\sphere.c" />
     <ClCompile Include="particle\particle.c" />
+    <ClCompile Include="shadow.c" />
+    <ClCompile Include="skybox.c" />
     <ClCompile Include="system\win32.c" />
     <ClCompile Include="utils\event.c" />
     <ClCompile Include="utils\genid.c" />
@@ -125,10 +125,13 @@
     <ClInclude Include="font\font.h" />
     <ClInclude Include="image\image.h" />
     <ClInclude Include="math\math.h" />
+    <ClInclude Include="models.h" />
     <ClInclude Include="model\bmodel.h" />
-    <ClInclude Include="model\skybox.h" />
     <ClInclude Include="particle\particle.h" />
+    <ClInclude Include="shadow.h" />
+    <ClInclude Include="skybox.h" />
     <ClInclude Include="system\system.h" />
+    <ClInclude Include="textures.h" />
     <ClInclude Include="utils\event.h" />
     <ClInclude Include="utils\genid.h" />
     <ClInclude Include="utils\input.h" />

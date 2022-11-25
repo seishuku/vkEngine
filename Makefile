@@ -2,7 +2,6 @@ TARGET=vkEngine
 
 # model loading/drawing
 OBJS=model/bmodel.o
-OBJS+=model/skybox.o
 
 # image loading
 OBJS+=image/qoi.o
@@ -34,6 +33,8 @@ OBJS+=utils/event.o
 OBJS+=utils/genid.o
 OBJS+=utils/list.o
 OBJS+=utils/memzone.o
+OBJS+=shadow.o
+OBJS+=skybox.o
 OBJS+=engine.o
 
 SHADERS=shaders/shadow.vert.spv
