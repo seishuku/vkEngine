@@ -23,9 +23,15 @@ typedef struct
 } Skybox_UBO_t;
 
 extern Skybox_UBO_t *Skybox_UBO;
+extern VkuBuffer_t Skybox_UBO_Buffer;
+
+extern VkuDescriptorSet_t SkyboxDescriptorSet[VKU_MAX_FRAME_COUNT];
+
+extern VkPipelineLayout SkyboxPipelineLayout;
+extern VkuPipeline_t SkyboxPipeline;
 
 bool CreateSkyboxPipeline(void);
-void DrawSkybox(VkCommandBuffer CommandBuffer, uint32_t Index);
+//void DrawSkybox(VkCommandBuffer CommandBuffer, uint32_t Index);
 void DestroySkybox(void);
 
 #endif

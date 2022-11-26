@@ -178,7 +178,7 @@ void _Font_Init(void)
 	vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=Context.CommandPool,
+		.commandPool=Context.CommandPool[0],
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount=1,
 	}, &copyCmd);
@@ -253,7 +253,7 @@ void _Font_Init(void)
 	vkDestroyFence(Context.Device, Fence, VK_NULL_HANDLE);
 
 	// Done with the command buffer
-	vkFreeCommandBuffers(Context.Device, Context.CommandPool, 1, &copyCmd);
+	vkFreeCommandBuffers(Context.Device, Context.CommandPool[0], 1, &copyCmd);
 
 	// Done with the staging buffer
 	vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);

@@ -265,13 +265,16 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		}, VK_NULL_HANDLE, &Context->PipelineCache);
 	}
 
-	// Create command pool
-	vkCreateCommandPool(Context->Device, &(VkCommandPoolCreateInfo)
+	// Create command pools
+	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-		.flags=VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-		.queueFamilyIndex=Context->QueueFamilyIndex,
-	}, 0, &Context->CommandPool);
+		vkCreateCommandPool(Context->Device, &(VkCommandPoolCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+			.flags=VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+			.queueFamilyIndex=Context->QueueFamilyIndex,
+		}, VK_NULL_HANDLE, &Context->CommandPool[i]);
+	}
 
 	return VK_TRUE;
 }
@@ -286,7 +289,8 @@ void DestroyVulkan(VkInstance Instance, VkuContext_t *Context)
 	vkDestroyPipelineCache(Context->Device, Context->PipelineCache, VK_NULL_HANDLE);
 
 	// Destroy command pool
-	vkDestroyCommandPool(Context->Device, Context->CommandPool, VK_NULL_HANDLE);
+	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+		vkDestroyCommandPool(Context->Device, Context->CommandPool[i], VK_NULL_HANDLE);
 
 	// Destroy logical device
 	vkDestroyDevice(Context->Device, VK_NULL_HANDLE);

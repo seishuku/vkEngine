@@ -70,6 +70,12 @@
     <Filter Include="Header Files\particle">
       <UniqueIdentifier>{9255b643-7629-435f-9497-137b09de4498}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\threads">
+      <UniqueIdentifier>{cf844439-4749-436e-aa67-76d423f65abe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\threads">
+      <UniqueIdentifier>{1ecbd12b-40da-4da3-91bd-a788e95b21b6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="engine.c">
@@ -144,6 +150,9 @@
     <ClCompile Include="vulkan\vulkan_swapchain.c">
       <Filter>Source Files\vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="threads\threads.c">
+      <Filter>Source Files\threads</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
@@ -196,6 +205,9 @@
     </ClInclude>
     <ClInclude Include="textures.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="threads\threads.h">
+      <Filter>Header Files\threads</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

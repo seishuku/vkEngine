@@ -6,10 +6,10 @@
 #include "../system/system.h"
 #include "vulkan.h"
 
-void vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, uint32_t Width, uint32_t Height, VkBool32 VSync)
+VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, uint32_t Width, uint32_t Height, VkBool32 VSync)
 {
 	if(!Swapchain)
-		return;
+		return VK_FALSE;
 
 	uint32_t FormatCount=0;
 	vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &FormatCount, VK_NULL_HANDLE);
@@ -17,7 +17,7 @@ void vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, uint32
 	VkSurfaceFormatKHR *SurfaceFormats=(VkSurfaceFormatKHR *)Zone_Malloc(Zone, sizeof(VkSurfaceFormatKHR)*FormatCount);
 
 	if(SurfaceFormats==NULL)
-		return;
+		return VK_FALSE;
 
 	vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &FormatCount, SurfaceFormats);
 
@@ -41,7 +41,7 @@ void vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, uint32
 	VkPresentModeKHR *PresentModes=(VkPresentModeKHR *)Zone_Malloc(Zone, sizeof(VkPresentModeKHR)*PresentModeCount);
 
 	if(PresentModes==NULL)
-		return;
+		return VK_FALSE;
 
 	vkGetPhysicalDeviceSurfacePresentModesKHR(Context->PhysicalDevice, Context->Surface, &PresentModeCount, PresentModes);
 
@@ -139,7 +139,7 @@ void vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, uint32
 	vkGetSwapchainImagesKHR(Context->Device, Swapchain->Swapchain, &SwapchainImageCount, VK_NULL_HANDLE);
 
 	if(SwapchainImageCount!=VKU_MAX_FRAME_COUNT)
-		return;
+		return VK_FALSE;
 
 	// Get the swap chain images
 	vkGetSwapchainImagesKHR(Context->Device, Swapchain->Swapchain, &SwapchainImageCount, Swapchain->Image);
@@ -163,10 +163,15 @@ void vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, uint32
 			.flags=0,
 		}, VK_NULL_HANDLE, &Swapchain->ImageView[i]);
 	}
+
+	return VK_TRUE;
 }
 
 void vkuDestroySwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain)
 {
+	if(!Context||!Swapchain)
+		return;
+
 	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 		vkDestroyImageView(Context->Device, Swapchain->ImageView[i], VK_NULL_HANDLE);
 

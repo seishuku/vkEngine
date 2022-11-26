@@ -27,6 +27,8 @@ extern PFN_vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR;
 
 #define VKU_MAX_DESCRIPTORSET_BINDINGS 16
 
+#define VKU_MAX_FRAME_COUNT 2
+
 typedef struct
 {
 #ifdef WIN32
@@ -48,7 +50,7 @@ typedef struct
 	VkDevice Device;
 	VkQueue Queue;
 	VkPipelineCache PipelineCache;
-	VkCommandPool CommandPool;
+	VkCommandPool CommandPool[VKU_MAX_FRAME_COUNT];
 } VkuContext_t;
 
 typedef struct
@@ -189,8 +191,6 @@ typedef struct
 	VkImageView View;
 } VkuImage_t;
 
-#define VKU_MAX_FRAME_COUNT 2
-
 typedef struct
 {
 	VkSwapchainKHR Swapchain;
@@ -240,7 +240,7 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance);
 VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context);
 void DestroyVulkan(VkInstance Instance, VkuContext_t *Context);
 
-void vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, uint32_t Width, uint32_t Height, VkBool32 VSync);
+VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, uint32_t Width, uint32_t Height, VkBool32 VSync);
 void vkuDestroySwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain);
 
 #endif

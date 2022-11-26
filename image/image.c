@@ -880,7 +880,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		vkAllocateCommandBuffers(Context->Device, &(VkCommandBufferAllocateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-			.commandPool=Context->CommandPool,
+			.commandPool=Context->CommandPool[0],
 			.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 			.commandBufferCount=1,
 		}, &CommandBuffer);
@@ -970,7 +970,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		vkDestroyFence(Context->Device, Fence, VK_NULL_HANDLE);
 
 		// Free the command buffer
-		vkFreeCommandBuffers(Context->Device, Context->CommandPool, 1, &CommandBuffer);
+		vkFreeCommandBuffers(Context->Device, Context->CommandPool[0], 1, &CommandBuffer);
 
 		// Delete staging buffers
 		vkFreeMemory(Context->Device, StagingBuffer.DeviceMemory, VK_NULL_HANDLE);
@@ -1044,7 +1044,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 	vkAllocateCommandBuffers(Context->Device, &(VkCommandBufferAllocateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=Context->CommandPool,
+		.commandPool=Context->CommandPool[0],
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount=1,
 	}, &CommandBuffer);
@@ -1130,7 +1130,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 	vkDestroyFence(Context->Device, Fence, VK_NULL_HANDLE);
 
 	// Free the command buffer
-	vkFreeCommandBuffers(Context->Device, Context->CommandPool, 1, &CommandBuffer);
+	vkFreeCommandBuffers(Context->Device, Context->CommandPool[0], 1, &CommandBuffer);
 
 	// Delete staging buffers
 	vkFreeMemory(Context->Device, StagingBuffer.DeviceMemory, VK_NULL_HANDLE);

@@ -183,7 +183,7 @@ VkBool32 vkuCopyBuffer(VkuContext_t *Context, VkBuffer Src, VkBuffer Dest, uint3
 	vkAllocateCommandBuffers(Context->Device, &(VkCommandBufferAllocateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=Context->CommandPool,
+		.commandPool=Context->CommandPool[0],
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount=1,
 	}, &CopyCmd);
@@ -208,7 +208,7 @@ VkBool32 vkuCopyBuffer(VkuContext_t *Context, VkBuffer Src, VkBuffer Dest, uint3
 	// Wait for it to finish
 	vkWaitForFences(Context->Device, 1, &Fence, VK_TRUE, UINT64_MAX);
 	vkDestroyFence(Context->Device, Fence, VK_NULL_HANDLE);
-	vkFreeCommandBuffers(Context->Device, Context->CommandPool, 1, &CopyCmd);
+	vkFreeCommandBuffers(Context->Device, Context->CommandPool[0], 1, &CopyCmd);
 
 	return VK_TRUE;
 }
