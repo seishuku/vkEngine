@@ -6,8 +6,6 @@
 #include "math/math.h"
 #include "skybox.h"
 
-#define MAX_FRAME_COUNT 2
-
 extern VkuContext_t Context;
 extern VkRenderPass RenderPass;
 extern VkDescriptorPool DescriptorPool[];
@@ -16,14 +14,14 @@ Skybox_UBO_t *Skybox_UBO;
 
 VkuBuffer_t Skybox_UBO_Buffer;
 
-VkuDescriptorSet_t SkyboxDescriptorSet[MAX_FRAME_COUNT];
+VkuDescriptorSet_t SkyboxDescriptorSet[VKU_MAX_FRAME_COUNT];
 
 VkPipelineLayout SkyboxPipelineLayout;
 VkuPipeline_t SkyboxPipeline;
 
 bool CreateSkyboxPipeline(void)
 {
-	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 	{
 		vkuInitDescriptorSet(&SkyboxDescriptorSet[i], &Context);
 		vkuDescriptorSet_AddBinding(&SkyboxDescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -73,7 +71,7 @@ void DrawSkybox(VkCommandBuffer CommandBuffer, uint32_t Index)
 
 	vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipelineLayout, 0, 1, &SkyboxDescriptorSet[Index].DescriptorSet, 0, VK_NULL_HANDLE);
 
-	vkCmdDrawIndexed(CommandBuffer, 60, 1, 0, 0, 0);
+	vkCmdDraw(CommandBuffer, 60, 1, 0, 0);
 }
 
 void DestroySkybox(void)
@@ -81,7 +79,7 @@ void DestroySkybox(void)
 	vkUnmapMemory(Context.Device, Skybox_UBO_Buffer.DeviceMemory);
 	vkuDestroyBuffer(&Context, &Skybox_UBO_Buffer);
 
-	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 		vkDestroyDescriptorSetLayout(Context.Device, SkyboxDescriptorSet[i].DescriptorSetLayout, VK_NULL_HANDLE);
 
 	vkDestroyPipeline(Context.Device, SkyboxPipeline.Pipeline, VK_NULL_HANDLE);

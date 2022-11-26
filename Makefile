@@ -24,6 +24,7 @@ OBJS+=vulkan/vulkan_descriptorset.o
 OBJS+=vulkan/vulkan_instance.o
 OBJS+=vulkan/vulkan_mem.o
 OBJS+=vulkan/vulkan_pipeline.o
+OBJS+=vulkan/vulkan_swapchain.o
 
 # core stuff
 OBJS+=system/linux_x11.o

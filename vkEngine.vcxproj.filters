@@ -141,6 +141,9 @@
     <ClCompile Include="skybox.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="vulkan\vulkan_swapchain.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">

@@ -189,6 +189,19 @@ typedef struct
 	VkImageView View;
 } VkuImage_t;
 
+#define VKU_MAX_FRAME_COUNT 2
+
+typedef struct
+{
+	VkSwapchainKHR Swapchain;
+
+	VkExtent2D Extent;
+	VkSurfaceFormatKHR SurfaceFormat;
+
+	VkImage Image[VKU_MAX_FRAME_COUNT];
+	VkImageView ImageView[VKU_MAX_FRAME_COUNT];
+} VkuSwapchain_t;
+
 VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile);
 
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask);
@@ -226,5 +239,8 @@ void vkuMem_Print(VkuMemZone_t *VkZone);
 VkBool32 CreateVulkanInstance(VkInstance *Instance);
 VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context);
 void DestroyVulkan(VkInstance Instance, VkuContext_t *Context);
+
+void vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, uint32_t Width, uint32_t Height, VkBool32 VSync);
+void vkuDestroySwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain);
 
 #endif

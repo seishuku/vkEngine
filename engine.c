@@ -41,23 +41,14 @@ BModel_t Model[NUM_MODELS];
 VkuImage_t Textures[NUM_TEXTURES];
 
 // Swapchain
-#define MAX_FRAME_COUNT 2
-
-VkSwapchainKHR Swapchain;
-
-VkExtent2D SwapchainExtent;
-VkSurfaceFormatKHR SurfaceFormat;
-VkFormat DepthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
-
-VkImage SwapchainImage[MAX_FRAME_COUNT];
-VkImageView SwapchainImageView[MAX_FRAME_COUNT];
-//////
+VkuSwapchain_t Swapchain;
 
 // Depth buffer image
+VkFormat DepthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
 VkuImage_t DepthImage;
 
 // Primary framebuffers
-VkFramebuffer FrameBuffers[MAX_FRAME_COUNT];
+VkFramebuffer FrameBuffers[VKU_MAX_FRAME_COUNT];
 
 // Primary PenderPass
 VkRenderPass RenderPass;
@@ -102,14 +93,14 @@ VkPipelineLayout SpherePipelineLayout;
 VkuPipeline_t SpherePipeline;
 //////
 
-VkDescriptorPool DescriptorPool[MAX_FRAME_COUNT];
-VkuDescriptorSet_t DescriptorSet[MAX_FRAME_COUNT*NUM_MODELS];
+VkDescriptorPool DescriptorPool[VKU_MAX_FRAME_COUNT];
+VkuDescriptorSet_t DescriptorSet[VKU_MAX_FRAME_COUNT*NUM_MODELS];
 
-VkCommandBuffer CommandBuffers[MAX_FRAME_COUNT];
+VkCommandBuffer CommandBuffers[VKU_MAX_FRAME_COUNT];
 
-VkFence FrameFences[MAX_FRAME_COUNT];
-VkSemaphore PresentCompleteSemaphores[MAX_FRAME_COUNT];
-VkSemaphore RenderCompleteSemaphores[MAX_FRAME_COUNT];
+VkFence FrameFences[VKU_MAX_FRAME_COUNT];
+VkSemaphore PresentCompleteSemaphores[VKU_MAX_FRAME_COUNT];
+VkSemaphore RenderCompleteSemaphores[VKU_MAX_FRAME_COUNT];
 
 void RecreateSwapchain(void);
 
@@ -141,16 +132,16 @@ bool CreateFramebuffers(void)
 		.flags=0,
 	}, NULL, &DepthImage.View);
 
-	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 	{
 		vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 			.renderPass=RenderPass,
 			.attachmentCount=2,
-			.pAttachments=(VkImageView[]) { SwapchainImageView[i], DepthImage.View },
-			.width=SwapchainExtent.width,
-			.height=SwapchainExtent.height,
+			.pAttachments=(VkImageView[]) { Swapchain.ImageView[i], DepthImage.View },
+			.width=Swapchain.Extent.width,
+			.height=Swapchain.Extent.height,
 			.layers=1,
 		}, 0, &FrameBuffers[i]);
 	}
@@ -167,7 +158,7 @@ bool CreatePipeline(void)
 		.pAttachments=(VkAttachmentDescription[])
 		{
 			{
-				.format=SurfaceFormat.format,
+				.format=Swapchain.SurfaceFormat.format,
 				.samples=VK_SAMPLE_COUNT_1_BIT,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
 				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
@@ -205,7 +196,7 @@ bool CreatePipeline(void)
 		},
 	}, 0, &RenderPass);
 
-	for(uint32_t i=0;i<MAX_FRAME_COUNT*NUM_MODELS;i++)
+	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT*NUM_MODELS;i++)
 	{
 		vkuInitDescriptorSet(&DescriptorSet[i], &Context);
 
@@ -447,7 +438,7 @@ void Render(void)
 	MatrixMult(ubo->modelview, ubo->projection, Skybox_UBO->mvp);
 	memcpy(ubo->light_mvp, Shadow_UBO.mvp, sizeof(matrix));
 
-	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain, UINT64_MAX, PresentCompleteSemaphores[Index], VK_NULL_HANDLE, &OldIndex);
+	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain.Swapchain, UINT64_MAX, PresentCompleteSemaphores[Index], VK_NULL_HANDLE, &OldIndex);
 
 	if(Result==VK_ERROR_OUT_OF_DATE_KHR)
 	{
@@ -479,11 +470,11 @@ void Render(void)
 		.clearValueCount=2,
 		.pClearValues=(VkClearValue[]) { { 0.0f, 0.0f, 0.0f, 1.0f }, { 1.0f, 0 } },
 		.renderArea.offset={ 0, 0 },
-		.renderArea.extent=SwapchainExtent,
+		.renderArea.extent=Swapchain.Extent,
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
-	vkCmdSetViewport(CommandBuffers[Index], 0, 1, &(VkViewport) { 0.0f, 0, (float)SwapchainExtent.width, (float)SwapchainExtent.height, 0.0f, 1.0f });
-	vkCmdSetScissor(CommandBuffers[Index], 0, 1, &(VkRect2D) { { 0, 0 }, SwapchainExtent});
+	vkCmdSetViewport(CommandBuffers[Index], 0, 1, &(VkViewport) { 0.0f, 0, (float)Swapchain.Extent.width, (float)Swapchain.Extent.height, 0.0f, 1.0f });
+	vkCmdSetScissor(CommandBuffers[Index], 0, 1, &(VkRect2D) { { 0, 0 }, Swapchain.Extent});
 
 	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
 	vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
@@ -493,13 +484,13 @@ void Render(void)
 	
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 0, &Textures[2*i+0]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 1, &Textures[2*i+1]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 2, &ShadowDepth);
-		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[MAX_FRAME_COUNT*i+Index], 3, uboBuffer.Buffer, 0, VK_WHOLE_SIZE);
-		vkuAllocateUpdateDescriptorSet(&DescriptorSet[MAX_FRAME_COUNT*i+Index], DescriptorPool[Index]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Index], 0, &Textures[2*i+0]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Index], 1, &Textures[2*i+1]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Index], 2, &ShadowDepth);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Index], 3, uboBuffer.Buffer, 0, VK_WHOLE_SIZE);
+		vkuAllocateUpdateDescriptorSet(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Index], DescriptorPool[Index]);
 
-		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[MAX_FRAME_COUNT*i+Index].DescriptorSet, 0, VK_NULL_HANDLE);
+		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[VKU_MAX_FRAME_COUNT*i+Index].DescriptorSet, 0, VK_NULL_HANDLE);
 
 		matrix local;
 		MatrixIdentity(local);
@@ -614,7 +605,7 @@ void Render(void)
 		.waitSemaphoreCount=1,
 		.pWaitSemaphores=&RenderCompleteSemaphores[Index],
 		.swapchainCount=1,
-		.pSwapchains=&Swapchain,
+		.pSwapchains=&Swapchain.Swapchain,
 		.pImageIndices=&OldIndex,
 	});
 }
@@ -703,7 +694,7 @@ bool Init(void)
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4_NORMAL], "./assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 
 	// Create a large descriptor pool, so I don't have to worry about readjusting for exactly what I have
-	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 	{
 		vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
 		{
@@ -758,171 +749,29 @@ bool Init(void)
 	// This needs to be done after the render pass is created
 	CreateFramebuffers();
 
-	return true;
-}
-
-void vkuCreateSwapchain(VkuContext_t *Context, uint32_t Width, uint32_t Height, int VSync)
-{
-	uint32_t FormatCount, PresentModeCount;
-	VkSurfaceCapabilitiesKHR SurfCaps;
-	VkPresentModeKHR SwapchainPresentMode=VK_PRESENT_MODE_FIFO_KHR;
-	VkSurfaceTransformFlagsKHR Pretransform;
-	VkCompositeAlphaFlagBitsKHR CompositeAlpha=VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	VkCompositeAlphaFlagBitsKHR CompositeAlphaFlags[]={ VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR, VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR, VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR };
-	VkImageUsageFlags ImageUsage=0;
-
-	vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &FormatCount, VK_NULL_HANDLE);
-
-	VkSurfaceFormatKHR *SurfaceFormats=(VkSurfaceFormatKHR *)Zone_Malloc(Zone, sizeof(VkSurfaceFormatKHR)*FormatCount);
-
-	if(SurfaceFormats==NULL)
-		return;
-
-	vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &FormatCount, SurfaceFormats);
-
-	// If no format is specified, find a 32bit RGBA format
-	if(SurfaceFormats[0].format==VK_FORMAT_UNDEFINED)
-		SurfaceFormat.format=VK_FORMAT_R8G8B8A8_SNORM;
-	// Otherwise the first format is the current surface format
-	else
-		SurfaceFormat=SurfaceFormats[0];
-
-	Zone_Free(Zone, SurfaceFormats);
-
-	// Get physical device surface properties and formats
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Context->PhysicalDevice, Context->Surface, &SurfCaps);
-
-	// Get available present modes
-	vkGetPhysicalDeviceSurfacePresentModesKHR(Context->PhysicalDevice, Context->Surface, &PresentModeCount, NULL);
-
-	VkPresentModeKHR *PresentModes=(VkPresentModeKHR *)Zone_Malloc(Zone, sizeof(VkPresentModeKHR)*PresentModeCount);
-
-	if(PresentModes==NULL)
-		return;
-
-	vkGetPhysicalDeviceSurfacePresentModesKHR(Context->PhysicalDevice, Context->Surface, &PresentModeCount, PresentModes);
-
-	// Set swapchain extents to the surface width/height
-	SwapchainExtent.width=Width;
-	SwapchainExtent.height=Height;
-
-	// Select a present mode for the swapchain
-
-	// The VK_PRESENT_MODE_FIFO_KHR mode must always be present as per spec
-	// This mode waits for the vertical blank ("v-sync")
-
-	// If v-sync is not requested, try to find a mailbox mode
-	// It's the lowest latency non-tearing present mode available
-	if(!VSync)
+	// Create needed fence and semaphores for rendering
+	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 	{
-		for(uint32_t i=0;i<PresentModeCount;i++)
-		{
-			if(PresentModes[i]==VK_PRESENT_MODE_MAILBOX_KHR)
-			{
-				SwapchainPresentMode=VK_PRESENT_MODE_MAILBOX_KHR;
-				break;
-			}
-
-			if((SwapchainPresentMode!=VK_PRESENT_MODE_MAILBOX_KHR)&&(PresentModes[i]==VK_PRESENT_MODE_IMMEDIATE_KHR))
-				SwapchainPresentMode=VK_PRESENT_MODE_IMMEDIATE_KHR;
-		}
-	}
-
-	Zone_Free(Zone, PresentModes);
-
-	// Find the transformation of the surface
-	if(SurfCaps.supportedTransforms&VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)
-		// We prefer a non-rotated transform
-		Pretransform=VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-	else
-		Pretransform=SurfCaps.currentTransform;
-
-	// Find a supported composite alpha format (not all devices support alpha opaque)
-	// Simply select the first composite alpha format available
-	for(uint32_t i=0;i<4;i++)
-	{
-		if(SurfCaps.supportedCompositeAlpha&CompositeAlphaFlags[i])
-		{
-			CompositeAlpha=CompositeAlphaFlags[i];
-			break;
-		}
-	}
-
-	// Enable transfer source on swap chain images if supported
-	if(SurfCaps.supportedUsageFlags&VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
-		ImageUsage|=VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-
-	// Enable transfer destination on swap chain images if supported
-	if(SurfCaps.supportedUsageFlags&VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-		ImageUsage|=VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-
-	vkCreateSwapchainKHR(Context->Device, &(VkSwapchainCreateInfoKHR)
-	{
-		.sType=VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-		.pNext=VK_NULL_HANDLE,
-		.surface=Context->Surface,
-		.minImageCount=MAX_FRAME_COUNT,
-		.imageFormat=SurfaceFormat.format,
-		.imageColorSpace=SurfaceFormat.colorSpace,
-		.imageExtent={ SwapchainExtent.width, SwapchainExtent.height },
-		.imageUsage=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|ImageUsage,
-		.preTransform=Pretransform,
-		.imageArrayLayers=1,
-		.imageSharingMode=VK_SHARING_MODE_EXCLUSIVE,
-		.queueFamilyIndexCount=0,
-		.pQueueFamilyIndices=VK_NULL_HANDLE,
-		.presentMode=SwapchainPresentMode,
-		// Setting clipped to VK_TRUE allows the implementation to discard rendering outside of the surface area
-		.clipped=VK_TRUE,
-		.compositeAlpha=CompositeAlpha,
-	}, VK_NULL_HANDLE, &Swapchain);
-
-	// Get swap chain image count
-	uint32_t SwapchainImageCount=0;
-	vkGetSwapchainImagesKHR(Context->Device, Swapchain, &SwapchainImageCount, VK_NULL_HANDLE);
-
-	// TODO: Allocate swapchain frame related stuff here (image, imageview, fences, semaphores, etc)
-
-	// Get the swap chain images
-	vkGetSwapchainImagesKHR(Context->Device, Swapchain, &SwapchainImageCount, SwapchainImage);
-
-	// Get the swap chain buffers containing the image and imageview
-	for(uint32_t i=0;i<SwapchainImageCount;i++)
-	{
-		vkCreateImageView(Context->Device, &(VkImageViewCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-			.pNext=VK_NULL_HANDLE,
-			.image=SwapchainImage[i],
-			.format=SurfaceFormat.format,
-			.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
-			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.subresourceRange.baseMipLevel=0,
-			.subresourceRange.levelCount=1,
-			.subresourceRange.baseArrayLayer=0,
-			.subresourceRange.layerCount=1,
-			.viewType=VK_IMAGE_VIEW_TYPE_2D,
-			.flags=0,
-		}, VK_NULL_HANDLE, &SwapchainImageView[i]);
-
 		// Wait fence for command queue, to signal when we can submit commands again
-		vkCreateFence(Context->Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=VK_FENCE_CREATE_SIGNALED_BIT }, VK_NULL_HANDLE, &FrameFences[i]);
+		vkCreateFence(Context.Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=VK_FENCE_CREATE_SIGNALED_BIT }, VK_NULL_HANDLE, &FrameFences[i]);
 
 		// Semaphore for image presentation, to signal when we can present again
-		vkCreateSemaphore(Context->Device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &PresentCompleteSemaphores[i]);
+		vkCreateSemaphore(Context.Device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &PresentCompleteSemaphores[i]);
 
 		// Semaphore for render complete, to signal when we can render again
-		vkCreateSemaphore(Context->Device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &RenderCompleteSemaphores[i]);
+		vkCreateSemaphore(Context.Device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &RenderCompleteSemaphores[i]);
 	}
 
 	// Allocate the command buffers we will be rendering into
-	vkAllocateCommandBuffers(Context->Device, &(VkCommandBufferAllocateInfo)
+	vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=Context->CommandPool,
+		.commandPool=Context.CommandPool,
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount=SwapchainImageCount,
+		.commandBufferCount=VKU_MAX_FRAME_COUNT,
 	}, CommandBuffers);
+
+	return true;
 }
 
 void RecreateSwapchain(void)
@@ -933,32 +782,25 @@ void RecreateSwapchain(void)
 		vkDeviceWaitIdle(Context.Device);
 
 		// To resize a surface, we need to destroy and recreate anything that's tied to the surface.
-		// This is basically just the swapchain and frame buffers
+		// This is basically just the swapchain, framebuffers, and depthbuffer.
 
+		// Destroy the depthbuffer
 		vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
 		vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
 		vkuMem_Free(VkZone, DepthImage.DeviceMemory);
 
-		for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
-		{
+		// Destroy the framebuffers
+		for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 			vkDestroyFramebuffer(Context.Device, FrameBuffers[i], VK_NULL_HANDLE);
 
-			vkDestroyImageView(Context.Device, SwapchainImageView[i], VK_NULL_HANDLE);
+		// Destroy the swapchain
+		vkuDestroySwapchain(&Context, &Swapchain);
 
-			vkDestroyFence(Context.Device, FrameFences[i], VK_NULL_HANDLE);
+		// Recreate the swapchain
+		vkuCreateSwapchain(&Context, &Swapchain, Width, Height, VK_TRUE);
 
-			vkDestroySemaphore(Context.Device, PresentCompleteSemaphores[i], VK_NULL_HANDLE);
-			vkDestroySemaphore(Context.Device, RenderCompleteSemaphores[i], VK_NULL_HANDLE);
-		}
-
-		vkDestroySwapchainKHR(Context.Device, Swapchain, VK_NULL_HANDLE);
-
-		// Recreate the swapchain and frame buffers
-		vkuCreateSwapchain(&Context, Width, Height, VK_TRUE);
+		// Recreate the framebuffer
 		CreateFramebuffers();
-
-		// Does the render pass need to be recreated as well?
-		// Validation doesn't complain about it...?
 	}
 }
 
@@ -1036,27 +878,25 @@ void Destroy(void)
 	vkDestroyPipeline(Context.Device, Pipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, PipelineLayout, VK_NULL_HANDLE);
 
-	for(uint32_t i=0;i<MAX_FRAME_COUNT*NUM_MODELS;i++)
+	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT*NUM_MODELS;i++)
 		vkDestroyDescriptorSetLayout(Context.Device, DescriptorSet[i].DescriptorSetLayout, VK_NULL_HANDLE);
 
 	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);
 	//////////
 
 	// Descriptor pool destruction
-	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 		vkDestroyDescriptorPool(Context.Device, DescriptorPool[i], VK_NULL_HANDLE);
 	//////////
 
-	// Swapchain destruction
+	// Swapchain, framebuffer, and depthbuffer destruction
 	vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
 	vkuMem_Free(VkZone, DepthImage.DeviceMemory);
 
-	for(uint32_t i=0;i<MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 	{
 		vkDestroyFramebuffer(Context.Device, FrameBuffers[i], VK_NULL_HANDLE);
-
-		vkDestroyImageView(Context.Device, SwapchainImageView[i], VK_NULL_HANDLE);
 
 		vkDestroyFence(Context.Device, FrameFences[i], VK_NULL_HANDLE);
 
@@ -1064,7 +904,7 @@ void Destroy(void)
 		vkDestroySemaphore(Context.Device, RenderCompleteSemaphores[i], VK_NULL_HANDLE);
 	}
 
-	vkDestroySwapchainKHR(Context.Device, Swapchain, VK_NULL_HANDLE);
+	vkuDestroySwapchain(&Context, &Swapchain);
 	//////////
 
 	DBGPRINTF(DEBUG_INFO"Remaining Vulkan memory blocks:\n");

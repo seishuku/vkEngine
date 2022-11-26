@@ -119,6 +119,7 @@
     <ClCompile Include="vulkan\vulkan_instance.c" />
     <ClCompile Include="vulkan\vulkan_mem.c" />
     <ClCompile Include="vulkan\vulkan_pipeline.c" />
+    <ClCompile Include="vulkan\vulkan_swapchain.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera\camera.h" />

@@ -11,8 +11,6 @@
 
 #define NUM_ASTEROIDS 600
 
-#define MAX_FRAME_COUNT 2
-
 extern VkuContext_t Context;
 extern VkuBuffer_t Asteroid_Instance;
 extern float fTime;

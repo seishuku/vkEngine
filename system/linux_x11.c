@@ -25,6 +25,8 @@ extern VkuContext_t Context;
 
 extern VkuMemZone_t *VkZone;
 
+extern VkuSwapchain_t Swapchain;
+
 extern uint32_t Width, Height;
 extern Camera_t Camera;
 
@@ -33,7 +35,6 @@ float avgfps=0.0f, fps=0.0f, fTimeStep, fTime=0.0f;
 
 void Render(void);
 bool Init(void);
-void vkuCreateSwapchain(VkuContext_t *Context, uint32_t Width, uint32_t Height, int VSync);
 void RecreateSwapchain(void);
 void Destroy(void);
 
@@ -354,7 +355,7 @@ int main(int argc, char **argv)
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Swapchain...\n");
-	vkuCreateSwapchain(&Context, Width, Height, VK_TRUE);
+	vkuCreateSwapchain(&Context, &Swapchain, Width, Height, VK_TRUE);
 
 	DBGPRINTF(DEBUG_INFO, "Initalizing Vulkan resources...\n");
 	if(!Init())

@@ -24,7 +24,7 @@ extern VkuContext_t Context;
 
 extern VkuMemZone_t *VkZone;
 
-extern bool TestFence;
+extern VkuSwapchain_t Swapchain;
 
 extern uint32_t Width, Height;
 
@@ -37,7 +37,6 @@ uint32_t Frames=0;
 void GenerateSkyParams(void);
 void Render(void);
 bool Init(void);
-void vkuCreateSwapchain(VkuContext_t *Context, uint32_t Width, uint32_t Height, int VSync);
 void RecreateSwapchain(void);
 void Destroy(void);
 
@@ -414,7 +413,7 @@ int main(int argc, char **argv)
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Creating swapchain...\n");
-	vkuCreateSwapchain(&Context, Width, Height, VK_TRUE);
+	vkuCreateSwapchain(&Context, &Swapchain, Width, Height, true);
 
 	DBGPRINTF(DEBUG_INFO, "Initalizing Vulkan resources...\n");
 	if(!Init())
