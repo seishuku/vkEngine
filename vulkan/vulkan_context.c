@@ -271,7 +271,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		vkCreateCommandPool(Context->Device, &(VkCommandPoolCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-			.flags=VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+			.flags=0,
 			.queueFamilyIndex=Context->QueueFamilyIndex,
 		}, VK_NULL_HANDLE, &Context->CommandPool[i]);
 	}

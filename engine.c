@@ -94,6 +94,7 @@ VkPipelineLayout SpherePipelineLayout;
 VkuPipeline_t SpherePipeline;
 //////
 
+//VkDescriptorPool DescriptorPool[VKU_MAX_FRAME_COUNT];
 VkuDescriptorSet_t DescriptorSet[VKU_MAX_FRAME_COUNT*NUM_MODELS];
 
 VkCommandBuffer CommandBuffers[VKU_MAX_FRAME_COUNT];
@@ -105,14 +106,14 @@ VkSemaphore RenderCompleteSemaphores[VKU_MAX_FRAME_COUNT];
 typedef struct
 {
 	uint32_t Index, OldIndex;
-	VkCommandPool CommandPool;
+	VkCommandPool CommandPool[VKU_MAX_FRAME_COUNT];
 	VkDescriptorPool DescriptorPool[VKU_MAX_FRAME_COUNT];
 	VkCommandBuffer SecCommandBuffer[VKU_MAX_FRAME_COUNT];
-	volatile bool ThreadFence;
 } ThreadData_t;
 
 ThreadWorker_t Thread[4];
 ThreadData_t ThreadData[4];
+pthread_barrier_t ThreadBarrier;
 
 void RecreateSwapchain(void);
 
@@ -434,42 +435,46 @@ void Thread_Constructor(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
 
-	vkCreateCommandPool(Context.Device, &(VkCommandPoolCreateInfo)
+	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-		.flags=VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-		.queueFamilyIndex=Context.QueueFamilyIndex,
-	}, VK_NULL_HANDLE, &Data->CommandPool);
+		vkCreateCommandPool(Context.Device, &(VkCommandPoolCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+			.flags=0,
+			.queueFamilyIndex=Context.QueueFamilyIndex,
+		}, VK_NULL_HANDLE, &Data->CommandPool[i]);
 
-	vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=Data->CommandPool,
-		.level=VK_COMMAND_BUFFER_LEVEL_SECONDARY,
-		.commandBufferCount=VKU_MAX_FRAME_COUNT,
-	}, Data->SecCommandBuffer);
-
-	Data->ThreadFence=true;
+		vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.commandPool=Data->CommandPool[i],
+			.level=VK_COMMAND_BUFFER_LEVEL_SECONDARY,
+			.commandBufferCount=1,
+		}, &Data->SecCommandBuffer[i]);
+	}
 }
 
 void Thread_Main_Constructor(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
 
-	vkCreateCommandPool(Context.Device, &(VkCommandPoolCreateInfo)
+	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-		.flags=VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-		.queueFamilyIndex=Context.QueueFamilyIndex,
-	}, VK_NULL_HANDLE, &Data->CommandPool);
+		vkCreateCommandPool(Context.Device, &(VkCommandPoolCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+			.flags=0,
+			.queueFamilyIndex=Context.QueueFamilyIndex,
+		}, VK_NULL_HANDLE, &Data->CommandPool[i]);
 
-	vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=Data->CommandPool,
-		.level=VK_COMMAND_BUFFER_LEVEL_SECONDARY,
-		.commandBufferCount=VKU_MAX_FRAME_COUNT,
-	}, Data->SecCommandBuffer);
+		vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.commandPool=Data->CommandPool[i],
+			.level=VK_COMMAND_BUFFER_LEVEL_SECONDARY,
+			.commandBufferCount=1,
+		}, &Data->SecCommandBuffer[i]);
+	}
 
 	// Create a large descriptor pool, so I don't have to worry about readjusting for exactly what I have
 	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
@@ -500,24 +505,19 @@ void Thread_Main_Constructor(void *Arg)
 			},
 		}, VK_NULL_HANDLE, &Data->DescriptorPool[i]);
 	}
-
-	Data->ThreadFence=true;
 }
 
 void Thread_Destructor(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
-
-	vkDestroyCommandPool(Context.Device, Data->CommandPool, VK_NULL_HANDLE);
 }
 
 void Thread_Main(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
 
-	while(!Data->ThreadFence);
-
 	vkResetDescriptorPool(Context.Device, Data->DescriptorPool[Data->Index], 0);
+	vkResetCommandPool(Context.Device, Data->CommandPool[Data->Index], 0);
 
 	vkBeginCommandBuffer(Data->SecCommandBuffer[Data->Index], &(VkCommandBufferBeginInfo)
 	{
@@ -570,16 +570,15 @@ void Thread_Main(void *Arg)
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Index]);
 
-	Data->ThreadFence=false;
+	pthread_barrier_wait(&ThreadBarrier);
 }
 
 void Thread_Skybox(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
 
-	while(!Data->ThreadFence);
-
 	vkResetDescriptorPool(Context.Device, Data->DescriptorPool[Data->Index], 0);
+	vkResetCommandPool(Context.Device, Data->CommandPool[Data->Index], 0);
 
 	vkBeginCommandBuffer(Data->SecCommandBuffer[Data->Index], &(VkCommandBufferBeginInfo)
 	{
@@ -608,14 +607,14 @@ void Thread_Skybox(void *Arg)
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Index]);
 
-	Data->ThreadFence=false;
+	pthread_barrier_wait(&ThreadBarrier);
 }
 
 void Thread_Font(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
 
-	while(!Data->ThreadFence);
+	vkResetCommandPool(Context.Device, Data->CommandPool[Data->Index], 0);
 
 	vkBeginCommandBuffer(Data->SecCommandBuffer[Data->Index], &(VkCommandBufferBeginInfo)
 	{
@@ -637,7 +636,55 @@ void Thread_Font(void *Arg)
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Index]);
 
-	Data->ThreadFence=false;
+	pthread_barrier_wait(&ThreadBarrier);
+}
+
+
+void Thread_Particles(void *Arg)
+{
+	ThreadData_t *Data=(ThreadData_t *)Arg;
+
+	vkResetDescriptorPool(Context.Device, Data->DescriptorPool[Data->Index], 0);
+	vkResetCommandPool(Context.Device, Data->CommandPool[Data->Index], 0);
+
+	vkBeginCommandBuffer(Data->SecCommandBuffer[Data->Index], &(VkCommandBufferBeginInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
+		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+			.pNext=NULL,
+			.renderPass=RenderPass,
+			.framebuffer=FrameBuffers[Data->OldIndex]
+		}
+	});
+
+	vkCmdSetViewport(Data->SecCommandBuffer[Data->Index], 0, 1, &(VkViewport) { 0.0f, 0, (float)Swapchain.Extent.width, (float)Swapchain.Extent.height, 0.0f, 1.0f });
+	vkCmdSetScissor(Data->SecCommandBuffer[Data->Index], 0, 1, &(VkRect2D) { { 0, 0 }, Swapchain.Extent});
+
+	// Get a pointer to the emitter that's providing the positions
+	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
+
+	for(uint32_t i=0;i<Emitter->NumParticles;i++)
+	{
+		if(Emitter->Particles[i].ID!=Emitter->ID)
+		{
+			// Get those positions and set the other emitter's positions to those
+			ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitter->Particles[i].ID, Emitter->Particles[i].pos);
+
+			// If this particle is dead, delete that emitter's ID
+			if(Emitter->Particles[i].life<0.0f)
+				ParticleSystem_DeleteEmitter(&ParticleSystem, Emitter->Particles[i].ID);
+		}
+	}
+
+	ParticleSystem_Step(&ParticleSystem, fTimeStep);
+	ParticleSystem_Draw(&ParticleSystem, Data->SecCommandBuffer[Data->Index], Data->DescriptorPool[Data->Index]);
+
+	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Index]);
+
+	pthread_barrier_wait(&ThreadBarrier);
 }
 
 void Render(void)
@@ -662,7 +709,7 @@ void Render(void)
 
 	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain.Swapchain, UINT64_MAX, PresentCompleteSemaphores[Index], VK_NULL_HANDLE, &OldIndex);
 
-	if(Result==VK_ERROR_OUT_OF_DATE_KHR)
+	if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
 	{
 		DBGPRINTF("Swapchain out of date... Rebuilding.\n");
 		RecreateSwapchain();
@@ -672,6 +719,7 @@ void Render(void)
 	vkWaitForFences(Context.Device, 1, &FrameFences[Index], VK_TRUE, UINT64_MAX);
 	vkResetFences(Context.Device, 1, &FrameFences[Index]);
 
+	//vkResetDescriptorPool(Context.Device, DescriptorPool[Index], 0);
 	vkResetCommandPool(Context.Device, Context.CommandPool[Index], 0);
 
 	// Start recording the commands
@@ -695,133 +743,31 @@ void Render(void)
 		.renderArea.extent=Swapchain.Extent,
 	}, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
-	ThreadData[0].Index = Index;
-	ThreadData[0].OldIndex = OldIndex;
+	ThreadData[0].Index=Index;
+	ThreadData[0].OldIndex=OldIndex;
 	Thread_AddJob(&Thread[0], Thread_Main, (void *)&ThreadData[0]);
 
-	ThreadData[1].Index = Index;
-	ThreadData[1].OldIndex = OldIndex;
+	ThreadData[1].Index=Index;
+	ThreadData[1].OldIndex=OldIndex;
 	Thread_AddJob(&Thread[1], Thread_Skybox, (void *)&ThreadData[1]);
 
-	ThreadData[2].Index = Index;
-	ThreadData[2].OldIndex = OldIndex;
-	Thread_AddJob(&Thread[2], Thread_Font, (void *)&ThreadData[2]);
+	ThreadData[2].Index=Index;
+	ThreadData[2].OldIndex=OldIndex;
+	Thread_AddJob(&Thread[2], Thread_Particles, (void *)&ThreadData[2]);
 
-/*
-	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
-	vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
+	ThreadData[3].Index=Index;
+	ThreadData[3].OldIndex=OldIndex;
+	Thread_AddJob(&Thread[3], Thread_Font, (void *)&ThreadData[3]);
 
-	// Draw the models
-	vkCmdBindVertexBuffers(CommandBuffers[Index], 1, 1, &Asteroid_Instance.Buffer, &(VkDeviceSize) { 0 });
-	
-	for(uint32_t i=0;i<NUM_MODELS;i++)
-	{
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Index], 0, &Textures[2*i+0]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Index], 1, &Textures[2*i+1]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Index], 2, &ShadowDepth);
-		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Index], 3, uboBuffer.Buffer, 0, VK_WHOLE_SIZE);
-		vkuAllocateUpdateDescriptorSet(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Index], DescriptorPool[Index]);
+	// Wait for the threads to finish
+	pthread_barrier_wait(&ThreadBarrier);
 
-		vkCmdBindDescriptorSets(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[VKU_MAX_FRAME_COUNT*i+Index].DescriptorSet, 0, VK_NULL_HANDLE);
-
-		matrix local;
-		MatrixIdentity(local);
-		MatrixRotate(fTime, 1.0f, 0.0f, 0.0f, local);
-		MatrixRotate(fTime, 0.0f, 1.0f, 0.0f, local);
-
-		vkCmdPushConstants(CommandBuffers[Index], PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(matrix), &local);
-
-		// Bind model data buffers and draw the triangles
-		vkCmdBindVertexBuffers(CommandBuffers[Index], 0, 1, &Model[i].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
-
-		for(uint32_t j=0;j<Model[i].NumMesh;j++)
-		{
-			vkCmdBindIndexBuffer(CommandBuffers[Index], Model[i].Mesh[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(CommandBuffers[Index], Model[i].Mesh[j].NumFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*i);
-		}
-	}
-	// ---
-
-	// Skybox
-//	DrawSkybox(CommandBuffers[Index], Index);
-	//////
-
-	////// DEBUG LINE FROM ORIGIN TO LIGHT DIRECTION
-	//struct
-	//{
-	//	matrix mvp;
-	//	vec4 start, end;
-	//} line_ubo;
-
-	//MatrixMult(ubo->modelview, ubo->projection, line_ubo.mvp);
-	//Vec4_Set(line_ubo.start, 0.0f, 0.0f, 0.0f, 1.0f);
-	//Vec3_Setv(line_ubo.end, Skybox_UBO->uSunPosition);
-	//Vec3_Muls(line_ubo.end, 10000.0f+(500.0f*2.0f));
-	//line_ubo.end[3]=1.0f;
-
-	//vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, LinePipeline.Pipeline);
-	//vkCmdPushConstants(CommandBuffers[Index], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
-	//vkCmdDraw(CommandBuffers[Index], 2, 1, 0, 0);
-	//////
-
-	////// DRAW ASTEROID BOUNDING SPHERE
-#if 0
-	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
-	{
-		struct
-		{
-			matrix mvp;
-			vec4 color;
-		} sphere_ubo;
-
-		matrix local;
-
-		MatrixIdentity(local);
-		MatrixTranslatev(Asteroids[i].Position, local);
-		MatrixScale(Asteroids[i].Radius, Asteroids[i].Radius, Asteroids[i].Radius, local);
-
-		MatrixMult(local, ubo->modelview, local);
-		MatrixMult(local, ubo->projection, sphere_ubo.mvp);
-
-		Vec4_Set(sphere_ubo.color, 1.0f, 0.0f, 0.0f, 1.0f);
-
-		vkCmdBindPipeline(CommandBuffers[Index], VK_PIPELINE_BIND_POINT_GRAPHICS, SpherePipeline.Pipeline);
-		vkCmdPushConstants(CommandBuffers[Index], SpherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(sphere_ubo), &sphere_ubo);
-		vkCmdDraw(CommandBuffers[Index], 60, 1, 0, 0);
-	}
-#endif
-	//////
-
-	// Get a pointer to the emitter that's providing the positions
-	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
-
-	for(uint32_t i=0;i<Emitter->NumParticles;i++)
-	{
-		if(Emitter->Particles[i].ID!=Emitter->ID)
-		{
-			// Get those positions and set the other emitter's positions to those
-			ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitter->Particles[i].ID, Emitter->Particles[i].pos);
-
-			// If this particle is dead, delete that emitter's ID
-			if(Emitter->Particles[i].life<0.0f)
-				ParticleSystem_DeleteEmitter(&ParticleSystem, Emitter->Particles[i].ID);
-		}
-	}
-
-	ParticleSystem_Step(&ParticleSystem, fTimeStep);
-	ParticleSystem_Draw(&ParticleSystem, CommandBuffers[Index], DescriptorPool[Index]);
-	*/
-	// Wait for the thread to set ThreadFence to false
-	while(ThreadData[0].ThreadFence);
-	ThreadData[0].ThreadFence=true;
-
-	while(ThreadData[1].ThreadFence);
-	ThreadData[1].ThreadFence=true;
-
-	while(ThreadData[2].ThreadFence);
-	ThreadData[2].ThreadFence=true;
-
-	vkCmdExecuteCommands(CommandBuffers[Index], 3, (VkCommandBuffer[]){ ThreadData[0].SecCommandBuffer[Index], ThreadData[1].SecCommandBuffer[Index], ThreadData[2].SecCommandBuffer[Index] });
+	vkCmdExecuteCommands(CommandBuffers[Index], 4, (VkCommandBuffer[]) {
+		ThreadData[0].SecCommandBuffer[Index],
+		ThreadData[1].SecCommandBuffer[Index],
+		ThreadData[2].SecCommandBuffer[Index],
+		ThreadData[3].SecCommandBuffer[Index]
+	});
 
 	vkCmdEndRenderPass(CommandBuffers[Index]);
 
@@ -841,7 +787,7 @@ void Render(void)
 	}, FrameFences[Index]);
 
 	// And present it to the screen
-	vkQueuePresentKHR(Context.Queue, &(VkPresentInfoKHR)
+	Result=vkQueuePresentKHR(Context.Queue, &(VkPresentInfoKHR)
 	{
 		.sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 		.waitSemaphoreCount=1,
@@ -850,6 +796,13 @@ void Render(void)
 		.pSwapchains=&Swapchain.Swapchain,
 		.pImageIndices=&OldIndex,
 	});
+	
+	if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
+	{
+		DBGPRINTF("Swapchain out of date... Rebuilding.\n");
+		RecreateSwapchain();
+		return;
+	}
 }
 
 #ifdef _DEBUG
@@ -882,6 +835,8 @@ void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle
 
 bool Init(void)
 {
+	pthread_barrier_init(&ThreadBarrier, NULL, 5);
+
 	Event_Add(EVENT_KEYDOWN, Event_KeyDown);
 	Event_Add(EVENT_KEYUP, Event_KeyUp);
 	Event_Add(EVENT_MOUSE, Event_Mouse);
@@ -925,6 +880,18 @@ bool Init(void)
 	else
 		return false;
 
+	uint32_t TriangleCount=0;
+
+	for(uint32_t i=0;i<NUM_MODELS;i++)
+	{
+		for(uint32_t j=0;j<Model[i].NumMesh;j++)
+			TriangleCount+=Model[i].Mesh[j].NumFace;
+	}
+
+	TriangleCount*=NUM_ASTEROIDS;
+
+	DBGPRINTF(DEBUG_ERROR, "\nNot an error, just a total triangle count: %d\n\n", TriangleCount);
+
 	// Load textures
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1], "./assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1_NORMAL], "./assets/asteroid1_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
@@ -961,22 +928,46 @@ bool Init(void)
 	// This needs to be done after the render pass is created
 	CreateFramebuffers();
 
-	// Create needed fence and semaphores for rendering
 	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 	{
+		// Create needed fence and semaphores for rendering
 		// Wait fence for command queue, to signal when we can submit commands again
-		vkCreateFence(Context.Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=VK_FENCE_CREATE_SIGNALED_BIT }, VK_NULL_HANDLE, &FrameFences[i]);
+		vkCreateFence(Context.Device, &(VkFenceCreateInfo) {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT }, VK_NULL_HANDLE, &FrameFences[i]);
 
 		// Semaphore for image presentation, to signal when we can present again
-		vkCreateSemaphore(Context.Device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &PresentCompleteSemaphores[i]);
+		vkCreateSemaphore(Context.Device, &(VkSemaphoreCreateInfo) {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext = VK_NULL_HANDLE }, VK_NULL_HANDLE, &PresentCompleteSemaphores[i]);
 
 		// Semaphore for render complete, to signal when we can render again
-		vkCreateSemaphore(Context.Device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &RenderCompleteSemaphores[i]);
-	}
+		vkCreateSemaphore(Context.Device, &(VkSemaphoreCreateInfo) {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext = VK_NULL_HANDLE }, VK_NULL_HANDLE, &RenderCompleteSemaphores[i]);
 
-	// Allocate the command buffers we will be rendering into
-	for(uint32_t i = 0;i < VKU_MAX_FRAME_COUNT;i++)
-	{
+		// Create a large descriptor pool, so I don't have to worry about readjusting for exactly what I have
+		//vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
+		//{
+		//	.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+		//	.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
+		//	.poolSizeCount=4,
+		//	.pPoolSizes=(VkDescriptorPoolSize[])
+		//	{
+		//		{
+		//			.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+		//			.descriptorCount=1024, // Max number of this descriptor type that can be in each descriptor set?
+		//		},
+		//		{
+		//			.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+		//			.descriptorCount=1024,
+		//		},
+		//		{
+		//			.type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+		//			.descriptorCount=1024,
+		//		},
+		//		{
+		//			.type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		//			.descriptorCount=1024,
+		//		},
+		//	},
+		//}, VK_NULL_HANDLE, &DescriptorPool[i]);
+
+		// Allocate the command buffers we will be rendering into
 		vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -997,9 +988,14 @@ bool Init(void)
 	Thread_Start(&Thread[1]);
 
 	Thread_Init(&Thread[2]);
-	Thread_AddConstructor(&Thread[2], Thread_Constructor, (void *)&ThreadData[2]);
+	Thread_AddConstructor(&Thread[2], Thread_Main_Constructor, (void *)&ThreadData[2]);
 	Thread_AddDestructor(&Thread[2], Thread_Destructor, (void *)&ThreadData[2]);
 	Thread_Start(&Thread[2]);
+
+	Thread_Init(&Thread[3]);
+	Thread_AddConstructor(&Thread[3], Thread_Main_Constructor, (void *)&ThreadData[3]);
+	Thread_AddDestructor(&Thread[3], Thread_Destructor, (void *)&ThreadData[3]);
+	Thread_Start(&Thread[3]);
 
 	return true;
 }

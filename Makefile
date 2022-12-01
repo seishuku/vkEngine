@@ -51,7 +51,7 @@ SHADERS+=shaders/skybox.frag.spv
 SHADERS+=shaders/skybox.vert.spv
 
 CC=gcc
-CFLAGS=-Wall -O3 -std=c17 -I/usr/X11/include
+CFLAGS=-Wall -O3 -std=gnu17 -I/usr/X11/include
 LDFLAGS=-Wold-style-definition -L/usr/X11/lib -lvulkan -lX11 -lm -lpthread
 
 all: $(TARGET) $(SHADERS)
