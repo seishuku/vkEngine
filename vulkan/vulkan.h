@@ -206,7 +206,7 @@ VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile);
 
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask);
 
-VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, VkuImage_t *Image, VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth, VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags);
+VkBool32 vkuCreateImageBuffer(VkuContext_t* Context, VkuImage_t* Image, VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth, VkSampleCountFlagBits Samples, VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags);
 void vkuDestroyImageBuffer(VkuContext_t *Context, VkuImage_t *Image);
 
 VkBool32 vkuCreateHostBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags);

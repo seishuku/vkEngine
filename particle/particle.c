@@ -251,6 +251,7 @@ bool ParticleSystem_Init(ParticleSystem_t *System)
 	ParticlePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
 	ParticlePipeline.DepthTest=VK_TRUE;
 	ParticlePipeline.DepthWrite=VK_FALSE;
+	ParticlePipeline.RasterizationSamples=VK_SAMPLE_COUNT_4_BIT;
 
 	ParticlePipeline.Blend=VK_TRUE;
 	ParticlePipeline.SrcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;

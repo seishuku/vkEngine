@@ -120,6 +120,7 @@ void _Font_Init(void)
 
 	fontPipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 	fontPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+	fontPipeline.RasterizationSamples=VK_SAMPLE_COUNT_4_BIT;
 
 	fontPipeline.Blend=VK_TRUE;
 	fontPipeline.SrcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
@@ -170,7 +171,7 @@ void _Font_Init(void)
 
 	vkuCreateImageBuffer(&Context, &fontTexture,
 		VK_IMAGE_TYPE_2D, VK_FORMAT_R8_UNORM, 1, 223, 16, 16, 1,
-		VK_IMAGE_TILING_OPTIMAL,
+		VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
 

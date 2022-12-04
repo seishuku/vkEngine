@@ -31,8 +31,8 @@ uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_pro
 }
 
 VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, VkuImage_t *Image,
-	VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth,
-	VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags)
+	VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth, 
+	VkSampleCountFlagBits Samples, VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags)
 {
 	if(Context==NULL||Image==NULL)
 		return false;
@@ -44,7 +44,7 @@ VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, VkuImage_t *Image,
 		.format=Format,
 		.mipLevels=MipLevels,
 		.arrayLayers=Layers,
-		.samples=VK_SAMPLE_COUNT_1_BIT,
+		.samples=Samples,
 		.tiling=Tiling,
 		.usage=Flags,
 		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,

@@ -870,7 +870,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		Zone_Free(Zone, Image->Data);
 
 		vkuCreateImageBuffer(Context, Image,
-			VK_IMAGE_TYPE_2D, Format, 1, 6, Out.Width, Out.Height, 1,
+			VK_IMAGE_TYPE_2D, Format, 1, 6, Out.Width, Out.Height, 1, VK_SAMPLE_COUNT_1_BIT,
 			Format==VK_FORMAT_R32G32B32A32_SFLOAT?VK_IMAGE_TILING_LINEAR:VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -1035,7 +1035,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 
 	if(!vkuCreateImageBuffer(Context, Image,
 		VK_IMAGE_TYPE_2D, Format, MipLevels, 1, Image->Width, Image->Height, 1,
-		VK_IMAGE_TILING_OPTIMAL,
+		VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
 		return VK_FALSE;

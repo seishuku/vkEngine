@@ -42,6 +42,7 @@ bool CreateSkyboxPipeline(void)
 
 	SkyboxPipeline.DepthTest=VK_TRUE;
 	SkyboxPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+	SkyboxPipeline.RasterizationSamples=VK_SAMPLE_COUNT_4_BIT;
 
 	if(!vkuPipeline_AddStage(&SkyboxPipeline, "./shaders/skybox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;

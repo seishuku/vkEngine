@@ -44,6 +44,9 @@ VkuImage_t Textures[NUM_TEXTURES];
 // Swapchain
 VkuSwapchain_t Swapchain;
 
+// Colorbuffer image
+VkuImage_t ColorImage;
+
 // Depth buffer image
 VkFormat DepthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
 VkuImage_t DepthImage;
@@ -109,19 +112,46 @@ typedef struct
 	VkCommandPool CommandPool[VKU_MAX_FRAME_COUNT];
 	VkDescriptorPool DescriptorPool[VKU_MAX_FRAME_COUNT];
 	VkCommandBuffer SecCommandBuffer[VKU_MAX_FRAME_COUNT];
+	uint32_t Which;
+	volatile bool Done;
 } ThreadData_t;
 
-ThreadWorker_t Thread[4];
-ThreadData_t ThreadData[4];
-pthread_barrier_t ThreadBarrier;
+ThreadWorker_t Thread[7];
+ThreadData_t ThreadData[7];
 
 void RecreateSwapchain(void);
 
 bool CreateFramebuffers(void)
 {
+	vkuCreateImageBuffer(&Context, &ColorImage,
+		VK_IMAGE_TYPE_2D, Swapchain.SurfaceFormat.format, 1, 1, Width, Height, 1,
+		VK_SAMPLE_COUNT_4_BIT, VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		0);
+
+	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+		.pNext=NULL,
+		.image=ColorImage.Image,
+		.format=Swapchain.SurfaceFormat.format,
+		.components.r=VK_COMPONENT_SWIZZLE_R,
+		.components.g=VK_COMPONENT_SWIZZLE_G,
+		.components.b=VK_COMPONENT_SWIZZLE_B,
+		.components.a=VK_COMPONENT_SWIZZLE_A,
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+		.subresourceRange.baseMipLevel=0,
+		.subresourceRange.levelCount=1,
+		.subresourceRange.baseArrayLayer=0,
+		.subresourceRange.layerCount=1,
+		.viewType=VK_IMAGE_VIEW_TYPE_2D,
+		.flags=0,
+	}, NULL, &ColorImage.View);
+
 	vkuCreateImageBuffer(&Context, &DepthImage,
 		VK_IMAGE_TYPE_2D, DepthFormat, 1, 1, Width, Height, 1,
-		VK_IMAGE_TILING_OPTIMAL,
+		VK_SAMPLE_COUNT_4_BIT, VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		0);
@@ -151,8 +181,8 @@ bool CreateFramebuffers(void)
 		{
 			.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 			.renderPass=RenderPass,
-			.attachmentCount=2,
-			.pAttachments=(VkImageView[]) { Swapchain.ImageView[i], DepthImage.View },
+			.attachmentCount=3,
+			.pAttachments=(VkImageView[]) { ColorImage.View, DepthImage.View, Swapchain.ImageView[i] },
 			.width=Swapchain.Extent.width,
 			.height=Swapchain.Extent.height,
 			.layers=1,
@@ -167,28 +197,38 @@ bool CreatePipeline(void)
 	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-		.attachmentCount=2,
+		.attachmentCount=3,
 		.pAttachments=(VkAttachmentDescription[])
 		{
 			{
 				.format=Swapchain.SurfaceFormat.format,
-				.samples=VK_SAMPLE_COUNT_1_BIT,
+				.samples=VK_SAMPLE_COUNT_4_BIT,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
 				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+				.finalLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			},
 			{
 				.format=DepthFormat,
-				.samples=VK_SAMPLE_COUNT_1_BIT,
+				.samples=VK_SAMPLE_COUNT_4_BIT,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
 				.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
 				.finalLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			},
+			{
+				.format=Swapchain.SurfaceFormat.format,
+				.samples=VK_SAMPLE_COUNT_1_BIT,
+				.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
+				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+				.finalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
 			},
 		},
 		.subpassCount=1,
@@ -206,6 +246,21 @@ bool CreatePipeline(void)
 				.attachment=1,
 				.layout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 			},
+			.pResolveAttachments=&(VkAttachmentReference)
+			{
+				.attachment=2,
+				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			},
+		},
+		.dependencyCount=1,
+		.pDependencies=&(VkSubpassDependency)
+		{
+			.srcSubpass=VK_SUBPASS_EXTERNAL,
+			.dstSubpass=0,
+			.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT|VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+			.srcAccessMask=0,
+			.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT|VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+			.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT|VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 		},
 	}, 0, &RenderPass);
 
@@ -242,6 +297,7 @@ bool CreatePipeline(void)
 
 	Pipeline.DepthTest=VK_TRUE;
 	Pipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+	Pipeline.RasterizationSamples=VK_SAMPLE_COUNT_4_BIT;
 
 	if(!vkuPipeline_AddStage(&Pipeline, "./shaders/lighting.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
@@ -451,34 +507,8 @@ void Thread_Constructor(void *Arg)
 			.level=VK_COMMAND_BUFFER_LEVEL_SECONDARY,
 			.commandBufferCount=1,
 		}, &Data->SecCommandBuffer[i]);
-	}
-}
 
-void Thread_Main_Constructor(void *Arg)
-{
-	ThreadData_t *Data=(ThreadData_t *)Arg;
-
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
-	{
-		vkCreateCommandPool(Context.Device, &(VkCommandPoolCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-			.flags=0,
-			.queueFamilyIndex=Context.QueueFamilyIndex,
-		}, VK_NULL_HANDLE, &Data->CommandPool[i]);
-
-		vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-			.commandPool=Data->CommandPool[i],
-			.level=VK_COMMAND_BUFFER_LEVEL_SECONDARY,
-			.commandBufferCount=1,
-		}, &Data->SecCommandBuffer[i]);
-	}
-
-	// Create a large descriptor pool, so I don't have to worry about readjusting for exactly what I have
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
-	{
+		// Create a large descriptor pool, so I don't have to worry about readjusting for exactly what I have
 		vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -505,6 +535,9 @@ void Thread_Main_Constructor(void *Arg)
 			},
 		}, VK_NULL_HANDLE, &Data->DescriptorPool[i]);
 	}
+
+	Data->Which=0;
+	Data->Done=false;
 }
 
 void Thread_Destructor(void *Arg)
@@ -541,7 +574,8 @@ void Thread_Main(void *Arg)
 	// Draw the models
 	vkCmdBindVertexBuffers(Data->SecCommandBuffer[Data->Index], 1, 1, &Asteroid_Instance.Buffer, &(VkDeviceSize) { 0 });
 	
-	for(uint32_t i=0;i<NUM_MODELS;i++)
+//	for(uint32_t i=0;i<NUM_MODELS;i++)
+	uint32_t i=Data->Which;
 	{
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 0, &Textures[2*i+0]);
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 1, &Textures[2*i+1]);
@@ -570,7 +604,7 @@ void Thread_Main(void *Arg)
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Index]);
 
-	pthread_barrier_wait(&ThreadBarrier);
+	Data->Done=true;
 }
 
 void Thread_Skybox(void *Arg)
@@ -607,7 +641,7 @@ void Thread_Skybox(void *Arg)
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Index]);
 
-	pthread_barrier_wait(&ThreadBarrier);
+	Data->Done=true;
 }
 
 void Thread_Font(void *Arg)
@@ -636,7 +670,7 @@ void Thread_Font(void *Arg)
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Index]);
 
-	pthread_barrier_wait(&ThreadBarrier);
+	Data->Done=true;
 }
 
 
@@ -684,7 +718,7 @@ void Thread_Particles(void *Arg)
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Index]);
 
-	pthread_barrier_wait(&ThreadBarrier);
+	Data->Done=true;
 }
 
 void Render(void)
@@ -743,30 +777,68 @@ void Render(void)
 		.renderArea.extent=Swapchain.Extent,
 	}, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
+	// Set per thread data and add the job to that worker thread
 	ThreadData[0].Index=Index;
 	ThreadData[0].OldIndex=OldIndex;
+	ThreadData[0].Which=MODEL_ASTEROID1;
 	Thread_AddJob(&Thread[0], Thread_Main, (void *)&ThreadData[0]);
 
 	ThreadData[1].Index=Index;
 	ThreadData[1].OldIndex=OldIndex;
-	Thread_AddJob(&Thread[1], Thread_Skybox, (void *)&ThreadData[1]);
+	ThreadData[1].Which=MODEL_ASTEROID2;
+	Thread_AddJob(&Thread[1], Thread_Main, (void *)&ThreadData[1]);
 
 	ThreadData[2].Index=Index;
 	ThreadData[2].OldIndex=OldIndex;
-	Thread_AddJob(&Thread[2], Thread_Particles, (void *)&ThreadData[2]);
+	ThreadData[2].Which=MODEL_ASTEROID3;
+	Thread_AddJob(&Thread[2], Thread_Main, (void *)&ThreadData[2]);
 
 	ThreadData[3].Index=Index;
 	ThreadData[3].OldIndex=OldIndex;
-	Thread_AddJob(&Thread[3], Thread_Font, (void *)&ThreadData[3]);
+	ThreadData[3].Which=MODEL_ASTEROID4;
+	Thread_AddJob(&Thread[3], Thread_Main, (void *)&ThreadData[3]);
+
+	ThreadData[4].Index=Index;
+	ThreadData[4].OldIndex=OldIndex;
+	Thread_AddJob(&Thread[4], Thread_Skybox, (void *)&ThreadData[4]);
+
+	ThreadData[5].Index=Index;
+	ThreadData[5].OldIndex=OldIndex;
+	Thread_AddJob(&Thread[5], Thread_Particles, (void *)&ThreadData[5]);
+
+	ThreadData[6].Index=Index;
+	ThreadData[6].OldIndex=OldIndex;
+	Thread_AddJob(&Thread[6], Thread_Font, (void *)&ThreadData[6]);
 
 	// Wait for the threads to finish
-	pthread_barrier_wait(&ThreadBarrier);
+	while(!(
+		ThreadData[0].Done&&
+		ThreadData[1].Done&&
+		ThreadData[2].Done&&
+		ThreadData[3].Done&&
+		ThreadData[4].Done&&
+		ThreadData[5].Done&&
+		ThreadData[6].Done
+	));
 
-	vkCmdExecuteCommands(CommandBuffers[Index], 4, (VkCommandBuffer[]) {
+	// Reset done flag
+	ThreadData[0].Done=false;
+	ThreadData[1].Done=false;
+	ThreadData[2].Done=false;
+	ThreadData[3].Done=false;
+	ThreadData[4].Done=false;
+	ThreadData[5].Done=false;
+	ThreadData[6].Done=false;
+
+	// Execute the secondary command buffers from the threads
+	vkCmdExecuteCommands(CommandBuffers[Index], 7, (VkCommandBuffer[]) {
 		ThreadData[0].SecCommandBuffer[Index],
 		ThreadData[1].SecCommandBuffer[Index],
 		ThreadData[2].SecCommandBuffer[Index],
-		ThreadData[3].SecCommandBuffer[Index]
+		ThreadData[3].SecCommandBuffer[Index],
+		ThreadData[4].SecCommandBuffer[Index],
+		ThreadData[5].SecCommandBuffer[Index],
+		ThreadData[6].SecCommandBuffer[Index]
 	});
 
 	vkCmdEndRenderPass(CommandBuffers[Index]);
@@ -835,8 +907,6 @@ void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle
 
 bool Init(void)
 {
-	pthread_barrier_init(&ThreadBarrier, NULL, 5);
-
 	Event_Add(EVENT_KEYDOWN, Event_KeyDown);
 	Event_Add(EVENT_KEYUP, Event_KeyUp);
 	Event_Add(EVENT_MOUSE, Event_Mouse);
@@ -940,33 +1010,6 @@ bool Init(void)
 		// Semaphore for render complete, to signal when we can render again
 		vkCreateSemaphore(Context.Device, &(VkSemaphoreCreateInfo) {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext = VK_NULL_HANDLE }, VK_NULL_HANDLE, &RenderCompleteSemaphores[i]);
 
-		// Create a large descriptor pool, so I don't have to worry about readjusting for exactly what I have
-		//vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
-		//{
-		//	.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-		//	.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
-		//	.poolSizeCount=4,
-		//	.pPoolSizes=(VkDescriptorPoolSize[])
-		//	{
-		//		{
-		//			.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		//			.descriptorCount=1024, // Max number of this descriptor type that can be in each descriptor set?
-		//		},
-		//		{
-		//			.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-		//			.descriptorCount=1024,
-		//		},
-		//		{
-		//			.type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-		//			.descriptorCount=1024,
-		//		},
-		//		{
-		//			.type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		//			.descriptorCount=1024,
-		//		},
-		//	},
-		//}, VK_NULL_HANDLE, &DescriptorPool[i]);
-
 		// Allocate the command buffers we will be rendering into
 		vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
 		{
@@ -977,25 +1020,13 @@ bool Init(void)
 		}, &CommandBuffers[i]);
 	}
 
-	Thread_Init(&Thread[0]);
-	Thread_AddConstructor(&Thread[0], Thread_Main_Constructor, (void *)&ThreadData[0]);
-	Thread_AddDestructor(&Thread[0], Thread_Destructor, (void *)&ThreadData[0]);
-	Thread_Start(&Thread[0]);
-
-	Thread_Init(&Thread[1]);
-	Thread_AddConstructor(&Thread[1], Thread_Main_Constructor, (void *)&ThreadData[1]);
-	Thread_AddDestructor(&Thread[1], Thread_Destructor, (void *)&ThreadData[1]);
-	Thread_Start(&Thread[1]);
-
-	Thread_Init(&Thread[2]);
-	Thread_AddConstructor(&Thread[2], Thread_Main_Constructor, (void *)&ThreadData[2]);
-	Thread_AddDestructor(&Thread[2], Thread_Destructor, (void *)&ThreadData[2]);
-	Thread_Start(&Thread[2]);
-
-	Thread_Init(&Thread[3]);
-	Thread_AddConstructor(&Thread[3], Thread_Main_Constructor, (void *)&ThreadData[3]);
-	Thread_AddDestructor(&Thread[3], Thread_Destructor, (void *)&ThreadData[3]);
-	Thread_Start(&Thread[3]);
+	for(uint32_t i=0;i<7;i++)
+	{
+		Thread_Init(&Thread[i]);
+		Thread_AddConstructor(&Thread[i], Thread_Constructor, (void *)&ThreadData[i]);
+		Thread_AddDestructor(&Thread[i], Thread_Destructor, (void *)&ThreadData[i]);
+		Thread_Start(&Thread[i]);
+	}
 
 	return true;
 }
