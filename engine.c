@@ -21,6 +21,8 @@
 #include "skybox.h"
 #include "shadow.h"
 
+VkuImage_t CubemapTest;
+
 uint32_t Width=1280, Height=720;
 
 VkInstance Instance;
@@ -43,6 +45,8 @@ VkuImage_t Textures[NUM_TEXTURES];
 
 // Swapchain
 VkuSwapchain_t Swapchain;
+
+VkSampleCountFlags MSAA=VK_SAMPLE_COUNT_2_BIT;
 
 // Colorbuffer image
 VkuImage_t ColorImage;
@@ -125,7 +129,7 @@ bool CreateFramebuffers(void)
 {
 	vkuCreateImageBuffer(&Context, &ColorImage,
 		VK_IMAGE_TYPE_2D, Swapchain.SurfaceFormat.format, 1, 1, Width, Height, 1,
-		VK_SAMPLE_COUNT_4_BIT, VK_IMAGE_TILING_OPTIMAL,
+		MSAA, VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		0);
@@ -151,7 +155,7 @@ bool CreateFramebuffers(void)
 
 	vkuCreateImageBuffer(&Context, &DepthImage,
 		VK_IMAGE_TYPE_2D, DepthFormat, 1, 1, Width, Height, 1,
-		VK_SAMPLE_COUNT_4_BIT, VK_IMAGE_TILING_OPTIMAL,
+		MSAA, VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		0);
@@ -202,7 +206,7 @@ bool CreatePipeline(void)
 		{
 			{
 				.format=Swapchain.SurfaceFormat.format,
-				.samples=VK_SAMPLE_COUNT_4_BIT,
+				.samples=MSAA,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
 				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -212,7 +216,7 @@ bool CreatePipeline(void)
 			},
 			{
 				.format=DepthFormat,
-				.samples=VK_SAMPLE_COUNT_4_BIT,
+				.samples=MSAA,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
 				.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -297,7 +301,7 @@ bool CreatePipeline(void)
 
 	Pipeline.DepthTest=VK_TRUE;
 	Pipeline.CullMode=VK_CULL_MODE_BACK_BIT;
-	Pipeline.RasterizationSamples=VK_SAMPLE_COUNT_4_BIT;
+	Pipeline.RasterizationSamples=MSAA;
 
 	if(!vkuPipeline_AddStage(&Pipeline, "./shaders/lighting.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
@@ -577,7 +581,7 @@ void Thread_Main(void *Arg)
 //	for(uint32_t i=0;i<NUM_MODELS;i++)
 	uint32_t i=Data->Which;
 	{
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 0, &Textures[2*i+0]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 0, &CubemapTest);//&Textures[2*i+0]);
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 1, &Textures[2*i+1]);
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 2, &ShadowDepth);
 		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 3, uboBuffer.Buffer, 0, VK_WHOLE_SIZE);
@@ -971,6 +975,8 @@ bool Init(void)
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID3_NORMAL], "./assets/asteroid3_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4], "./assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4_NORMAL], "./assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+
+	Image_Upload(&Context, &CubemapTest, "./assets/rnl.tga", IMAGE_CUBEMAP_ANGULAR|IMAGE_MIPMAP|IMAGE_BILINEAR);
 
 	// Create primary pipeline and renderpass
 	CreatePipeline();

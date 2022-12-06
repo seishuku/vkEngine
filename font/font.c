@@ -19,6 +19,7 @@
 // external Vulkan context data/functions for this module:
 extern VkuContext_t Context;
 extern VkRenderPass RenderPass;
+extern VkSampleCountFlags MSAA;
 
 extern VkuMemZone_t *VkZone;
 
@@ -120,7 +121,7 @@ void _Font_Init(void)
 
 	fontPipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 	fontPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
-	fontPipeline.RasterizationSamples=VK_SAMPLE_COUNT_4_BIT;
+	fontPipeline.RasterizationSamples=MSAA;
 
 	fontPipeline.Blend=VK_TRUE;
 	fontPipeline.SrcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;

@@ -668,7 +668,7 @@ void RGBtoRGBA(VkuImage_t *Image)
 	}
 }
 
-void GenerateMipmaps(VkCommandBuffer commandBuffer, VkuImage_t *Image, uint32_t mipLevels)
+void GenerateMipmaps(VkCommandBuffer commandBuffer, VkuImage_t *Image, uint32_t mipLevels, uint32_t layerCount, uint32_t baseLayer)
 {
 	uint32_t texWidth=Image->Width;
 	uint32_t texHeight=Image->Height;
@@ -680,7 +680,7 @@ void GenerateMipmaps(VkCommandBuffer commandBuffer, VkuImage_t *Image, uint32_t 
 		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseArrayLayer=0,
+		.subresourceRange.baseArrayLayer=baseLayer,
 		.subresourceRange.layerCount=1,
 		.subresourceRange.levelCount=1,
 	};
@@ -700,13 +700,13 @@ void GenerateMipmaps(VkCommandBuffer commandBuffer, VkuImage_t *Image, uint32_t 
 			.srcOffsets[1]={ texWidth, texHeight, 1 },
 			.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.srcSubresource.mipLevel=i-1,
-			.srcSubresource.baseArrayLayer=0,
+			.srcSubresource.baseArrayLayer=baseLayer,
 			.srcSubresource.layerCount=1,
 			.dstOffsets[0]={ 0, 0, 0 },
 			.dstOffsets[1]={ texWidth>1?texWidth/2:1, texHeight>1?texHeight/2:1, 1 },
 			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.dstSubresource.mipLevel=i,
-			.dstSubresource.baseArrayLayer=0,
+			.dstSubresource.baseArrayLayer=baseLayer,
 			.dstSubresource.layerCount=1,
 		}, VK_FILTER_LINEAR);
 
@@ -844,6 +844,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 
 	if(Flags&IMAGE_CUBEMAP_ANGULAR)
 	{
+		uint32_t MipLevels=1;
 		VkuImage_t Out;
 		void *Data=NULL;
 
@@ -869,8 +870,16 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 
 		Zone_Free(Zone, Image->Data);
 
+		// Going from an angular map to 6 faces, the faces are a different size than the original image,
+		//	so change the width/height of the working image we're loading.
+		Image->Width=Out.Width;
+		Image->Height=Out.Height;
+
+		if(Flags&IMAGE_MIPMAP)
+			MipLevels=(uint32_t)(floor(log2(max(Out.Width, Out.Height))))+1;
+
 		vkuCreateImageBuffer(Context, Image,
-			VK_IMAGE_TYPE_2D, Format, 1, 6, Out.Width, Out.Height, 1, VK_SAMPLE_COUNT_1_BIT,
+			VK_IMAGE_TYPE_2D, Format, MipLevels, 6, Out.Width, Out.Height, 1, VK_SAMPLE_COUNT_1_BIT,
 			Format==VK_FORMAT_R32G32B32A32_SFLOAT?VK_IMAGE_TILING_LINEAR:VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -901,7 +910,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 			.image=Image->Image,
 			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.subresourceRange.baseMipLevel=0,
-			.subresourceRange.levelCount=1,
+			.subresourceRange.levelCount=MipLevels,
 			.subresourceRange.layerCount=6,
 			.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
 			.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
@@ -932,22 +941,31 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		// Copy from staging buffer to the texture buffer.
 		vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer.Buffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, BufferCopyRegions);
 
-		// Now change the image layout from destination optimal to be optimal reading only by shader.
-		vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+		if(Flags&IMAGE_MIPMAP)
 		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=Image->Image,
-			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.subresourceRange.baseMipLevel=0,
-			.subresourceRange.levelCount=1,
-			.subresourceRange.layerCount=6,
-			.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
-			.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		});
+			// Build mipmaps for the faces (will change image layout to shader read only)
+			for(uint32_t i=0;i<6;i++)
+				GenerateMipmaps(CommandBuffer, Image, MipLevels, 6, i);
+		}
+		else
+		{
+			// Now change the image layout from destination optimal to shader read-only.
+			vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+			{
+				.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+				.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+				.image=Image->Image,
+				.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.subresourceRange.baseMipLevel=0,
+				.subresourceRange.levelCount=MipLevels,
+				.subresourceRange.layerCount=6,
+				.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
+				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			});
+		}
 
 		// Stop recording
 		vkEndCommandBuffer(CommandBuffer);
@@ -990,7 +1008,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 			.mipLodBias=0.0f,
 			.compareOp=VK_COMPARE_OP_NEVER,
 			.minLod=0.0f,
-			.maxLod=0.0f,
+			.maxLod=MipLevels,
 			.maxAnisotropy=1.0,
 			.anisotropyEnable=VK_FALSE,
 			.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
@@ -1088,7 +1106,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 
 	// Generate mipmaps, if needed
 	if(Flags&IMAGE_MIPMAP)
-		GenerateMipmaps(CommandBuffer, Image, MipLevels);
+		GenerateMipmaps(CommandBuffer, Image, MipLevels, 1, 0);
 	else
 	{
 		// Now change the image layout from destination optimal to be optimal reading only by shader.
