@@ -21,9 +21,112 @@
 #include "skybox.h"
 #include "shadow.h"
 
-VkuImage_t CubemapTest;
+#include <openvr_capi.h>
+
+intptr_t VR_InitInternal(EVRInitError *peError, EVRApplicationType eType);
+void VR_ShutdownInternal();
+int VR_IsHmdPresent();
+intptr_t VR_GetGenericInterface(const char *pchInterfaceVersion, EVRInitError *peError);
+int VR_IsRuntimeInstalled();
+const char *VR_GetVRInitErrorAsSymbol(EVRInitError error);
+const char *VR_GetVRInitErrorAsEnglishDescription(EVRInitError error);
+
+struct VR_IVRSystem_FnTable *VRSystem=NULL;
+struct VR_IVRCompositor_FnTable *VRCompositor=NULL;
+uint32_t rtWidth;
+uint32_t rtHeight;
+
+TrackedDevicePose_t trackedDevicePose[64];
 
 uint32_t Width=1280, Height=720;
+void RecreateSwapchain(void);
+
+
+void HMDEyeCalc(EVREye eye, matrix dest_proj, matrix dest_pose)
+{
+	float fnear=0.1f;
+	float ffar=10000.0f;
+
+	HmdMatrix44_t Projection=VRSystem->GetProjectionMatrix(eye, fnear, ffar);
+	HmdMatrix34_t Position=VRSystem->GetEyeToHeadTransform(eye);
+
+	memcpy(dest_proj, &Projection, sizeof(HmdMatrix44_t));
+	MatrixIdentity(dest_pose);
+	memcpy(dest_pose, &Position, sizeof(HmdMatrix34_t));
+}
+
+bool InitOpenVR(void)
+{
+	EVRInitError eError=EVRInitError_VRInitError_None;
+	char fnTableName[128]="\0";
+
+	if(!VR_IsHmdPresent())
+	{
+		DBGPRINTF(DEBUG_ERROR, "Error : HMD not detected on the system");
+		return false;
+	}
+
+	if(!VR_IsRuntimeInstalled())
+	{
+		DBGPRINTF(DEBUG_ERROR, "Error : OpenVR Runtime not detected on the system");
+		return false;
+	}
+
+	VR_InitInternal(&eError, EVRApplicationType_VRApplication_Scene);
+
+	if(eError!=EVRInitError_VRInitError_None)
+	{
+		DBGPRINTF(DEBUG_ERROR, "VR_InitInternal: %s", VR_GetVRInitErrorAsSymbol(eError));
+		return false;
+	}
+
+	sprintf(fnTableName, "FnTable:%s", IVRSystem_Version);
+	VRSystem=(struct VR_IVRSystem_FnTable *)VR_GetGenericInterface(fnTableName, &eError);
+
+	if(eError!=EVRInitError_VRInitError_None)
+	{
+		DBGPRINTF(DEBUG_ERROR, "Unable to initialize VR compositor!\n ");
+		return false;
+	}
+
+	sprintf(fnTableName, "FnTable:%s", IVRCompositor_Version);
+	VRCompositor=(struct VR_IVRCompositor_FnTable *)VR_GetGenericInterface(fnTableName, &eError);
+	
+	if(eError!=EVRInitError_VRInitError_None)
+	{
+		DBGPRINTF(DEBUG_ERROR, "VR_GetGenericInterface(\"%s\"): %s", IVRCompositor_Version, VR_GetVRInitErrorAsSymbol(eError));
+		return false;
+	}
+
+	VRSystem->GetRecommendedRenderTargetSize(&rtWidth, &rtHeight);
+	
+	Width=rtWidth;
+	Height=rtHeight;
+
+	DBGPRINTF(DEBUG_INFO, "HMD suggested render target size: %d x %d\n", rtWidth, rtHeight);
+
+	const float freq=VRSystem->GetFloatTrackedDeviceProperty(k_unTrackedDeviceIndex_Hmd, ETrackedDeviceProperty_Prop_DisplayFrequency_Float, &eError);
+
+	if(eError!=EVRInitError_VRInitError_None)
+	{
+		DBGPRINTF(DEBUG_ERROR, "IVRSystem::GetFloatTrackedDeviceProperty::Prop_DisplayFrequency failed: %s\n", VR_GetVRInitErrorAsSymbol(eError));
+		return false;
+	}
+
+	DBGPRINTF(DEBUG_INFO, "HMD display frequency: %0.3f\n", freq);
+
+	return true;
+}
+
+void DestroyOpenVR(void)
+{
+	if(VRSystem)
+	{
+		DBGPRINTF(DEBUG_INFO, "shutting down OpenVR\n");
+		VR_ShutdownInternal();
+		VRSystem=NULL;
+	}
+}
 
 VkInstance Instance;
 VkuContext_t Context;
@@ -42,6 +145,8 @@ ParticleSystem_t ParticleSystem;
 
 BModel_t Model[NUM_MODELS];
 VkuImage_t Textures[NUM_TEXTURES];
+
+VkuImage_t BlackTexture;
 
 // Swapchain
 VkuSwapchain_t Swapchain;
@@ -67,6 +172,7 @@ VkuPipeline_t Pipeline;
 
 typedef struct
 {
+	matrix HMD;
 	matrix projection;
 	matrix modelview;
 	matrix light_mvp;
@@ -130,7 +236,7 @@ bool CreateFramebuffers(void)
 	vkuCreateImageBuffer(&Context, &ColorImage,
 		VK_IMAGE_TYPE_2D, Swapchain.SurfaceFormat.format, 1, 1, Width, Height, 1,
 		MSAA, VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+		VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		0);
 
@@ -581,7 +687,7 @@ void Thread_Main(void *Arg)
 //	for(uint32_t i=0;i<NUM_MODELS;i++)
 	uint32_t i=Data->Which;
 	{
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 0, &CubemapTest);//&Textures[2*i+0]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 0, &Textures[2*i+0]);
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 1, &Textures[2*i+1]);
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 2, &ShadowDepth);
 		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 3, uboBuffer.Buffer, 0, VK_WHOLE_SIZE);
@@ -725,6 +831,26 @@ void Thread_Particles(void *Arg)
 	Data->Done=true;
 }
 
+void HmdMatrix34toMatrix44(HmdMatrix34_t in, matrix out)
+{
+	out[0]=in.m[0][0];
+	out[1]=in.m[1][0];
+	out[2]=in.m[2][0];
+	out[3]=0.0f;
+	out[4]=in.m[0][1];
+	out[5]=in.m[1][1];
+	out[6]=in.m[2][1];
+	out[7]=0.0f;
+	out[8]=in.m[0][2];
+	out[9]=in.m[1][2];
+	out[10]=in.m[2][2];
+	out[11]=0.0f;
+	out[12]=in.m[0][3];
+	out[13]=in.m[1][3];
+	out[14]=in.m[2][3];
+	out[15]=1.0f;
+}
+
 void Render(void)
 {
 	static uint32_t OldIndex=0;
@@ -732,17 +858,50 @@ void Render(void)
 
 	// Generate the projection matrix
 	MatrixIdentity(ubo->projection);
-	MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, true, ubo->projection);
+//	MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, true, ubo->projection);
+	HmdMatrix44_t EyeProjection=VRSystem->GetProjectionMatrix(EVREye_Eye_Left, 0.01f, 50000.0f);
+	EyeProjection.m[1][1]*=-1.0f;
+	memcpy(ubo->projection, &EyeProjection, sizeof(matrix));
+	MatrixTranspose(ubo->projection, ubo->projection);
+
 
 	// Set up the modelview matrix
 	MatrixIdentity(ubo->modelview);
-	CameraUpdate(&Camera, fTimeStep, ubo->modelview);
+//	CameraUpdate(&Camera, fTimeStep, ubo->modelview);
+
+	matrix HMDMatrix;
+	MatrixIdentity(HMDMatrix);
+
+	VRCompositor->WaitGetPoses(trackedDevicePose, k_unMaxTrackedDeviceCount, NULL, 0);
+
+	if(trackedDevicePose[k_unTrackedDeviceIndex_Hmd].bDeviceIsConnected&&trackedDevicePose[k_unTrackedDeviceIndex_Hmd].bPoseIsValid)
+	{
+		HmdMatrix34toMatrix44(trackedDevicePose[k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking, HMDMatrix);
+		MatrixInverse(HMDMatrix, HMDMatrix);
+	}
+
+	// update matrices
+//	for(uint32_t i=0;i<2;i++)
+	uint32_t i=0;
+	{
+		HmdMatrix34_t EyeToHeadTransform=VRSystem->GetEyeToHeadTransform((EVREye)i);
+
+		matrix eyeMat;
+		MatrixIdentity(eyeMat);
+		HmdMatrix34toMatrix44(EyeToHeadTransform, eyeMat);
+		MatrixInverse(eyeMat, eyeMat);
+		MatrixMult(eyeMat, HMDMatrix, ubo->HMD);
+	}
+
+	memcpy(Skybox_UBO->HMD, ubo->HMD, sizeof(matrix));
+
+	memcpy(Skybox_UBO->modelview, ubo->modelview, sizeof(matrix));
+	memcpy(Skybox_UBO->projection, ubo->projection, sizeof(matrix));
 
 	Vec3_Setv(ubo->light_color, Skybox_UBO->uSunColor);
 	Vec3_Setv(ubo->light_direction, Skybox_UBO->uSunPosition);
 	ubo->light_direction[3]=Skybox_UBO->uSunSize;
 
-	MatrixMult(ubo->modelview, ubo->projection, Skybox_UBO->mvp);
 	memcpy(ubo->light_mvp, Shadow_UBO.mvp, sizeof(matrix));
 
 	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain.Swapchain, UINT64_MAX, PresentCompleteSemaphores[Index], VK_NULL_HANDLE, &OldIndex);
@@ -862,6 +1021,31 @@ void Render(void)
 		.pCommandBuffers=(VkCommandBuffer[]){ CommandBuffers[Index] },
 	}, FrameFences[Index]);
 
+	VRTextureBounds_t bounds={ 0.0f, 0.0f, 1.0f, 1.0f };
+
+	VRVulkanTextureData_t vulkanData=
+	{
+		.m_nImage=(uint64_t)ColorImage.Image,
+		.m_pDevice=(struct VkDevice_T *)Context.Device,
+		.m_pPhysicalDevice=(struct VkPhysicalDevice_T *)Context.PhysicalDevice,
+		.m_pInstance=(struct VkInstance_T *)Instance,
+		.m_pQueue=(struct VkQueue_T *)Context.Queue,
+		.m_nQueueFamilyIndex=Context.QueueFamilyIndex,
+
+		.m_nWidth=Width,
+		.m_nHeight=Height,
+		.m_nFormat=Swapchain.SurfaceFormat.format,
+		.m_nSampleCount=2,
+	};
+
+	struct Texture_t texture={ &vulkanData, ETextureType_TextureType_Vulkan, EColorSpace_ColorSpace_Auto };
+	VRCompositor->Submit(EVREye_Eye_Left, &texture, &bounds, EVRSubmitFlags_Submit_Default);
+
+	vulkanData.m_nImage=(uint64_t)BlackTexture.Image;
+	vulkanData.m_nWidth=1;
+	vulkanData.m_nHeight=1;
+	VRCompositor->Submit(EVREye_Eye_Right, &texture, &bounds, EVRSubmitFlags_Submit_Default);
+
 	// And present it to the screen
 	Result=vkQueuePresentKHR(Context.Queue, &(VkPresentInfoKHR)
 	{
@@ -976,7 +1160,7 @@ bool Init(void)
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4], "./assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4_NORMAL], "./assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 
-	Image_Upload(&Context, &CubemapTest, "./assets/rnl.tga", IMAGE_CUBEMAP_ANGULAR|IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Context, &BlackTexture, "./assets/black.qoi", IMAGE_NONE);
 
 	// Create primary pipeline and renderpass
 	CreatePipeline();
@@ -1071,7 +1255,10 @@ void Destroy(void)
 {
 	vkDeviceWaitIdle(Context.Device);
 
-	Thread_Destroy(&Thread[0]);
+	DestroyOpenVR();
+
+	for(uint32_t i=0;i<7;i++)
+		Thread_Destroy(&Thread[i]);
 
 	if(Context.PipelineCache)
 	{

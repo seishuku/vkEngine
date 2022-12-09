@@ -10,6 +10,7 @@ layout (location=5) in mat4 iPosition;
 
 layout (binding=3) uniform ubo
 {
+	mat4 HMD;
 	mat4 projection;
     mat4 modelview;
 	mat4 light_mvp;
@@ -41,7 +42,7 @@ const mat4 biasMat = mat4(
 
 void main()
 {
-	gl_Position=projection*modelview*iPosition*local*vec4(vPosition.xyz, 1.0);
+	gl_Position=projection*HMD*modelview*iPosition*local*vec4(vPosition.xyz, 1.0);
 
 	Position=vPosition.xyz;
 	UV=vUV.xy;

@@ -4,7 +4,9 @@ layout (location=0) in vec3 Position;
 
 layout (binding=0) uniform ubo
 {
-	mat4 mvp;
+	mat4 HMD;
+	mat4 projection;
+    mat4 modelview;
 	vec4 uOffset;
 
 	vec3 uNebulaAColor;

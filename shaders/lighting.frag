@@ -8,6 +8,7 @@ layout (location=9) in vec4 Shadow;
 
 layout (binding=3) uniform ubo
 {
+	mat4 HMD;
 	mat4 projection;
     mat4 modelview;
 	mat4 light_mvp;
@@ -20,7 +21,7 @@ layout (push_constant) uniform pc
 	mat4 local;
 };
 
-layout (binding=0) uniform samplerCube TexBase;
+layout (binding=0) uniform sampler2D TexBase;
 layout (binding=1) uniform sampler2D TexNormal;
 layout (binding=2) uniform sampler2DShadow TexShadow;
 
@@ -48,8 +49,8 @@ float ShadowPCF(vec4 Coords)
 
 void main()
 {
-	vec4 Base=texture(TexBase, vec3(Position));
+	vec4 Base=texture(TexBase, UV);
 	vec3 n=normalize(iMatrix*local*vec4(Tangent*(2*texture(TexNormal, UV)-1).xyz, 0.0)).xyz;
 
-	Output=Base;//vec4(sqrt(Base.xyz*light_color.xyz*max(0.045, dot(n, light_direction.xyz)*ShadowPCF(Shadow))), 1.0);
+	Output=vec4(sqrt(Base.xyz*light_color.xyz*max(0.045, dot(n, light_direction.xyz)*ShadowPCF(Shadow))), 1.0);
 }

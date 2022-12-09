@@ -372,6 +372,14 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
+	bool InitOpenVR(void);
+	DBGPRINTF(DEBUG_INFO, "Initalizing OpenVR...\n");
+	if(!InitOpenVR())
+	{
+		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
+		return -1;
+	}
+
 	RegisterClass(&(WNDCLASS)
 	{
 		.style=CS_VREDRAW|CS_HREDRAW|CS_OWNDC,

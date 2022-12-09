@@ -66,7 +66,9 @@ const vec3 ico[]=
 
 layout (binding=0) uniform ubo
 {
-	mat4 mvp;
+	mat4 HMD;
+	mat4 projection;
+    mat4 modelview;
 	vec4 uOffset;
 
 	vec3 uNebulaAColor;
@@ -94,8 +96,8 @@ layout (location=0) out vec3 Position;
 
 void main()
 {
-	vec3 vPosition=ico[gl_VertexIndex];
+	vec3 vPosition=ico[gl_VertexIndex]*20000.0f;
 
-	gl_Position=mvp*vec4(vPosition, 0.0);
-	Position=vPosition;
+	gl_Position=projection*modelview*HMD*vec4(vPosition, 1.0);
+	Position=normalize(vPosition);
 }

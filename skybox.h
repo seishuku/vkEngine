@@ -3,7 +3,9 @@
 
 typedef struct
 {
-	matrix mvp;
+	matrix HMD;
+	matrix projection;
+	matrix modelview;
 	vec4 uOffset;
 
 	vec3 uNebulaAColor;
