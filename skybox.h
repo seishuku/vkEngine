@@ -24,8 +24,8 @@ typedef struct
 	vec4 uSunColor;
 } Skybox_UBO_t;
 
-extern Skybox_UBO_t *Skybox_UBO;
-extern VkuBuffer_t Skybox_UBO_Buffer;
+extern Skybox_UBO_t *Skybox_UBO[2];
+extern VkuBuffer_t Skybox_UBO_Buffer[2];
 
 extern VkuDescriptorSet_t SkyboxDescriptorSet[VKU_MAX_FRAME_COUNT];
 

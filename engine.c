@@ -38,21 +38,28 @@ uint32_t rtHeight;
 
 TrackedDevicePose_t trackedDevicePose[64];
 
+HmdMatrix44_t EyeProjection[2];
+
 uint32_t Width=1280, Height=720;
-void RecreateSwapchain(void);
 
-
-void HMDEyeCalc(EVREye eye, matrix dest_proj, matrix dest_pose)
+void HmdMatrix34toMatrix44(HmdMatrix34_t in, matrix out)
 {
-	float fnear=0.1f;
-	float ffar=10000.0f;
-
-	HmdMatrix44_t Projection=VRSystem->GetProjectionMatrix(eye, fnear, ffar);
-	HmdMatrix34_t Position=VRSystem->GetEyeToHeadTransform(eye);
-
-	memcpy(dest_proj, &Projection, sizeof(HmdMatrix44_t));
-	MatrixIdentity(dest_pose);
-	memcpy(dest_pose, &Position, sizeof(HmdMatrix34_t));
+	out[0]=in.m[0][0];
+	out[1]=in.m[1][0];
+	out[2]=in.m[2][0];
+	out[3]=0.0f;
+	out[4]=in.m[0][1];
+	out[5]=in.m[1][1];
+	out[6]=in.m[2][1];
+	out[7]=0.0f;
+	out[8]=in.m[0][2];
+	out[9]=in.m[1][2];
+	out[10]=in.m[2][2];
+	out[11]=0.0f;
+	out[12]=in.m[0][3];
+	out[13]=in.m[1][3];
+	out[14]=in.m[2][3];
+	out[15]=1.0f;
 }
 
 bool InitOpenVR(void)
@@ -83,7 +90,7 @@ bool InitOpenVR(void)
 	sprintf(fnTableName, "FnTable:%s", IVRSystem_Version);
 	VRSystem=(struct VR_IVRSystem_FnTable *)VR_GetGenericInterface(fnTableName, &eError);
 
-	if(eError!=EVRInitError_VRInitError_None)
+	if(eError!=EVRInitError_VRInitError_None||!VRSystem)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Unable to initialize VR compositor!\n ");
 		return false;
@@ -92,7 +99,7 @@ bool InitOpenVR(void)
 	sprintf(fnTableName, "FnTable:%s", IVRCompositor_Version);
 	VRCompositor=(struct VR_IVRCompositor_FnTable *)VR_GetGenericInterface(fnTableName, &eError);
 	
-	if(eError!=EVRInitError_VRInitError_None)
+	if(eError!=EVRInitError_VRInitError_None||!VRCompositor)
 	{
 		DBGPRINTF(DEBUG_ERROR, "VR_GetGenericInterface(\"%s\"): %s", IVRCompositor_Version, VR_GetVRInitErrorAsSymbol(eError));
 		return false;
@@ -114,6 +121,24 @@ bool InitOpenVR(void)
 	}
 
 	DBGPRINTF(DEBUG_INFO, "HMD display frequency: %0.3f\n", freq);
+
+	matrix eyeMat;
+
+	EyeProjection[0]=VRSystem->GetProjectionMatrix(EVREye_Eye_Left, 0.01f, 50000.0f);
+	EyeProjection[0].m[1][1]*=-1.0f;
+	MatrixTranspose((const float *)&EyeProjection[0], (float *)&EyeProjection[0]);
+
+	HmdMatrix34toMatrix44(VRSystem->GetEyeToHeadTransform(EVREye_Eye_Left), eyeMat);
+	MatrixInverse(eyeMat, eyeMat);
+	MatrixMult((const float *)&EyeProjection[0], eyeMat, (float *)&EyeProjection[0]);
+
+	EyeProjection[1]=VRSystem->GetProjectionMatrix(EVREye_Eye_Right, 0.01f, 50000.0f);
+	EyeProjection[1].m[1][1]*=-1.0f;
+	MatrixTranspose((const float *)&EyeProjection[1], (float *)&EyeProjection[1]);
+
+	HmdMatrix34toMatrix44(VRSystem->GetEyeToHeadTransform(EVREye_Eye_Right), eyeMat);
+	MatrixInverse(eyeMat, eyeMat);
+	MatrixMult((const float *)&EyeProjection[1], eyeMat, (float *)&EyeProjection[1]);
 
 	return true;
 }
@@ -151,19 +176,20 @@ VkuImage_t BlackTexture;
 // Swapchain
 VkuSwapchain_t Swapchain;
 
-VkSampleCountFlags MSAA=VK_SAMPLE_COUNT_2_BIT;
+VkSampleCountFlags MSAA=VK_SAMPLE_COUNT_8_BIT;
 
 // Colorbuffer image
-VkuImage_t ColorImage;
+VkFormat ColorFormat=VK_FORMAT_R8G8B8A8_UNORM;
+VkuImage_t ColorImage[2];
 
 // Depth buffer image
 VkFormat DepthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
-VkuImage_t DepthImage;
+VkuImage_t DepthImage[2];
 
 // Primary framebuffers
-VkFramebuffer FrameBuffers[VKU_MAX_FRAME_COUNT];
+VkFramebuffer FrameBuffers[2];
 
-// Primary PenderPass
+// Primary RenderPass
 VkRenderPass RenderPass;
 
 // Primary rendering pipeline stuff
@@ -180,9 +206,9 @@ typedef struct
 	vec4 light_direction;
 } UBO_t;
 
-UBO_t *ubo;
+UBO_t *Main_UBO[2];
 
-VkuBuffer_t uboBuffer;
+VkuBuffer_t uboBuffer[2];
 //////
 
 // Asteroid data
@@ -195,7 +221,7 @@ typedef struct
 	vec3 Rotate;
 } Asteroid_t;
 
-#define NUM_ASTEROIDS 600
+#define NUM_ASTEROIDS 50
 Asteroid_t Asteroids[NUM_ASTEROIDS];
 //////
 
@@ -218,7 +244,7 @@ VkSemaphore RenderCompleteSemaphores[VKU_MAX_FRAME_COUNT];
 
 typedef struct
 {
-	uint32_t Index, OldIndex;
+	uint32_t Index;
 	VkCommandPool CommandPool[VKU_MAX_FRAME_COUNT];
 	VkDescriptorPool DescriptorPool[VKU_MAX_FRAME_COUNT];
 	VkCommandBuffer SecCommandBuffer[VKU_MAX_FRAME_COUNT];
@@ -231,12 +257,12 @@ ThreadData_t ThreadData[7];
 
 void RecreateSwapchain(void);
 
-bool CreateFramebuffers(void)
+bool CreateFramebuffers(uint32_t Eye)
 {
-	vkuCreateImageBuffer(&Context, &ColorImage,
-		VK_IMAGE_TYPE_2D, Swapchain.SurfaceFormat.format, 1, 1, Width, Height, 1,
+	vkuCreateImageBuffer(&Context, &ColorImage[Eye],
+		VK_IMAGE_TYPE_2D, ColorFormat, 1, 1, Width, Height, 1,
 		MSAA, VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		0);
 
@@ -244,8 +270,8 @@ bool CreateFramebuffers(void)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.pNext=NULL,
-		.image=ColorImage.Image,
-		.format=Swapchain.SurfaceFormat.format,
+		.image=ColorImage[Eye].Image,
+		.format=ColorFormat,
 		.components.r=VK_COMPONENT_SWIZZLE_R,
 		.components.g=VK_COMPONENT_SWIZZLE_G,
 		.components.b=VK_COMPONENT_SWIZZLE_B,
@@ -257,9 +283,9 @@ bool CreateFramebuffers(void)
 		.subresourceRange.layerCount=1,
 		.viewType=VK_IMAGE_VIEW_TYPE_2D,
 		.flags=0,
-	}, NULL, &ColorImage.View);
+	}, NULL, &ColorImage[Eye].View);
 
-	vkuCreateImageBuffer(&Context, &DepthImage,
+	vkuCreateImageBuffer(&Context, &DepthImage[Eye],
 		VK_IMAGE_TYPE_2D, DepthFormat, 1, 1, Width, Height, 1,
 		MSAA, VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
@@ -270,7 +296,7 @@ bool CreateFramebuffers(void)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.pNext=NULL,
-		.image=DepthImage.Image,
+		.image=DepthImage[Eye].Image,
 		.format=DepthFormat,
 		.components.r=VK_COMPONENT_SWIZZLE_R,
 		.components.g=VK_COMPONENT_SWIZZLE_G,
@@ -283,21 +309,19 @@ bool CreateFramebuffers(void)
 		.subresourceRange.layerCount=1,
 		.viewType=VK_IMAGE_VIEW_TYPE_2D,
 		.flags=0,
-	}, NULL, &DepthImage.View);
+	}, NULL, &DepthImage[Eye].View);
 
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
 	{
-		vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-			.renderPass=RenderPass,
-			.attachmentCount=3,
-			.pAttachments=(VkImageView[]) { ColorImage.View, DepthImage.View, Swapchain.ImageView[i] },
-			.width=Swapchain.Extent.width,
-			.height=Swapchain.Extent.height,
-			.layers=1,
-		}, 0, &FrameBuffers[i]);
-	}
+		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+		.renderPass=RenderPass,
+		.attachmentCount=2,
+		.pAttachments=(VkImageView[]) { ColorImage[Eye].View, DepthImage[Eye].View },
+		.width=Swapchain.Extent.width,
+		.height=Swapchain.Extent.height,
+		.layers=1,
+	}, 0, &FrameBuffers[Eye]);
+
 
 	return true;
 }
@@ -307,17 +331,17 @@ bool CreatePipeline(void)
 	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-		.attachmentCount=3,
+		.attachmentCount=2,
 		.pAttachments=(VkAttachmentDescription[])
 		{
 			{
-				.format=Swapchain.SurfaceFormat.format,
+				.format=ColorFormat,
 				.samples=MSAA,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
 				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+				.initialLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 				.finalLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			},
 			{
@@ -327,18 +351,8 @@ bool CreatePipeline(void)
 				.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+				.initialLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 				.finalLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-			},
-			{
-				.format=Swapchain.SurfaceFormat.format,
-				.samples=VK_SAMPLE_COUNT_1_BIT,
-				.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
 			},
 		},
 		.subpassCount=1,
@@ -356,22 +370,7 @@ bool CreatePipeline(void)
 				.attachment=1,
 				.layout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 			},
-			.pResolveAttachments=&(VkAttachmentReference)
-			{
-				.attachment=2,
-				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			},
-		},
-		.dependencyCount=1,
-		.pDependencies=&(VkSubpassDependency)
-		{
-			.srcSubpass=VK_SUBPASS_EXTERNAL,
-			.dstSubpass=0,
-			.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT|VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-			.srcAccessMask=0,
-			.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT|VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-			.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT|VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-		},
+		}
 	}, 0, &RenderPass);
 
 	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT*NUM_MODELS;i++)
@@ -431,8 +430,11 @@ bool CreatePipeline(void)
 	if(!vkuAssemblePipeline(&Pipeline))
 		return false;
 
-	vkuCreateHostBuffer(&Context, &uboBuffer, sizeof(UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-	vkMapMemory(Context.Device, uboBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&ubo);
+	vkuCreateHostBuffer(&Context, &uboBuffer[0], sizeof(UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	vkMapMemory(Context.Device, uboBuffer[0].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Main_UBO[0]);
+
+	vkuCreateHostBuffer(&Context, &uboBuffer[1], sizeof(UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	vkMapMemory(Context.Device, uboBuffer[1].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Main_UBO[1]);
 
 	return true;
 }
@@ -526,24 +528,26 @@ bool SphereSphereIntersect(vec3 PositionA, float RadiusA, vec3 PositionB, float 
 
 void GenerateSkyParams(void)
 {
-	Vec4_Set(Skybox_UBO->uOffset, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
-	Vec3_Normalize(Skybox_UBO->uOffset);
+	Vec4_Set(Skybox_UBO[0]->uOffset, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
+	Vec3_Normalize(Skybox_UBO[0]->uOffset);
 
-	Vec3_Set(Skybox_UBO->uNebulaAColor, RandFloat(), RandFloat(), RandFloat());
-	Skybox_UBO->uNebulaADensity=RandFloat()*2.0f;
+	Vec3_Set(Skybox_UBO[0]->uNebulaAColor, RandFloat(), RandFloat(), RandFloat());
+	Skybox_UBO[0]->uNebulaADensity=RandFloat()*2.0f;
 
-	Vec3_Set(Skybox_UBO->uNebulaBColor, RandFloat(), RandFloat(), RandFloat());
-	Skybox_UBO->uNebulaBDensity=RandFloat()*2.0f;
+	Vec3_Set(Skybox_UBO[0]->uNebulaBColor, RandFloat(), RandFloat(), RandFloat());
+	Skybox_UBO[0]->uNebulaBDensity=RandFloat()*2.0f;
 
-	Vec4_Set(Skybox_UBO->uSunPosition, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
-	Vec3_Normalize(Skybox_UBO->uSunPosition);
+	Vec4_Set(Skybox_UBO[0]->uSunPosition, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
+	Vec3_Normalize(Skybox_UBO[0]->uSunPosition);
 
-	Vec4_Set(Skybox_UBO->uSunColor, min(1.0f, RandFloat()+0.5f), min(1.0f, RandFloat()+0.5f), min(1.0f, RandFloat()+0.5f), 0.0f);
-	Skybox_UBO->uSunSize=1.0f/(RandFloat()*1000.0f+100.0f);
-	Skybox_UBO->uSunFalloff=RandFloat()*16.0f+8.0f;
+	Vec4_Set(Skybox_UBO[0]->uSunColor, min(1.0f, RandFloat()+0.5f), min(1.0f, RandFloat()+0.5f), min(1.0f, RandFloat()+0.5f), 0.0f);
+	Skybox_UBO[0]->uSunSize=1.0f/(RandFloat()*1000.0f+100.0f);
+	Skybox_UBO[0]->uSunFalloff=RandFloat()*16.0f+8.0f;
 
-	Skybox_UBO->uStarsScale=200.0f;
-	Skybox_UBO->uStarDensity=8.0f;
+	Skybox_UBO[0]->uStarsScale=200.0f;
+	Skybox_UBO[0]->uStarDensity=8.0f;
+
+	memcpy(Skybox_UBO[1], Skybox_UBO[0], sizeof(Skybox_UBO_t));
 
 	float *Data=NULL;
 
@@ -671,7 +675,7 @@ void Thread_Main(void *Arg)
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
 			.pNext=NULL,
 			.renderPass=RenderPass,
-			.framebuffer=FrameBuffers[Data->OldIndex]
+			.framebuffer=FrameBuffers[Data->Index]
 		}
 	});
 
@@ -690,7 +694,7 @@ void Thread_Main(void *Arg)
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 0, &Textures[2*i+0]);
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 1, &Textures[2*i+1]);
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 2, &ShadowDepth);
-		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 3, uboBuffer.Buffer, 0, VK_WHOLE_SIZE);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], 3, uboBuffer[Data->Index].Buffer, 0, VK_WHOLE_SIZE);
 		vkuAllocateUpdateDescriptorSet(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index], Data->DescriptorPool[Data->Index]);
 
 		vkCmdBindDescriptorSets(Data->SecCommandBuffer[Data->Index], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Index].DescriptorSet, 0, VK_NULL_HANDLE);
@@ -733,7 +737,7 @@ void Thread_Skybox(void *Arg)
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
 			.pNext=NULL,
 			.renderPass=RenderPass,
-			.framebuffer=FrameBuffers[Data->OldIndex]
+			.framebuffer=FrameBuffers[Data->Index]
 		}
 	});
 
@@ -742,7 +746,7 @@ void Thread_Skybox(void *Arg)
 
 	vkCmdBindPipeline(Data->SecCommandBuffer[Data->Index], VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipeline.Pipeline);
 
-	vkuDescriptorSet_UpdateBindingBufferInfo(&SkyboxDescriptorSet[Data->Index], 0, Skybox_UBO_Buffer.Buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&SkyboxDescriptorSet[Data->Index], 0, Skybox_UBO_Buffer[Data->Index].Buffer, 0, VK_WHOLE_SIZE);
 	vkuAllocateUpdateDescriptorSet(&SkyboxDescriptorSet[Data->Index], Data->DescriptorPool[Data->Index]);
 
 	vkCmdBindDescriptorSets(Data->SecCommandBuffer[Data->Index], VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipelineLayout, 0, 1, &SkyboxDescriptorSet[Data->Index].DescriptorSet, 0, VK_NULL_HANDLE);
@@ -769,7 +773,7 @@ void Thread_Font(void *Arg)
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
 			.pNext=NULL,
 			.renderPass=RenderPass,
-			.framebuffer=FrameBuffers[Data->OldIndex]
+			.framebuffer=FrameBuffers[Data->Index]
 		}
 	});
 
@@ -800,7 +804,7 @@ void Thread_Particles(void *Arg)
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
 			.pNext=NULL,
 			.renderPass=RenderPass,
-			.framebuffer=FrameBuffers[Data->OldIndex]
+			.framebuffer=FrameBuffers[Data->Index]
 		}
 	});
 
@@ -831,109 +835,39 @@ void Thread_Particles(void *Arg)
 	Data->Done=true;
 }
 
-void HmdMatrix34toMatrix44(HmdMatrix34_t in, matrix out)
-{
-	out[0]=in.m[0][0];
-	out[1]=in.m[1][0];
-	out[2]=in.m[2][0];
-	out[3]=0.0f;
-	out[4]=in.m[0][1];
-	out[5]=in.m[1][1];
-	out[6]=in.m[2][1];
-	out[7]=0.0f;
-	out[8]=in.m[0][2];
-	out[9]=in.m[1][2];
-	out[10]=in.m[2][2];
-	out[11]=0.0f;
-	out[12]=in.m[0][3];
-	out[13]=in.m[1][3];
-	out[14]=in.m[2][3];
-	out[15]=1.0f;
-}
+matrix HMDMatrix;
 
-void Render(void)
+void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index)
 {
-	static uint32_t OldIndex=0;
-	uint32_t Index=OldIndex;
-
 	// Generate the projection matrix
-	MatrixIdentity(ubo->projection);
+//	MatrixIdentity(Main_UBO[Index]->projection);
 //	MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, true, ubo->projection);
-	HmdMatrix44_t EyeProjection=VRSystem->GetProjectionMatrix(EVREye_Eye_Left, 0.01f, 50000.0f);
-	EyeProjection.m[1][1]*=-1.0f;
-	memcpy(ubo->projection, &EyeProjection, sizeof(matrix));
-	MatrixTranspose(ubo->projection, ubo->projection);
+	memcpy(Main_UBO[Index]->projection, &EyeProjection[Index], sizeof(matrix));
 
 
 	// Set up the modelview matrix
-	MatrixIdentity(ubo->modelview);
-//	CameraUpdate(&Camera, fTimeStep, ubo->modelview);
+	MatrixIdentity(Main_UBO[Index]->modelview);
+	CameraUpdate(&Camera, fTimeStep, Main_UBO[Index]->modelview);
 
-	matrix HMDMatrix;
-	MatrixIdentity(HMDMatrix);
+	memcpy(Main_UBO[Index]->HMD, HMDMatrix, sizeof(matrix));
 
-	VRCompositor->WaitGetPoses(trackedDevicePose, k_unMaxTrackedDeviceCount, NULL, 0);
+	memcpy(Skybox_UBO[Index]->HMD, Main_UBO[Index]->HMD, sizeof(matrix));
 
-	if(trackedDevicePose[k_unTrackedDeviceIndex_Hmd].bDeviceIsConnected&&trackedDevicePose[k_unTrackedDeviceIndex_Hmd].bPoseIsValid)
-	{
-		HmdMatrix34toMatrix44(trackedDevicePose[k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking, HMDMatrix);
-		MatrixInverse(HMDMatrix, HMDMatrix);
-	}
+	memcpy(Skybox_UBO[Index]->modelview, Main_UBO[Index]->modelview, sizeof(matrix));
+	memcpy(Skybox_UBO[Index]->projection, Main_UBO[Index]->projection, sizeof(matrix));
 
-	// update matrices
-//	for(uint32_t i=0;i<2;i++)
-	uint32_t i=0;
-	{
-		HmdMatrix34_t EyeToHeadTransform=VRSystem->GetEyeToHeadTransform((EVREye)i);
+	Vec3_Setv(Main_UBO[Index]->light_color, Skybox_UBO[Index]->uSunColor);
+	Vec3_Setv(Main_UBO[Index]->light_direction, Skybox_UBO[Index]->uSunPosition);
+	Main_UBO[Index]->light_direction[3]=Skybox_UBO[Index]->uSunSize;
 
-		matrix eyeMat;
-		MatrixIdentity(eyeMat);
-		HmdMatrix34toMatrix44(EyeToHeadTransform, eyeMat);
-		MatrixInverse(eyeMat, eyeMat);
-		MatrixMult(eyeMat, HMDMatrix, ubo->HMD);
-	}
-
-	memcpy(Skybox_UBO->HMD, ubo->HMD, sizeof(matrix));
-
-	memcpy(Skybox_UBO->modelview, ubo->modelview, sizeof(matrix));
-	memcpy(Skybox_UBO->projection, ubo->projection, sizeof(matrix));
-
-	Vec3_Setv(ubo->light_color, Skybox_UBO->uSunColor);
-	Vec3_Setv(ubo->light_direction, Skybox_UBO->uSunPosition);
-	ubo->light_direction[3]=Skybox_UBO->uSunSize;
-
-	memcpy(ubo->light_mvp, Shadow_UBO.mvp, sizeof(matrix));
-
-	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain.Swapchain, UINT64_MAX, PresentCompleteSemaphores[Index], VK_NULL_HANDLE, &OldIndex);
-
-	if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
-	{
-		DBGPRINTF("Swapchain out of date... Rebuilding.\n");
-		RecreateSwapchain();
-		return;
-	}
-
-	vkWaitForFences(Context.Device, 1, &FrameFences[Index], VK_TRUE, UINT64_MAX);
-	vkResetFences(Context.Device, 1, &FrameFences[Index]);
-
-	//vkResetDescriptorPool(Context.Device, DescriptorPool[Index], 0);
-	vkResetCommandPool(Context.Device, Context.CommandPool[Index], 0);
-
-	// Start recording the commands
-	vkBeginCommandBuffer(CommandBuffers[Index], &(VkCommandBufferBeginInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
-	});
-
-	ShadowUpdateMap(CommandBuffers[Index], Index);
+	memcpy(Main_UBO[Index]->light_mvp, Shadow_UBO.mvp, sizeof(matrix));
 
 	// Start a render pass and clear the frame/depth buffer
-	vkCmdBeginRenderPass(CommandBuffers[Index], &(VkRenderPassBeginInfo)
+	vkCmdBeginRenderPass(CommandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=RenderPass,
-		.framebuffer=FrameBuffers[OldIndex],
+		.framebuffer=FrameBuffers[Index],
 		.clearValueCount=2,
 		.pClearValues=(VkClearValue[]) { { 0.0f, 0.0f, 0.0f, 1.0f }, { 1.0f, 0 } },
 		.renderArea.offset={ 0, 0 },
@@ -942,36 +876,29 @@ void Render(void)
 
 	// Set per thread data and add the job to that worker thread
 	ThreadData[0].Index=Index;
-	ThreadData[0].OldIndex=OldIndex;
 	ThreadData[0].Which=MODEL_ASTEROID1;
 	Thread_AddJob(&Thread[0], Thread_Main, (void *)&ThreadData[0]);
 
 	ThreadData[1].Index=Index;
-	ThreadData[1].OldIndex=OldIndex;
 	ThreadData[1].Which=MODEL_ASTEROID2;
 	Thread_AddJob(&Thread[1], Thread_Main, (void *)&ThreadData[1]);
 
 	ThreadData[2].Index=Index;
-	ThreadData[2].OldIndex=OldIndex;
 	ThreadData[2].Which=MODEL_ASTEROID3;
 	Thread_AddJob(&Thread[2], Thread_Main, (void *)&ThreadData[2]);
 
 	ThreadData[3].Index=Index;
-	ThreadData[3].OldIndex=OldIndex;
 	ThreadData[3].Which=MODEL_ASTEROID4;
 	Thread_AddJob(&Thread[3], Thread_Main, (void *)&ThreadData[3]);
 
 	ThreadData[4].Index=Index;
-	ThreadData[4].OldIndex=OldIndex;
 	Thread_AddJob(&Thread[4], Thread_Skybox, (void *)&ThreadData[4]);
 
-	ThreadData[5].Index=Index;
-	ThreadData[5].OldIndex=OldIndex;
-	Thread_AddJob(&Thread[5], Thread_Particles, (void *)&ThreadData[5]);
+//	ThreadData[5].Index=Index;
+//	Thread_AddJob(&Thread[5], Thread_Particles, (void *)&ThreadData[5]);
 
-	ThreadData[6].Index=Index;
-	ThreadData[6].OldIndex=OldIndex;
-	Thread_AddJob(&Thread[6], Thread_Font, (void *)&ThreadData[6]);
+//	ThreadData[6].Index=Index;
+//	Thread_AddJob(&Thread[6], Thread_Font, (void *)&ThreadData[6]);
 
 	// Wait for the threads to finish
 	while(!(
@@ -979,9 +906,9 @@ void Render(void)
 		ThreadData[1].Done&&
 		ThreadData[2].Done&&
 		ThreadData[3].Done&&
-		ThreadData[4].Done&&
-		ThreadData[5].Done&&
-		ThreadData[6].Done
+		ThreadData[4].Done
+//		ThreadData[5].Done&&
+//		ThreadData[6].Done
 	));
 
 	// Reset done flag
@@ -994,7 +921,7 @@ void Render(void)
 	ThreadData[6].Done=false;
 
 	// Execute the secondary command buffers from the threads
-	vkCmdExecuteCommands(CommandBuffers[Index], 7, (VkCommandBuffer[]) {
+	vkCmdExecuteCommands(CommandBuffer, 5, (VkCommandBuffer[]) {
 		ThreadData[0].SecCommandBuffer[Index],
 		ThreadData[1].SecCommandBuffer[Index],
 		ThreadData[2].SecCommandBuffer[Index],
@@ -1004,28 +931,121 @@ void Render(void)
 		ThreadData[6].SecCommandBuffer[Index]
 	});
 
-	vkCmdEndRenderPass(CommandBuffers[Index]);
+	vkCmdEndRenderPass(CommandBuffer);
+}
 
-	vkEndCommandBuffer(CommandBuffers[Index]);
+void Render(void)
+{
+	static uint32_t OldIndex=0;
+	static uint32_t Index=0;
+
+	MatrixIdentity(HMDMatrix);
+
+	VRCompositor->WaitGetPoses(trackedDevicePose, k_unMaxTrackedDeviceCount, NULL, 0);
+
+	if(trackedDevicePose[k_unTrackedDeviceIndex_Hmd].bDeviceIsConnected&&trackedDevicePose[k_unTrackedDeviceIndex_Hmd].bPoseIsValid)
+	{
+		HmdMatrix34toMatrix44(trackedDevicePose[k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking, HMDMatrix);
+		MatrixInverse(HMDMatrix, HMDMatrix);
+	}
+
+	vkResetFences(Context.Device, 1, &FrameFences[0]);
+
+	vkResetCommandPool(Context.Device, Context.CommandPool[0], 0);
+
+	// Start recording the commands
+	vkBeginCommandBuffer(CommandBuffers[0], &(VkCommandBufferBeginInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+	});
+
+	ShadowUpdateMap(CommandBuffers[0], 0);
+
+	vkCmdPipelineBarrier(CommandBuffers[0], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 2, (VkImageMemoryBarrier[])
+	{
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.image=ColorImage[0].Image,
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseMipLevel=0,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.layerCount=1,
+			.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
+			.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			.newLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		},
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.image=ColorImage[1].Image,
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseMipLevel=0,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.layerCount=1,
+			.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
+			.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			.newLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		}
+	});
+
+	EyeRender(CommandBuffers[0], 0);
+	EyeRender(CommandBuffers[0], 1);
+
+	vkCmdPipelineBarrier(CommandBuffers[0], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 2, (VkImageMemoryBarrier[])
+	{
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.image=ColorImage[0].Image,
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseMipLevel=0,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.layerCount=1,
+			.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
+			.oldLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			.newLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		},
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+			.image=ColorImage[1].Image,
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseMipLevel=0,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.layerCount=1,
+			.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
+			.oldLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			.newLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		}
+	});
+
+	vkEndCommandBuffer(CommandBuffers[0]);
 
 	// Sumit command queue
 	vkQueueSubmit(Context.Queue, 1, &(VkSubmitInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.pWaitDstStageMask=&(VkPipelineStageFlags) { VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT },
-		.waitSemaphoreCount=1,
-		.pWaitSemaphores=&PresentCompleteSemaphores[Index],
-		.signalSemaphoreCount=1,
-		.pSignalSemaphores=&RenderCompleteSemaphores[Index],
 		.commandBufferCount=1,
-		.pCommandBuffers=(VkCommandBuffer[]){ CommandBuffers[Index] },
-	}, FrameFences[Index]);
+		.pCommandBuffers=(VkCommandBuffer[]){ CommandBuffers[0] },
+	}, FrameFences[0]);
+
+	vkWaitForFences(Context.Device, 1, &FrameFences[0], VK_TRUE, UINT64_MAX);
 
 	VRTextureBounds_t bounds={ 0.0f, 0.0f, 1.0f, 1.0f };
 
 	VRVulkanTextureData_t vulkanData=
 	{
-		.m_nImage=(uint64_t)ColorImage.Image,
 		.m_pDevice=(struct VkDevice_T *)Context.Device,
 		.m_pPhysicalDevice=(struct VkPhysicalDevice_T *)Context.PhysicalDevice,
 		.m_pInstance=(struct VkInstance_T *)Instance,
@@ -1034,35 +1054,137 @@ void Render(void)
 
 		.m_nWidth=Width,
 		.m_nHeight=Height,
-		.m_nFormat=Swapchain.SurfaceFormat.format,
-		.m_nSampleCount=2,
+		.m_nFormat=ColorFormat,
+		.m_nSampleCount=MSAA,
 	};
 
 	struct Texture_t texture={ &vulkanData, ETextureType_TextureType_Vulkan, EColorSpace_ColorSpace_Auto };
+
+	vulkanData.m_nImage=(uint64_t)ColorImage[EVREye_Eye_Left].Image,
 	VRCompositor->Submit(EVREye_Eye_Left, &texture, &bounds, EVRSubmitFlags_Submit_Default);
 
-	vulkanData.m_nImage=(uint64_t)BlackTexture.Image;
-	vulkanData.m_nWidth=1;
-	vulkanData.m_nHeight=1;
+	vulkanData.m_nImage=(uint64_t)ColorImage[EVREye_Eye_Right].Image;
 	VRCompositor->Submit(EVREye_Eye_Right, &texture, &bounds, EVRSubmitFlags_Submit_Default);
 
-	// And present it to the screen
-	Result=vkQueuePresentKHR(Context.Queue, &(VkPresentInfoKHR)
-	{
-		.sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-		.waitSemaphoreCount=1,
-		.pWaitSemaphores=&RenderCompleteSemaphores[Index],
-		.swapchainCount=1,
-		.pSwapchains=&Swapchain.Swapchain,
-		.pImageIndices=&OldIndex,
-	});
-	
-	if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
-	{
-		DBGPRINTF("Swapchain out of date... Rebuilding.\n");
-		RecreateSwapchain();
-		return;
-	}
+//	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain.Swapchain, UINT64_MAX, PresentCompleteSemaphores[Index], VK_NULL_HANDLE, &OldIndex);
+//
+//	if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
+//	{
+//		DBGPRINTF("Swapchain out of date... Rebuilding.\n");
+//		RecreateSwapchain();
+//		return;
+//	}
+//
+//	vkResetFences(Context.Device, 1, &FrameFences[1]);
+//	vkResetCommandPool(Context.Device, Context.CommandPool[1], 0);
+//
+//	// Start recording the commands
+//	vkBeginCommandBuffer(CommandBuffers[1], &(VkCommandBufferBeginInfo)
+//	{
+//		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+//		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+//	});
+//
+//	vkCmdPipelineBarrier(CommandBuffers[1], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+//	{
+//		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+//		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+//		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+//		.image=Swapchain.Image[Index],
+//		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+//		.subresourceRange.baseMipLevel=0,
+//		.subresourceRange.levelCount=1,
+//		.subresourceRange.layerCount=1,
+//		.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
+//		.dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
+//		.oldLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+//		.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+//	});
+//
+//	vkCmdBlitImage(CommandBuffers[1], ColorImage[0].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Swapchain.Image[Index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
+//	{
+//		.srcOffsets[0]={ 0, 0, 0 },
+//		.srcOffsets[1]={ Width, Height, 1 },
+//		.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+//		.srcSubresource.mipLevel=0,
+//		.srcSubresource.baseArrayLayer=0,
+//		.srcSubresource.layerCount=1,
+//		.dstOffsets[0]={ 0, 0, 0 },
+//		.dstOffsets[1]={ Width, Height, 1 },
+//		.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+//		.dstSubresource.mipLevel=0,
+//		.dstSubresource.baseArrayLayer=0,
+//		.dstSubresource.layerCount=1,
+//	}, VK_FILTER_LINEAR);
+//
+//	vkCmdPipelineBarrier(CommandBuffers[1], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+//	{
+//		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+//		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+//		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+//		.image=ColorImage[0].Image,
+//		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+//		.subresourceRange.baseMipLevel=0,
+//		.subresourceRange.levelCount=1,
+//		.subresourceRange.layerCount=1,
+//		.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
+//		.dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
+//		.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+//		.newLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+//	});
+//
+//	vkCmdPipelineBarrier(CommandBuffers[1], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+//	{
+//		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+//		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+//		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+//		.image=Swapchain.Image[Index],
+//		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+//		.subresourceRange.baseMipLevel=0,
+//		.subresourceRange.levelCount=1,
+//		.subresourceRange.layerCount=1,
+//		.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
+//		.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
+//		.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+//		.newLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+//	});
+//
+//	vkEndCommandBuffer(CommandBuffers[1]);
+//
+//	// Sumit command queue
+//	vkQueueSubmit(Context.Queue, 1, &(VkSubmitInfo)
+//	{
+//		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
+//		.pWaitDstStageMask=&(VkPipelineStageFlags) { VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT },
+//		.waitSemaphoreCount=1,
+//		.pWaitSemaphores=&PresentCompleteSemaphores[Index],
+//		.signalSemaphoreCount=0,
+////		.pSignalSemaphores=&RenderCompleteSemaphores[Index],
+//		.commandBufferCount=1,
+//		.pCommandBuffers=(VkCommandBuffer[]){ CommandBuffers[1] },
+//	}, FrameFences[1]);
+//
+//	vkWaitForFences(Context.Device, 1, &FrameFences[1], VK_TRUE, UINT64_MAX);
+//
+//	// And present it to the screen
+//	Result=vkQueuePresentKHR(Context.Queue, &(VkPresentInfoKHR)
+//	{
+//		.sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+//		.waitSemaphoreCount=0,
+////		.pWaitSemaphores=&RenderCompleteSemaphores[Index],
+//		.swapchainCount=1,
+//		.pSwapchains=&Swapchain.Swapchain,
+//		.pImageIndices=&OldIndex,
+//	});
+//	
+//	if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
+//	{
+//		DBGPRINTF("Swapchain out of date... Rebuilding.\n");
+//		RecreateSwapchain();
+//		return;
+//	}
+
+	Index=(Index+1)%2;
 }
 
 #ifdef _DEBUG
@@ -1186,7 +1308,8 @@ bool Init(void)
 
 	// Create primary frame buffers, depth image
 	// This needs to be done after the render pass is created
-	CreateFramebuffers();
+	CreateFramebuffers(0);
+	CreateFramebuffers(1);
 
 	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 	{
@@ -1231,14 +1354,16 @@ void RecreateSwapchain(void)
 		// To resize a surface, we need to destroy and recreate anything that's tied to the surface.
 		// This is basically just the swapchain, framebuffers, and depthbuffer.
 
-		// Destroy the depthbuffer
-		vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
-		vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
-		vkuMem_Free(VkZone, DepthImage.DeviceMemory);
+		for(uint32_t i=0;i<2;i++)
+		{
+			// Destroy the depthbuffer
+			vkDestroyImageView(Context.Device, DepthImage[i].View, VK_NULL_HANDLE);
+			vkDestroyImage(Context.Device, DepthImage[i].Image, VK_NULL_HANDLE);
+			vkuMem_Free(VkZone, DepthImage[i].DeviceMemory);
 
-		// Destroy the framebuffers
-		for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+			// Destroy the framebuffers
 			vkDestroyFramebuffer(Context.Device, FrameBuffers[i], VK_NULL_HANDLE);
+		}
 
 		// Destroy the swapchain
 		vkuDestroySwapchain(&Context, &Swapchain);
@@ -1247,7 +1372,8 @@ void RecreateSwapchain(void)
 		vkuCreateSwapchain(&Context, &Swapchain, Width, Height, VK_TRUE);
 
 		// Recreate the framebuffer
-		CreateFramebuffers();
+		CreateFramebuffers(0);
+		CreateFramebuffers(1);
 	}
 }
 
@@ -1325,7 +1451,10 @@ void Destroy(void)
 	//////////
 
 	// Main render destruction
-	vkuDestroyBuffer(&Context, &uboBuffer);
+	vkUnmapMemory(Context.Device, uboBuffer[0].DeviceMemory);
+	vkuDestroyBuffer(&Context, &uboBuffer[0]);
+	vkUnmapMemory(Context.Device, uboBuffer[1].DeviceMemory);
+	vkuDestroyBuffer(&Context, &uboBuffer[1]);
 
 	vkDestroyPipeline(Context.Device, Pipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, PipelineLayout, VK_NULL_HANDLE);
@@ -1342,12 +1471,12 @@ void Destroy(void)
 	//////////
 
 	// Swapchain, framebuffer, and depthbuffer destruction
-	vkDestroyImageView(Context.Device, DepthImage.View, VK_NULL_HANDLE);
-	vkDestroyImage(Context.Device, DepthImage.Image, VK_NULL_HANDLE);
-	vkuMem_Free(VkZone, DepthImage.DeviceMemory);
-
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<2;i++)
 	{
+		vkDestroyImageView(Context.Device, DepthImage[i].View, VK_NULL_HANDLE);
+		vkDestroyImage(Context.Device, DepthImage[i].Image, VK_NULL_HANDLE);
+		vkuMem_Free(VkZone, DepthImage[i].DeviceMemory);
+
 		vkDestroyFramebuffer(Context.Device, FrameBuffers[i], VK_NULL_HANDLE);
 
 		vkDestroyFence(Context.Device, FrameFences[i], VK_NULL_HANDLE);

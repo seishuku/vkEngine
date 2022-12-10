@@ -9,7 +9,7 @@
 #include "skybox.h"
 #include "shadow.h"
 
-#define NUM_ASTEROIDS 600
+#define NUM_ASTEROIDS 50
 
 extern VkuContext_t Context;
 extern VkuBuffer_t Asteroid_Instance;
@@ -211,7 +211,7 @@ void ShadowUpdateMap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 	MatrixIdentity(ModelView);
 
 	vec3 Position;
-	Vec3_Setv(Position, Skybox_UBO->uSunPosition);
+	Vec3_Setv(Position, Skybox_UBO[0]->uSunPosition);
 	Vec3_Muls(Position, 20000.0f);
 
 	MatrixLookAt(Position, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.0f, 1.0f, 0.0f }, ModelView);

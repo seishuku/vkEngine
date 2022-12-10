@@ -70,6 +70,8 @@ layout(push_constant) uniform ubo
 	vec4 color;
 };
 
+layout (location=0) in vec4 vPosition;
+
 out gl_PerVertex
 {
     vec4 gl_Position;
@@ -79,6 +81,6 @@ layout(location=0) out vec4 Color;
 
 void main()
 {
-	gl_Position=mvp*vec4(ico[gl_VertexIndex], 1.0);
+	gl_Position=mvp*vec4(vPosition.xyz, 1.0);
 	Color=color;
 }

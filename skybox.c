@@ -10,9 +10,9 @@ extern VkuContext_t Context;
 extern VkRenderPass RenderPass;
 extern VkSampleCountFlags MSAA;
 
-Skybox_UBO_t *Skybox_UBO;
+Skybox_UBO_t *Skybox_UBO[2];
 
-VkuBuffer_t Skybox_UBO_Buffer;
+VkuBuffer_t Skybox_UBO_Buffer[2];
 
 VkuDescriptorSet_t SkyboxDescriptorSet[VKU_MAX_FRAME_COUNT];
 
@@ -57,16 +57,21 @@ bool CreateSkyboxPipeline(void)
 	if(!vkuAssemblePipeline(&SkyboxPipeline))
 		return false;
 
-	vkuCreateHostBuffer(&Context, &Skybox_UBO_Buffer, sizeof(Skybox_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-	vkMapMemory(Context.Device, Skybox_UBO_Buffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Skybox_UBO);
+	vkuCreateHostBuffer(&Context, &Skybox_UBO_Buffer[0], sizeof(Skybox_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	vkMapMemory(Context.Device, Skybox_UBO_Buffer[0].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Skybox_UBO[0]);
+
+	vkuCreateHostBuffer(&Context, &Skybox_UBO_Buffer[1], sizeof(Skybox_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	vkMapMemory(Context.Device, Skybox_UBO_Buffer[1].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Skybox_UBO[1]);
 
 	return true;
 }
 
 void DestroySkybox(void)
 {
-	vkUnmapMemory(Context.Device, Skybox_UBO_Buffer.DeviceMemory);
-	vkuDestroyBuffer(&Context, &Skybox_UBO_Buffer);
+	vkUnmapMemory(Context.Device, Skybox_UBO_Buffer[0].DeviceMemory);
+	vkuDestroyBuffer(&Context, &Skybox_UBO_Buffer[0]);
+	vkUnmapMemory(Context.Device, Skybox_UBO_Buffer[1].DeviceMemory);
+	vkuDestroyBuffer(&Context, &Skybox_UBO_Buffer[1]);
 
 	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 		vkDestroyDescriptorSetLayout(Context.Device, SkyboxDescriptorSet[i].DescriptorSetLayout, VK_NULL_HANDLE);

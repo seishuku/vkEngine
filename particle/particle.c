@@ -18,14 +18,18 @@ extern VkSampleCountFlags MSAA;
 
 extern VkuMemZone_t *VkZone;
 
-extern struct
+typedef struct
 {
+	matrix HMD;
 	matrix projection;
 	matrix modelview;
 	matrix light_mvp;
 	vec4 light_color;
 	vec4 light_direction;
-} *ubo;
+} UBO_t;
+
+extern UBO_t *Main_UBO[2];
+
 ////////////////////////////
 
 float PartGrav[3]={ 0.0, -9.81f, 0.0 };
@@ -380,9 +384,9 @@ void ParticleSystem_Draw(ParticleSystem_t *System, VkCommandBuffer CommandBuffer
 		}
 	}
 
-	MatrixMult(ubo->modelview, ubo->projection, ParticlePC.mvp);
-	Vec4_Set(ParticlePC.Right, ubo->modelview[0], ubo->modelview[4], ubo->modelview[8], ubo->modelview[12]);
-	Vec4_Set(ParticlePC.Up, ubo->modelview[1], ubo->modelview[5], ubo->modelview[9], ubo->modelview[13]);
+	MatrixMult(Main_UBO[0]->modelview, Main_UBO[0]->projection, ParticlePC.mvp);
+	Vec4_Set(ParticlePC.Right, Main_UBO[0]->modelview[0], Main_UBO[0]->modelview[4], Main_UBO[0]->modelview[8], Main_UBO[0]->modelview[12]);
+	Vec4_Set(ParticlePC.Up, Main_UBO[0]->modelview[1], Main_UBO[0]->modelview[5], Main_UBO[0]->modelview[9], Main_UBO[0]->modelview[13]);
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&ParticleDescriptorSet, 0, &ParticleTexture);
 	vkuAllocateUpdateDescriptorSet(&ParticleDescriptorSet, DescriptorPool);
