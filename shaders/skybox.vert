@@ -96,8 +96,8 @@ layout (location=0) out vec3 Position;
 
 void main()
 {
-	vec3 vPosition=ico[gl_VertexIndex]*20000.0f;
+	vec3 vPosition=ico[gl_VertexIndex];
 
-	gl_Position=projection*modelview*HMD*vec4(vPosition, 1.0);
+	gl_Position=projection*HMD*modelview*vec4(vPosition, 0.0);
 	Position=normalize(vPosition);
 }

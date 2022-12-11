@@ -9,7 +9,7 @@
 #include "skybox.h"
 #include "shadow.h"
 
-#define NUM_ASTEROIDS 50
+#define NUM_ASTEROIDS 300
 
 extern VkuContext_t Context;
 extern VkuBuffer_t Asteroid_Instance;

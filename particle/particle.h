@@ -38,7 +38,7 @@ void ParticleSystem_SetEmitterPosition(ParticleSystem_t *System, uint32_t ID, ve
 
 bool ParticleSystem_Init(ParticleSystem_t *System);
 void ParticleSystem_Step(ParticleSystem_t *System, float dt);
-void ParticleSystem_Draw(ParticleSystem_t *System, VkCommandBuffer CommandBuffer, VkDescriptorPool DescriptorPool);
+void ParticleSystem_Draw(ParticleSystem_t *System, VkCommandBuffer CommandBuffer, VkDescriptorPool DescriptorPool, matrix Modelview, matrix Projection);
 void ParticleSystem_Destroy(ParticleSystem_t *System);
 
 #endif

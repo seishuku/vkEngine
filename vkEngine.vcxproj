@@ -118,6 +118,7 @@
     <ClCompile Include="utils\input.c" />
     <ClCompile Include="utils\list.c" />
     <ClCompile Include="utils\memzone.c" />
+    <ClCompile Include="vr\vr.c" />
     <ClCompile Include="vulkan\vulkan_buffer.c" />
     <ClCompile Include="vulkan\vulkan_context.c" />
     <ClCompile Include="vulkan\vulkan_descriptorset.c" />
@@ -144,6 +145,7 @@
     <ClInclude Include="utils\input.h" />
     <ClInclude Include="utils\list.h" />
     <ClInclude Include="utils\memzone.h" />
+    <ClInclude Include="vr\vr.h" />
     <ClInclude Include="vulkan\vulkan.h" />
   </ItemGroup>
   <ItemGroup>

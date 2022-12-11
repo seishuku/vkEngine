@@ -76,6 +76,12 @@
     <Filter Include="Source Files\threads">
       <UniqueIdentifier>{1ecbd12b-40da-4da3-91bd-a788e95b21b6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\vr">
+      <UniqueIdentifier>{59309212-1e7c-4c97-9b20-c652ece3b96a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\vr">
+      <UniqueIdentifier>{ac23c9dc-2db0-4ba0-a607-52d96c97ff57}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="engine.c">
@@ -153,6 +159,9 @@
     <ClCompile Include="threads\threads.c">
       <Filter>Source Files\threads</Filter>
     </ClCompile>
+    <ClCompile Include="vr\vr.c">
+      <Filter>Source Files\vr</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
@@ -208,6 +217,9 @@
     </ClInclude>
     <ClInclude Include="threads\threads.h">
       <Filter>Header Files\threads</Filter>
+    </ClInclude>
+    <ClInclude Include="vr\vr.h">
+      <Filter>Header Files\vr</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
