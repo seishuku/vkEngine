@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include "../system/system.h"
 #include "../math/math.h"
 #include "vr.h"
@@ -129,9 +130,7 @@ bool InitOpenVR(void)
 
 	VRSystem->GetRecommendedRenderTargetSize(&rtWidth, &rtHeight);
 
-	DBGPRINTF(DEBUG_INFO, "HMD suggested render target size: %d x %d\n", rtWidth, rtHeight);
-
-	const float freq=VRSystem->GetFloatTrackedDeviceProperty(k_unTrackedDeviceIndex_Hmd, ETrackedDeviceProperty_Prop_DisplayFrequency_Float, &eError);
+	const float Freq=VRSystem->GetFloatTrackedDeviceProperty(k_unTrackedDeviceIndex_Hmd, ETrackedDeviceProperty_Prop_DisplayFrequency_Float, &eError);
 
 	if(eError!=EVRInitError_VRInitError_None)
 	{
@@ -139,7 +138,7 @@ bool InitOpenVR(void)
 		return false;
 	}
 
-	DBGPRINTF(DEBUG_INFO, "HMD display frequency: %0.3f\n", freq);
+	DBGPRINTF(DEBUG_INFO, "HMD suggested render target size: %d x %d @ %0.1fHz\n", rtWidth, rtHeight, Freq);
 
 	GetEyeProjection(EVREye_Eye_Left, EyeProjection[0]);
 	GetEyeProjection(EVREye_Eye_Right, EyeProjection[1]);

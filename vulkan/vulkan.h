@@ -213,7 +213,10 @@ VkBool32 vkuCreateHostBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_
 VkBool32 vkuCreateGPUBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags);
 void vkuDestroyBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer);
 
-VkBool32 vkuCopyBuffer(VkuContext_t *Context, VkBuffer Src, VkBuffer Dest, uint32_t Size);
+void vkuTransitionLayout(VkCommandBuffer CommandBuffer, VkImage Image, uint32_t levelCount, uint32_t baseLevel, uint32_t layerCount, uint32_t baseLayer, VkImageLayout oldLayout, VkImageLayout newLayout);
+
+VkCommandBuffer vkuOneShotCommandBufferBegin(VkuContext_t *Context);
+VkBool32 vkuOneShotCommandBufferEnd(VkuContext_t *Context, VkCommandBuffer CommandBuffer);
 
 VkBool32 vkuPipeline_AddVertexBinding(VkuPipeline_t *Pipeline, uint32_t Binding, uint32_t Stride, VkVertexInputRate InputRate);
 VkBool32 vkuPipeline_AddVertexAttribute(VkuPipeline_t *Pipeline, uint32_t Location, uint32_t Binding, VkFormat Format, uint32_t Offset);

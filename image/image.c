@@ -673,26 +673,9 @@ void GenerateMipmaps(VkCommandBuffer commandBuffer, VkuImage_t *Image, uint32_t 
 	uint32_t texWidth=Image->Width;
 	uint32_t texHeight=Image->Height;
 
-	VkImageMemoryBarrier MemoryBarrier=
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.image=Image->Image,
-		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseArrayLayer=baseLayer,
-		.subresourceRange.layerCount=1,
-		.subresourceRange.levelCount=1,
-	};
-
 	for(uint32_t i=1;i<mipLevels;i++)
 	{
-		MemoryBarrier.subresourceRange.baseMipLevel=i-1;
-		MemoryBarrier.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		MemoryBarrier.newLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-		MemoryBarrier.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;
-		MemoryBarrier.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT;
-		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &MemoryBarrier);
+		vkuTransitionLayout(commandBuffer, Image->Image, 1, i-1, 1, baseLayer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
 		vkCmdBlitImage(commandBuffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
 		{
@@ -710,11 +693,7 @@ void GenerateMipmaps(VkCommandBuffer commandBuffer, VkuImage_t *Image, uint32_t 
 			.dstSubresource.layerCount=1,
 		}, VK_FILTER_LINEAR);
 
-		MemoryBarrier.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-		MemoryBarrier.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		MemoryBarrier.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT;
-		MemoryBarrier.dstAccessMask=VK_ACCESS_SHADER_READ_BIT;
-		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &MemoryBarrier);
+		vkuTransitionLayout(commandBuffer, Image->Image, 1, i-1, 1, baseLayer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 		if(texWidth>1)
 			texWidth/=2;
@@ -723,13 +702,7 @@ void GenerateMipmaps(VkCommandBuffer commandBuffer, VkuImage_t *Image, uint32_t 
 			texHeight/=2;
 	}
 
-	MemoryBarrier.subresourceRange.baseMipLevel=mipLevels-1;
-	MemoryBarrier.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	MemoryBarrier.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	MemoryBarrier.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;
-	MemoryBarrier.dstAccessMask=VK_ACCESS_SHADER_READ_BIT;
-
-	vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &MemoryBarrier);
+	vkuTransitionLayout(commandBuffer, Image->Image, 1, mipLevels-1, 1, baseLayer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *Filename, uint32_t Flags)
@@ -743,7 +716,6 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 	VkSamplerAddressMode WrapModeW=VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	VkFormat Format=VK_FORMAT_UNDEFINED;
 	VkCommandBuffer CommandBuffer;
-	VkFence Fence;
 	VkuBuffer_t StagingBuffer;
 	void *Data=NULL;
 	uint32_t Size=0;
@@ -885,38 +857,11 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
 
-		// Setup a command buffer to transfer image to device and change shader read layout
-		vkAllocateCommandBuffers(Context->Device, &(VkCommandBufferAllocateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-			.commandPool=Context->CommandPool[0],
-			.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-			.commandBufferCount=1,
-		}, &CommandBuffer);
-
-		// Start recording commands
-		vkBeginCommandBuffer(CommandBuffer, &(VkCommandBufferBeginInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-			.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-		});
+		// Start a one shot command buffer
+		CommandBuffer=vkuOneShotCommandBufferBegin(Context);
 
 		// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
-		vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=Image->Image,
-			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.subresourceRange.baseMipLevel=0,
-			.subresourceRange.levelCount=MipLevels,
-			.subresourceRange.layerCount=6,
-			.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
-			.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-			.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		});
+		vkuTransitionLayout(CommandBuffer, Image->Image, MipLevels, 0, 6, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 		// Setup buffer copy regions for each face including all of its miplevels
 		VkBufferImageCopy BufferCopyRegions[6];
@@ -950,45 +895,11 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		else
 		{
 			// Now change the image layout from destination optimal to shader read-only.
-			vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-			{
-				.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-				.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-				.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-				.image=Image->Image,
-				.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-				.subresourceRange.baseMipLevel=0,
-				.subresourceRange.levelCount=MipLevels,
-				.subresourceRange.layerCount=6,
-				.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
-				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-				.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			});
+			vkuTransitionLayout(CommandBuffer, Image->Image, MipLevels, 0, 6, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		}
 
-		// Stop recording
-		vkEndCommandBuffer(CommandBuffer);
-
-		// Create a fence for the queue submit
-		vkCreateFence(Context->Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &Fence);
-
-		// Submit to the queue
-		vkQueueSubmit(Context->Queue, 1, &(VkSubmitInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
-			.commandBufferCount=1,
-			.pCommandBuffers=&CommandBuffer,
-		}, Fence);
-
-		// Wait for the queue submit to finish
-		vkWaitForFences(Context->Device, 1, &Fence, VK_TRUE, UINT64_MAX);
-
-		// Destroy fence
-		vkDestroyFence(Context->Device, Fence, VK_NULL_HANDLE);
-
-		// Free the command buffer
-		vkFreeCommandBuffers(Context->Device, Context->CommandPool[0], 1, &CommandBuffer);
+		// End one shot command buffer and submit
+		vkuOneShotCommandBufferEnd(Context, CommandBuffer);
 
 		// Delete staging buffers
 		vkFreeMemory(Context->Device, StagingBuffer.DeviceMemory, VK_NULL_HANDLE);
@@ -1008,7 +919,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 			.mipLodBias=0.0f,
 			.compareOp=VK_COMPARE_OP_NEVER,
 			.minLod=0.0f,
-			.maxLod=MipLevels,
+			.maxLod=(float)MipLevels,
 			.maxAnisotropy=1.0,
 			.anisotropyEnable=VK_FALSE,
 			.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
@@ -1058,38 +969,11 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
 		return VK_FALSE;
 
-	// Setup a command buffer to transfer image to device and change shader read layout
-	vkAllocateCommandBuffers(Context->Device, &(VkCommandBufferAllocateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=Context->CommandPool[0],
-		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount=1,
-	}, &CommandBuffer);
-
-	// Start recording commands
-	vkBeginCommandBuffer(CommandBuffer, &(VkCommandBufferBeginInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-	});
+	// Start a one shot command buffer
+	CommandBuffer=vkuOneShotCommandBufferBegin(Context);
 
 	// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
-	vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.image=Image->Image,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.levelCount=MipLevels,
-		.subresourceRange.layerCount=1,
-		.srcAccessMask=VK_ACCESS_HOST_READ_BIT,
-		.dstAccessMask=VK_ACCESS_HOST_WRITE_BIT,
-		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-		.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-	});
+	vkuTransitionLayout(CommandBuffer, Image->Image, MipLevels, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 	// Copy from staging buffer to the texture buffer.
 	vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer.Buffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkBufferImageCopy)
@@ -1110,45 +994,11 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 	else
 	{
 		// Now change the image layout from destination optimal to be optimal reading only by shader.
-		vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=Image->Image,
-			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.subresourceRange.baseMipLevel=0,
-			.subresourceRange.levelCount=1,
-			.subresourceRange.layerCount=1,
-			.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
-			.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		});
+		vkuTransitionLayout(CommandBuffer, Image->Image, MipLevels, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	}
 
-	// Stop recording
-	vkEndCommandBuffer(CommandBuffer);
-		
-	// Create a fence for the queue submit
-	vkCreateFence(Context->Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &Fence);
-
-	// Submit to the queue
-	vkQueueSubmit(Context->Queue, 1, &(VkSubmitInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.commandBufferCount=1,
-		.pCommandBuffers=&CommandBuffer,
-	}, Fence);
-
-	// Wait for the queue submit to finish
-	vkWaitForFences(Context->Device, 1, &Fence, VK_TRUE, UINT64_MAX);
-
-	// Destroy fence
-	vkDestroyFence(Context->Device, Fence, VK_NULL_HANDLE);
-
-	// Free the command buffer
-	vkFreeCommandBuffers(Context->Device, Context->CommandPool[0], 1, &CommandBuffer);
+	// End one shot command buffer and submit
+	vkuOneShotCommandBufferEnd(Context, CommandBuffer);
 
 	// Delete staging buffers
 	vkFreeMemory(Context->Device, StagingBuffer.DeviceMemory, VK_NULL_HANDLE);

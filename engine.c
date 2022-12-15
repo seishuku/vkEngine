@@ -9,7 +9,6 @@
 #include "camera/camera.h"
 #include "model/bmodel.h"
 #include "image/image.h"
-#include "font/font.h"
 #include "utils/list.h"
 #include "lights/lights.h"
 #include "utils/event.h"
@@ -17,6 +16,7 @@
 #include "particle/particle.h"
 #include "threads/threads.h"
 #include "vr/vr.h"
+#include "font/font.h"
 #include "models.h"
 #include "textures.h"
 #include "skybox.h"
@@ -194,6 +194,10 @@ bool CreateFramebuffers(uint32_t Eye)
 		.layers=1,
 	}, 0, &FrameBuffers[Eye]);
 
+	VkCommandBuffer CommandBuffer=vkuOneShotCommandBufferBegin(&Context);
+	vkuTransitionLayout(CommandBuffer, ColorImage[Eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	vkuTransitionLayout(CommandBuffer, DepthImage[Eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+	vkuOneShotCommandBufferEnd(&Context, CommandBuffer);
 
 	return true;
 }
@@ -652,7 +656,7 @@ void Thread_Font(void *Arg)
 	vkCmdSetViewport(Data->SecCommandBuffer[Data->Index], 0, 1, &(VkViewport) { 0.0f, 0, (float)rtWidth, (float)rtHeight, 0.0f, 1.0f });
 	vkCmdSetScissor(Data->SecCommandBuffer[Data->Index], 0, 1, &(VkRect2D) { { 0, 0 }, { rtWidth, rtHeight } });
 
-	Font_Print(Data->SecCommandBuffer[Data->Index], 0.0f, 16.0f, "FPS: %0.1f", fps);
+	Font_Print(Data->SecCommandBuffer[Data->Index], 0.0f, 0.0f, "FPS: %0.1f", fps);
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Index]);
 
@@ -711,66 +715,66 @@ void Thread_Particles(void *Arg)
 
 matrix HMDMatrix;
 
-void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, matrix Pose)
+void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Eye, matrix Pose)
 {
 	// Generate the projection matrix
-//	MatrixIdentity(Main_UBO[Index]->projection);
-//	MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, true, ubo->projection);
-	memcpy(Main_UBO[Index]->projection, &EyeProjection[Index], sizeof(matrix));
+//	MatrixIdentity(Main_UBO[Eye]->projection);
+//	MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, true, Main_UBO[Eye]->projection);
+	memcpy(Main_UBO[Eye]->projection, &EyeProjection[Eye], sizeof(matrix));
 
 	// Set up the modelview matrix
-	MatrixIdentity(Main_UBO[Index]->modelview);
-	CameraUpdate(&Camera, fTimeStep, Main_UBO[Index]->modelview);
+	MatrixIdentity(Main_UBO[Eye]->modelview);
+	CameraUpdate(&Camera, fTimeStep, Main_UBO[Eye]->modelview);
 
-	memcpy(Main_UBO[Index]->HMD, Pose, sizeof(matrix));
+	memcpy(Main_UBO[Eye]->HMD, Pose, sizeof(matrix));
 
-	memcpy(Skybox_UBO[Index]->HMD, Main_UBO[Index]->HMD, sizeof(matrix));
+	memcpy(Skybox_UBO[Eye]->HMD, Main_UBO[Eye]->HMD, sizeof(matrix));
 
-	memcpy(Skybox_UBO[Index]->modelview, Main_UBO[Index]->modelview, sizeof(matrix));
-	memcpy(Skybox_UBO[Index]->projection, Main_UBO[Index]->projection, sizeof(matrix));
+	memcpy(Skybox_UBO[Eye]->modelview, Main_UBO[Eye]->modelview, sizeof(matrix));
+	memcpy(Skybox_UBO[Eye]->projection, Main_UBO[Eye]->projection, sizeof(matrix));
 
-	Vec3_Setv(Main_UBO[Index]->light_color, Skybox_UBO[Index]->uSunColor);
-	Vec3_Setv(Main_UBO[Index]->light_direction, Skybox_UBO[Index]->uSunPosition);
-	Main_UBO[Index]->light_direction[3]=Skybox_UBO[Index]->uSunSize;
+	Vec3_Setv(Main_UBO[Eye]->light_color, Skybox_UBO[Eye]->uSunColor);
+	Vec3_Setv(Main_UBO[Eye]->light_direction, Skybox_UBO[Eye]->uSunPosition);
+	Main_UBO[Eye]->light_direction[3]=Skybox_UBO[Eye]->uSunSize;
 
-	memcpy(Main_UBO[Index]->light_mvp, Shadow_UBO.mvp, sizeof(matrix));
+	memcpy(Main_UBO[Eye]->light_mvp, Shadow_UBO.mvp, sizeof(matrix));
 
 	// Start a render pass and clear the frame/depth buffer
 	vkCmdBeginRenderPass(CommandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=RenderPass,
-		.framebuffer=FrameBuffers[Index],
+		.framebuffer=FrameBuffers[Eye],
 		.clearValueCount=2,
 		.pClearValues=(VkClearValue[]) { { 0.0f, 0.0f, 0.0f, 1.0f }, { 1.0f, 0 } },
 		.renderArea=(VkRect2D){ { 0, 0 }, { rtWidth, rtHeight } },
 	}, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
 	// Set per thread data and add the job to that worker thread
-	ThreadData[0].Index=Index;
+	ThreadData[0].Index=Eye;
 	ThreadData[0].Which=MODEL_ASTEROID1;
 	Thread_AddJob(&Thread[0], Thread_Main, (void *)&ThreadData[0]);
 
-	ThreadData[1].Index=Index;
+	ThreadData[1].Index=Eye;
 	ThreadData[1].Which=MODEL_ASTEROID2;
 	Thread_AddJob(&Thread[1], Thread_Main, (void *)&ThreadData[1]);
 
-	ThreadData[2].Index=Index;
+	ThreadData[2].Index=Eye;
 	ThreadData[2].Which=MODEL_ASTEROID3;
 	Thread_AddJob(&Thread[2], Thread_Main, (void *)&ThreadData[2]);
 
-	ThreadData[3].Index=Index;
+	ThreadData[3].Index=Eye;
 	ThreadData[3].Which=MODEL_ASTEROID4;
 	Thread_AddJob(&Thread[3], Thread_Main, (void *)&ThreadData[3]);
 
-	ThreadData[4].Index=Index;
+	ThreadData[4].Index=Eye;
 	Thread_AddJob(&Thread[4], Thread_Skybox, (void *)&ThreadData[4]);
 
-	ThreadData[5].Index=Index;
+	ThreadData[5].Index=Eye;
 	Thread_AddJob(&Thread[5], Thread_Particles, (void *)&ThreadData[5]);
 
-//	ThreadData[6].Index=Index;
-//	Thread_AddJob(&Thread[6], Thread_Font, (void *)&ThreadData[6]);
+	//ThreadData[6].Index=Eye;
+	//Thread_AddJob(&Thread[6], Thread_Font, (void *)&ThreadData[6]);
 
 	// Wait for the threads to finish
 	while(!(
@@ -794,13 +798,13 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, matrix Pose)
 
 	// Execute the secondary command buffers from the threads
 	vkCmdExecuteCommands(CommandBuffer, 6, (VkCommandBuffer[]) {
-		ThreadData[0].SecCommandBuffer[Index],
-		ThreadData[1].SecCommandBuffer[Index],
-		ThreadData[2].SecCommandBuffer[Index],
-		ThreadData[3].SecCommandBuffer[Index],
-		ThreadData[4].SecCommandBuffer[Index],
-		ThreadData[5].SecCommandBuffer[Index],
-		ThreadData[6].SecCommandBuffer[Index]
+		ThreadData[0].SecCommandBuffer[Eye],
+		ThreadData[1].SecCommandBuffer[Eye],
+		ThreadData[2].SecCommandBuffer[Eye],
+		ThreadData[3].SecCommandBuffer[Eye],
+		ThreadData[4].SecCommandBuffer[Eye],
+		ThreadData[5].SecCommandBuffer[Eye],
+//		ThreadData[6].SecCommandBuffer[Eye]
 	});
 
 	vkCmdEndRenderPass(CommandBuffer);
@@ -828,72 +832,14 @@ void Render(void)
 
 	ShadowUpdateMap(CommandBuffers[0], 0);
 
-	vkCmdPipelineBarrier(CommandBuffers[0], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 2, (VkImageMemoryBarrier[])
-	{
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=ColorImage[0].Image,
-			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.subresourceRange.baseMipLevel=0,
-			.subresourceRange.levelCount=1,
-			.subresourceRange.layerCount=1,
-			.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-			.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-			.newLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		},
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=ColorImage[1].Image,
-			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.subresourceRange.baseMipLevel=0,
-			.subresourceRange.levelCount=1,
-			.subresourceRange.layerCount=1,
-			.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-			.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-			.newLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		}
-	});
+	vkuTransitionLayout(CommandBuffers[0], ColorImage[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	vkuTransitionLayout(CommandBuffers[0], ColorImage[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 	EyeRender(CommandBuffers[0], 0, Pose);
 	EyeRender(CommandBuffers[0], 1, Pose);
 
-	vkCmdPipelineBarrier(CommandBuffers[0], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 2, (VkImageMemoryBarrier[])
-	{
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=ColorImage[0].Image,
-			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.subresourceRange.baseMipLevel=0,
-			.subresourceRange.levelCount=1,
-			.subresourceRange.layerCount=1,
-			.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-			.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			.newLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		},
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=ColorImage[1].Image,
-			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.subresourceRange.baseMipLevel=0,
-			.subresourceRange.levelCount=1,
-			.subresourceRange.layerCount=1,
-			.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-			.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			.newLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		}
-	});
+	vkuTransitionLayout(CommandBuffers[0], ColorImage[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	vkuTransitionLayout(CommandBuffers[0], ColorImage[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
 	vkEndCommandBuffer(CommandBuffers[0]);
 
@@ -953,53 +899,9 @@ void Render(void)
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 	});
 
-	vkCmdPipelineBarrier(CommandBuffers[1], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.image=Swapchain.Image[Index],
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.levelCount=1,
-		.subresourceRange.layerCount=1,
-		.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-		.dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
-		.oldLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-		.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-	});
-
-	vkCmdPipelineBarrier(CommandBuffers[1], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.image=ColorResolve[0].Image,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.levelCount=1,
-		.subresourceRange.layerCount=1,
-		.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-		.dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
-		.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-	});
-
-	vkCmdPipelineBarrier(CommandBuffers[1], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.image=ColorResolve[1].Image,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.levelCount=1,
-		.subresourceRange.layerCount=1,
-		.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-		.dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
-		.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-	});
+	vkuTransitionLayout(CommandBuffers[1], Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	vkuTransitionLayout(CommandBuffers[1], ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	vkuTransitionLayout(CommandBuffers[1], ColorResolve[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 	vkCmdResolveImage(CommandBuffers[1], ColorImage[0].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, ColorResolve[0].Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageResolve)
 	{
@@ -1031,37 +933,8 @@ void Render(void)
 		.dstSubresource.layerCount=1,
 	});
 
-	vkCmdPipelineBarrier(CommandBuffers[1], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.image=ColorResolve[0].Image,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.levelCount=1,
-		.subresourceRange.layerCount=1,
-		.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
-		.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-		.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		.newLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-	});
-
-	vkCmdPipelineBarrier(CommandBuffers[1], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.image=ColorResolve[1].Image,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.levelCount=1,
-		.subresourceRange.layerCount=1,
-		.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
-		.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-		.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		.newLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-	});
+	vkuTransitionLayout(CommandBuffers[1], ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	vkuTransitionLayout(CommandBuffers[1], ColorResolve[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
 	vkCmdBlitImage(CommandBuffers[1], ColorResolve[0].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Swapchain.Image[Index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
 	{
@@ -1095,21 +968,7 @@ void Render(void)
 		.dstSubresource.layerCount=1,
 	}, VK_FILTER_LINEAR);
 
-	vkCmdPipelineBarrier(CommandBuffers[1], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.image=Swapchain.Image[Index],
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.levelCount=1,
-		.subresourceRange.layerCount=1,
-		.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
-		.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-		.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		.newLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-	});
+	vkuTransitionLayout(CommandBuffers[1], Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
 	vkEndCommandBuffer(CommandBuffers[1]);
 

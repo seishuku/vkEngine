@@ -342,6 +342,7 @@ void FreeBModel(BModel_t *Model)
 
 void BuildMemoryBuffersBModel(VkuContext_t *Context, BModel_t *Model)
 {
+	VkCommandBuffer CopyCommand=VK_NULL_HANDLE;
 	VkuBuffer_t stagingBuffer;
 	void *Data=NULL;
 
@@ -389,7 +390,9 @@ void BuildMemoryBuffersBModel(VkuContext_t *Context, BModel_t *Model)
 	vkUnmapMemory(Context->Device, stagingBuffer.DeviceMemory);
 
 	// Copy to device memory
-	vkuCopyBuffer(Context, stagingBuffer.Buffer, Model->VertexBuffer.Buffer, sizeof(float)*20*Model->NumVertex);
+	CopyCommand=vkuOneShotCommandBufferBegin(Context);
+	vkCmdCopyBuffer(CopyCommand, stagingBuffer.Buffer, Model->VertexBuffer.Buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(float)*20*Model->NumVertex });
+	vkuOneShotCommandBufferEnd(Context, CopyCommand);
 
 	// Delete staging data
 	vkFreeMemory(Context->Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
@@ -419,7 +422,9 @@ void BuildMemoryBuffersBModel(VkuContext_t *Context, BModel_t *Model)
 
 		vkUnmapMemory(Context->Device, stagingBuffer.DeviceMemory);
 
-		vkuCopyBuffer(Context, stagingBuffer.Buffer, Model->Mesh[i].IndexBuffer.Buffer, sizeof(uint32_t)*Model->Mesh[i].NumFace*3);
+		CopyCommand=vkuOneShotCommandBufferBegin(Context);
+		vkCmdCopyBuffer(CopyCommand, stagingBuffer.Buffer, Model->Mesh[i].IndexBuffer.Buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(uint32_t)*Model->Mesh[i].NumFace*3 });
+		vkuOneShotCommandBufferEnd(Context, CopyCommand);
 
 		// Delete staging data
 		vkFreeMemory(Context->Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);

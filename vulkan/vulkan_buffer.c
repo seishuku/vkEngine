@@ -173,42 +173,172 @@ void vkuDestroyBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer)
 		vkuMem_Free(VkZone, Buffer->Memory);
 }
 
-// Copy from one buffer to another
-VkBool32 vkuCopyBuffer(VkuContext_t *Context, VkBuffer Src, VkBuffer Dest, uint32_t Size)
+void vkuTransitionLayout(VkCommandBuffer CommandBuffer, VkImage Image, uint32_t levelCount, uint32_t baseLevel, uint32_t layerCount, uint32_t baseLayer, VkImageLayout oldLayout, VkImageLayout newLayout)
 {
-	VkCommandBuffer CopyCmd=VK_NULL_HANDLE;
-	VkFence Fence=VK_NULL_HANDLE;
+	VkPipelineStageFlags SrcStageFlag=VK_PIPELINE_STAGE_NONE;
+	VkPipelineStageFlags DstStageFlag=VK_PIPELINE_STAGE_NONE;
+	VkAccessFlags SrcAccessMask=VK_ACCESS_NONE;
+	VkAccessFlags DstAccessMask=VK_ACCESS_NONE;
+	VkImageAspectFlags AspectMask=VK_IMAGE_ASPECT_COLOR_BIT;
+
+	switch(oldLayout)
+	{
+		case VK_IMAGE_LAYOUT_PREINITIALIZED:
+			SrcAccessMask=VK_ACCESS_HOST_WRITE_BIT;
+			SrcStageFlag=VK_PIPELINE_STAGE_HOST_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			SrcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			SrcStageFlag=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			SrcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			AspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT;
+			SrcStageFlag=VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			SrcAccessMask=VK_ACCESS_TRANSFER_READ_BIT;
+			SrcStageFlag=VK_PIPELINE_STAGE_TRANSFER_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			SrcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;
+			SrcStageFlag=VK_PIPELINE_STAGE_TRANSFER_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			SrcAccessMask=VK_ACCESS_SHADER_READ_BIT;
+			SrcStageFlag=VK_PIPELINE_STAGE_TRANSFER_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_UNDEFINED:
+		default:
+			SrcStageFlag=VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+			break;
+	}
+
+	switch(newLayout)
+	{
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			DstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;
+			DstStageFlag=VK_PIPELINE_STAGE_TRANSFER_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			DstAccessMask=VK_ACCESS_TRANSFER_READ_BIT;
+			DstStageFlag=VK_PIPELINE_STAGE_TRANSFER_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			DstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			DstStageFlag=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			DstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			DstStageFlag=VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+			AspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			if(SrcAccessMask==0)
+				SrcAccessMask=VK_ACCESS_HOST_WRITE_BIT|VK_ACCESS_TRANSFER_WRITE_BIT;
+
+			DstAccessMask=VK_ACCESS_SHADER_READ_BIT;
+			DstStageFlag=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+			DstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			DstStageFlag=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			break;
+
+		default:
+			break;
+	}
+
+	vkCmdPipelineBarrier(CommandBuffer, SrcStageFlag, DstStageFlag, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=Image,
+		.subresourceRange.aspectMask=AspectMask,
+		.subresourceRange.baseMipLevel=baseLevel,
+		.subresourceRange.levelCount=levelCount,
+		.subresourceRange.baseArrayLayer=baseLayer,
+		.subresourceRange.layerCount=layerCount,
+		.srcAccessMask=SrcAccessMask,
+		.dstAccessMask=DstAccessMask,
+		.oldLayout=oldLayout,
+		.newLayout=newLayout,
+	});
+}
+
+VkCommandBuffer vkuOneShotCommandBufferBegin(VkuContext_t *Context)
+{
+	VkCommandBuffer CommandBuffer;
 
 	// Create a command buffer to submit a copy command from the staging buffer into the static vertex buffer
-	vkAllocateCommandBuffers(Context->Device, &(VkCommandBufferAllocateInfo)
+	VkResult Result=vkAllocateCommandBuffers(Context->Device, &(VkCommandBufferAllocateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 		.commandPool=Context->CommandPool[0],
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount=1,
-	}, &CopyCmd);
+	}, &CommandBuffer);
 
-	vkBeginCommandBuffer(CopyCmd, &(VkCommandBufferBeginInfo) { .sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO });
+	if(Result!=VK_SUCCESS)
+		return VK_FALSE;
 
-	// Copy command
-	vkCmdCopyBuffer(CopyCmd, Src, Dest, 1, &(VkBufferCopy) { .srcOffset=0, .dstOffset=0, .size=Size });
+	Result=vkBeginCommandBuffer(CommandBuffer, &(VkCommandBufferBeginInfo) { .sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO });
+
+	if(Result!=VK_SUCCESS)
+	{
+		vkFreeCommandBuffers(Context->Device, Context->CommandPool[0], 1, &CommandBuffer);
+		return VK_NULL_HANDLE;
+	}
+
+	return CommandBuffer;
+}
+
+VkBool32 vkuOneShotCommandBufferEnd(VkuContext_t *Context, VkCommandBuffer CommandBuffer)
+{
+	VkFence Fence=VK_NULL_HANDLE;
 
 	// End command buffer and submit
-	vkEndCommandBuffer(CopyCmd);
-		
-	vkCreateFence(Context->Device, &(VkFenceCreateInfo) { .sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &Fence);
+	VkResult Result=vkEndCommandBuffer(CommandBuffer);
 
-	vkQueueSubmit(Context->Queue, 1, &(VkSubmitInfo)
+	if(Result!=VK_SUCCESS)
+		return VK_FALSE;
+
+	Result=vkCreateFence(Context->Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &Fence);
+
+	if(Result!=VK_SUCCESS)
+		return VK_FALSE;
+
+	Result=vkQueueSubmit(Context->Queue, 1, &(VkSubmitInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.commandBufferCount=1,
-		.pCommandBuffers=&CopyCmd,
+		.pCommandBuffers=&CommandBuffer,
 	}, Fence);
 
+	if(Result!=VK_SUCCESS)
+		return VK_FALSE;
+
 	// Wait for it to finish
-	vkWaitForFences(Context->Device, 1, &Fence, VK_TRUE, UINT64_MAX);
+	Result=vkWaitForFences(Context->Device, 1, &Fence, VK_TRUE, UINT64_MAX);
+
+	if(Result!=VK_SUCCESS)
+		return VK_FALSE;
+
 	vkDestroyFence(Context->Device, Fence, VK_NULL_HANDLE);
-	vkFreeCommandBuffers(Context->Device, Context->CommandPool[0], 1, &CopyCmd);
+
+	vkFreeCommandBuffers(Context->Device, Context->CommandPool[0], 1, &CommandBuffer);
 
 	return VK_TRUE;
 }

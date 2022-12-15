@@ -54,7 +54,6 @@ void _Font_Init(void)
 {
 	VkuBuffer_t stagingBuffer;
 	VkCommandBuffer copyCmd;
-	VkFence Fence;
 	void *data=NULL;
 
 	// Create new descriptor sets and pipeline
@@ -176,32 +175,11 @@ void _Font_Init(void)
 		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
 
-	// Setup image memory barrier transfer image to shader read layout
-	vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=Context.CommandPool[0],
-		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount=1,
-	}, &copyCmd);
+	// Start a one shot command buffer
+	copyCmd=vkuOneShotCommandBufferBegin(&Context);
 
-	vkBeginCommandBuffer(copyCmd, &(VkCommandBufferBeginInfo) { .sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO });
-
-	vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.image=fontTexture.Image,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.levelCount=1,
-		.subresourceRange.layerCount=223,
-		.srcAccessMask=VK_ACCESS_HOST_READ_BIT,
-		.dstAccessMask=VK_ACCESS_HOST_WRITE_BIT,
-		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-		.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-	});
+	// Change image layout from undefined to transfer destination
+	vkuTransitionLayout(copyCmd, fontTexture.Image, 1, 0, 223, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 	// Copy from staging buffer to the texture buffer
 	vkCmdCopyBufferToImage(copyCmd, stagingBuffer.Buffer, fontTexture.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkBufferImageCopy)
@@ -216,46 +194,11 @@ void _Font_Init(void)
 		.bufferOffset=0,
 	});
 
-	// Insert a memory dependency at the proper pipeline stages that will execute the image layout transition
-	// Source pipeline stage is host write/read execution (VK_PIPELINE_STAGE_HOST_BIT)
-	// Destination pipeline stage fragment shader access (VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-	vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.image=fontTexture.Image,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.levelCount=1,
-		.subresourceRange.layerCount=223,
-		.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT,
-		.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-		.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-	});
+	// Change image layout to shader read-only for sampling in shaders
+	vkuTransitionLayout(copyCmd, fontTexture.Image, 1, 0, 223, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-	vkEndCommandBuffer(copyCmd);
-
-	// Create a fence for the command buffer queue submit
-	vkCreateFence(Context.Device, &(VkFenceCreateInfo) { .sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, }, VK_NULL_HANDLE, &Fence);
-
-	// Submit to the queue
-	vkQueueSubmit(Context.Queue, 1, &(VkSubmitInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.commandBufferCount=1,
-		.pCommandBuffers=&copyCmd,
-	}, Fence);
-
-	// Wait for the fence to signal that command buffer has finished executing
-	vkWaitForFences(Context.Device, 1, &Fence, VK_TRUE, UINT64_MAX);
-
-	// Done with the fence
-	vkDestroyFence(Context.Device, Fence, VK_NULL_HANDLE);
-
-	// Done with the command buffer
-	vkFreeCommandBuffers(Context.Device, Context.CommandPool[0], 1, &copyCmd);
+	// End one shot command buffer and submit it
+	vkuOneShotCommandBufferEnd(&Context, copyCmd);
 
 	// Done with the staging buffer
 	vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
@@ -358,7 +301,9 @@ void _Font_Init(void)
 
 	vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
 
-	vkuCopyBuffer(&Context, stagingBuffer.Buffer, fontVertexBuffer.Buffer, sizeof(float)*4*4);
+	copyCmd=vkuOneShotCommandBufferBegin(&Context);
+	vkCmdCopyBuffer(copyCmd, stagingBuffer.Buffer, fontVertexBuffer.Buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(float)*4*4 });
+	vkuOneShotCommandBufferEnd(&Context, copyCmd);
 
 	// Delete staging data
 	vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
