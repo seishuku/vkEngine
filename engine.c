@@ -24,6 +24,8 @@
 
 uint32_t Width=1440, Height=720;
 
+extern bool IsVR;
+
 VkInstance Instance;
 VkuContext_t Context;
 
@@ -47,10 +49,10 @@ VkuImage_t BlackTexture;
 // Swapchain
 VkuSwapchain_t Swapchain;
 
-VkSampleCountFlags MSAA=VK_SAMPLE_COUNT_8_BIT;
+VkSampleCountFlags MSAA=VK_SAMPLE_COUNT_2_BIT;
 
 // Colorbuffer image
-VkFormat ColorFormat=VK_FORMAT_R8G8B8A8_SRGB;
+VkFormat ColorFormat=VK_FORMAT_B8G8R8A8_SRGB;
 VkuImage_t ColorImage[2];
 VkuImage_t ColorResolve[2];
 
@@ -129,10 +131,10 @@ ThreadData_t ThreadData[7];
 
 void RecreateSwapchain(void);
 
-bool CreateFramebuffers(uint32_t Eye)
+bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeight)
 {
 	vkuCreateImageBuffer(&Context, &ColorImage[Eye],
-		VK_IMAGE_TYPE_2D, ColorFormat, 1, 1, rtWidth, rtHeight, 1,
+		VK_IMAGE_TYPE_2D, ColorFormat, 1, 1, targetWidth, targetHeight, 1,
 		MSAA, VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -158,7 +160,7 @@ bool CreateFramebuffers(uint32_t Eye)
 	}, NULL, &ColorImage[Eye].View);
 
 	vkuCreateImageBuffer(&Context, &DepthImage[Eye],
-		VK_IMAGE_TYPE_2D, DepthFormat, 1, 1, rtWidth, rtHeight, 1,
+		VK_IMAGE_TYPE_2D, DepthFormat, 1, 1, targetWidth, targetHeight, 1,
 		MSAA, VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -189,8 +191,8 @@ bool CreateFramebuffers(uint32_t Eye)
 		.renderPass=RenderPass,
 		.attachmentCount=2,
 		.pAttachments=(VkImageView[]) { ColorImage[Eye].View, DepthImage[Eye].View },
-		.width=rtWidth,
-		.height=rtHeight,
+		.width=targetWidth,
+		.height=targetHeight,
 		.layers=1,
 	}, 0, &FrameBuffers[Eye]);
 
@@ -817,7 +819,9 @@ void Render(void)
 	matrix Pose;
 
 	MatrixIdentity(Pose);
-	GetHeadPose(Pose);
+
+	if(IsVR)
+		GetHeadPose(Pose);
 
 	vkResetFences(Context.Device, 1, &FrameFences[0]);
 
@@ -832,14 +836,25 @@ void Render(void)
 
 	ShadowUpdateMap(CommandBuffers[0], 0);
 
-	vkuTransitionLayout(CommandBuffers[0], ColorImage[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-	vkuTransitionLayout(CommandBuffers[0], ColorImage[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	if(IsVR)
+	{
+		vkuTransitionLayout(CommandBuffers[0], ColorImage[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		vkuTransitionLayout(CommandBuffers[0], ColorImage[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-	EyeRender(CommandBuffers[0], 0, Pose);
-	EyeRender(CommandBuffers[0], 1, Pose);
+		EyeRender(CommandBuffers[0], 0, Pose);
+		EyeRender(CommandBuffers[0], 1, Pose);
 
-	vkuTransitionLayout(CommandBuffers[0], ColorImage[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-	vkuTransitionLayout(CommandBuffers[0], ColorImage[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+		vkuTransitionLayout(CommandBuffers[0], ColorImage[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+		vkuTransitionLayout(CommandBuffers[0], ColorImage[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	}
+	else
+	{
+		vkuTransitionLayout(CommandBuffers[0], ColorImage[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+		EyeRender(CommandBuffers[0], 0, Pose);
+
+		vkuTransitionLayout(CommandBuffers[0], ColorImage[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	}
 
 	vkEndCommandBuffer(CommandBuffers[0]);
 
@@ -854,29 +869,32 @@ void Render(void)
 
 	vkWaitForFences(Context.Device, 1, &FrameFences[0], VK_TRUE, UINT64_MAX);
 
-	VRTextureBounds_t bounds={ 0.0f, 0.0f, 1.0f, 1.0f };
-
-	VRVulkanTextureData_t vulkanData=
+	if(IsVR)
 	{
-		.m_pDevice=(struct VkDevice_T *)Context.Device,
-		.m_pPhysicalDevice=(struct VkPhysicalDevice_T *)Context.PhysicalDevice,
-		.m_pInstance=(struct VkInstance_T *)Instance,
-		.m_pQueue=(struct VkQueue_T *)Context.Queue,
-		.m_nQueueFamilyIndex=Context.QueueFamilyIndex,
+		VRTextureBounds_t bounds={ 0.0f, 0.0f, 1.0f, 1.0f };
 
-		.m_nWidth=rtWidth,
-		.m_nHeight=rtHeight,
-		.m_nFormat=ColorFormat,
-		.m_nSampleCount=MSAA,
-	};
+		VRVulkanTextureData_t vulkanData=
+		{
+			.m_pDevice=(struct VkDevice_T *)Context.Device,
+			.m_pPhysicalDevice=(struct VkPhysicalDevice_T *)Context.PhysicalDevice,
+			.m_pInstance=(struct VkInstance_T *)Instance,
+			.m_pQueue=(struct VkQueue_T *)Context.Queue,
+			.m_nQueueFamilyIndex=Context.QueueFamilyIndex,
 
-	struct Texture_t texture={ &vulkanData, ETextureType_TextureType_Vulkan, EColorSpace_ColorSpace_Auto };
+			.m_nWidth=rtWidth,
+			.m_nHeight=rtHeight,
+			.m_nFormat=ColorFormat,
+			.m_nSampleCount=MSAA,
+		};
 
-	vulkanData.m_nImage=(uint64_t)ColorImage[EVREye_Eye_Left].Image,
-	VRCompositor->Submit(EVREye_Eye_Left, &texture, &bounds, EVRSubmitFlags_Submit_Default);
+		struct Texture_t texture={ &vulkanData, ETextureType_TextureType_Vulkan, EColorSpace_ColorSpace_Auto };
 
-	vulkanData.m_nImage=(uint64_t)ColorImage[EVREye_Eye_Right].Image;
-	VRCompositor->Submit(EVREye_Eye_Right, &texture, &bounds, EVRSubmitFlags_Submit_Default);
+		vulkanData.m_nImage=(uint64_t)ColorImage[EVREye_Eye_Left].Image,
+			VRCompositor->Submit(EVREye_Eye_Left, &texture, &bounds, EVRSubmitFlags_Submit_Default);
+
+		vulkanData.m_nImage=(uint64_t)ColorImage[EVREye_Eye_Right].Image;
+		VRCompositor->Submit(EVREye_Eye_Right, &texture, &bounds, EVRSubmitFlags_Submit_Default);
+	}
 
 	//*********************************************************//
 	// MSAA resolve and blit eyes to swapchain image
@@ -899,76 +917,119 @@ void Render(void)
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 	});
 
-	vkuTransitionLayout(CommandBuffers[1], Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	vkuTransitionLayout(CommandBuffers[1], ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	vkuTransitionLayout(CommandBuffers[1], ColorResolve[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-	vkCmdResolveImage(CommandBuffers[1], ColorImage[0].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, ColorResolve[0].Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageResolve)
+	if(IsVR)
 	{
-		.srcOffset={ 0, 0, 0 },
-		.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.srcSubresource.mipLevel=0,
-		.srcSubresource.baseArrayLayer=0,
-		.srcSubresource.layerCount=1,
-		.dstOffset={ 0, 0, 0 },
-		.extent={ rtWidth, rtHeight, 1 },
-		.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.dstSubresource.mipLevel=0,
-		.dstSubresource.baseArrayLayer=0,
-		.dstSubresource.layerCount=1,
-	});
+		vkuTransitionLayout(CommandBuffers[1], Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		vkuTransitionLayout(CommandBuffers[1], ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		vkuTransitionLayout(CommandBuffers[1], ColorResolve[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-	vkCmdResolveImage(CommandBuffers[1], ColorImage[1].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, ColorResolve[1].Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageResolve)
+		vkCmdResolveImage(CommandBuffers[1], ColorImage[0].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, ColorResolve[0].Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageResolve)
+		{
+			.srcOffset={ 0, 0, 0 },
+				.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.srcSubresource.mipLevel=0,
+				.srcSubresource.baseArrayLayer=0,
+				.srcSubresource.layerCount=1,
+				.dstOffset={ 0, 0, 0 },
+				.extent={ rtWidth, rtHeight, 1 },
+				.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.dstSubresource.mipLevel=0,
+				.dstSubresource.baseArrayLayer=0,
+				.dstSubresource.layerCount=1,
+		});
+
+		vkCmdResolveImage(CommandBuffers[1], ColorImage[1].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, ColorResolve[1].Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageResolve)
+		{
+			.srcOffset={ 0, 0, 0 },
+				.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.srcSubresource.mipLevel=0,
+				.srcSubresource.baseArrayLayer=0,
+				.srcSubresource.layerCount=1,
+				.dstOffset={ 0, 0, 0 },
+				.extent={ rtWidth, rtHeight, 1 },
+				.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.dstSubresource.mipLevel=0,
+				.dstSubresource.baseArrayLayer=0,
+				.dstSubresource.layerCount=1,
+		});
+
+		vkuTransitionLayout(CommandBuffers[1], ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+		vkuTransitionLayout(CommandBuffers[1], ColorResolve[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+		vkCmdBlitImage(CommandBuffers[1], ColorResolve[0].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Swapchain.Image[Index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
+		{
+			.srcOffsets[0]={ 0, 0, 0 },
+				.srcOffsets[1]={ rtWidth, rtHeight, 1 },
+				.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.srcSubresource.mipLevel=0,
+				.srcSubresource.baseArrayLayer=0,
+				.srcSubresource.layerCount=1,
+				.dstOffsets[0]={ 0, 0, 0 },
+				.dstOffsets[1]={ Width/2, Height, 1 },
+				.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.dstSubresource.mipLevel=0,
+				.dstSubresource.baseArrayLayer=0,
+				.dstSubresource.layerCount=1,
+		}, VK_FILTER_LINEAR);
+
+		vkCmdBlitImage(CommandBuffers[1], ColorResolve[1].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Swapchain.Image[Index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
+		{
+			.srcOffsets[0]={ 0, 0, 0 },
+				.srcOffsets[1]={ rtWidth, rtHeight, 1 },
+				.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.srcSubresource.mipLevel=0,
+				.srcSubresource.baseArrayLayer=0,
+				.srcSubresource.layerCount=1,
+				.dstOffsets[0]={ Width/2, 0, 0 },
+				.dstOffsets[1]={ Width, Height, 1 },
+				.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.dstSubresource.mipLevel=0,
+				.dstSubresource.baseArrayLayer=0,
+				.dstSubresource.layerCount=1,
+		}, VK_FILTER_LINEAR);
+
+		vkuTransitionLayout(CommandBuffers[1], Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+	}
+	else
 	{
-		.srcOffset={ 0, 0, 0 },
-		.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.srcSubresource.mipLevel=0,
-		.srcSubresource.baseArrayLayer=0,
-		.srcSubresource.layerCount=1,
-		.dstOffset={ 0, 0, 0 },
-		.extent={ rtWidth, rtHeight, 1 },
-		.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.dstSubresource.mipLevel=0,
-		.dstSubresource.baseArrayLayer=0,
-		.dstSubresource.layerCount=1,
-	});
+		vkuTransitionLayout(CommandBuffers[1], Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		vkuTransitionLayout(CommandBuffers[1], ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-	vkuTransitionLayout(CommandBuffers[1], ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-	vkuTransitionLayout(CommandBuffers[1], ColorResolve[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+		vkCmdResolveImage(CommandBuffers[1], ColorImage[0].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, ColorResolve[0].Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageResolve)
+		{
+			.srcOffset={ 0, 0, 0 },
+				.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.srcSubresource.mipLevel=0,
+				.srcSubresource.baseArrayLayer=0,
+				.srcSubresource.layerCount=1,
+				.dstOffset={ 0, 0, 0 },
+				.extent={ rtWidth, rtHeight, 1 },
+				.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+				.dstSubresource.mipLevel=0,
+				.dstSubresource.baseArrayLayer=0,
+				.dstSubresource.layerCount=1,
+		});
 
-	vkCmdBlitImage(CommandBuffers[1], ColorResolve[0].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Swapchain.Image[Index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
-	{
-		.srcOffsets[0]={ 0, 0, 0 },
-		.srcOffsets[1]={ rtWidth, rtHeight, 1 },
-		.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.srcSubresource.mipLevel=0,
-		.srcSubresource.baseArrayLayer=0,
-		.srcSubresource.layerCount=1,
-		.dstOffsets[0]={ 0, 0, 0 },
-		.dstOffsets[1]={ Width/2, Height, 1 },
-		.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.dstSubresource.mipLevel=0,
-		.dstSubresource.baseArrayLayer=0,
-		.dstSubresource.layerCount=1,
-	}, VK_FILTER_LINEAR);
+		vkuTransitionLayout(CommandBuffers[1], ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-	vkCmdBlitImage(CommandBuffers[1], ColorResolve[1].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Swapchain.Image[Index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
-	{
-		.srcOffsets[0]={ 0, 0, 0 },
-		.srcOffsets[1]={ rtWidth, rtHeight, 1 },
-		.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.srcSubresource.mipLevel=0,
-		.srcSubresource.baseArrayLayer=0,
-		.srcSubresource.layerCount=1,
-		.dstOffsets[0]={ Width/2, 0, 0 },
-		.dstOffsets[1]={ Width, Height, 1 },
-		.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.dstSubresource.mipLevel=0,
-		.dstSubresource.baseArrayLayer=0,
-		.dstSubresource.layerCount=1,
-	}, VK_FILTER_LINEAR);
+		vkCmdBlitImage(CommandBuffers[1], ColorResolve[0].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Swapchain.Image[Index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
+		{
+			.srcOffsets[0]={ 0, 0, 0 },
+			.srcOffsets[1]={ rtWidth, rtHeight, 1 },
+			.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.srcSubresource.mipLevel=0,
+			.srcSubresource.baseArrayLayer=0,
+			.srcSubresource.layerCount=1,
+			.dstOffsets[0]={ 0, 0, 0 },
+			.dstOffsets[1]={ Width, Height, 1 },
+			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.dstSubresource.mipLevel=0,
+			.dstSubresource.baseArrayLayer=0,
+			.dstSubresource.layerCount=1,
+		}, VK_FILTER_LINEAR);
 
-	vkuTransitionLayout(CommandBuffers[1], Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+		vkuTransitionLayout(CommandBuffers[1], Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+	}
 
 	vkEndCommandBuffer(CommandBuffers[1]);
 
@@ -1123,8 +1184,10 @@ bool Init(void)
 
 	// Create primary frame buffers, depth image
 	// This needs to be done after the render pass is created
-	CreateFramebuffers(0);
-	CreateFramebuffers(1);
+	CreateFramebuffers(0, rtWidth, rtHeight);
+
+	if(IsVR)
+		CreateFramebuffers(1, rtWidth, rtHeight);
 
 	// Image for resolving multisampled color buffer, so it can be blitted to the swapchain.
 	vkuCreateImageBuffer(&Context, &ColorResolve[0],
@@ -1168,6 +1231,12 @@ bool Init(void)
 		Thread_Start(&Thread[i]);
 	}
 
+	if(!IsVR)
+	{
+		MatrixIdentity(EyeProjection[0]);
+		MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, true, EyeProjection[0]);
+	}
+
 	return true;
 }
 
@@ -1199,8 +1268,8 @@ void RecreateSwapchain(void)
 		vkuCreateSwapchain(&Context, &Swapchain, Width, Height, VK_TRUE);
 
 		// Recreate the framebuffer
-		CreateFramebuffers(0);
-		CreateFramebuffers(1);
+		CreateFramebuffers(0, rtWidth, rtHeight);
+		CreateFramebuffers(1, rtWidth, rtHeight);
 	}
 }
 

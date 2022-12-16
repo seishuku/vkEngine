@@ -11,6 +11,7 @@
 #include "../lights/lights.h"
 #include "../utils/event.h"
 #include "../utils/input.h"
+#include "../vr/vr.h"
 
 MemZone_t *Zone;
 
@@ -18,6 +19,8 @@ char szAppName[]="Vulkan";
 
 bool Done=false;
 bool ToggleFullscreen=true;
+
+bool IsVR=true;
 
 extern VkInstance Instance;
 extern VkuContext_t Context;
@@ -372,14 +375,6 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	bool InitOpenVR(void);
-	DBGPRINTF(DEBUG_INFO, "Initalizing OpenVR...\n");
-	if(!InitOpenVR())
-	{
-		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
-		return -1;
-	}
-
 	RegisterClass(&(WNDCLASS)
 	{
 		.style=CS_VREDRAW|CS_HREDRAW|CS_OWNDC,
@@ -405,6 +400,15 @@ int main(int argc, char **argv)
 
 	ShowWindow(Context.hWnd, SW_SHOW);
 	SetForegroundWindow(Context.hWnd);
+
+	DBGPRINTF(DEBUG_INFO, "Initalizing OpenVR...\n");
+	if(!InitOpenVR())
+	{
+		DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
+		IsVR=false;
+		rtWidth=Width;
+		rtHeight=Height;
+	}
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan instance...\n");
 	if(!CreateVulkanInstance(&Instance))

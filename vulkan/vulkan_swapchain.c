@@ -22,11 +22,19 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 	vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &FormatCount, SurfaceFormats);
 
 	// If no format is specified, find a 32bit RGBA format
-	if(SurfaceFormats[0].format==VK_FORMAT_UNDEFINED)
-		Swapchain->SurfaceFormat.format=VK_FORMAT_R8G8B8A8_SNORM;
+	//if(SurfaceFormats[0].format==VK_FORMAT_UNDEFINED)
+	//	Swapchain->SurfaceFormat.format=VK_FORMAT_R8G8B8A8_SNORM;
 	// Otherwise the first format is the current surface format
-	else
-		Swapchain->SurfaceFormat=SurfaceFormats[0];
+	//else
+	//	Swapchain->SurfaceFormat=SurfaceFormats[0];
+	for(uint32_t i=0;i<FormatCount;i++)
+	{
+		if(SurfaceFormats[i].format==VK_FORMAT_B8G8R8A8_SRGB)
+		{
+			Swapchain->SurfaceFormat=SurfaceFormats[i];
+			break;
+		}
+	}
 
 	Zone_Free(Zone, SurfaceFormats);
 

@@ -1,7 +1,7 @@
 #ifndef __VR_H__
 #define __VR_H__
 
-#include <openvr_capi.h>
+#include <openvr/openvr_capi.h>
 
 extern struct VR_IVRSystem_FnTable *VRSystem;
 extern struct VR_IVRCompositor_FnTable *VRCompositor;

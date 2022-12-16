@@ -46,6 +46,9 @@ void HmdMatrix34toMatrix44(HmdMatrix34_t in, matrix out)
 // Get the current projection and transform for selected eye and output a projection matrix for vulkan
 void GetEyeProjection(EVREye Eye, matrix Projection)
 {
+	if(!VRSystem)
+		return;
+
 	matrix Transform;
 	HmdMatrix44_t HmdProj;
 	float zNear=0.01f;
@@ -74,6 +77,9 @@ void GetEyeProjection(EVREye Eye, matrix Projection)
 // Get current inverse head pose matrix
 void GetHeadPose(matrix Pose)
 {
+	if(!VRCompositor)
+		return;
+
 	TrackedDevicePose_t trackedDevicePose[64];
 
 	VRCompositor->WaitGetPoses(trackedDevicePose, k_unMaxTrackedDeviceCount, NULL, 0);
@@ -130,11 +136,12 @@ bool InitOpenVR(void)
 
 	VRSystem->GetRecommendedRenderTargetSize(&rtWidth, &rtHeight);
 
-	const float Freq=VRSystem->GetFloatTrackedDeviceProperty(k_unTrackedDeviceIndex_Hmd, ETrackedDeviceProperty_Prop_DisplayFrequency_Float, &eError);
+	ETrackedPropertyError tdError=ETrackedPropertyError_TrackedProp_Success;
+	const float Freq=VRSystem->GetFloatTrackedDeviceProperty(k_unTrackedDeviceIndex_Hmd, ETrackedDeviceProperty_Prop_DisplayFrequency_Float, &tdError);
 
-	if(eError!=EVRInitError_VRInitError_None)
+	if(tdError!=ETrackedPropertyError_TrackedProp_Success)
 	{
-		DBGPRINTF(DEBUG_ERROR, "IVRSystem::GetFloatTrackedDeviceProperty::Prop_DisplayFrequency failed: %s\n", VR_GetVRInitErrorAsSymbol(eError));
+		DBGPRINTF(DEBUG_ERROR, "IVRSystem::GetFloatTrackedDeviceProperty::Prop_DisplayFrequency failed: %d\n", tdError);
 		return false;
 	}
 

@@ -27,6 +27,7 @@ OBJS+=vulkan/vulkan_pipeline.o
 OBJS+=vulkan/vulkan_swapchain.o
 
 # core stuff
+OBJS+=vr/vr.o
 OBJS+=system/linux_x11.o
 OBJS+=font/font.o
 OBJS+=threads/threads.o
@@ -52,7 +53,7 @@ SHADERS+=shaders/skybox.vert.spv
 
 CC=gcc
 CFLAGS=-Wall -O3 -std=gnu17 -I/usr/X11/include
-LDFLAGS=-Wold-style-definition -L/usr/X11/lib -lvulkan -lX11 -lm -lpthread
+LDFLAGS=-Wold-style-definition -L/usr/X11/lib -lvulkan -lX11 -lm -lpthread -lopenvr_api
 
 all: $(TARGET) $(SHADERS)
 

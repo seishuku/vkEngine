@@ -13,12 +13,14 @@
 #include "../utils/list.h"
 #include "../utils/event.h"
 #include "../utils/input.h"
+#include "../vr/vr.h"
 
 MemZone_t *Zone;
 
 char szAppName[]="Vulkan";
 
 bool ToggleFullscreen=true;
+bool IsVR=true;
 
 extern VkInstance Instance;
 extern VkuContext_t Context;
@@ -339,6 +341,15 @@ int main(int argc, char **argv)
 	Context.Win=XCreateSimpleWindow(Context.Dpy, Root, 10, 10, Width, Height, 1, BlackPixel(Context.Dpy, Screen), WhitePixel(Context.Dpy, Screen));
 	XSelectInput(Context.Dpy, Context.Win, StructureNotifyMask|PointerMotionMask|ExposureMask|ButtonPressMask|KeyPressMask|KeyReleaseMask);
 	XStoreName(Context.Dpy, Context.Win, szAppName);
+
+	DBGPRINTF(DEBUG_INFO, "Initalizing OpenVR...\n");
+	if(!InitOpenVR())
+	{
+		DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
+		IsVR=false;
+		rtWidth=Width;
+		rtHeight=Height;
+	}
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Instance...\n");
 	if(!CreateVulkanInstance(&Instance))
