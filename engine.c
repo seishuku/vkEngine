@@ -658,7 +658,7 @@ void Thread_Font(void *Arg)
 	vkCmdSetViewport(Data->SecCommandBuffer[Data->Index], 0, 1, &(VkViewport) { 0.0f, 0, (float)rtWidth, (float)rtHeight, 0.0f, 1.0f });
 	vkCmdSetScissor(Data->SecCommandBuffer[Data->Index], 0, 1, &(VkRect2D) { { 0, 0 }, { rtWidth, rtHeight } });
 
-	Font_Print(Data->SecCommandBuffer[Data->Index], 0.0f, 0.0f, "FPS: %0.1f", fps);
+	Font_Print(Data->SecCommandBuffer[Data->Index], rtWidth/2, rtHeight/2, "FPS: %0.1f", fps);
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Index]);
 
@@ -689,25 +689,8 @@ void Thread_Particles(void *Arg)
 	vkCmdSetViewport(Data->SecCommandBuffer[Data->Index], 0, 1, &(VkViewport) { 0.0f, 0, (float)rtWidth, (float)rtHeight, 0.0f, 1.0f });
 	vkCmdSetScissor(Data->SecCommandBuffer[Data->Index], 0, 1, &(VkRect2D) { { 0, 0 }, { rtWidth, rtHeight } });
 
-	// Get a pointer to the emitter that's providing the positions
-	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
-
-	for(uint32_t i=0;i<Emitter->NumParticles;i++)
-	{
-		if(Emitter->Particles[i].ID!=Emitter->ID)
-		{
-			// Get those positions and set the other emitter's positions to those
-			ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitter->Particles[i].ID, Emitter->Particles[i].pos);
-
-			// If this particle is dead, delete that emitter's ID
-			if(Emitter->Particles[i].life<0.0f)
-				ParticleSystem_DeleteEmitter(&ParticleSystem, Emitter->Particles[i].ID);
-		}
-	}
-
 	matrix Modelview;
 	MatrixMult(Main_UBO[Data->Index]->modelview, Main_UBO[Data->Index]->HMD, Modelview);
-	ParticleSystem_Step(&ParticleSystem, fTimeStep);
 	ParticleSystem_Draw(&ParticleSystem, Data->SecCommandBuffer[Data->Index], Data->DescriptorPool[Data->Index], Modelview, Main_UBO[Data->Index]->projection);
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Index]);
@@ -720,8 +703,6 @@ matrix HMDMatrix;
 void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Eye, matrix Pose)
 {
 	// Generate the projection matrix
-//	MatrixIdentity(Main_UBO[Eye]->projection);
-//	MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, true, Main_UBO[Eye]->projection);
 	memcpy(Main_UBO[Eye]->projection, &EyeProjection[Eye], sizeof(matrix));
 
 	// Set up the modelview matrix
@@ -775,8 +756,8 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Eye, matrix Pose)
 	ThreadData[5].Index=Eye;
 	Thread_AddJob(&Thread[5], Thread_Particles, (void *)&ThreadData[5]);
 
-	//ThreadData[6].Index=Eye;
-	//Thread_AddJob(&Thread[6], Thread_Font, (void *)&ThreadData[6]);
+	ThreadData[6].Index=Eye;
+	Thread_AddJob(&Thread[6], Thread_Font, (void *)&ThreadData[6]);
 
 	// Wait for the threads to finish
 	while(!(
@@ -785,8 +766,8 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Eye, matrix Pose)
 		ThreadData[2].Done&&
 		ThreadData[3].Done&&
 		ThreadData[4].Done&&
-		ThreadData[5].Done
-//		ThreadData[6].Done
+		ThreadData[5].Done&&
+		ThreadData[6].Done
 	));
 
 	// Reset done flag
@@ -799,14 +780,14 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Eye, matrix Pose)
 	ThreadData[6].Done=false;
 
 	// Execute the secondary command buffers from the threads
-	vkCmdExecuteCommands(CommandBuffer, 6, (VkCommandBuffer[]) {
+	vkCmdExecuteCommands(CommandBuffer, 7, (VkCommandBuffer[]) {
 		ThreadData[0].SecCommandBuffer[Eye],
 		ThreadData[1].SecCommandBuffer[Eye],
 		ThreadData[2].SecCommandBuffer[Eye],
 		ThreadData[3].SecCommandBuffer[Eye],
 		ThreadData[4].SecCommandBuffer[Eye],
 		ThreadData[5].SecCommandBuffer[Eye],
-//		ThreadData[6].SecCommandBuffer[Eye]
+		ThreadData[6].SecCommandBuffer[Eye]
 	});
 
 	vkCmdEndRenderPass(CommandBuffer);
@@ -817,6 +798,24 @@ void Render(void)
 	static uint32_t OldIndex=0;
 	uint32_t Index=OldIndex;
 	matrix Pose;
+
+	// Get a pointer to the emitter that's providing the positions
+	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
+
+	for(uint32_t i=0;i<Emitter->NumParticles;i++)
+	{
+		if(Emitter->Particles[i].ID!=Emitter->ID)
+		{
+			// Get those positions and set the other emitter's positions to those
+			ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitter->Particles[i].ID, Emitter->Particles[i].pos);
+
+			// If this particle is dead, delete that emitter's ID
+			if(Emitter->Particles[i].life<0.0f)
+				ParticleSystem_DeleteEmitter(&ParticleSystem, Emitter->Particles[i].ID);
+		}
+	}
+
+	ParticleSystem_Step(&ParticleSystem, fTimeStep);
 
 	MatrixIdentity(Pose);
 
@@ -1195,11 +1194,26 @@ bool Init(void)
 						 VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
 						 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
-	vkuCreateImageBuffer(&Context, &ColorResolve[1],
-						 VK_IMAGE_TYPE_2D, ColorFormat, 1, 1, rtWidth, rtHeight, 1,
-						 VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
-						 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
+
+	if(IsVR)
+	{
+		vkuCreateImageBuffer(&Context, &ColorResolve[1],
+							 VK_IMAGE_TYPE_2D, ColorFormat, 1, 1, rtWidth, rtHeight, 1,
+							 VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
+							 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
+
+		VkCommandBuffer CommandBuffer=vkuOneShotCommandBufferBegin(&Context);
+		vkuTransitionLayout(CommandBuffer, ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+		vkuTransitionLayout(CommandBuffer, ColorResolve[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+		vkuOneShotCommandBufferEnd(&Context, CommandBuffer);
+	}
+	else
+	{
+		VkCommandBuffer CommandBuffer=vkuOneShotCommandBufferBegin(&Context);
+		vkuTransitionLayout(CommandBuffer, ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+		vkuOneShotCommandBufferEnd(&Context, CommandBuffer);
+	}
 
 	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 	{
@@ -1269,7 +1283,14 @@ void RecreateSwapchain(void)
 
 		// Recreate the framebuffer
 		CreateFramebuffers(0, rtWidth, rtHeight);
-		CreateFramebuffers(1, rtWidth, rtHeight);
+
+		if(IsVR)
+			CreateFramebuffers(1, rtWidth, rtHeight);
+		else
+		{
+			MatrixIdentity(EyeProjection[0]);
+			MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, true, EyeProjection[0]);
+		}
 	}
 }
 

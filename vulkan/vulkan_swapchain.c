@@ -152,9 +152,13 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 	// Get the swap chain images
 	vkGetSwapchainImagesKHR(Context->Device, Swapchain->Swapchain, &SwapchainImageCount, Swapchain->Image);
 
-	// Get the swap chain buffers containing the image and imageview
+	// Create imageviews and transition to correct image layout
+	VkCommandBuffer CommandBuffer=vkuOneShotCommandBufferBegin(Context);
+
 	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 	{
+		vkuTransitionLayout(CommandBuffer, Swapchain->Image[i], 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
 		vkCreateImageView(Context->Device, &(VkImageViewCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -171,6 +175,8 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 			.flags=0,
 		}, VK_NULL_HANDLE, &Swapchain->ImageView[i]);
 	}
+
+	vkuOneShotCommandBufferEnd(Context, CommandBuffer);
 
 	return VK_TRUE;
 }
