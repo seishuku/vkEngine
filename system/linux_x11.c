@@ -350,6 +350,8 @@ int main(int argc, char **argv)
 		rtWidth=Width;
 		rtHeight=Height;
 	}
+	else
+		XMoveResizeWindow(Context.Dpy, Context.Win, 0, 0, rtWidth, rtHeight/2);
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Instance...\n");
 	if(!CreateVulkanInstance(&Instance))

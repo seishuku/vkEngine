@@ -23,7 +23,7 @@
 #include "shadow.h"
 #include "perframe.h"
 
-uint32_t Width=1440, Height=720;
+uint32_t Width=1280, Height=720;
 
 extern bool IsVR;
 
@@ -135,11 +135,14 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 		.flags=0,
 	}, NULL, &ColorImage[Eye].View);
 
-	vkuCreateImageBuffer(&Context, &ColorResolve[Eye],
-						 VK_IMAGE_TYPE_2D, ColorFormat, 1, 1, rtWidth, rtHeight, 1,
-						 VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
-						 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
+	if(IsVR)
+	{
+		vkuCreateImageBuffer(&Context, &ColorResolve[Eye],
+							 VK_IMAGE_TYPE_2D, ColorFormat, 1, 1, rtWidth, rtHeight, 1,
+							 VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
+							 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
+	}
 
 	vkuCreateImageBuffer(&Context, &DepthImage[Eye],
 						 VK_IMAGE_TYPE_2D, DepthFormat, 1, 1, targetWidth, targetHeight, 1,
@@ -180,7 +183,10 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 
 	VkCommandBuffer CommandBuffer=vkuOneShotCommandBufferBegin(&Context);
 	vkuTransitionLayout(CommandBuffer, ColorImage[Eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-	vkuTransitionLayout(CommandBuffer, ColorResolve[Eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+	if(IsVR)
+		vkuTransitionLayout(CommandBuffer, ColorResolve[Eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
 	vkuTransitionLayout(CommandBuffer, DepthImage[Eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 	vkuOneShotCommandBufferEnd(&Context, CommandBuffer);
 
@@ -200,19 +206,19 @@ bool CreatePipeline(void)
 				.samples=MSAA,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
 				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.initialLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_STORE,
+				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
 				.finalLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			},
 			{
 				.format=DepthFormat,
 				.samples=MSAA,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-				.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.initialLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
+				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_STORE,
+				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
 				.finalLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 			},
 		},
@@ -230,7 +236,7 @@ bool CreatePipeline(void)
 			{
 				.attachment=1,
 				.layout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-			},
+			}
 		}
 	}, 0, &RenderPass);
 
@@ -708,7 +714,6 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	CameraUpdate(&Camera, fTimeStep, PerFrame[Index].Main_UBO[Eye]->modelview);
 
 	memcpy(PerFrame[Index].Main_UBO[Eye]->HMD, Pose, sizeof(matrix));
-
 	memcpy(PerFrame[Index].Skybox_UBO[Eye]->HMD, PerFrame[Index].Main_UBO[Eye]->HMD, sizeof(matrix));
 
 	memcpy(PerFrame[Index].Skybox_UBO[Eye]->modelview, PerFrame[Index].Main_UBO[Eye]->modelview, sizeof(matrix));
@@ -749,12 +754,15 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	Thread_AddJob(&Thread[3], Thread_Font, (void *)&ThreadData[3]);
 
 	// Wait for the threads to finish
-	while(!(
-		ThreadData[0].Done&&
-		ThreadData[1].Done&&
-		ThreadData[2].Done&&
-		ThreadData[3].Done
-	));
+	// FIXME: This has a timeout, because occationally the thread doesn't set the done flag and I don't know why.
+	volatile int32_t Timeout=INT32_MAX;
+	while(!(ThreadData[0].Done&&ThreadData[1].Done&&ThreadData[2].Done&&ThreadData[3].Done))
+	{
+		if(Timeout<0)
+			break;
+
+		Timeout--;
+	}
 
 	// Reset done flag
 	ThreadData[0].Done=false;
@@ -877,31 +885,22 @@ void Render(void)
 	}
 	else
 	{
+		// Non-VR mode doesn't need the blit for cloning the eye images to swapchain
+		// and also doesn't need the intermediate resolve image, so we can just MSAA resolve directly to the swapchain.
+		// This doesn't net any more FPS, but it does save VRAM at least.
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorImage[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 		EyeRender(PerFrame[Index].CommandBuffer, Index, 0, Pose);
 
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorImage[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-		vkCmdResolveImage(PerFrame[Index].CommandBuffer, ColorImage[0].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, ColorResolve[0].Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageResolve)
+		vkCmdResolveImage(PerFrame[Index].CommandBuffer, ColorImage[0].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Swapchain.Image[Index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageResolve)
 		{
 			.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .srcSubresource.mipLevel=0, .srcSubresource.baseArrayLayer=0, .srcSubresource.layerCount=1, .srcOffset={ 0, 0, 0 },
 			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .dstSubresource.mipLevel=0, .dstSubresource.baseArrayLayer=0, .dstSubresource.layerCount=1, .dstOffset={ 0, 0, 0 },
 			.extent={ rtWidth, rtHeight, 1 },
 		});
-
-		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-
-		vkCmdBlitImage(PerFrame[Index].CommandBuffer, ColorResolve[0].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Swapchain.Image[Index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
-		{
-			.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .srcSubresource.mipLevel=0, .srcSubresource.baseArrayLayer=0, .srcSubresource.layerCount=1,
-			.srcOffsets[0]={ 0, 0, 0 }, .srcOffsets[1]={ rtWidth, rtHeight, 1 },
-			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .dstSubresource.mipLevel=0, .dstSubresource.baseArrayLayer=0, .dstSubresource.layerCount=1,
-			.dstOffsets[0]={ 0, 0, 0 }, .dstOffsets[1]={ Width, Height, 1 },
-		}, VK_FILTER_LINEAR);
 
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 	}
@@ -1158,11 +1157,6 @@ void RecreateSwapchain(void)
 		vkDestroyImage(Context.Device, ColorImage[0].Image, VK_NULL_HANDLE);
 		vkuMem_Free(VkZone, ColorImage[0].DeviceMemory);
 
-		// Destroy the color resolve buffer
-		vkDestroyImageView(Context.Device, ColorResolve[0].View, VK_NULL_HANDLE);
-		vkDestroyImage(Context.Device, ColorResolve[0].Image, VK_NULL_HANDLE);
-		vkuMem_Free(VkZone, ColorResolve[0].DeviceMemory);
-
 		// Destroy the depth buffer
 		vkDestroyImageView(Context.Device, DepthImage[0].View, VK_NULL_HANDLE);
 		vkDestroyImage(Context.Device, DepthImage[0].Image, VK_NULL_HANDLE);
@@ -1177,6 +1171,11 @@ void RecreateSwapchain(void)
 			vkDestroyImageView(Context.Device, ColorImage[1].View, VK_NULL_HANDLE);
 			vkDestroyImage(Context.Device, ColorImage[1].Image, VK_NULL_HANDLE);
 			vkuMem_Free(VkZone, ColorImage[1].DeviceMemory);
+
+			// MSAA color resolve buffer only used in VR mode
+			vkDestroyImageView(Context.Device, ColorResolve[0].View, VK_NULL_HANDLE);
+			vkDestroyImage(Context.Device, ColorResolve[0].Image, VK_NULL_HANDLE);
+			vkuMem_Free(VkZone, ColorResolve[0].DeviceMemory);
 
 			vkDestroyImageView(Context.Device, ColorResolve[1].View, VK_NULL_HANDLE);
 			vkDestroyImage(Context.Device, ColorResolve[1].Image, VK_NULL_HANDLE);
@@ -1304,10 +1303,6 @@ void Destroy(void)
 	vkDestroyImage(Context.Device, ColorImage[0].Image, VK_NULL_HANDLE);
 	vkuMem_Free(VkZone, ColorImage[0].DeviceMemory);
 
-	vkDestroyImageView(Context.Device, ColorResolve[0].View, VK_NULL_HANDLE);
-	vkDestroyImage(Context.Device, ColorResolve[0].Image, VK_NULL_HANDLE);
-	vkuMem_Free(VkZone, ColorResolve[0].DeviceMemory);
-
 	vkDestroyImageView(Context.Device, DepthImage[0].View, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, DepthImage[0].Image, VK_NULL_HANDLE);
 	vkuMem_Free(VkZone, DepthImage[0].DeviceMemory);
@@ -1319,6 +1314,10 @@ void Destroy(void)
 		vkDestroyImageView(Context.Device, ColorImage[1].View, VK_NULL_HANDLE);
 		vkDestroyImage(Context.Device, ColorImage[1].Image, VK_NULL_HANDLE);
 		vkuMem_Free(VkZone, ColorImage[1].DeviceMemory);
+
+		vkDestroyImageView(Context.Device, ColorResolve[0].View, VK_NULL_HANDLE);
+		vkDestroyImage(Context.Device, ColorResolve[0].Image, VK_NULL_HANDLE);
+		vkuMem_Free(VkZone, ColorResolve[0].DeviceMemory);
 
 		vkDestroyImageView(Context.Device, ColorResolve[1].View, VK_NULL_HANDLE);
 		vkDestroyImage(Context.Device, ColorResolve[1].Image, VK_NULL_HANDLE);

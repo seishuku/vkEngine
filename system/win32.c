@@ -409,6 +409,8 @@ int main(int argc, char **argv)
 		rtWidth=Width;
 		rtHeight=Height;
 	}
+	else
+		MoveWindow(Context.hWnd, 0, 0, rtWidth, rtHeight/2, TRUE);
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan instance...\n");
 	if(!CreateVulkanInstance(&Instance))

@@ -41,12 +41,12 @@ void *Thread_Worker(void *Data)
 			// Remove it from the job list
 			List_Del(&Worker->Jobs, 0);
 
-			// Unlock the mutex
-			pthread_mutex_unlock(&Worker->Mutex);
-
 			// If there's a valid pointer on the job item, run it
 			if(Job.Function)
 				Job.Function(Job.Arg);
+
+			// Unlock the mutex
+			pthread_mutex_unlock(&Worker->Mutex);
 		}
 		else
 		{

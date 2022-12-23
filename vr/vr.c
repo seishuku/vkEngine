@@ -136,6 +136,9 @@ bool InitOpenVR(void)
 
 	VRSystem->GetRecommendedRenderTargetSize(&rtWidth, &rtHeight);
 
+//	rtWidth>>=1;
+//	rtHeight>>=1;
+
 	ETrackedPropertyError tdError=ETrackedPropertyError_TrackedProp_Success;
 	const float Freq=VRSystem->GetFloatTrackedDeviceProperty(k_unTrackedDeviceIndex_Hmd, ETrackedDeviceProperty_Prop_DisplayFrequency_Float, &tdError);
 
@@ -157,7 +160,7 @@ void DestroyOpenVR(void)
 {
 	if(VRSystem)
 	{
-		DBGPRINTF(DEBUG_INFO, "shutting down OpenVR\n");
+		DBGPRINTF(DEBUG_INFO, "Shutting down OpenVR...\n");
 		VR_ShutdownInternal();
 		VRSystem=NULL;
 	}
