@@ -22,7 +22,7 @@ typedef struct
 	// Main render per-frame, per-eye data
 	UBO_t *Main_UBO[2];
 	VkuBuffer_t uboBuffer[2];
-	VkuDescriptorSet_t DescriptorSet[2*NUM_MODELS];
+	VkuDescriptorSet_t DescriptorSet[NUM_MODELS];
 	//////
 
 	// Command buffer

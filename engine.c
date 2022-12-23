@@ -93,21 +93,17 @@ VkPipelineLayout SpherePipelineLayout;
 VkuPipeline_t SpherePipeline;
 //////
 
-//VkDescriptorPool DescriptorPool[VKU_MAX_FRAME_COUNT];
-VkuDescriptorSet_t DescriptorSet[VKU_MAX_FRAME_COUNT*NUM_MODELS];
-
 typedef struct
 {
 	uint32_t Index, Eye;
 	VkCommandPool CommandPool[VKU_MAX_FRAME_COUNT];
 	VkDescriptorPool DescriptorPool[VKU_MAX_FRAME_COUNT];
 	VkCommandBuffer SecCommandBuffer[VKU_MAX_FRAME_COUNT];
-	uint32_t Which;
 	volatile bool Done;
 } ThreadData_t;
 
-ThreadWorker_t Thread[7];
-ThreadData_t ThreadData[7];
+ThreadWorker_t Thread[4];
+ThreadData_t ThreadData[4];
 
 void RecreateSwapchain(void);
 
@@ -245,25 +241,25 @@ bool CreatePipeline(void)
 
 		vkuCreateHostBuffer(&Context, &PerFrame[i].uboBuffer[1], sizeof(UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 		vkMapMemory(Context.Device, PerFrame[i].uboBuffer[1].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&PerFrame[i].Main_UBO[1]);
-	}
 
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT*NUM_MODELS;i++)
-	{
-		vkuInitDescriptorSet(&DescriptorSet[i], &Context);
+		for(uint32_t j=0;j<NUM_MODELS;j++)
+		{
+			vkuInitDescriptorSet(&PerFrame[i].DescriptorSet[j], &Context);
 
-		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-		vkuDescriptorSet_AddBinding(&DescriptorSet[i], 3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
+			vkuDescriptorSet_AddBinding(&PerFrame[i].DescriptorSet[j], 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+			vkuDescriptorSet_AddBinding(&PerFrame[i].DescriptorSet[j], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+			vkuDescriptorSet_AddBinding(&PerFrame[i].DescriptorSet[j], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+			vkuDescriptorSet_AddBinding(&PerFrame[i].DescriptorSet[j], 3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		vkuAssembleDescriptorSetLayout(&DescriptorSet[i]);
+			vkuAssembleDescriptorSetLayout(&PerFrame[i].DescriptorSet[j]);
+		}
 	}
 
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
-		.pSetLayouts=&DescriptorSet[0].DescriptorSetLayout, // Just use the first in the set, they're all the same layout
+		.pSetLayouts=&PerFrame[0].DescriptorSet[0].DescriptorSetLayout, // Just use the first in the set, they're all the same layout
 		.pushConstantRangeCount=1,
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
@@ -526,7 +522,6 @@ void Thread_Constructor(void *Arg)
 		}, VK_NULL_HANDLE, &Data->DescriptorPool[i]);
 	}
 
-	Data->Which=0;
 	Data->Done=false;
 }
 
@@ -570,16 +565,15 @@ void Thread_Main(void *Arg)
 	// Draw the models
 	vkCmdBindVertexBuffers(Data->SecCommandBuffer[Data->Eye], 1, 1, &Asteroid_Instance.Buffer, &(VkDeviceSize) { 0 });
 	
-//	for(uint32_t i=0;i<NUM_MODELS;i++)
-	uint32_t i=Data->Which;
+	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Eye], 0, &Textures[2*i+0]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Eye], 1, &Textures[2*i+1]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Eye], 2, &ShadowDepth);
-		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Eye], 3, PerFrame[Data->Index].uboBuffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
-		vkuAllocateUpdateDescriptorSet(&DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Eye], Data->DescriptorPool[Data->Eye]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&PerFrame[Data->Index].DescriptorSet[i], 0, &Textures[2*i+0]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&PerFrame[Data->Index].DescriptorSet[i], 1, &Textures[2*i+1]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&PerFrame[Data->Index].DescriptorSet[i], 2, &ShadowDepth);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&PerFrame[Data->Index].DescriptorSet[i], 3, PerFrame[Data->Index].uboBuffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
+		vkuAllocateUpdateDescriptorSet(&PerFrame[Data->Index].DescriptorSet[i], Data->DescriptorPool[Data->Eye]);
 
-		vkCmdBindDescriptorSets(Data->SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet[VKU_MAX_FRAME_COUNT*i+Data->Eye].DescriptorSet, 0, VK_NULL_HANDLE);
+		vkCmdBindDescriptorSets(Data->SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &PerFrame[Data->Index].DescriptorSet[i].DescriptorSet, 0, VK_NULL_HANDLE);
 
 		matrix local;
 		MatrixIdentity(local);
@@ -740,45 +734,26 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	// Set per thread data and add the job to that worker thread
 	ThreadData[0].Index=Index;
 	ThreadData[0].Eye=Eye;
-	ThreadData[0].Which=MODEL_ASTEROID1;
 	Thread_AddJob(&Thread[0], Thread_Main, (void *)&ThreadData[0]);
 
 	ThreadData[1].Index=Index;
 	ThreadData[1].Eye=Eye;
-	ThreadData[1].Which=MODEL_ASTEROID2;
-	Thread_AddJob(&Thread[1], Thread_Main, (void *)&ThreadData[1]);
+	Thread_AddJob(&Thread[1], Thread_Skybox, (void *)&ThreadData[1]);
 
 	ThreadData[2].Index=Index;
 	ThreadData[2].Eye=Eye;
-	ThreadData[2].Which=MODEL_ASTEROID3;
-	Thread_AddJob(&Thread[2], Thread_Main, (void *)&ThreadData[2]);
+	Thread_AddJob(&Thread[2], Thread_Particles, (void *)&ThreadData[2]);
 
 	ThreadData[3].Index=Index;
 	ThreadData[3].Eye=Eye;
-	ThreadData[3].Which=MODEL_ASTEROID4;
-	Thread_AddJob(&Thread[3], Thread_Main, (void *)&ThreadData[3]);
-
-	ThreadData[4].Index=Index;
-	ThreadData[4].Eye=Eye;
-	Thread_AddJob(&Thread[4], Thread_Skybox, (void *)&ThreadData[4]);
-
-	ThreadData[5].Index=Index;
-	ThreadData[5].Eye=Eye;
-	Thread_AddJob(&Thread[5], Thread_Particles, (void *)&ThreadData[5]);
-
-	ThreadData[6].Index=Index;
-	ThreadData[6].Eye=Eye;
-	Thread_AddJob(&Thread[6], Thread_Font, (void *)&ThreadData[6]);
+	Thread_AddJob(&Thread[3], Thread_Font, (void *)&ThreadData[3]);
 
 	// Wait for the threads to finish
 	while(!(
 		ThreadData[0].Done&&
 		ThreadData[1].Done&&
 		ThreadData[2].Done&&
-		ThreadData[3].Done&&
-		ThreadData[4].Done&&
-		ThreadData[5].Done&&
-		ThreadData[6].Done
+		ThreadData[3].Done
 	));
 
 	// Reset done flag
@@ -786,19 +761,13 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	ThreadData[1].Done=false;
 	ThreadData[2].Done=false;
 	ThreadData[3].Done=false;
-	ThreadData[4].Done=false;
-	ThreadData[5].Done=false;
-	ThreadData[6].Done=false;
 
 	// Execute the secondary command buffers from the threads
-	vkCmdExecuteCommands(CommandBuffer, 7, (VkCommandBuffer[]) {
+	vkCmdExecuteCommands(CommandBuffer, 4, (VkCommandBuffer[]) {
 		ThreadData[0].SecCommandBuffer[Eye],
 		ThreadData[1].SecCommandBuffer[Eye],
 		ThreadData[2].SecCommandBuffer[Eye],
-		ThreadData[3].SecCommandBuffer[Eye],
-		ThreadData[4].SecCommandBuffer[Eye],
-		ThreadData[5].SecCommandBuffer[Eye],
-		ThreadData[6].SecCommandBuffer[Eye]
+		ThreadData[3].SecCommandBuffer[Eye]
 	});
 
 	vkCmdEndRenderPass(CommandBuffer);
@@ -1154,7 +1123,7 @@ bool Init(void)
 		}, &PerFrame[i].CommandBuffer);
 	}
 
-	for(uint32_t i=0;i<7;i++)
+	for(uint32_t i=0;i<4;i++)
 	{
 		Thread_Init(&Thread[i]);
 		Thread_AddConstructor(&Thread[i], Thread_Constructor, (void *)&ThreadData[i]);
@@ -1245,7 +1214,7 @@ void Destroy(void)
 
 	DestroyOpenVR();
 
-	for(uint32_t i=0;i<7;i++)
+	for(uint32_t i=0;i<4;i++)
 		Thread_Destroy(&Thread[i]);
 
 	if(Context.PipelineCache)
@@ -1320,34 +1289,48 @@ void Destroy(void)
 
 		vkUnmapMemory(Context.Device, PerFrame[i].uboBuffer[1].DeviceMemory);
 		vkuDestroyBuffer(&Context, &PerFrame[i].uboBuffer[1]);
+
+		for(uint32_t j=0;j<NUM_MODELS;j++)
+			vkDestroyDescriptorSetLayout(Context.Device, PerFrame[i].DescriptorSet[j].DescriptorSetLayout, VK_NULL_HANDLE);
 	}
 
+	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);
 	vkDestroyPipeline(Context.Device, Pipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, PipelineLayout, VK_NULL_HANDLE);
-
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT*NUM_MODELS;i++)
-		vkDestroyDescriptorSetLayout(Context.Device, DescriptorSet[i].DescriptorSetLayout, VK_NULL_HANDLE);
-
-	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);
 	//////////
 
 	// Swapchain, framebuffer, and depthbuffer destruction
-	for(uint32_t i=0;i<2;i++)
+	vkDestroyImageView(Context.Device, ColorImage[0].View, VK_NULL_HANDLE);
+	vkDestroyImage(Context.Device, ColorImage[0].Image, VK_NULL_HANDLE);
+	vkuMem_Free(VkZone, ColorImage[0].DeviceMemory);
+
+	vkDestroyImageView(Context.Device, ColorResolve[0].View, VK_NULL_HANDLE);
+	vkDestroyImage(Context.Device, ColorResolve[0].Image, VK_NULL_HANDLE);
+	vkuMem_Free(VkZone, ColorResolve[0].DeviceMemory);
+
+	vkDestroyImageView(Context.Device, DepthImage[0].View, VK_NULL_HANDLE);
+	vkDestroyImage(Context.Device, DepthImage[0].Image, VK_NULL_HANDLE);
+	vkuMem_Free(VkZone, DepthImage[0].DeviceMemory);
+
+	vkDestroyFramebuffer(Context.Device, FrameBuffers[0], VK_NULL_HANDLE);
+
+	if(IsVR)
 	{
-		vkDestroyImageView(Context.Device, ColorImage[i].View, VK_NULL_HANDLE);
-		vkDestroyImage(Context.Device, ColorImage[i].Image, VK_NULL_HANDLE);
-		vkuMem_Free(VkZone, ColorImage[i].DeviceMemory);
+		vkDestroyImageView(Context.Device, ColorImage[1].View, VK_NULL_HANDLE);
+		vkDestroyImage(Context.Device, ColorImage[1].Image, VK_NULL_HANDLE);
+		vkuMem_Free(VkZone, ColorImage[1].DeviceMemory);
 
-		vkDestroyImageView(Context.Device, ColorResolve[i].View, VK_NULL_HANDLE);
-		vkDestroyImage(Context.Device, ColorResolve[i].Image, VK_NULL_HANDLE);
-		vkuMem_Free(VkZone, ColorResolve[i].DeviceMemory);
+		vkDestroyImageView(Context.Device, ColorResolve[1].View, VK_NULL_HANDLE);
+		vkDestroyImage(Context.Device, ColorResolve[1].Image, VK_NULL_HANDLE);
+		vkuMem_Free(VkZone, ColorResolve[1].DeviceMemory);
 
-		vkDestroyImageView(Context.Device, DepthImage[i].View, VK_NULL_HANDLE);
-		vkDestroyImage(Context.Device, DepthImage[i].Image, VK_NULL_HANDLE);
-		vkuMem_Free(VkZone, DepthImage[i].DeviceMemory);
+		vkDestroyImageView(Context.Device, DepthImage[1].View, VK_NULL_HANDLE);
+		vkDestroyImage(Context.Device, DepthImage[1].Image, VK_NULL_HANDLE);
+		vkuMem_Free(VkZone, DepthImage[1].DeviceMemory);
 
-		vkDestroyFramebuffer(Context.Device, FrameBuffers[i], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(Context.Device, FrameBuffers[1], VK_NULL_HANDLE);
 	}
+
 
 	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
 	{
