@@ -286,7 +286,7 @@ VkCommandBuffer vkuOneShotCommandBufferBegin(VkuContext_t *Context)
 	VkResult Result=vkAllocateCommandBuffers(Context->Device, &(VkCommandBufferAllocateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=Context->CommandPool[0],
+		.commandPool=Context->CommandPool,
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount=1,
 	}, &CommandBuffer);
@@ -298,7 +298,7 @@ VkCommandBuffer vkuOneShotCommandBufferBegin(VkuContext_t *Context)
 
 	if(Result!=VK_SUCCESS)
 	{
-		vkFreeCommandBuffers(Context->Device, Context->CommandPool[0], 1, &CommandBuffer);
+		vkFreeCommandBuffers(Context->Device, Context->CommandPool, 1, &CommandBuffer);
 		return VK_NULL_HANDLE;
 	}
 
@@ -338,7 +338,7 @@ VkBool32 vkuOneShotCommandBufferEnd(VkuContext_t *Context, VkCommandBuffer Comma
 
 	vkDestroyFence(Context->Device, Fence, VK_NULL_HANDLE);
 
-	vkFreeCommandBuffers(Context->Device, Context->CommandPool[0], 1, &CommandBuffer);
+	vkFreeCommandBuffers(Context->Device, Context->CommandPool, 1, &CommandBuffer);
 
 	return VK_TRUE;
 }

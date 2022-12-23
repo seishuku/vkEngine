@@ -36,6 +36,7 @@ OBJS+=utils/event.o
 OBJS+=utils/genid.o
 OBJS+=utils/list.o
 OBJS+=utils/memzone.o
+OBJS+=perframe.o
 OBJS+=shadow.o
 OBJS+=skybox.o
 OBJS+=engine.o

@@ -50,7 +50,7 @@ typedef struct
 	VkDevice Device;
 	VkQueue Queue;
 	VkPipelineCache PipelineCache;
-	VkCommandPool CommandPool[VKU_MAX_FRAME_COUNT];
+	VkCommandPool CommandPool;
 } VkuContext_t;
 
 typedef struct

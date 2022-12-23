@@ -61,9 +61,6 @@
     <Filter Include="Header Files\camera">
       <UniqueIdentifier>{fd66522e-6afb-4e25-8589-38fa9a318e95}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\camera">
-      <UniqueIdentifier>{3c6294bb-196d-4d97-a5e5-63e2e9019398}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\particle">
       <UniqueIdentifier>{237e06da-cd03-467a-8255-1071fa686f32}</UniqueIdentifier>
     </Filter>
@@ -81,6 +78,9 @@
     </Filter>
     <Filter Include="Source Files\vr">
       <UniqueIdentifier>{ac23c9dc-2db0-4ba0-a607-52d96c97ff57}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\camera">
+      <UniqueIdentifier>{3c6294bb-196d-4d97-a5e5-63e2e9019398}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -162,6 +162,9 @@
     <ClCompile Include="vr\vr.c">
       <Filter>Source Files\vr</Filter>
     </ClCompile>
+    <ClCompile Include="perframe.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
@@ -220,6 +223,9 @@
     </ClInclude>
     <ClInclude Include="vr\vr.h">
       <Filter>Header Files\vr</Filter>
+    </ClInclude>
+    <ClInclude Include="perframe.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
