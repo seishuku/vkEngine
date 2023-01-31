@@ -1155,7 +1155,7 @@ bool Init(void)
 	if(!IsVR)
 	{
 		MatrixIdentity(EyeProjection[0]);
-		MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, true, EyeProjection[0]);
+		MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, EyeProjection[0]);
 	}
 
 	return true;
@@ -1224,7 +1224,7 @@ void RecreateSwapchain(void)
 		else
 		{
 			MatrixIdentity(EyeProjection[0]);
-			MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, true, EyeProjection[0]);
+			MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, EyeProjection[0]);
 		}
 	}
 }

@@ -123,8 +123,8 @@ void Matrix4x4MultVec4(const vec4 in, const matrix m, vec4 out);
 void Matrix4x4MultVec3(const vec3 in, const matrix m, vec3 out);
 void Matrix3x3MultVec3(const vec3 in, const matrix m, vec3 out);
 void MatrixLookAt(const vec3 position, const vec3 forward, const vec3 up, matrix out);
-void MatrixInfPerspective(float fovy, float aspect, float zNear, bool flip, matrix out);
-void MatrixPerspective(float fovy, float aspect, float zNear, float zFar, bool flip, matrix out);
+void MatrixInfPerspective(float fovy, float aspect, float zNear, matrix out);
+void MatrixPerspective(float fovy, float aspect, float zNear, float zFar, matrix out);
 void MatrixOrtho(float left, float right, float bottom, float top, float zNear, float zFar, matrix out);
 
 #endif

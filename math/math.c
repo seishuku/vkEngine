@@ -766,77 +766,36 @@ void MatrixLookAt(const vec3 position, const vec3 forward, const vec3 up, matrix
 	}
 }
 
-// Projection matrix functions
-void MatrixInfPerspective(const float fovy, const float aspect, const float zNear, const bool flip, matrix out)
+// Projection matrix functions, these are set up for "z reverse" (depth cleared to 0.0, and greater than or equal depth test)
+void MatrixInfPerspective(const float fovy, const float aspect, const float zNear, matrix out)
 {
 	if(out)
 	{
-		//float y=tanf((fovy/2.0f)*3.14159f/180.0f)*zNear, x=aspect*y;
-		//float nudge=1.0f-(1.0f/(1<<16));
-		matrix m;
-
-		//m[0]=zNear/x;
-		//m[1]=0.0f;
-		//m[2]=0.0f;
-		//m[3]=0.0f;
-		//m[4]=0.0f;
-		//m[5]=flip?-zNear/y:zNear/y;
-		//m[6]=0.0f;
-		//m[7]=0.0f;
-		//m[8]=0.0f;
-		//m[9]=0.0f;
-		//m[10]=-1.0f*nudge;
-		//m[11]=-1.0f;
-		//m[12]=0.0f;
-		//m[13]=0.0f;
-		//m[14]=-2.0f*zNear*nudge;
-		//m[15]=0.0f;
 		const float focal=tanf((fovy*PI/180.0f)*0.5f);
-
-		m[0]=1.0f/(aspect*focal);
-		m[1]=0.0f;
-		m[2]=0.0f;
-		m[3]=0.0f;
-		m[4]=0.0f;
-		m[5]=-1.0f/focal;
-		m[6]=0.0f;
-		m[7]=0.0f;
-		m[8]=0.0f;
-		m[9]=0.0f;
-		m[10]=0.0f;
-		m[11]=-1.0f;
-		m[12]=0.0f;
-		m[13]=0.0f;
-		m[14]=zNear;
-		m[15]=0.0f;
+		matrix m=
+		{
+			1.0f/(aspect*focal),  0.0f,        0.0f,  0.0f,
+			0.0f,                 -1.0f/focal, 0.0f,  0.0f,
+			0.0f,                 0.0f,        0.0f,  -1.0f,
+			0.0f,                 0.0f,        zNear, 0.0f
+		};
 
 		MatrixMult(m, out, out);
 	}
 }
 
-void MatrixPerspective(const float fovy, const float aspect, const float zNear, const float zFar, const bool flip, matrix out)
+void MatrixPerspective(const float fovy, const float aspect, const float zNear, const float zFar, matrix out)
 {
 	if(out)
 	{
-		float y=tanf((fovy/2.0f)*3.14159f/180.0f)*zNear, x=aspect*y;
-		matrix m;
-
-		m[0]=zNear/x;
-		m[1]=0.0f;
-		m[2]=0.0f;
-		m[3]=0.0f;
-		m[4]=0.0f;
-		m[5]=flip?-zNear/y:zNear/y;
-		m[6]=0.0f;
-		m[7]=0.0f;
-		m[8]=0.0f;
-		m[9]=0.0f;
-		m[10]=-(zFar+zNear)/(zFar-zNear);
-		m[11]=-1.0f;
-		m[12]=0.0f;
-		m[13]=0.0f;
-		m[14]=-(2.0f*zNear*zFar)/(zFar-zNear);
-		m[15]=0.0f;
+		const float focal=tanf((fovy*PI/180.0f)*0.5f);
+		matrix m=
+		{
+			1.0f/(aspect*focal),  0.0f,        0.0f,                      0.0f,
+			0.0f,                 -1.0f/focal, 0.0f,                      0.0f,
+			0.0f,                 0.0f,        zNear/(zFar-zNear),        -1.0f,
+			0.0f,                 0.0f,        zFar*(zNear/(zFar-zNear)), 0.0f,
+		};
 
 		MatrixMult(m, out, out);
 	}
@@ -848,40 +807,11 @@ void MatrixOrtho(const float left, const float right, const float bottom, const 
 	{
 		matrix m=
 		{
-			2.0f/(right-left),
-			0.0f,
-			0.0f,
-			0.0f,
-			0.0f,
-			2.0f/(bottom-top),
-			0.0f,
-			0.0f,
-			0.0f,
-			0.0f,
-			1.0f/(zNear-zFar),
-			0.0f,
-			-(right+left)/(right-left),
-			-(bottom+top)/(bottom-top),
-			zNear/(zNear-zFar),
-			1.0f
+			2.0f/(right-left),          0.0f,                       0.0f,               0.0f,
+			0.0f,                       2.0f/(bottom-top),          0.0f,               0.0f,
+			0.0f,                       0.0f,                       1.0f/(zNear-zFar),  0.0f,
+			-(right+left)/(right-left), -(bottom+top)/(bottom-top), zNear/(zNear-zFar), 1.0f
 		};
-
-		//m[0]=2.0f/(right-left);
-		//m[1]=0.0f;
-		//m[2]=0.0f;
-		//m[3]=0.0f;
-		//m[4]=0.0f;
-		//m[5]=2.0f/(top-bottom);
-		//m[6]=0.0f;
-		//m[7]=0.0f;
-		//m[8]=0.0f;
-		//m[9]=0.0f;
-		//m[10]=-2.0f/(zFar-zNear);
-		//m[11]=0.0f;
-		//m[12]=-(right+left)/(right-left);
-		//m[13]=-(top+bottom)/(top-bottom);
-		//m[14]=-(zFar+zNear)/(zFar-zNear);
-		//m[15]=1.0f;
 
 		MatrixMult(m, out, out);
 	}
