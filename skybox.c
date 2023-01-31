@@ -46,6 +46,7 @@ bool CreateSkyboxPipeline(void)
 
 	SkyboxPipeline.DepthTest=VK_TRUE;
 	SkyboxPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+	SkyboxPipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
 	SkyboxPipeline.RasterizationSamples=MSAA;
 
 	if(!vkuPipeline_AddStage(&SkyboxPipeline, "./shaders/skybox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))

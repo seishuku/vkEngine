@@ -771,25 +771,43 @@ void MatrixInfPerspective(const float fovy, const float aspect, const float zNea
 {
 	if(out)
 	{
-		float y=tanf((fovy/2.0f)*3.14159f/180.0f)*zNear, x=aspect*y;
-		float nudge=1.0f-(1.0f/(1<<16));
+		//float y=tanf((fovy/2.0f)*3.14159f/180.0f)*zNear, x=aspect*y;
+		//float nudge=1.0f-(1.0f/(1<<16));
 		matrix m;
 
-		m[0]=zNear/x;
+		//m[0]=zNear/x;
+		//m[1]=0.0f;
+		//m[2]=0.0f;
+		//m[3]=0.0f;
+		//m[4]=0.0f;
+		//m[5]=flip?-zNear/y:zNear/y;
+		//m[6]=0.0f;
+		//m[7]=0.0f;
+		//m[8]=0.0f;
+		//m[9]=0.0f;
+		//m[10]=-1.0f*nudge;
+		//m[11]=-1.0f;
+		//m[12]=0.0f;
+		//m[13]=0.0f;
+		//m[14]=-2.0f*zNear*nudge;
+		//m[15]=0.0f;
+		const float focal=tanf((fovy*PI/180.0f)*0.5f);
+
+		m[0]=1.0f/(aspect*focal);
 		m[1]=0.0f;
 		m[2]=0.0f;
 		m[3]=0.0f;
 		m[4]=0.0f;
-		m[5]=flip?-zNear/y:zNear/y;
+		m[5]=-1.0f/focal;
 		m[6]=0.0f;
 		m[7]=0.0f;
 		m[8]=0.0f;
 		m[9]=0.0f;
-		m[10]=-1.0f*nudge;
+		m[10]=0.0f;
 		m[11]=-1.0f;
 		m[12]=0.0f;
 		m[13]=0.0f;
-		m[14]=-2.0f*zNear*nudge;
+		m[14]=zNear;
 		m[15]=0.0f;
 
 		MatrixMult(m, out, out);

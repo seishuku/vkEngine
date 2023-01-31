@@ -49,6 +49,14 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		return VK_FALSE;
 	}
 
+	uint32_t *QueueIndices=(uint32_t *)Zone_Malloc(Zone, sizeof(uint32_t)*PhysicalDeviceCount);
+
+	if(QueueIndices==NULL)
+	{
+		DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for queue indices.\n");
+		return VK_FALSE;
+	}
+
 	// Get the handles to the devices
 	vkEnumeratePhysicalDevices(Instance, &PhysicalDeviceCount, DeviceHandles);
 
@@ -87,23 +95,23 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 
 			if(SupportsPresent&&(QueueFamilyProperties[j].queueFlags&VK_QUEUE_GRAPHICS_BIT))
 			{
-				Context->QueueFamilyIndex=j;
-				Context->PhysicalDevice=DeviceHandles[i];
-
+				QueueIndices[i]=j;
 				break;
 			}
 		}
 
 		// Done with queue family properties
 		Zone_Free(Zone, QueueFamilyProperties);
-
-		// Found device?
-		if(Context->PhysicalDevice)
-			break;
 	}
 
-	// Free allocated handles
+	// Select which device to use
+	uint32_t DeviceIndex=0;
+	Context->QueueFamilyIndex=QueueIndices[DeviceIndex];
+	Context->PhysicalDevice=DeviceHandles[DeviceIndex];
+
+	// Free allocated handles and queue indices
 	Zone_Free(Zone, DeviceHandles);
+	Zone_Free(Zone, QueueIndices);
 
 	uint32_t ExtensionCount=0;
 

@@ -1,7 +1,9 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdalign.h>
 #include <string.h>
 #include "system/system.h"
 #include "vulkan/vulkan.h"
@@ -93,13 +95,16 @@ VkPipelineLayout SpherePipelineLayout;
 VkuPipeline_t SpherePipeline;
 //////
 
+#include <semaphore.h>
+
 typedef struct
 {
 	uint32_t Index, Eye;
-	VkCommandPool CommandPool[VKU_MAX_FRAME_COUNT];
-	VkDescriptorPool DescriptorPool[VKU_MAX_FRAME_COUNT];
-	VkCommandBuffer SecCommandBuffer[VKU_MAX_FRAME_COUNT];
-	volatile bool Done;
+	VkCommandPool CommandPool[2];
+	VkDescriptorPool DescriptorPool[2];
+	VkCommandBuffer SecCommandBuffer[2];
+	bool Done;
+	sem_t Semaphore;
 } ThreadData_t;
 
 ThreadWorker_t Thread[4];
@@ -282,6 +287,7 @@ bool CreatePipeline(void)
 
 	Pipeline.DepthTest=VK_TRUE;
 	Pipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+	Pipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
 	Pipeline.RasterizationSamples=MSAA;
 
 	if(!vkuPipeline_AddStage(&Pipeline, "./shaders/lighting.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
@@ -600,7 +606,10 @@ void Thread_Main(void *Arg)
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Eye]);
 
+	sem_wait(&Data->Semaphore);
 	Data->Done=true;
+	assert(Data->Done);
+	sem_post(&Data->Semaphore);
 }
 
 void Thread_Skybox(void *Arg)
@@ -637,7 +646,10 @@ void Thread_Skybox(void *Arg)
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Eye]);
 
+	sem_wait(&Data->Semaphore);
 	Data->Done=true;
+	assert(Data->Done);
+	sem_post(&Data->Semaphore);
 }
 
 void Thread_Font(void *Arg)
@@ -666,7 +678,10 @@ void Thread_Font(void *Arg)
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Eye]);
 
+	sem_wait(&Data->Semaphore);
 	Data->Done=true;
+	assert(Data->Done);
+	sem_post(&Data->Semaphore);
 }
 
 
@@ -694,15 +709,16 @@ void Thread_Particles(void *Arg)
 	vkCmdSetScissor(Data->SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { rtWidth, rtHeight } });
 
 	matrix Modelview;
-	MatrixMult(PerFrame[0].Main_UBO[Data->Eye]->modelview, PerFrame[0].Main_UBO[Data->Eye]->HMD, Modelview);
-	ParticleSystem_Draw(&ParticleSystem, Data->SecCommandBuffer[Data->Eye], Data->DescriptorPool[Data->Eye], Modelview, PerFrame[0].Main_UBO[Data->Eye]->projection);
+	MatrixMult(PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->HMD, Modelview);
+	ParticleSystem_Draw(&ParticleSystem, Data->SecCommandBuffer[Data->Eye], Data->DescriptorPool[Data->Eye], Modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Eye]);
 
+	sem_wait(&Data->Semaphore);
 	Data->Done=true;
+	assert(Data->Done);
+	sem_post(&Data->Semaphore);
 }
-
-matrix HMDMatrix;
 
 void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matrix Pose)
 {
@@ -732,7 +748,7 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 		.renderPass=RenderPass,
 		.framebuffer=FrameBuffers[Eye],
 		.clearValueCount=2,
-		.pClearValues=(VkClearValue[]) { { 0.0f, 0.0f, 0.0f, 1.0f }, { 1.0f, 0 } },
+		.pClearValues=(VkClearValue[]) { { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0 } },
 		.renderArea=(VkRect2D){ { 0, 0 }, { rtWidth, rtHeight } },
 	}, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
@@ -759,7 +775,10 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	while(!(ThreadData[0].Done&&ThreadData[1].Done&&ThreadData[2].Done&&ThreadData[3].Done))
 	{
 		if(Timeout<0)
+		{
+			assert(true);
 			break;
+		}
 
 		Timeout--;
 	}
@@ -1128,7 +1147,10 @@ bool Init(void)
 		Thread_AddConstructor(&Thread[i], Thread_Constructor, (void *)&ThreadData[i]);
 		Thread_AddDestructor(&Thread[i], Thread_Destructor, (void *)&ThreadData[i]);
 		Thread_Start(&Thread[i]);
+
+		sem_init(&ThreadData[i].Semaphore, 0, 1);
 	}
+
 
 	if(!IsVR)
 	{
@@ -1192,7 +1214,7 @@ void RecreateSwapchain(void)
 		vkuDestroySwapchain(&Context, &Swapchain);
 
 		// Recreate the swapchain
-		vkuCreateSwapchain(&Context, &Swapchain, Width, Height, VK_TRUE);
+		vkuCreateSwapchain(&Context, &Swapchain, Width, Height, VK_FALSE);
 
 		// Recreate the framebuffer
 		CreateFramebuffers(0, rtWidth, rtHeight);
