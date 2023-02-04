@@ -115,7 +115,8 @@ VkBool32 vkuAllocateUpdateDescriptorSet(VkuDescriptorSet_t *DescriptorSet, VkDes
 		.pSetLayouts=&DescriptorSet->DescriptorSetLayout,
 	};
 
-	vkAllocateDescriptorSets(DescriptorSet->Device, &AllocateInfo, &DescriptorSet->DescriptorSet);
+//	if(!DescriptorSet->DescriptorSet)
+		vkAllocateDescriptorSets(DescriptorSet->Device, &AllocateInfo, &DescriptorSet->DescriptorSet);
 
 	// Need to update destination set handle now that one has been allocated.
 	for(uint32_t i=0;i<DescriptorSet->NumBindings;i++)

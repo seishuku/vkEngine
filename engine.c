@@ -187,7 +187,7 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 	}, 0, &FrameBuffers[Eye]);
 
 	VkCommandBuffer CommandBuffer=vkuOneShotCommandBufferBegin(&Context);
-	vkuTransitionLayout(CommandBuffer, ColorImage[Eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	//vkuTransitionLayout(CommandBuffer, ColorImage[Eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
 	if(IsVR)
 		vkuTransitionLayout(CommandBuffer, ColorResolve[Eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -214,7 +214,7 @@ bool CreatePipeline(void)
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_STORE,
 				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				.finalLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 			},
 			{
 				.format=DepthFormat,
@@ -253,24 +253,21 @@ bool CreatePipeline(void)
 		vkuCreateHostBuffer(&Context, &PerFrame[i].uboBuffer[1], sizeof(UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 		vkMapMemory(Context.Device, PerFrame[i].uboBuffer[1].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&PerFrame[i].Main_UBO[1]);
 
-		for(uint32_t j=0;j<NUM_MODELS;j++)
-		{
-			vkuInitDescriptorSet(&PerFrame[i].DescriptorSet[j], &Context);
+		vkuInitDescriptorSet(&PerFrame[i].DescriptorSet, &Context);
 
-			vkuDescriptorSet_AddBinding(&PerFrame[i].DescriptorSet[j], 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-			vkuDescriptorSet_AddBinding(&PerFrame[i].DescriptorSet[j], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-			vkuDescriptorSet_AddBinding(&PerFrame[i].DescriptorSet[j], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-			vkuDescriptorSet_AddBinding(&PerFrame[i].DescriptorSet[j], 3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
+		vkuDescriptorSet_AddBinding(&PerFrame[i].DescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+		vkuDescriptorSet_AddBinding(&PerFrame[i].DescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+		vkuDescriptorSet_AddBinding(&PerFrame[i].DescriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+		vkuDescriptorSet_AddBinding(&PerFrame[i].DescriptorSet, 3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
 
-			vkuAssembleDescriptorSetLayout(&PerFrame[i].DescriptorSet[j]);
-		}
+		vkuAssembleDescriptorSetLayout(&PerFrame[i].DescriptorSet);
 	}
 
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
-		.pSetLayouts=&PerFrame[0].DescriptorSet[0].DescriptorSetLayout, // Just use the first in the set, they're all the same layout
+		.pSetLayouts=&PerFrame[0].DescriptorSet.DescriptorSetLayout, // Just use the first in the set, they're all the same layout
 		.pushConstantRangeCount=1,
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
@@ -579,13 +576,13 @@ void Thread_Main(void *Arg)
 	
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		vkuDescriptorSet_UpdateBindingImageInfo(&PerFrame[Data->Index].DescriptorSet[i], 0, &Textures[2*i+0]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&PerFrame[Data->Index].DescriptorSet[i], 1, &Textures[2*i+1]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&PerFrame[Data->Index].DescriptorSet[i], 2, &ShadowDepth);
-		vkuDescriptorSet_UpdateBindingBufferInfo(&PerFrame[Data->Index].DescriptorSet[i], 3, PerFrame[Data->Index].uboBuffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
-		vkuAllocateUpdateDescriptorSet(&PerFrame[Data->Index].DescriptorSet[i], Data->DescriptorPool[Data->Eye]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&PerFrame[Data->Index].DescriptorSet, 0, &Textures[2*i+0]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&PerFrame[Data->Index].DescriptorSet, 1, &Textures[2*i+1]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&PerFrame[Data->Index].DescriptorSet, 2, &ShadowDepth);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&PerFrame[Data->Index].DescriptorSet, 3, PerFrame[Data->Index].uboBuffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
+		vkuAllocateUpdateDescriptorSet(&PerFrame[Data->Index].DescriptorSet, Data->DescriptorPool[Data->Eye]);
 
-		vkCmdBindDescriptorSets(Data->SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &PerFrame[Data->Index].DescriptorSet[i].DescriptorSet, 0, VK_NULL_HANDLE);
+		vkCmdBindDescriptorSets(Data->SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &PerFrame[Data->Index].DescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
 		matrix local;
 		MatrixIdentity(local);
@@ -674,7 +671,7 @@ void Thread_Font(void *Arg)
 	vkCmdSetViewport(Data->SecCommandBuffer[Data->Eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)rtWidth, (float)rtHeight, 0.0f, 1.0f });
 	vkCmdSetScissor(Data->SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { rtWidth, rtHeight } });
 
-	Font_Print(Data->SecCommandBuffer[Data->Eye], 0.0f, 0.0f, "FPS: %0.1f", fps);
+	Font_Print(Data->SecCommandBuffer[Data->Eye], 0.0f, 16.0f, "FPS: %0.1f\nFrame time: %0.3fms", fps, fTimeStep);
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Eye]);
 
@@ -806,6 +803,12 @@ void Render(void)
 	uint32_t Index=OldIndex;
 	matrix Pose;
 
+	if(!IsVR)
+	{
+		MatrixIdentity(EyeProjection[0]);
+		MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, EyeProjection[0]);
+	}
+
 	// Get a pointer to the emitter that's providing the positions
 	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
 
@@ -854,14 +857,8 @@ void Render(void)
 
 	if(IsVR)
 	{
-		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorImage[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorImage[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
 		EyeRender(PerFrame[Index].CommandBuffer, Index, 0, Pose);
 		EyeRender(PerFrame[Index].CommandBuffer, Index, 1, Pose);
-
-		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorImage[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorImage[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -907,11 +904,9 @@ void Render(void)
 		// Non-VR mode doesn't need the blit for cloning the eye images to swapchain
 		// and also doesn't need the intermediate resolve image, so we can just MSAA resolve directly to the swapchain.
 		// This doesn't net any more FPS, but it does save VRAM at least.
-		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorImage[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 		EyeRender(PerFrame[Index].CommandBuffer, Index, 0, Pose);
 
-		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorImage[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 		vkCmdResolveImage(PerFrame[Index].CommandBuffer, ColorImage[0].Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Swapchain.Image[Index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageResolve)
@@ -1151,13 +1146,6 @@ bool Init(void)
 		sem_init(&ThreadData[i].Semaphore, 0, 1);
 	}
 
-
-	if(!IsVR)
-	{
-		MatrixIdentity(EyeProjection[0]);
-		MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, EyeProjection[0]);
-	}
-
 	return true;
 }
 
@@ -1221,11 +1209,6 @@ void RecreateSwapchain(void)
 
 		if(IsVR)
 			CreateFramebuffers(1, rtWidth, rtHeight);
-		else
-		{
-			MatrixIdentity(EyeProjection[0]);
-			MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, EyeProjection[0]);
-		}
 	}
 }
 
@@ -1311,8 +1294,7 @@ void Destroy(void)
 		vkUnmapMemory(Context.Device, PerFrame[i].uboBuffer[1].DeviceMemory);
 		vkuDestroyBuffer(&Context, &PerFrame[i].uboBuffer[1]);
 
-		for(uint32_t j=0;j<NUM_MODELS;j++)
-			vkDestroyDescriptorSetLayout(Context.Device, PerFrame[i].DescriptorSet[j].DescriptorSetLayout, VK_NULL_HANDLE);
+		vkDestroyDescriptorSetLayout(Context.Device, PerFrame[i].DescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
 	}
 
 	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);

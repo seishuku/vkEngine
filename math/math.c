@@ -791,16 +791,17 @@ void MatrixPerspective(const float fovy, const float aspect, const float zNear, 
 		const float focal=tanf((fovy*PI/180.0f)*0.5f);
 		matrix m=
 		{
-			1.0f/(aspect*focal),  0.0f,        0.0f,                      0.0f,
-			0.0f,                 -1.0f/focal, 0.0f,                      0.0f,
-			0.0f,                 0.0f,        zNear/(zFar-zNear),        -1.0f,
-			0.0f,                 0.0f,        zFar*(zNear/(zFar-zNear)), 0.0f,
+			1.0f/(aspect*focal),  0.0f,        0.0f,                       0.0f,
+			0.0f,                 -1.0f/focal, 0.0f,                       0.0f,
+			0.0f,                 0.0f,        -2.0f/(zFar-zNear),         -1.0f,
+			0.0f,                 0.0f,        -(zFar+zNear)/(zFar-zNear), 0.0f,
 		};
 
 		MatrixMult(m, out, out);
 	}
 }
 
+// This is *not* set up for "z reverse"
 void MatrixOrtho(const float left, const float right, const float bottom, const float top, const float zNear, const float zFar, matrix out)
 {
 	if(out)

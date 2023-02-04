@@ -366,7 +366,7 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 		if(*ptr=='\n')
 		{
 			x=(float)sx;
-			y-=4;
+			y-=16;
 			continue;
 		}
 

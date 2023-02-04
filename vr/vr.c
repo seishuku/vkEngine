@@ -63,10 +63,10 @@ void GetEyeProjection(EVREye Eye, matrix Projection)
 	// Y-Flip for vulkan
 	Projection[5]*=-1.0f;
 
-	// nudge mod for infinite far plane
-	float nudge=1.0f-(1.0f/(1<<16));
-	Projection[10]=-1.0f*nudge;
-	Projection[14]=-2.0f*zNear*nudge;
+	// mod for infinite far plane
+	Projection[10]=0.0f;
+	Projection[11]=-1.0f;
+	Projection[14]=zNear;
 
 	// Inverse eye transform and multiply into projection matrix
 	HmdMatrix34toMatrix44(VRSystem->GetEyeToHeadTransform(Eye), Transform);

@@ -256,6 +256,7 @@ bool ParticleSystem_Init(ParticleSystem_t *System)
 	ParticlePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 	ParticlePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
 	ParticlePipeline.DepthTest=VK_TRUE;
+	ParticlePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
 	ParticlePipeline.DepthWrite=VK_FALSE;
 	ParticlePipeline.RasterizationSamples=MSAA;
 
