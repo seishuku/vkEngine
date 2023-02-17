@@ -116,7 +116,7 @@ static void CalculateTangent(BModel_t *Model)
 static void ReadString(char *String, size_t StringLength, FILE *fp)
 {
 	uint32_t i=0;
-	char ch=255;
+	char ch=127;
 
 	while(ch!='\0'&&i<StringLength)
 	{

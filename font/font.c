@@ -1,334 +1,96 @@
-/*
-	Copyright 2020 Matt Williams/NitroGL
-	Simple (?) Vulakn Font/Text printing function
-	Uses two vertex buffers, one for a single triangle strip making up
-	a quad, the other contains instancing data for character
-	position, texture altas lookup and color.
-*/
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "../system/system.h"
+#include <string.h>
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
-#include "../font/font.h"
+#include "../utils/list.h"
+#include "../vr/vr.h"
+#include "font.h"
 
-// external Vulkan context data/functions for this module:
 extern VkuContext_t Context;
 extern VkRenderPass RenderPass;
 extern VkSampleCountFlags MSAA;
 
-extern VkuMemZone_t *VkZone;
+extern uint32_t Width, Height;
 
-extern int Width, Height;	// Window width/height from main app.
-// ---
+VkPipelineLayout FontPipelineLayout;
+VkuPipeline_t FontPipeline;
 
-// Vulkan context data unique to this module:
+VkuBuffer_t FontBuffer;
 
-// Descriptors
-VkDescriptorPool fontDescriptorPool;
-VkDescriptorSet fontDescriptorSet;
-VkDescriptorSetLayout fontDescriptorSetLayout;
-
-// Pipeline
-VkPipelineLayout fontPipelineLayout;
-VkuPipeline_t fontPipeline;
-
-// Texture handles
-VkuImage_t fontTexture;
-
-// Vertex data handles
-VkuBuffer_t fontVertexBuffer;
-
-// Instance data handles
-VkuBuffer_t fontInstanceBuffer;
-void *fontInstanceBufferPtr;
+// List for storing current string vectors
+List_t FontVectors;
 
 // Initialization flag
-bool Font_Init=false;
+bool FontInit=true;
 
-void _Font_Init(void)
+struct
 {
-	VkuBuffer_t stagingBuffer;
-	VkCommandBuffer copyCmd;
-	void *data=NULL;
+	uint32_t Advance;
+	uint32_t numPath;
+	vec2 *Path;
+} Gylphs[256];
 
-	// Create new descriptor sets and pipeline
-	vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
+uint32_t GylphSize=0;
+
+bool LoadFontGylphs(const char *Filename)
+{
+	FILE *Stream=NULL;
+	const uint32_t GYLP=('G'|('Y'<<8)|('L'<<16)|('P'<<24));
+
+	Stream=fopen(Filename, "rb");
+
+	if(!Stream)
+		return false;
+
+	uint32_t Magic=0;
+
+	fread(&Magic, sizeof(uint32_t), 1, Stream);
+
+	if(Magic!=GYLP)
+		return false;
+
+	// Vertical size
+	fread(&GylphSize, sizeof(uint32_t), 1, Stream);
+	GylphSize-=2;
+
+	// Read in all chars
+	for(uint32_t i=0;i<255;i++)
 	{
-		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-		.pNext=VK_NULL_HANDLE,
-		.maxSets=1,
-		.poolSizeCount=1,
-		.pPoolSizes=(VkDescriptorPoolSize[])
-		{
-			{
-				.type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.descriptorCount=1,
-			},
-		},
-	}, NULL, &fontDescriptorPool);
+		// Advancement spacing for char
+		fread(&Gylphs[i].Advance, sizeof(uint32_t), 1, Stream);
+		// Number of bezier curves in this char
+		fread(&Gylphs[i].numPath, sizeof(uint32_t), 1, Stream);
 
-	vkCreateDescriptorSetLayout(Context.Device, &(VkDescriptorSetLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-		.pNext=VK_NULL_HANDLE,
-		.bindingCount=1,
-		.pBindings=(VkDescriptorSetLayoutBinding[])
-		{
-			{
-				.binding=0,
-				.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.descriptorCount=1,
-				.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
-				.pImmutableSamplers=NULL,
-			},
-		},
-	}, NULL, &fontDescriptorSetLayout);
+		// Allocate memory and read in the paths
+		Gylphs[i].Path=malloc(sizeof(vec2)*Gylphs[i].numPath);
 
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=1,
-		.pSetLayouts=&fontDescriptorSetLayout,
-		.pushConstantRangeCount=1,
-		.pPushConstantRanges=&(VkPushConstantRange)
-		{
-			.offset=0,
-			.size=sizeof(uint32_t)*2,
-			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
-		},		
-	}, 0, &fontPipelineLayout);
+		if(!Gylphs[i].Path)
+			return false;
 
-	vkuInitPipeline(&fontPipeline, &Context);
-
-	vkuPipeline_AddStage(&fontPipeline, "./shaders/font.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-	vkuPipeline_AddStage(&fontPipeline, "./shaders/font.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-
-	vkuPipeline_SetPipelineLayout(&fontPipeline, fontPipelineLayout);
-	vkuPipeline_SetRenderPass(&fontPipeline, RenderPass);
-
-	vkuPipeline_AddVertexBinding(&fontPipeline, 0, sizeof(float)*4, VK_VERTEX_INPUT_RATE_VERTEX);
-	vkuPipeline_AddVertexBinding(&fontPipeline, 1, sizeof(float)*7, VK_VERTEX_INPUT_RATE_INSTANCE);
-
-	vkuPipeline_AddVertexAttribute(&fontPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-	vkuPipeline_AddVertexAttribute(&fontPipeline, 1, 1, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-	vkuPipeline_AddVertexAttribute(&fontPipeline, 2, 1, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float)*4);
-
-	fontPipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-	fontPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
-	fontPipeline.RasterizationSamples=MSAA;
-
-	fontPipeline.Blend=VK_TRUE;
-	fontPipeline.SrcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	fontPipeline.DstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	fontPipeline.ColorBlendOp=VK_BLEND_OP_ADD;
-	fontPipeline.SrcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	fontPipeline.DstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	fontPipeline.AlphaBlendOp=VK_BLEND_OP_ADD;
-
-	vkuAssemblePipeline(&fontPipeline);
-	// ---
-
-	// Create sampler and load texture data
-	vkuCreateHostBuffer(&Context, &stagingBuffer, 16*16*223, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-
-	{
-		FILE *Stream=NULL;
-
-		if((Stream=fopen("./assets/font.bin", "rb"))==NULL)
-			return;
-
-		if(Stream==NULL)
-			return;
-
-		fseek(Stream, 0, SEEK_END);
-		uint32_t Size=ftell(Stream);
-		fseek(Stream, 0, SEEK_SET);
-
-		uint8_t *_FontData=(uint8_t *)Zone_Malloc(Zone, Size);
-
-		if(_FontData==NULL)
-			return;
-
-		fread(_FontData, 1, Size, Stream);
-		fclose(Stream);
-
-		// Map image memory and copy data
-		vkMapMemory(Context.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
-		uint8_t *ptr=(uint8_t *)data;
-		uint8_t *FontPtr=(uint8_t *)_FontData;
-
-		for(uint32_t i=0;i<16*16*223;i++)
-			*ptr++=*FontPtr++;
-		vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
-
-		Zone_Free(Zone, _FontData);
+		fread(Gylphs[i].Path, sizeof(vec2), Gylphs[i].numPath, Stream);
 	}
 
-	vkuCreateImageBuffer(&Context, &fontTexture,
-		VK_IMAGE_TYPE_2D, VK_FORMAT_R8_UNORM, 1, 223, 16, 16, 1,
-		VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
+	fclose(Stream);
 
-	// Start a one shot command buffer
-	copyCmd=vkuOneShotCommandBufferBegin(&Context);
-
-	// Change image layout from undefined to transfer destination
-	vkuTransitionLayout(copyCmd, fontTexture.Image, 1, 0, 223, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-	// Copy from staging buffer to the texture buffer
-	vkCmdCopyBufferToImage(copyCmd, stagingBuffer.Buffer, fontTexture.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkBufferImageCopy)
-	{
-		.imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.imageSubresource.mipLevel=0,
-		.imageSubresource.baseArrayLayer=0,
-		.imageSubresource.layerCount=223,
-		.imageExtent.width=16,
-		.imageExtent.height=16,
-		.imageExtent.depth=1,
-		.bufferOffset=0,
-	});
-
-	// Change image layout to shader read-only for sampling in shaders
-	vkuTransitionLayout(copyCmd, fontTexture.Image, 1, 0, 223, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-	// End one shot command buffer and submit it
-	vkuOneShotCommandBufferEnd(&Context, copyCmd);
-
-	// Done with the staging buffer
-	vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
-	vkDestroyBuffer(Context.Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
-
-	vkCreateSampler(Context.Device, &(VkSamplerCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-		.maxAnisotropy=1.0f,
-		.magFilter=VK_FILTER_LINEAR,
-		.minFilter=VK_FILTER_LINEAR,
-		.mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR,
-		.addressModeU=VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		.addressModeV=VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		.addressModeW=VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		.mipLodBias=0.0f,
-		.compareOp=VK_COMPARE_OP_NEVER,
-		.minLod=0.0f,
-		.maxLod=0.0f,
-		.maxAnisotropy=1.0,
-		.anisotropyEnable=VK_FALSE,
-		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-	}, VK_NULL_HANDLE, &fontTexture.Sampler);
-
-	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.viewType=VK_IMAGE_VIEW_TYPE_2D_ARRAY,
-		.format=VK_FORMAT_R8_UNORM,
-		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.baseArrayLayer=0,
-		.subresourceRange.layerCount=223,
-		.subresourceRange.levelCount=1,
-		.image=fontTexture.Image,
-	}, VK_NULL_HANDLE, &fontTexture.View);
-	// ---
-
-	// Allocate and update descripter set with uniform/texture handles
-	vkAllocateDescriptorSets(Context.Device, &(VkDescriptorSetAllocateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-		.pNext=NULL,
-		.descriptorPool=fontDescriptorPool,
-		.descriptorSetCount=1,
-		.pSetLayouts=&fontDescriptorSetLayout,
-	}, &fontDescriptorSet);
-
-	vkUpdateDescriptorSets(Context.Device, 1, (VkWriteDescriptorSet[])
-	{
-		{
-			.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.descriptorCount=1,
-			.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.dstBinding=0,
-			.pImageInfo=&(VkDescriptorImageInfo)
-			{
-				.imageView=fontTexture.View,
-				.sampler=fontTexture.Sampler,
-				.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			},
-			.dstSet=fontDescriptorSet,
-		},
-	}, 0, VK_NULL_HANDLE);
-
-	// Create static vertex data buffer
-	vkuCreateGPUBuffer(&Context, &fontVertexBuffer, sizeof(float)*4*4, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-
-	// Create staging buffer, map it, and copy vertex data to it
-	vkuCreateHostBuffer(&Context, &stagingBuffer, sizeof(float)*4*4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-
-	// Map it
-	vkMapMemory(Context.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
-
-	if(!data)
-		return;
-
-	float *Ptr=data;
-
-	*Ptr++=0.0f;	// X
-	*Ptr++=16.0f;	// Y
-	*Ptr++=0.0f;	// U
-	*Ptr++=1.0f;	// V
-
-	*Ptr++=0.0f;
-	*Ptr++=0.0f;
-	*Ptr++=0.0f;
-	*Ptr++=0.0f;
-
-	*Ptr++=16.0f;
-	*Ptr++=16.0f;
-	*Ptr++=1.0f;
-	*Ptr++=1.0f;
-
-	*Ptr++=16.0f;
-	*Ptr++=0.0f;
-	*Ptr++=1.0f;
-	*Ptr++=0.0f;
-
-	vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
-
-	copyCmd=vkuOneShotCommandBufferBegin(&Context);
-	vkCmdCopyBuffer(copyCmd, stagingBuffer.Buffer, fontVertexBuffer.Buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(float)*4*4 });
-	vkuOneShotCommandBufferEnd(&Context, copyCmd);
-
-	// Delete staging data
-	vkFreeMemory(Context.Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
-	vkDestroyBuffer(Context.Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
-	// ---
-
-	// Create instance buffer and map it
-	vkuCreateHostBuffer(&Context, &fontInstanceBuffer, sizeof(float)*7*255, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-	vkMapMemory(Context.Device, fontInstanceBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void *)&fontInstanceBufferPtr);
-	// ---
+	return true;
 }
 
-void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
+void Font_Print(VkCommandBuffer CommandBuffer, uint32_t Eye, float x, float y, char *string, ...)
 {
-	// float pointer for VBO mappings (both vertex and instance data)
-	float *verts=NULL;
 	// pointer and buffer for formatted text
-	char *ptr, text[255];
+	char *ptr, text[4096];
 	// variable arguments list
 	va_list	ap;
 	// some misc variables
-	int sx=(int)x, numchar;
+	int32_t sx=(int32_t)x;
 	// current text color
 	float r=1.0f, g=1.0f, b=1.0f;
+	// scale factor, smaller value = larger font
+	const float scale=2.0f;
 
 	// Check if the string is even valid first
 	if(string==NULL)
@@ -339,25 +101,56 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 	vsprintf(text, string, ap);
 	va_end(ap);
 
-	// Find how many characters were need to deal with
-	numchar=(int)strlen(text);
-
-	// Generate texture, shaders, etc once
-	if(!Font_Init)
+	// One time init, loads font paths, set up buffers and list
+	if(FontInit)
 	{
-		_Font_Init();
+		if(!LoadFontGylphs("./assets/font.gylph"))
+			return;
+
+		vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+			.pushConstantRangeCount=1,
+			.pPushConstantRanges=&(VkPushConstantRange)
+			{
+				.offset=0,
+				.size=sizeof(matrix),
+				.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+			},
+		}, 0, &FontPipelineLayout);
+
+		vkuInitPipeline(&FontPipeline, &Context);
+
+		vkuPipeline_SetPipelineLayout(&FontPipeline, FontPipelineLayout);
+		vkuPipeline_SetRenderPass(&FontPipeline, RenderPass);
+
+		FontPipeline.Topology=VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY;
+		FontPipeline.RasterizationSamples=MSAA;
+
+		if(!vkuPipeline_AddStage(&FontPipeline, "./shaders/bezier.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+			return;
+
+		if(!vkuPipeline_AddStage(&FontPipeline, "./shaders/bezier.geom.spv", VK_SHADER_STAGE_GEOMETRY_BIT))
+			return;
+
+		if(!vkuPipeline_AddStage(&FontPipeline, "./shaders/bezier.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+			return;
+
+		vkuPipeline_AddVertexBinding(&FontPipeline, 0, sizeof(vec4)*2, VK_VERTEX_INPUT_RATE_VERTEX);
+		vkuPipeline_AddVertexAttribute(&FontPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
+		vkuPipeline_AddVertexAttribute(&FontPipeline, 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*1);
+
+		if(!vkuAssemblePipeline(&FontPipeline))
+			return;
+
+		// Initalize a list for building a list of control points to feed to the Bezier shader
+		List_Init(&FontVectors, sizeof(vec4)*2, 4, NULL);
+
+		vkuCreateHostBuffer(&Context, &FontBuffer, 4096*sizeof(vec4)*2*100, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
 		// Done with init
-		Font_Init=true;
+		FontInit=false;
 	}
-
-	// Update instance data
-	// Get the pointer to the mapped instance buffer
-	verts=(float *)fontInstanceBufferPtr;
-
-	// Check if it's still valid
-	if(verts==NULL)
-		return;
 
 	// Loop through the text string until EOL
 	for(ptr=text;*ptr!='\0';ptr++)
@@ -366,15 +159,14 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 		if(*ptr=='\n')
 		{
 			x=(float)sx;
-			y-=16;
+			y-=GylphSize;
 			continue;
 		}
 
-		// Just advance spaces instead of rendering empty quads
+		// Just advance spaces instead of rendering empty character
 		if(*ptr==' ')
 		{
-			x+=9;
-			numchar--;
+			x+=Gylphs[(uint32_t)*ptr].Advance;
 			continue;
 		}
 
@@ -403,57 +195,51 @@ void Font_Print(VkCommandBuffer cmd, float x, float y, char *string, ...)
 			ptr+=4;
 		}
 
-		// Emit position, atlas offset, and color for this character
-		*verts++=x;					// InstancePos.x
-		*verts++=y;					// InstancePos.y
-		*verts++=(float)(*ptr-33);	// InstancePos.z
-		*verts++=0.0f;				// InstancePos.w
-		*verts++=r;					// InstanceColor.r
-		*verts++=g;					// InstanceColor.g
-		*verts++=b;					// InstanceColor.b
+		// Push the current character gylph path with offset and color on to the list
+		for(uint32_t i=0;i<Gylphs[(uint32_t)*ptr].numPath;i++)
+		{
+			float vert[]={ Gylphs[(uint32_t)*ptr].Path[i][0]+x, Gylphs[(uint32_t)*ptr].Path[i][1]+y, -1.0f, 1.0f, r, g, b, 1.0f};
+			List_Add(&FontVectors, vert);
+		}
 
 		// Advance one character
-		x+=9;
+		x+=Gylphs[(uint32_t)*ptr].Advance;
 	}
-	// ---
 
-	// Bind the font rendering pipeline (sets states and shaders)
-	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, fontPipeline.Pipeline);
-	
-	// Bind descriptor sets (sets uniform/texture bindings)
-	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, fontPipelineLayout, 0, 1, &fontDescriptorSet, 0, NULL);
+	void *Data=NULL;
 
-	uint32_t viewport[2]={ Width, Height };
-	vkCmdPushConstants(cmd, fontPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t)*2, viewport);
+	vkMapMemory(Context.Device, FontBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void *)&Data);
 
-	// Bind vertex data buffer
-	vkCmdBindVertexBuffers(cmd, 0, 1, &fontVertexBuffer.Buffer, &(VkDeviceSize) { 0 });
-	// Bind object instance buffer
-	vkCmdBindVertexBuffers(cmd, 1, 1, &fontInstanceBuffer.Buffer, &(VkDeviceSize) { 0 });
+	if(Data)
+	{
+		memcpy(Data, List_GetPointer(&FontVectors, 0), sizeof(float)*8*List_GetCount(&FontVectors));
+		vkUnmapMemory(Context.Device, FontBuffer.DeviceMemory);
+	}
 
-	// Draw the number of characters
-	vkCmdDraw(cmd, 4, numchar, 0, 0);
+	matrix Projection;
+	MatrixIdentity(Projection);
+	MatrixOrtho(0.0f, ((float)Width/Height)*scale, 0.0f, 1.0f*scale, 0.001f, 100.0f, Projection);
+
+	// Draw characters!
+	vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, FontPipeline.Pipeline);
+	vkCmdPushConstants(CommandBuffer, FontPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(matrix), &Projection);
+	vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &FontBuffer.Buffer, &(VkDeviceSize) { 0 });
+	vkCmdDraw(CommandBuffer, (uint32_t)List_GetCount(&FontVectors), 1, 0, 0);
+
+	// Clear the list for next time
+	List_Clear(&FontVectors);
 }
 
 void Font_Destroy(void)
 {
-	// Instance buffer handles
-	if(fontInstanceBuffer.DeviceMemory)
-		vkUnmapMemory(Context.Device, fontInstanceBuffer.DeviceMemory);
+	// Loop through gylphs to free memory
+	for(uint32_t i=0;i<255;i++)
+		free(Gylphs[i].Path);
 
-	vkuDestroyBuffer(&Context, &fontInstanceBuffer);
+	// Destroy the control point list
+	List_Destroy(&FontVectors);
 
-	// Vertex data handles
-	vkuDestroyBuffer(&Context, &fontVertexBuffer);
-
-	// Texture handles
-	vkuDestroyImageBuffer(&Context, &fontTexture);
-
-	// Pipeline
-	vkDestroyPipelineLayout(Context.Device, fontPipelineLayout, VK_NULL_HANDLE);
-	vkDestroyPipeline(Context.Device, fontPipeline.Pipeline, VK_NULL_HANDLE);
-
-	// Descriptors
-	vkDestroyDescriptorPool(Context.Device, fontDescriptorPool, VK_NULL_HANDLE);
-	vkDestroyDescriptorSetLayout(Context.Device, fontDescriptorSetLayout, VK_NULL_HANDLE);
+	vkuDestroyBuffer(&Context, &FontBuffer);
+	vkDestroyPipeline(Context.Device, FontPipeline.Pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(Context.Device, FontPipelineLayout, VK_NULL_HANDLE);
 }

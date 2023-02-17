@@ -10,7 +10,7 @@
 #include "shadow.h"
 #include "perframe.h"
 
-#define NUM_ASTEROIDS 300
+#define NUM_ASTEROIDS 600
 
 extern VkuContext_t Context;
 extern VkuBuffer_t Asteroid_Instance;
@@ -22,7 +22,7 @@ VkuPipeline_t ShadowPipeline;
 VkPipelineLayout ShadowPipelineLayout;
 VkRenderPass ShadowRenderPass;
 
-const uint32_t ShadowSize=2048;
+const uint32_t ShadowSize=4096;
 
 VkuImage_t ShadowDepth;
 VkFramebuffer ShadowFrameBuffer;
@@ -41,7 +41,6 @@ void InitShadowMap(void)
 	vkCreateSampler(Context.Device, &(VkSamplerCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-		.maxAnisotropy=1.0f,
 		.magFilter=VK_FILTER_LINEAR,
 		.minFilter=VK_FILTER_LINEAR,
 		.mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR,
@@ -53,7 +52,7 @@ void InitShadowMap(void)
 		.compareEnable=VK_TRUE,
 		.minLod=0.0f,
 		.maxLod=1.0f,
-		.maxAnisotropy=1.0,
+		.maxAnisotropy=1.0f,
 		.anisotropyEnable=VK_FALSE,
 		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
 	}, VK_NULL_HANDLE, &ShadowDepth.Sampler);
@@ -193,7 +192,7 @@ void ShadowUpdateMap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 		.renderPass=ShadowRenderPass,
 		.framebuffer=ShadowFrameBuffer,
 		.clearValueCount=1,
-		.pClearValues=(VkClearValue[]){ { 1.0f, 0 } },
+		.pClearValues=(VkClearValue[]){{ {{ 1.0f, 0 }} }},
 		.renderArea.offset=(VkOffset2D){ 0, 0 },
 		.renderArea.extent=(VkExtent2D){ ShadowSize, ShadowSize },
 	}, VK_SUBPASS_CONTENTS_INLINE);
@@ -206,14 +205,14 @@ void ShadowUpdateMap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 
 	matrix Projection;
 	MatrixIdentity(Projection);
-	MatrixOrtho(-12500.0f, 12500.0f, -12500.0f, 12500.0f, 0.1f, 30000.0f, Projection);
+	MatrixOrtho(-1200.0f, 1200.0f, -1200.0f, 1200.0f, 0.1f, 3000.0f, Projection);
 
 	matrix ModelView;
 	MatrixIdentity(ModelView);
 
 	vec3 Position;
 	Vec3_Setv(Position, PerFrame[FrameIndex].Skybox_UBO[0]->uSunPosition);
-	Vec3_Muls(Position, 20000.0f);
+	Vec3_Muls(Position, 200.0f);
 
 	MatrixLookAt(Position, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.0f, 1.0f, 0.0f }, ModelView);
 

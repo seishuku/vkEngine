@@ -107,7 +107,7 @@ typedef struct
 	VkStencilOp FrontStencilFailOp;
 	VkStencilOp FrontStencilPassOp;
 	VkStencilOp FrontStencilDepthFailOp;
-	VkStencilOp FrontStencilCompareOp;
+	VkCompareOp FrontStencilCompareOp;
 	uint32_t FrontStencilCompareMask;
 	uint32_t FrontStencilWriteMask;
 	uint32_t FrontStencilRference;
@@ -116,7 +116,7 @@ typedef struct
 	VkStencilOp BackStencilFailOp;
 	VkStencilOp BackStencilPassOp;
 	VkStencilOp BackStencilDepthFailOp;
-	VkStencilOp BackStencilCompareOp;
+	VkCompareOp BackStencilCompareOp;
 	uint32_t BackStencilCompareMask;
 	uint32_t BackStencilWriteMask;
 	uint32_t BackStencilReference;

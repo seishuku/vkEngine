@@ -13,9 +13,21 @@
 void GenerateSkyParams(void);
 extern Camera_t Camera;
 extern ParticleSystem_t ParticleSystem;
-void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle);
 float RandFloat(void);
 //////////////////////////////
+
+// Emitter callback for the launched emitter's particles
+void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle)
+{
+	Vec3_Sets(Particle->pos, 0.0f);
+
+	// Simple -1.0 to 1.0 random spherical pattern, scaled by 100, fairly short lifespan.
+	Vec3_Set(Particle->vel, ((float)rand()/RAND_MAX)*2.0f-1.0f, ((float)rand()/RAND_MAX)*2.0f-1.0f, ((float)rand()/RAND_MAX)*2.0f-1.0f);
+	Vec3_Normalize(Particle->vel);
+	Vec3_Muls(Particle->vel, 10.0f);
+
+	Particle->life=((float)rand()/RAND_MAX)*2.5f+0.01f;
+}
 
 // Launch a "missle"
 // This is basically the same as an emitter callback, but done manually by working on the particle array directly.
@@ -27,7 +39,7 @@ void FireParticleEmitter(vec3 Position, vec3 Direction)
 	// Create a new particle emitter
 	vec3 RandVec={ RandFloat(), RandFloat(), RandFloat() };
 	Vec3_Normalize(RandVec);
-	uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.2f, 0.2f, 0.2f }, RandVec, 10.0f, 500, false, EmitterCallback);
+	uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.2f, 0.2f, 0.2f }, RandVec, 1.0f, 500, false, EmitterCallback);
 
 	// Search list for first dead particle
 	for(uint32_t i=0;i<Emitter->NumParticles;i++)
@@ -41,7 +53,7 @@ void FireParticleEmitter(vec3 Position, vec3 Direction)
 
 			Vec3_Setv(Emitter->Particles[i].vel, Direction);
 			Vec3_Normalize(Emitter->Particles[i].vel);
-			Vec3_Muls(Emitter->Particles[i].vel, 1000.0f);
+			Vec3_Muls(Emitter->Particles[i].vel, 100.0f);
 
 			Emitter->Particles[i].life=10.0f;
 
@@ -109,7 +121,7 @@ void Event_Mouse(void *Arg)
 
 	if(MouseEvent->button&MOUSE_BUTTON_LEFT)
 	{
-		Camera.Yaw-=(float)MouseEvent->dx/800.0f;
-		Camera.Pitch-=(float)MouseEvent->dy/800.0f;
+		Camera.Yaw-=(float)MouseEvent->dx/8000.0f;
+		Camera.Pitch-=(float)MouseEvent->dy/8000.0f;
 	}
 }

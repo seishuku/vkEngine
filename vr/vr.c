@@ -54,7 +54,7 @@ void GetEyeProjection(EVREye Eye, matrix Projection)
 	float zNear=0.01f;
 
 	// Get projection matrix and copy into my matrix format
-	HmdProj=VRSystem->GetProjectionMatrix(Eye, zNear, 0.0f);
+	HmdProj=VRSystem->GetProjectionMatrix(Eye, zNear, 1.0f);
 	memcpy(Projection, &HmdProj, sizeof(matrix));
 
 	// Row/Col major convert

@@ -32,8 +32,6 @@ extern UBO_t *Main_UBO[2];
 
 ////////////////////////////
 
-float PartGrav[3]={ 0.0, -9.81f, 0.0 };
-
 VkuDescriptorSet_t ParticleDescriptorSet;
 VkPipelineLayout ParticlePipelineLayout;
 VkuPipeline_t ParticlePipeline;
@@ -218,6 +216,26 @@ void ParticleSystem_SetEmitterPosition(ParticleSystem_t *System, uint32_t ID, ve
 	}
 }
 
+bool ParticleSystem_SetGravity(ParticleSystem_t *System, float x, float y, float z)
+{
+	if(System==NULL)
+		return false;
+
+	Vec3_Set(System->Gravity, x, y, z);
+
+	return true;
+}
+
+bool ParticleSystem_SetGravityv(ParticleSystem_t *System, vec3 v)
+{
+	if(System==NULL)
+		return false;
+
+	Vec3_Setv(System->Gravity, v);
+
+	return true;
+}
+
 bool ParticleSystem_Init(ParticleSystem_t *System)
 {
 	if(System==NULL)
@@ -226,6 +244,9 @@ bool ParticleSystem_Init(ParticleSystem_t *System)
 	List_Init(&System->Emitters, sizeof(ParticleEmitter_t), 10, NULL);
 
 	System->ParticleArray=NULL;
+
+	// Default generic gravity
+	Vec3_Set(System->Gravity, 0.0f, -9.81f, 0.0f);
 
 	if(!Image_Upload(&Context, &ParticleTexture, "./assets/particle.tga", IMAGE_BILINEAR|IMAGE_MIPMAP))
 		return false;
@@ -334,7 +355,7 @@ void ParticleSystem_Step(ParticleSystem_t *System, float dt)
 				{
 					vec3 temp;
 
-					Vec3_Setv(temp, PartGrav);
+					Vec3_Setv(temp, System->Gravity);
 					Vec3_Muls(temp, dt);
 					Vec3_Addv(Emitter->Particles[j].vel, temp);
 

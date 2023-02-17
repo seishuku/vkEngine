@@ -909,7 +909,6 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		vkCreateSampler(Context->Device, &(VkSamplerCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-			.maxAnisotropy=1.0f,
 			.magFilter=MagFilter,
 			.minFilter=MinFilter,
 			.mipmapMode=MipmapMode,
@@ -920,7 +919,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 			.compareOp=VK_COMPARE_OP_NEVER,
 			.minLod=0.0f,
 			.maxLod=(float)MipLevels,
-			.maxAnisotropy=1.0,
+			.maxAnisotropy=1.0f,
 			.anisotropyEnable=VK_FALSE,
 			.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
 		}, VK_NULL_HANDLE, &Image->Sampler);
@@ -1008,7 +1007,6 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 	vkCreateSampler(Context->Device, &(VkSamplerCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-		.maxAnisotropy=1.0f,
 		.magFilter=MagFilter,
 		.minFilter=MinFilter,
 		.mipmapMode=MipmapMode,
@@ -1019,7 +1017,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		.compareOp=VK_COMPARE_OP_NEVER,
 		.minLod=0.0f,
 		.maxLod=(float)MipLevels,
-		.maxAnisotropy=1.0,
+		.maxAnisotropy=1.0f,
 		.anisotropyEnable=VK_FALSE,
 		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
 	}, VK_NULL_HANDLE, &Image->Sampler);

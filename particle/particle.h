@@ -25,6 +25,8 @@ typedef struct
 
 typedef struct
 {
+	vec3 Gravity;
+
 	List_t Emitters;
 
 	VkuBuffer_t ParticleBuffer;
@@ -35,6 +37,9 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *System, vec3 Position, vec3
 void ParticleSystem_DeleteEmitter(ParticleSystem_t *System, uint32_t ID);
 void ParticleSystem_ResetEmitter(ParticleSystem_t *System, uint32_t ID);
 void ParticleSystem_SetEmitterPosition(ParticleSystem_t *System, uint32_t ID, vec3 Position);
+
+bool ParticleSystem_SetGravity(ParticleSystem_t *System, float x, float y, float z);
+bool ParticleSystem_SetGravityv(ParticleSystem_t *System, vec3 v);
 
 bool ParticleSystem_Init(ParticleSystem_t *System);
 void ParticleSystem_Step(ParticleSystem_t *System, float dt);

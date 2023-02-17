@@ -54,7 +54,7 @@ VkuSwapchain_t Swapchain;
 VkSampleCountFlags MSAA=VK_SAMPLE_COUNT_2_BIT;
 
 // Colorbuffer image
-VkFormat ColorFormat=VK_FORMAT_B8G8R8A8_SRGB;
+VkFormat ColorFormat=VK_FORMAT_R8G8B8A8_SRGB;
 VkuImage_t ColorImage[2];		// left and right eye color buffer
 VkuImage_t ColorResolve[2];		// left and right eye MSAA resolve color buffer
 
@@ -83,7 +83,7 @@ typedef struct
 	vec3 Rotate;
 } Asteroid_t;
 
-#define NUM_ASTEROIDS 300
+#define NUM_ASTEROIDS 600
 Asteroid_t Asteroids[NUM_ASTEROIDS];
 //////
 
@@ -187,7 +187,6 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 	}, 0, &FrameBuffers[Eye]);
 
 	VkCommandBuffer CommandBuffer=vkuOneShotCommandBufferBegin(&Context);
-	//vkuTransitionLayout(CommandBuffer, ColorImage[Eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
 	if(IsVR)
 		vkuTransitionLayout(CommandBuffer, ColorResolve[Eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -448,9 +447,9 @@ void GenerateSkyParams(void)
 		Vec3_Normalize(RandomVec);
 
 		Asteroid_t Asteroid;
-		Vec3_Set(Asteroid.Position, RandomVec[0]*(RandFloat()*10000.0f+500.0f), RandomVec[1]*(RandFloat()*10000.0f+500.0f), RandomVec[2]*(RandFloat()*10000.0f+500.0f));
+		Vec3_Set(Asteroid.Position, RandomVec[0]*(RandFloat()*1000.0f+50.0f), RandomVec[1]*(RandFloat()*1000.0f+50.0f), RandomVec[2]*(RandFloat()*1000.0f+50.0f));
 		Vec3_Set(Asteroid.Rotate, RandFloat()*PI*2.0f, RandFloat()*PI*2.0f, RandFloat()*PI*2.0f);
-		Asteroid.Radius=(RandFloat()*1000.0f+10.0f)*2.0f;
+		Asteroid.Radius=(RandFloat()*20.0f+0.01f)*2.0f;
 
 		bool overlapping=false;
 
@@ -671,7 +670,7 @@ void Thread_Font(void *Arg)
 	vkCmdSetViewport(Data->SecCommandBuffer[Data->Eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)rtWidth, (float)rtHeight, 0.0f, 1.0f });
 	vkCmdSetScissor(Data->SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { rtWidth, rtHeight } });
 
-	Font_Print(Data->SecCommandBuffer[Data->Eye], 0.0f, 16.0f, "FPS: %0.1f\nFrame time: %0.3fms", fps, fTimeStep);
+	Font_Print(Data->SecCommandBuffer[Data->Eye], Data->Eye, 0.0f, 16.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep);
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Eye]);
 
@@ -745,7 +744,7 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 		.renderPass=RenderPass,
 		.framebuffer=FrameBuffers[Eye],
 		.clearValueCount=2,
-		.pClearValues=(VkClearValue[]) { { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0 } },
+		.pClearValues=(VkClearValue[]){ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0 } },
 		.renderArea=(VkRect2D){ { 0, 0 }, { rtWidth, rtHeight } },
 	}, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
@@ -904,7 +903,6 @@ void Render(void)
 		// Non-VR mode doesn't need the blit for cloning the eye images to swapchain
 		// and also doesn't need the intermediate resolve image, so we can just MSAA resolve directly to the swapchain.
 		// This doesn't net any more FPS, but it does save VRAM at least.
-
 		EyeRender(PerFrame[Index].CommandBuffer, Index, 0, Pose);
 
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -998,20 +996,10 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 }
 #endif
 
-void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle)
-{
-	Vec3_Sets(Particle->pos, 0.0f);
-
-	// Simple -1.0 to 1.0 random spherical pattern, scaled by 100, fairly short lifespan.
-	Vec3_Set(Particle->vel, ((float)rand()/RAND_MAX)*2.0f-1.0f, ((float)rand()/RAND_MAX)*2.0f-1.0f, ((float)rand()/RAND_MAX)*2.0f-1.0f);
-	Vec3_Normalize(Particle->vel);
-	Vec3_Muls(Particle->vel, 100.0f);
-
-	Particle->life=((float)rand()/RAND_MAX)*2.5f+0.01f;
-}
-
 bool Init(void)
 {
+	ColorFormat=Swapchain.SurfaceFormat.format;
+
 	Event_Add(EVENT_KEYDOWN, Event_KeyDown);
 	Event_Add(EVENT_KEYUP, Event_KeyUp);
 	Event_Add(EVENT_MOUSE, Event_Mouse);
@@ -1032,7 +1020,7 @@ bool Init(void)
 	if(VkZone==NULL)
 		return false;
 
-	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 200.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
+	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 2.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
 
 	// Load models
 	if(LoadBModel(&Model[MODEL_ASTEROID1], "./assets/asteroid1.bmodel"))
@@ -1095,6 +1083,8 @@ bool Init(void)
 
 	if(!ParticleSystem_Init(&ParticleSystem))
 		return false;
+
+	ParticleSystem_SetGravity(&ParticleSystem, 0.0f, 0.0f, 0.0f);
 
 	vec3 Zero={ 0.0f, 0.0f, 0.0f };
 	ParticleSystem_AddEmitter(&ParticleSystem, Zero, Zero, Zero, 0.0f, 100, true, NULL);

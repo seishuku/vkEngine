@@ -251,14 +251,14 @@ void CameraRoll(Camera_t *Camera, const float Angle)
 
 void CameraUpdate(Camera_t *Camera, float Time, matrix out)
 {
-	float speed=25.0f;
+	float speed=2.0f;
 	float m[16];
 
 	if(!out)
 		return;
 
 	if(Camera->shift)
-		speed*=4.0f;
+		speed*=2.0f;
 
 	if(Camera->key_d)
 		Camera->Velocity[0]+=Time;
@@ -279,22 +279,22 @@ void CameraUpdate(Camera_t *Camera, float Time, matrix out)
 		Camera->Velocity[2]-=Time;
 
 	if(Camera->key_q)
-		Camera->Roll+=Time*0.25f;
+		Camera->Roll+=Time*0.125f;
 
 	if(Camera->key_e)
-		Camera->Roll-=Time*0.25f;
+		Camera->Roll-=Time*0.125f;
 
 	if(Camera->key_left)
-		Camera->Yaw+=Time*0.25f;
+		Camera->Yaw+=Time*0.125f;
 
 	if(Camera->key_right)
-		Camera->Yaw-=Time*0.25f;
+		Camera->Yaw-=Time*0.125f;
 
 	if(Camera->key_up)
-		Camera->Pitch+=Time*0.25f;
+		Camera->Pitch+=Time*0.125f;
 
 	if(Camera->key_down)
-		Camera->Pitch-=Time*0.25f;
+		Camera->Pitch-=Time*0.125f;
 
 	Camera->Velocity[0]*=0.91f;
 	Camera->Velocity[1]*=0.91f;

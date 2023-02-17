@@ -271,5 +271,14 @@
     <GLSL Include="shaders\sphere.frag">
       <Filter>Shaders</Filter>
     </GLSL>
+    <GLSL Include="shaders\bezier.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\bezier.geom">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\bezier.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
   </ItemGroup>
 </Project>
