@@ -114,7 +114,7 @@ bool TGA_Write(const char *filename, VkuImage_t *Image, bool rle)
 	uint8_t IDLength=0;
 	uint8_t ColorMapType=0, ColorMapStart=0, ColorMapLength=0, ColorMapDepth=0;
 	uint16_t XOffset=0, YOffset=0, Width=Image->Width, Height=Image->Height;
-	uint8_t Depth=(uint8_t)Image->Depth, ImageDescriptor=0, ImageType;
+	uint8_t Depth=(uint8_t)Image->Depth, ImageDescriptor=0x20, ImageType;
 
 	switch(Image->Depth)
 	{

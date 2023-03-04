@@ -296,12 +296,13 @@ void CameraUpdate(Camera_t *Camera, float Time, matrix out)
 	if(Camera->key_down)
 		Camera->Pitch-=Time*0.125f;
 
-	Camera->Velocity[0]*=0.91f;
-	Camera->Velocity[1]*=0.91f;
-	Camera->Velocity[2]*=0.91f;
-	Camera->Pitch*=0.91f;
-	Camera->Yaw*=0.91f;
-	Camera->Roll*=0.91f;
+	const float Damp=0.91f;//Time*65.0f;
+	Camera->Velocity[0]*=Damp;
+	Camera->Velocity[1]*=Damp;
+	Camera->Velocity[2]*=Damp;
+	Camera->Pitch*=Damp;
+	Camera->Yaw*=Damp;
+	Camera->Roll*=Damp;
 
 	CameraPitch(Camera, Camera->Pitch);
 	CameraYaw(Camera, Camera->Yaw);
