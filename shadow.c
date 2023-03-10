@@ -10,7 +10,7 @@
 #include "shadow.h"
 #include "perframe.h"
 
-#define NUM_ASTEROIDS 600
+#define NUM_ASTEROIDS 1000
 
 extern VkuContext_t Context;
 extern VkuBuffer_t Asteroid_Instance;

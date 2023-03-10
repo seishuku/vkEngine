@@ -51,7 +51,7 @@ VkuImage_t Textures[NUM_TEXTURES];
 VkuSwapchain_t Swapchain;
 
 // Multisample anti-alias sample count
-VkSampleCountFlags MSAA=VK_SAMPLE_COUNT_2_BIT;
+VkSampleCountFlags MSAA=VK_SAMPLE_COUNT_4_BIT;
 
 // Colorbuffer image
 VkFormat ColorFormat=VK_FORMAT_R8G8B8A8_SRGB;
@@ -63,7 +63,7 @@ VkFormat DepthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
 VkuImage_t DepthImage[2];		// left and right eye depth buffers
 
 // Primary framebuffers
-VkFramebuffer FrameBuffers[2];	// left and right eye frame buffers
+VkFramebuffer Framebuffers[2];	// left and right eye frame buffers
 
 // Primary RenderPass
 VkRenderPass RenderPass;
@@ -71,6 +71,15 @@ VkRenderPass RenderPass;
 // Primary rendering pipeline stuff
 VkPipelineLayout PipelineLayout;
 VkuPipeline_t Pipeline;
+//////
+
+// Compositing pipeline stuff
+VkDescriptorPool CompositeDescriptorPool[VKU_MAX_FRAME_COUNT];
+VkuDescriptorSet_t CompositeDescriptorSet[VKU_MAX_FRAME_COUNT];
+VkPipelineLayout CompositePipelineLayout;
+VkuPipeline_t CompositePipeline;
+VkRenderPass CompositeRenderPass;
+VkFramebuffer CompositeFramebuffers[VKU_MAX_FRAME_COUNT];
 //////
 
 // Asteroid data
@@ -83,19 +92,9 @@ typedef struct
 	vec3 Rotate;
 } Asteroid_t;
 
-#define NUM_ASTEROIDS 600
+#define NUM_ASTEROIDS 1000
 Asteroid_t Asteroids[NUM_ASTEROIDS];
 //////
-
-// Some debugging object pipelines
-VkPipelineLayout LinePipelineLayout;
-VkuPipeline_t LinePipeline;
-
-VkPipelineLayout SpherePipelineLayout;
-VkuPipeline_t SpherePipeline;
-//////
-
-#include <semaphore.h>
 
 typedef struct
 {
@@ -103,12 +102,11 @@ typedef struct
 	VkCommandPool CommandPool[2];
 	VkDescriptorPool DescriptorPool[2];
 	VkCommandBuffer SecCommandBuffer[2];
-	bool Done;
-	sem_t Semaphore;
 } ThreadData_t;
 
 ThreadWorker_t Thread[4];
 ThreadData_t ThreadData[4];
+pthread_barrier_t ThreadBarrier;
 
 void RecreateSwapchain(void);
 
@@ -120,6 +118,24 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 						 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 						 0);
+
+	vkCreateSampler(Context.Device, &(VkSamplerCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+		.magFilter=VK_FILTER_LINEAR,
+		.minFilter=VK_FILTER_NEAREST,
+		.mipmapMode=VK_FILTER_LINEAR,
+		.addressModeU=VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.addressModeV=VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.addressModeW=VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.mipLodBias=0.0f,
+		.compareOp=VK_COMPARE_OP_NEVER,
+		.minLod=0.0f,
+		.maxLod=VK_LOD_CLAMP_NONE,
+		.maxAnisotropy=1.0f,
+		.anisotropyEnable=VK_FALSE,
+		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+	}, VK_NULL_HANDLE, &ColorImage[Eye].Sampler);
 
 	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
 	{
@@ -180,11 +196,11 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 		.renderPass=RenderPass,
 		.attachmentCount=2,
-		.pAttachments=(VkImageView[]) { ColorImage[Eye].View, DepthImage[Eye].View },
+		.pAttachments=(VkImageView[]){ ColorImage[Eye].View, DepthImage[Eye].View },
 		.width=targetWidth,
 		.height=targetHeight,
 		.layers=1,
-	}, 0, &FrameBuffers[Eye]);
+	}, 0, &Framebuffers[Eye]);
 
 	VkCommandBuffer CommandBuffer=vkuOneShotCommandBufferBegin(&Context);
 
@@ -213,6 +229,7 @@ bool CreatePipeline(void)
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_STORE,
 				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+//				.finalLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				.finalLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 			},
 			{
@@ -236,11 +253,11 @@ bool CreatePipeline(void)
 				.attachment=0,
 				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			},
-			.pDepthStencilAttachment=&(VkAttachmentReference)
-			{
-				.attachment=1,
-				.layout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-			}
+				.pDepthStencilAttachment=&(VkAttachmentReference)
+				{
+					.attachment=1,
+					.layout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				}
 		}
 	}, 0, &RenderPass);
 
@@ -311,72 +328,86 @@ bool CreatePipeline(void)
 	return true;
 }
 
-bool CreateLinePipeline(void)
+bool CreateCompositePipeline(void)
 {
+	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+		.attachmentCount=1,
+		.pAttachments=(VkAttachmentDescription[])
+		{
+			{
+				.format=Swapchain.SurfaceFormat.format,
+				.samples=VK_SAMPLE_COUNT_1_BIT,
+				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
+				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_STORE,
+				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+				.finalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+			}
+		},
+		.subpassCount=1,
+		.pSubpasses=&(VkSubpassDescription)
+		{
+			.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS,
+			.colorAttachmentCount=1,
+			.pColorAttachments=&(VkAttachmentReference)
+			{
+				.attachment=0,
+				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			}
+		}
+	}, 0, &CompositeRenderPass);
+
+	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	{
+		vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+			.renderPass=CompositeRenderPass,
+			.attachmentCount=1,
+			.pAttachments=(VkImageView[]){ Swapchain.ImageView[i] },
+			.width=rtWidth,
+			.height=rtHeight,
+			.layers=1,
+		}, 0, &CompositeFramebuffers[i]);
+
+		vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+			.maxSets=1,
+			.poolSizeCount=1,
+			.pPoolSizes=(VkDescriptorPoolSize[]) { { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 } },
+		}, VK_NULL_HANDLE, &CompositeDescriptorPool[i]);
+
+		vkuInitDescriptorSet(&CompositeDescriptorSet[i], &Context);
+		vkuDescriptorSet_AddBinding(&CompositeDescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+		vkuAssembleDescriptorSetLayout(&CompositeDescriptorSet[i]);
+	}
+
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.pushConstantRangeCount=1,
-		.pPushConstantRanges=&(VkPushConstantRange)
-		{
-			.offset=0,
-			.size=sizeof(matrix)+(sizeof(vec4)*2),
-			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
-		},
-	}, 0, &LinePipelineLayout);
+		.setLayoutCount=1,
+		.pSetLayouts=&CompositeDescriptorSet[0].DescriptorSetLayout,
+	}, 0, &CompositePipelineLayout);
 
-	vkuInitPipeline(&LinePipeline, &Context);
+	vkuInitPipeline(&CompositePipeline, &Context);
 
-	vkuPipeline_SetPipelineLayout(&LinePipeline, LinePipelineLayout);
-	vkuPipeline_SetRenderPass(&LinePipeline, RenderPass);
+	vkuPipeline_SetPipelineLayout(&CompositePipeline, CompositePipelineLayout);
+	vkuPipeline_SetRenderPass(&CompositePipeline, CompositeRenderPass);
 
-	LinePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-	LinePipeline.DepthTest=VK_TRUE;
-	LinePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+	CompositePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	CompositePipeline.CullMode=VK_CULL_MODE_NONE;
 
-	if(!vkuPipeline_AddStage(&LinePipeline, "./shaders/line.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&CompositePipeline, "./shaders/composite.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
-	if(!vkuPipeline_AddStage(&LinePipeline, "./shaders/line.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	if(!vkuPipeline_AddStage(&CompositePipeline, "./shaders/composite.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
-	if(!vkuAssemblePipeline(&LinePipeline))
-		return false;
-
-	return true;
-}
-
-bool CreateSpherePipeline(void)
-{
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.pushConstantRangeCount=1,
-		.pPushConstantRanges=&(VkPushConstantRange)
-		{
-			.offset=0,
-			.size=sizeof(matrix)+sizeof(vec4),
-			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
-		},
-	}, 0, &SpherePipelineLayout);
-
-	vkuInitPipeline(&SpherePipeline, &Context);
-
-	vkuPipeline_SetPipelineLayout(&SpherePipeline, SpherePipelineLayout);
-	vkuPipeline_SetRenderPass(&SpherePipeline, RenderPass);
-
-	SpherePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	SpherePipeline.DepthTest=VK_TRUE;
-	SpherePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
-	SpherePipeline.PolygonMode=VK_POLYGON_MODE_LINE;
-
-	if(!vkuPipeline_AddStage(&SpherePipeline, "./shaders/sphere.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
-		return false;
-
-	if(!vkuPipeline_AddStage(&SpherePipeline, "./shaders/sphere.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-		return false;
-
-	if(!vkuAssemblePipeline(&SpherePipeline))
+	if(!vkuAssemblePipeline(&CompositePipeline))
 		return false;
 
 	return true;
@@ -529,8 +560,6 @@ void Thread_Constructor(void *Arg)
 			},
 		}, VK_NULL_HANDLE, &Data->DescriptorPool[i]);
 	}
-
-	Data->Done=false;
 }
 
 void Thread_Destructor(void *Arg)
@@ -560,7 +589,7 @@ void Thread_Main(void *Arg)
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
 			.pNext=NULL,
 			.renderPass=RenderPass,
-			.framebuffer=FrameBuffers[Data->Eye]
+			.framebuffer=Framebuffers[Data->Eye]
 		}
 	});
 
@@ -572,7 +601,7 @@ void Thread_Main(void *Arg)
 
 	// Draw the models
 	vkCmdBindVertexBuffers(Data->SecCommandBuffer[Data->Eye], 1, 1, &Asteroid_Instance.Buffer, &(VkDeviceSize) { 0 });
-	
+
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
 		vkuDescriptorSet_UpdateBindingImageInfo(&PerFrame[Data->Index].DescriptorSet, 0, &Textures[2*i+0]);
@@ -602,10 +631,7 @@ void Thread_Main(void *Arg)
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Eye]);
 
-	sem_wait(&Data->Semaphore);
-	Data->Done=true;
-	assert(Data->Done);
-	sem_post(&Data->Semaphore);
+	pthread_barrier_wait(&ThreadBarrier);
 }
 
 void Thread_Skybox(void *Arg)
@@ -624,7 +650,7 @@ void Thread_Skybox(void *Arg)
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
 			.pNext=NULL,
 			.renderPass=RenderPass,
-			.framebuffer=FrameBuffers[Data->Eye]
+			.framebuffer=Framebuffers[Data->Eye]
 		}
 	});
 
@@ -642,44 +668,8 @@ void Thread_Skybox(void *Arg)
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Eye]);
 
-	sem_wait(&Data->Semaphore);
-	Data->Done=true;
-	assert(Data->Done);
-	sem_post(&Data->Semaphore);
+	pthread_barrier_wait(&ThreadBarrier);
 }
-
-void Thread_Font(void *Arg)
-{
-	ThreadData_t *Data=(ThreadData_t *)Arg;
-
-	vkResetCommandPool(Context.Device, Data->CommandPool[Data->Eye], 0);
-
-	vkBeginCommandBuffer(Data->SecCommandBuffer[Data->Eye], &(VkCommandBufferBeginInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
-		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-			.pNext=NULL,
-			.renderPass=RenderPass,
-			.framebuffer=FrameBuffers[Data->Eye]
-		}
-	});
-
-	vkCmdSetViewport(Data->SecCommandBuffer[Data->Eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)rtWidth, (float)rtHeight, 0.0f, 1.0f });
-	vkCmdSetScissor(Data->SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { rtWidth, rtHeight } });
-
-	Font_Print(Data->SecCommandBuffer[Data->Eye], Data->Eye, 0.0f, 16.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep);
-
-	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Eye]);
-
-	sem_wait(&Data->Semaphore);
-	Data->Done=true;
-	assert(Data->Done);
-	sem_post(&Data->Semaphore);
-}
-
 
 void Thread_Particles(void *Arg)
 {
@@ -697,7 +687,7 @@ void Thread_Particles(void *Arg)
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
 			.pNext=NULL,
 			.renderPass=RenderPass,
-			.framebuffer=FrameBuffers[Data->Eye]
+			.framebuffer=Framebuffers[Data->Eye]
 		}
 	});
 
@@ -710,10 +700,36 @@ void Thread_Particles(void *Arg)
 
 	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Eye]);
 
-	sem_wait(&Data->Semaphore);
-	Data->Done=true;
-	assert(Data->Done);
-	sem_post(&Data->Semaphore);
+	pthread_barrier_wait(&ThreadBarrier);
+}
+
+void Thread_Font(void *Arg)
+{
+	ThreadData_t *Data=(ThreadData_t *)Arg;
+
+	vkResetCommandPool(Context.Device, Data->CommandPool[Data->Eye], 0);
+
+	vkBeginCommandBuffer(Data->SecCommandBuffer[Data->Eye], &(VkCommandBufferBeginInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
+		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+			.pNext=NULL,
+			.renderPass=RenderPass,
+			.framebuffer=Framebuffers[Data->Eye]
+		}
+	});
+
+	vkCmdSetViewport(Data->SecCommandBuffer[Data->Eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)rtWidth, (float)rtHeight, 0.0f, 1.0f });
+	vkCmdSetScissor(Data->SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { rtWidth, rtHeight } });
+
+	Font_Print(Data->SecCommandBuffer[Data->Eye], Data->Eye, 0.0f, 16.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep);
+
+	vkEndCommandBuffer(Data->SecCommandBuffer[Data->Eye]);
+
+	pthread_barrier_wait(&ThreadBarrier);
 }
 
 void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matrix Pose)
@@ -742,7 +758,7 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=RenderPass,
-		.framebuffer=FrameBuffers[Eye],
+		.framebuffer=Framebuffers[Eye],
 		.clearValueCount=2,
 		.pClearValues=(VkClearValue[]){ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0 } },
 		.renderArea=(VkRect2D){ { 0, 0 }, { rtWidth, rtHeight } },
@@ -765,28 +781,11 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	ThreadData[3].Eye=Eye;
 	Thread_AddJob(&Thread[3], Thread_Font, (void *)&ThreadData[3]);
 
-	// Wait for the threads to finish
-	// FIXME: This has a timeout, because occationally the thread doesn't set the done flag and I don't know why.
-	volatile int32_t Timeout=INT32_MAX;
-	while(!(ThreadData[0].Done&&ThreadData[1].Done&&ThreadData[2].Done&&ThreadData[3].Done))
-	{
-		if(Timeout<0)
-		{
-			assert(true);
-			break;
-		}
-
-		Timeout--;
-	}
-
-	// Reset done flag
-	ThreadData[0].Done=false;
-	ThreadData[1].Done=false;
-	ThreadData[2].Done=false;
-	ThreadData[3].Done=false;
+	pthread_barrier_wait(&ThreadBarrier);
 
 	// Execute the secondary command buffers from the threads
-	vkCmdExecuteCommands(CommandBuffer, 4, (VkCommandBuffer[]) {
+	vkCmdExecuteCommands(CommandBuffer, 4, (VkCommandBuffer[])
+	{
 		ThreadData[0].SecCommandBuffer[Eye],
 		ThreadData[1].SecCommandBuffer[Eye],
 		ThreadData[2].SecCommandBuffer[Eye],
@@ -798,8 +797,9 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 
 void Render(void)
 {
-	static uint32_t OldIndex=0;
-	uint32_t Index=OldIndex;
+	static uint32_t FrameIndex=0;
+	uint32_t Index=FrameIndex%VKU_MAX_FRAME_COUNT;
+	uint32_t imageIndex;
 	matrix Pose;
 
 	if(!IsVR)
@@ -831,7 +831,7 @@ void Render(void)
 	if(IsVR)
 		GetHeadPose(Pose);
 
-	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain.Swapchain, UINT64_MAX, PerFrame[Index].PresentCompleteSemaphore, VK_NULL_HANDLE, &OldIndex);
+	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain.Swapchain, UINT64_MAX, PerFrame[Index].PresentCompleteSemaphore, VK_NULL_HANDLE, &imageIndex);
 
 	if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
 	{
@@ -917,6 +917,38 @@ void Render(void)
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 	}
 
+	//EyeRender(PerFrame[Index].CommandBuffer, Index, 0, Pose);
+
+	//// TeStInG sTuFf
+	//vkResetDescriptorPool(Context.Device, CompositeDescriptorPool[Index], 0);
+
+	//vkCmdBeginRenderPass(PerFrame[Index].CommandBuffer, &(VkRenderPassBeginInfo)
+	//{
+	//	.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+	//	.renderPass=CompositeRenderPass,
+	//	.framebuffer=CompositeFramebuffers[Index],
+	//	.clearValueCount=1,
+	//	.pClearValues=(VkClearValue[]){ { 1.0f, 0.0f, 0.0f, 1.0f } },
+	//	.renderArea={ { 0, 0 }, { rtWidth, rtHeight } },
+	//}, VK_SUBPASS_CONTENTS_INLINE);
+
+	//vkCmdSetViewport(PerFrame[Index].CommandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)rtWidth, (float)rtHeight, 0.0f, 1.0f });
+	//vkCmdSetScissor(PerFrame[Index].CommandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { rtWidth, rtHeight } });
+
+	//vkCmdBindPipeline(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CompositePipeline.Pipeline);
+
+	//vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet[Index], 0, &ColorImage[0]);
+	//vkuAllocateUpdateDescriptorSet(&CompositeDescriptorSet[Index], CompositeDescriptorPool[Index]);
+	//vkCmdBindDescriptorSets(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CompositePipelineLayout, 0, 1, &CompositeDescriptorSet[Index].DescriptorSet, 0, VK_NULL_HANDLE);
+
+	//vkCmdDraw(PerFrame[Index].CommandBuffer, 3, 1, 0, 0);
+
+	//// Draw text in the compositing renderpass
+	//Font_Print(PerFrame[Index].CommandBuffer, 0, 0.0f, 16.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep);
+
+	//vkCmdEndRenderPass(PerFrame[Index].CommandBuffer);
+	////////
+
 	vkEndCommandBuffer(PerFrame[Index].CommandBuffer);
 
 	// Sumit command queue
@@ -929,7 +961,7 @@ void Render(void)
 		.signalSemaphoreCount=1,
 		.pSignalSemaphores=&PerFrame[Index].RenderCompleteSemaphore,
 		.commandBufferCount=1,
-		.pCommandBuffers=(VkCommandBuffer[]){ PerFrame[Index].CommandBuffer },
+		.pCommandBuffers=&PerFrame[Index].CommandBuffer,
 	}, PerFrame[Index].FrameFence);
 
 	vkWaitForFences(Context.Device, 1, &PerFrame[Index].FrameFence, VK_TRUE, UINT64_MAX);
@@ -942,9 +974,9 @@ void Render(void)
 		.pWaitSemaphores=&PerFrame[Index].RenderCompleteSemaphore,
 		.swapchainCount=1,
 		.pSwapchains=&Swapchain.Swapchain,
-		.pImageIndices=&OldIndex,
+		.pImageIndices=&imageIndex,
 	});
-	
+
 	if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
 	{
 		DBGPRINTF("Swapchain out of date... Rebuilding.\n");
@@ -972,12 +1004,14 @@ void Render(void)
 
 		struct Texture_t texture={ &vulkanData, ETextureType_TextureType_Vulkan, EColorSpace_ColorSpace_Auto };
 
-		vulkanData.m_nImage=(uint64_t)ColorImage[EVREye_Eye_Left].Image,
-			VRCompositor->Submit(EVREye_Eye_Left, &texture, &bounds, EVRSubmitFlags_Submit_Default);
+		vulkanData.m_nImage=(uint64_t)ColorImage[EVREye_Eye_Left].Image;
+		VRCompositor->Submit(EVREye_Eye_Left, &texture, &bounds, EVRSubmitFlags_Submit_Default);
 
 		vulkanData.m_nImage=(uint64_t)ColorImage[EVREye_Eye_Right].Image;
 		VRCompositor->Submit(EVREye_Eye_Right, &texture, &bounds, EVRSubmitFlags_Submit_Default);
 	}
+
+	FrameIndex++;
 }
 
 #ifdef _DEBUG
@@ -1072,11 +1106,8 @@ bool Init(void)
 	CreateSkyboxPipeline();
 	GenerateSkyParams();
 
-	// Create debug line pipeline
-	//CreateLinePipeline();
-
-	// Create debug sphere pipeline
-	//CreateSpherePipeline();
+	// Create compositing pipeline
+	CreateCompositePipeline();
 
 	InitShadowPipeline();
 	InitShadowMap();
@@ -1100,13 +1131,13 @@ bool Init(void)
 	{
 		// Create needed fence and semaphores for rendering
 		// Wait fence for command queue, to signal when we can submit commands again
-		vkCreateFence(Context.Device, &(VkFenceCreateInfo) {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT }, VK_NULL_HANDLE, &PerFrame[i].FrameFence);
+		vkCreateFence(Context.Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=VK_FENCE_CREATE_SIGNALED_BIT }, VK_NULL_HANDLE, &PerFrame[i].FrameFence);
 
 		// Semaphore for image presentation, to signal when we can present again
-		vkCreateSemaphore(Context.Device, &(VkSemaphoreCreateInfo) {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext = VK_NULL_HANDLE }, VK_NULL_HANDLE, &PerFrame[i].PresentCompleteSemaphore);
+		vkCreateSemaphore(Context.Device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &PerFrame[i].PresentCompleteSemaphore);
 
 		// Semaphore for render complete, to signal when we can render again
-		vkCreateSemaphore(Context.Device, &(VkSemaphoreCreateInfo) {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext = VK_NULL_HANDLE }, VK_NULL_HANDLE, &PerFrame[i].RenderCompleteSemaphore);
+		vkCreateSemaphore(Context.Device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &PerFrame[i].RenderCompleteSemaphore);
 
 		// Create per-frame command pools
 		vkCreateCommandPool(Context.Device, &(VkCommandPoolCreateInfo)
@@ -1132,9 +1163,9 @@ bool Init(void)
 		Thread_AddConstructor(&Thread[i], Thread_Constructor, (void *)&ThreadData[i]);
 		Thread_AddDestructor(&Thread[i], Thread_Destructor, (void *)&ThreadData[i]);
 		Thread_Start(&Thread[i]);
-
-		sem_init(&ThreadData[i].Semaphore, 0, 1);
 	}
+
+	pthread_barrier_init(&ThreadBarrier, NULL, 5);
 
 	return true;
 }
@@ -1153,6 +1184,7 @@ void RecreateSwapchain(void)
 		// This is basically just the swapchain, framebuffers, and depthbuffer.
 
 		// Destroy the color buffer
+		vkDestroySampler(Context.Device, ColorImage[0].Sampler, VK_NULL_HANDLE);
 		vkDestroyImageView(Context.Device, ColorImage[0].View, VK_NULL_HANDLE);
 		vkDestroyImage(Context.Device, ColorImage[0].Image, VK_NULL_HANDLE);
 		vkuMem_Free(VkZone, ColorImage[0].DeviceMemory);
@@ -1163,7 +1195,7 @@ void RecreateSwapchain(void)
 		vkuMem_Free(VkZone, DepthImage[0].DeviceMemory);
 
 		// Destroy the framebuffers
-		vkDestroyFramebuffer(Context.Device, FrameBuffers[0], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(Context.Device, Framebuffers[0], VK_NULL_HANDLE);
 
 		// Destroy the other eye as well, only if VR is enabled
 		if(IsVR)
@@ -1185,14 +1217,14 @@ void RecreateSwapchain(void)
 			vkDestroyImage(Context.Device, DepthImage[1].Image, VK_NULL_HANDLE);
 			vkuMem_Free(VkZone, DepthImage[1].DeviceMemory);
 
-			vkDestroyFramebuffer(Context.Device, FrameBuffers[1], VK_NULL_HANDLE);
+			vkDestroyFramebuffer(Context.Device, Framebuffers[1], VK_NULL_HANDLE);
 		}
 
 		// Destroy the swapchain
 		vkuDestroySwapchain(&Context, &Swapchain);
 
 		// Recreate the swapchain
-		vkuCreateSwapchain(&Context, &Swapchain, Width, Height, VK_FALSE);
+		vkuCreateSwapchain(&Context, &Swapchain, Width, Height, false);
 
 		// Recreate the framebuffer
 		CreateFramebuffers(0, rtWidth, rtHeight);
@@ -1237,6 +1269,19 @@ void Destroy(void)
 		else
 			DBGPRINTF(DEBUG_ERROR, "Failed to allocate memory for pipeline cache data.\n");
 	}
+
+	// Compositing pipeline
+	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	{
+		vkDestroyDescriptorSetLayout(Context.Device, CompositeDescriptorSet[i].DescriptorSetLayout, VK_NULL_HANDLE);
+		vkDestroyDescriptorPool(Context.Device, CompositeDescriptorPool[i], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(Context.Device, CompositeFramebuffers[i], VK_NULL_HANDLE);
+	}
+
+	vkDestroyPipeline(Context.Device, CompositePipeline.Pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(Context.Device, CompositePipelineLayout, VK_NULL_HANDLE);
+	vkDestroyRenderPass(Context.Device, CompositeRenderPass, VK_NULL_HANDLE);
+	//////////
 
 	// Particle system destruction
 	ParticleSystem_Destroy(&ParticleSystem);
@@ -1293,6 +1338,7 @@ void Destroy(void)
 	//////////
 
 	// Swapchain, framebuffer, and depthbuffer destruction
+	vkDestroySampler(Context.Device, ColorImage[0].Sampler, VK_NULL_HANDLE);
 	vkDestroyImageView(Context.Device, ColorImage[0].View, VK_NULL_HANDLE);
 	vkDestroyImage(Context.Device, ColorImage[0].Image, VK_NULL_HANDLE);
 	vkuMem_Free(VkZone, ColorImage[0].DeviceMemory);
@@ -1301,10 +1347,11 @@ void Destroy(void)
 	vkDestroyImage(Context.Device, DepthImage[0].Image, VK_NULL_HANDLE);
 	vkuMem_Free(VkZone, DepthImage[0].DeviceMemory);
 
-	vkDestroyFramebuffer(Context.Device, FrameBuffers[0], VK_NULL_HANDLE);
+	vkDestroyFramebuffer(Context.Device, Framebuffers[0], VK_NULL_HANDLE);
 
 	if(IsVR)
 	{
+		vkDestroySampler(Context.Device, ColorImage[1].Sampler, VK_NULL_HANDLE);
 		vkDestroyImageView(Context.Device, ColorImage[1].View, VK_NULL_HANDLE);
 		vkDestroyImage(Context.Device, ColorImage[1].Image, VK_NULL_HANDLE);
 		vkuMem_Free(VkZone, ColorImage[1].DeviceMemory);
@@ -1321,7 +1368,7 @@ void Destroy(void)
 		vkDestroyImage(Context.Device, DepthImage[1].Image, VK_NULL_HANDLE);
 		vkuMem_Free(VkZone, DepthImage[1].DeviceMemory);
 
-		vkDestroyFramebuffer(Context.Device, FrameBuffers[1], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(Context.Device, Framebuffers[1], VK_NULL_HANDLE);
 	}
 
 

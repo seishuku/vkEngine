@@ -29,4 +29,7 @@
 
 extern MemZone_t *Zone;
 
+uint64_t GetFrequency(void);
+void DelayUS(uint64_t us);
+
 #endif

@@ -66,6 +66,18 @@ unsigned long long GetFrequency(void)
 	return (StopTicks-StartTicks)*1000000/(TimeStop.tv_usec-TimeStart.tv_usec);
 }
 
+void DelayUS(uint64_t us)
+{
+	struct timeval TimeStart, TimeStop;
+
+	gettimeofday(&TimeStart, NULL);
+
+	do
+	{
+		gettimeofday(&TimeCurrent, NULL);
+	} while((TimeCurrent.tv_usec-TimeStart.tv_usec)<us);
+}
+
 void EventLoop(void)
 {
 	KeySym Keysym, temp;

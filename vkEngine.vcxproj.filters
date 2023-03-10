@@ -280,5 +280,11 @@
     <GLSL Include="shaders\bezier.vert">
       <Filter>Shaders</Filter>
     </GLSL>
+    <GLSL Include="shaders\composite.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\composite.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
   </ItemGroup>
 </Project>

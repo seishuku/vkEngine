@@ -43,28 +43,40 @@ bool Init(void);
 void RecreateSwapchain(void);
 void Destroy(void);
 
-unsigned __int64 rdtsc(void)
+uint64_t rdtsc(void)
 {
 	return __rdtsc();
 }
 
-unsigned __int64 GetFrequency(void)
+uint64_t GetFrequency(void)
 {
-	unsigned __int64 TimeStart, TimeStop, TimeFreq;
-	unsigned __int64 StartTicks, StopTicks;
-	volatile unsigned __int64 i;
+	uint64_t TimeStart, TimeStop, TimeFreq;
 
 	QueryPerformanceFrequency((LARGE_INTEGER *)&TimeFreq);
 
 	QueryPerformanceCounter((LARGE_INTEGER *)&TimeStart);
-	StartTicks=rdtsc();
+	uint64_t StartTicks=rdtsc();
 
-	for(i=0;i<1000000;i++);
+	for(volatile uint64_t i=0;i<1000000;i++);
 
-	StopTicks=rdtsc();
+	uint64_t StopTicks=rdtsc();
 	QueryPerformanceCounter((LARGE_INTEGER *)&TimeStop);
 
 	return (StopTicks-StartTicks)*TimeFreq/(TimeStop-TimeStart);
+}
+
+void DelayUS(uint64_t us)
+{
+	uint64_t TimeStart=0, TimeCurrent=0, TimeFreq=0;
+
+	QueryPerformanceFrequency((LARGE_INTEGER *)&TimeFreq);
+	QueryPerformanceCounter((LARGE_INTEGER *)&TimeStart);
+	TimeFreq=(uint64_t)(((double)us/1000000)*TimeFreq);
+
+	do
+	{
+		QueryPerformanceCounter((LARGE_INTEGER *)&TimeCurrent);
+	} while((TimeCurrent-TimeStart)<TimeFreq);
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -427,7 +439,7 @@ int main(int argc, char **argv)
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Creating swapchain...\n");
-	vkuCreateSwapchain(&Context, &Swapchain, Width, Height, true);
+	vkuCreateSwapchain(&Context, &Swapchain, Width, Height, false);
 
 	DBGPRINTF(DEBUG_INFO, "Initalizing Vulkan resources...\n");
 	if(!Init())

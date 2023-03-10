@@ -11,6 +11,7 @@
 #include "font.h"
 
 extern VkuContext_t Context;
+//extern VkRenderPass CompositeRenderPass;
 extern VkRenderPass RenderPass;
 extern VkSampleCountFlags MSAA;
 

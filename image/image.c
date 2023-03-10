@@ -39,7 +39,7 @@ static bool _MakeNormalMap(VkuImage_t *Image)
 	};
 
 	// Check if input image is a valid bit depth.
-	if(!((Image->Depth==32)||(Image->Depth==8)))
+	if(Image->Depth!=32&&Image->Depth!=8)
 		return false;
 
 	// Allocate memory for output data.
@@ -222,7 +222,7 @@ static bool _Resize(VkuImage_t *Src, VkuImage_t *Dst)
 	if(Dst->Depth!=Src->Depth)
 		return false;
 
-	Dst->Data=(uint8_t *)Zone_Malloc(Zone, Dst->Width*Dst->Height*(Dst->Depth>>3));
+	Dst->Data=(uint8_t *)Zone_Malloc(Zone, (size_t)Dst->Width*Dst->Height*(Dst->Depth>>3));
 
 	if(Dst->Data==NULL)
 		return false;
@@ -375,7 +375,7 @@ static bool _HalfImage(VkuImage_t *Src, VkuImage_t *Dst)
 	Dst->Width=Src->Width>>1;
 	Dst->Height=Src->Height>>1;
 	Dst->Depth=Src->Depth;
-	Dst->Data=(uint8_t *)Zone_Malloc(Zone, Dst->Width*Dst->Height*(Dst->Depth>>3));
+	Dst->Data=(uint8_t *)Zone_Malloc(Zone, (size_t)Dst->Width*Dst->Height*(Dst->Depth>>3));
 
 	if(Dst->Data==NULL)
 		return false;
@@ -477,67 +477,61 @@ static bool _HalfImage(VkuImage_t *Src, VkuImage_t *Dst)
 	return true;
 }
 
-// This manually builds a mipmap chain and uploads to GPU,
-//   still needs porting from OpenGL, maybe.
+// _BuildMipmaps, internal function used by Image_Upload.
+// Builds a Vulkan mipmap chain by using a CPU scaler to resize the images.
 // 
-//void _BuildMipmaps(VkuImage_t *Image, unsigned int Target)
+// TODO: This doesn't obviously work, the data must persist until the command buffer is complete and submitted
+// 
+//static void _BuildMipmaps(VkDevice Device, VkCommandBuffer CommandBuffer, VkuBuffer_t *StagingBuffer, VkuImage_t *Image, uint32_t mipLevels, uint32_t layerCount, uint32_t baseLayer)
 //{
-//	int i=0, levels;
-//	uint32_t MaxSize=UINT32_MAX;
-//	VkuImage_t Dst;
+//	VkuImage_t Stage, Temp;
 //
-//	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &MaxSize);
+//	// Create a temporary image
+//	Temp.Width=Image->Width;
+//	Temp.Height=Image->Height;
+//	Temp.Depth=Image->Depth;
 //
-//	Dst.Depth=Image->Depth;
-//	Dst.Width=min(MaxSize, NextPower2(Image->Width));
-//	Dst.Height=min(MaxSize, NextPower2(Image->Height));
+//	// Create and map memory for the already existing staging buffer (this contains the original image)
+//	Stage.Width=Image->Width;
+//	Stage.Height=Image->Height;
+//	Stage.Depth=Image->Depth;
+//	vkMapMemory(Device, StagingBuffer->DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Stage.Data);
 //
-//	if(Dst.Height>Dst.Width)
-//		levels=ComputeLog(Dst.Height);
-//	else
-//		levels=ComputeLog(Dst.Width);
-//
-//	while(i<=levels)
+//	for(uint32_t i=1;i<mipLevels;i++)
 //	{
-//		Dst.Data=(unsigned char *)Zone_Malloc(Zone, Dst.Width*Dst.Height*(Dst.Depth>>3));
+//		// Half the image from the staging buffer image into the temporary image
+//		_HalfImage(&Stage, &Temp);
 //
-//		_Resize(Image, &Dst);
+//		// Copy the halved image from the temporary image into the staging buffer
+//		memcpy(Stage.Data, Temp.Data, Temp.Width*Temp.Height*(Temp.Depth>>3));
 //
-//		switch(Dst.Depth)
+//		// Copy from staging buffer to the texture buffer
+//		vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer->Buffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, (VkBufferImageCopy[1])
 //		{
-//			case 128:
-//				glTexImage2D(Target, i, GL_RGBA16, Dst.Width, Dst.Height, 0, GL_RGBA, GL_FLOAT, Dst.Data);
-//				break;
+//			{ 0, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, i, baseLayer, layerCount }, { 0, 0, 0 }, { Temp.Width, Temp.Height, 1 } }
+//		});
 //
-//			case 64:
-//				glTexImage2D(Target, i, GL_RGBA16, Dst.Width, Dst.Height, 0, GL_RGBA, GL_UNSIGNED_SHORT, Dst.Data);
-//				break;
+//		// The staging buffer now contains the halved image, so update the width/height for the next round
+//		Stage.Width=Temp.Width;
+//		Stage.Height=Temp.Height;
 //
-//			case 32:
-//				glTexImage2D(Target, i, GL_RGBA8, Dst.Width, Dst.Height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, Dst.Data);
-//				break;
-//
-//			case 16:
-//				glTexImage2D(Target, i, GL_RGB5, Dst.Width, Dst.Height, 0, GL_BGRA, GL_UNSIGNED_SHORT_1_5_5_5_REV, Dst.Data);
-//				break;
-//
-//			case 8:
-//				glTexImage2D(Target, i, GL_INTENSITY8, Dst.Width, Dst.Height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, Dst.Data);
-//				break;
-//		}
-//
-//		Zone_Free(Zone, Dst.Data);
-//
-//		Dst.Width=(Dst.Width>1)?Dst.Width>>1:Dst.Width;
-//		Dst.Height=(Dst.Height>1)?Dst.Height>>1:Dst.Height;
-//		i++;
+//		// Free the temp data allocated by _HalfImage
+//		Zone_Free(Zone, Temp.Data);
 //	}
+//
+//	// Unmap the staging buffer
+//	vkUnmapMemory(Device, StagingBuffer->DeviceMemory);
+//
+//	// Final image layout transition to shader read-only
+//	vkuTransitionLayout(CommandBuffer, Image->Image, 1, mipLevels-1, 1, baseLayer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 //}
 
 // _GetPixelBilinear, internal function used by functions that need to sample pixels out of image data.
 // Essentially does what the GPU does when sampling textures, xy coords are unnormalized (0 to image size).
 //
 // Output must be sized correctly for sampled image bit depth and format.
+// TODO: Source/destination color depths *could* be different,
+//         maybe make this do a format conversion as well?
 static void _GetPixelBilinear(VkuImage_t *Image, float x, float y, void *Out)
 {
 	uint32_t ix=(int)x, iy=(int)y;
@@ -639,11 +633,8 @@ static void _GetXYZFace(vec2 uv, vec3 xyz, int face)
 // Gets a selected 2D cubemap face from an angular lightmap probe image
 static bool _AngularMapFace(VkuImage_t *In, int Face, VkuImage_t *Out)
 {
-	memset(Out, 0, sizeof(VkuImage_t));
-	Out->Depth=In->Depth;
-	Out->Width=NextPower2(In->Width>>1);
-	Out->Height=NextPower2(In->Height>>1);
-	Out->Data=(uint8_t *)Zone_Malloc(Zone, Out->Width*Out->Height*(Out->Depth>>3));
+	// Allocate memory for output
+	Out->Data=(uint8_t *)Zone_Malloc(Zone, (size_t)Out->Width*Out->Height*(Out->Depth>>3));
 
 	if(Out->Data==NULL)
 		return false;
@@ -655,12 +646,20 @@ static bool _AngularMapFace(VkuImage_t *In, int Face, VkuImage_t *Out)
 		for(uint32_t x=0;x<Out->Width;x++)
 		{
 			float fx=(float)x/(Out->Width-1);
-			vec2 uv={ fx, fy };
 			vec3 xyz;
 
+			// UV coordinate into the image we're producing
+			vec2 uv={ fx, fy };
+
+			// Get a 3D cubemap coordinate for the given UV and selected cube face
 			_GetXYZFace(uv, xyz, Face);
+
+			// Use that 3D coordinate and this function to transform it into a UV coord into an angular map lightprobe
+			// TODO: This function can also be substituted for other image formats (lat/lon,  vertical cross, mirror ball),
+			//		   maybe add a flag for different layouts?
 			_GetUVAngularMap(xyz, uv);
 
+			// Bilinearly sample the pixel from the source image and set it into the output data (destination cubemap face)
 			_GetPixelBilinear(In, uv[0]*In->Width, uv[1]*In->Height, (void *)&Out->Data[(Out->Depth>>3)*(y*Out->Width+x)]);
 		}
 	}
@@ -745,41 +744,32 @@ static void _RGBtoRGBA(VkuImage_t *Image)
 
 // _GenerateMipmaps, internal function used by Image_Upload.
 // Builds a Vulkan mipmap chain by using the GPU image blitter to resize the images.
-static void _GenerateMipmaps(VkCommandBuffer commandBuffer, VkuImage_t *Image, uint32_t mipLevels, uint32_t layerCount, uint32_t baseLayer)
+static void _GenerateMipmaps(VkCommandBuffer CommandBuffer, VkuImage_t *Image, uint32_t MipLevels, uint32_t LayerCount, uint32_t BaseLayer)
 {
-	uint32_t texWidth=Image->Width;
-	uint32_t texHeight=Image->Height;
-
-	for(uint32_t i=1;i<mipLevels;i++)
+	for(uint32_t i=1;i<MipLevels;i++)
 	{
-		vkuTransitionLayout(commandBuffer, Image->Image, 1, i-1, 1, baseLayer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+		vkuTransitionLayout(CommandBuffer, Image->Image, 1, i-1, 1, BaseLayer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-		vkCmdBlitImage(commandBuffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
+		vkCmdBlitImage(CommandBuffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
 		{
 			.srcOffsets[0]={ 0, 0, 0 },
-				.srcOffsets[1]={ texWidth, texHeight, 1 },
-				.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-				.srcSubresource.mipLevel=i-1,
-				.srcSubresource.baseArrayLayer=baseLayer,
-				.srcSubresource.layerCount=1,
-				.dstOffsets[0]={ 0, 0, 0 },
-				.dstOffsets[1]={ texWidth>1?texWidth/2:1, texHeight>1?texHeight/2:1, 1 },
-				.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-				.dstSubresource.mipLevel=i,
-				.dstSubresource.baseArrayLayer=baseLayer,
-				.dstSubresource.layerCount=1,
+			.srcOffsets[1]={ Image->Width>>(i-1), Image->Height>>(i-1), 1 },
+			.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.srcSubresource.mipLevel=i-1,
+			.srcSubresource.baseArrayLayer=BaseLayer,
+			.srcSubresource.layerCount=1,
+			.dstOffsets[0]={ 0, 0, 0 },
+			.dstOffsets[1]={ Image->Width>>i, Image->Height>>i, 1 },
+			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.dstSubresource.mipLevel=i,
+			.dstSubresource.baseArrayLayer=BaseLayer,
+			.dstSubresource.layerCount=1,
 		}, VK_FILTER_LINEAR);
 
-		vkuTransitionLayout(commandBuffer, Image->Image, 1, i-1, 1, baseLayer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-		if(texWidth>1)
-			texWidth/=2;
-
-		if(texHeight>1)
-			texHeight/=2;
+		vkuTransitionLayout(CommandBuffer, Image->Image, 1, i-1, 1, BaseLayer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	}
 
-	vkuTransitionLayout(commandBuffer, Image->Image, 1, mipLevels-1, 1, baseLayer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuTransitionLayout(CommandBuffer, Image->Image, 1, MipLevels-1, 1, BaseLayer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 // Image_Upload, external function.
@@ -903,8 +893,13 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		VkuImage_t Out;
 		void *Data=NULL;
 
+		// Calculate the cubemap face size from the angular map size (half the size of the original seems to be good)
+		Out.Width=NextPower2(Image->Width>>1);
+		Out.Height=NextPower2(Image->Height>>1);
+		Out.Depth=Image->Depth;
+
 		// Precalculate each cube face iamge size in bytes
-		uint32_t Size=(NextPower2(Image->Width>>1)*NextPower2(Image->Height>>1)*(Image->Depth>>3));
+		uint32_t Size=Out.Width*Out.Height*(Image->Depth>>3);
 
 		// Create staging buffer
 		vkuCreateHostBuffer(Context, &StagingBuffer, Size*6, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
@@ -913,16 +908,19 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		vkMapMemory(Context->Device, StagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
 		for(uint32_t i=0;i<6;i++)
 		{
-			_AngularMapFace(Image, i, &Out);
-
-			if(Out.Data==NULL)
+			// Extract the cubemap face from the angular map lightprobe
+			if(!_AngularMapFace(Image, i, &Out))
 				return VK_FALSE;
 
-			memcpy((uint8_t *)Data+(Size*i), Out.Data, Size);
+			// Copy the image into the staging buffer
+			memcpy((uint8_t *)Data+((size_t)Size*i), Out.Data, Size);
+
+			// Free the output data for the next face
 			Zone_Free(Zone, Out.Data);
 		}
 		vkUnmapMemory(Context->Device, StagingBuffer.DeviceMemory);
 
+		// All faces are copied, free the original image data
 		Zone_Free(Zone, Image->Data);
 
 		// Going from an angular map to 6 faces, the faces are a different size than the original image,
@@ -930,9 +928,11 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		Image->Width=Out.Width;
 		Image->Height=Out.Height;
 
+		// If mipmaps are requested, calculate how many levels there are
 		if(Flags&IMAGE_MIPMAP)
-			MipLevels=(uint32_t)(floor(log2(max(Out.Width, Out.Height))))+1;
+			MipLevels=ComputeLog(max(Image->Width, Image->Height))+1;
 
+		// Create the GPU side image memory buffer
 		vkuCreateImageBuffer(Context, Image,
 							 VK_IMAGE_TYPE_2D, Format, MipLevels, 6, Out.Width, Out.Height, 1, VK_SAMPLE_COUNT_1_BIT,
 							 Format==VK_FORMAT_R32G32B32A32_SFLOAT?VK_IMAGE_TILING_LINEAR:VK_IMAGE_TILING_OPTIMAL,
@@ -949,12 +949,12 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		// Copy all faces from staging buffer to the texture image buffer.
 		vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer.Buffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, (VkBufferImageCopy[6])
 		{
-			{ Size*0, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } },
-			{ Size*1, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } },
-			{ Size*2, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 2, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } },
-			{ Size*3, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 3, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } },
-			{ Size*4, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 4, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } },
-			{ Size*5, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 5, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } }
+			{ (VkDeviceSize)Size*0, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } },
+			{ (VkDeviceSize)Size*1, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } },
+			{ (VkDeviceSize)Size*2, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 2, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } },
+			{ (VkDeviceSize)Size*3, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 3, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } },
+			{ (VkDeviceSize)Size*4, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 4, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } },
+			{ (VkDeviceSize)Size*5, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 5, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } }
 		});
 
 		// Final change to image layout from destination optimal to be optimal reading only by shader.
@@ -995,7 +995,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		Zone_Free(Zone, Image->Data);
 
 		if(Flags&IMAGE_MIPMAP)
-			MipLevels=(uint32_t)(floor(log2(max(Image->Width, Image->Height))))+1;
+			MipLevels=ComputeLog(max(Image->Width, Image->Height))+1;
 
 		if(!vkuCreateImageBuffer(Context, Image,
 		   VK_IMAGE_TYPE_2D, Format, MipLevels, 1, Image->Width, Image->Height, 1,
@@ -1013,9 +1013,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		// Copy from staging buffer to the texture buffer.
 		vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer.Buffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, (VkBufferImageCopy[1])
 		{
-			{
-				0, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }, { 0, 0, 0 }, { Image->Width, Image->Height, 1 }
-			}
+			{ 0, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }, { 0, 0, 0 }, { Image->Width, Image->Height, 1 } }
 		});
 
 		// Final change to image layout from destination optimal to be optimal reading only by shader.
@@ -1032,6 +1030,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		vkFreeMemory(Context->Device, StagingBuffer.DeviceMemory, VK_NULL_HANDLE);
 		vkDestroyBuffer(Context->Device, StagingBuffer.Buffer, VK_NULL_HANDLE);
 	}
+
 	// Create texture sampler object
 	vkCreateSampler(Context->Device, &(VkSamplerCreateInfo)
 	{
