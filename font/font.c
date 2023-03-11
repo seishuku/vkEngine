@@ -11,7 +11,7 @@
 #include "font.h"
 
 extern VkuContext_t Context;
-//extern VkRenderPass CompositeRenderPass;
+extern VkRenderPass CompositeRenderPass;
 extern VkRenderPass RenderPass;
 extern VkSampleCountFlags MSAA;
 
@@ -123,10 +123,10 @@ void Font_Print(VkCommandBuffer CommandBuffer, uint32_t Eye, float x, float y, c
 		vkuInitPipeline(&FontPipeline, &Context);
 
 		vkuPipeline_SetPipelineLayout(&FontPipeline, FontPipelineLayout);
-		vkuPipeline_SetRenderPass(&FontPipeline, RenderPass);
+		vkuPipeline_SetRenderPass(&FontPipeline, CompositeRenderPass);
 
 		FontPipeline.Topology=VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY;
-		FontPipeline.RasterizationSamples=MSAA;
+//		FontPipeline.RasterizationSamples=MSAA;
 
 		if(!vkuPipeline_AddStage(&FontPipeline, "./shaders/bezier.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 			return;

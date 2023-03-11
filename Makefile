@@ -52,7 +52,7 @@ SHADERS+=shaders/lighting.vert.spv
 SHADERS+=shaders/skybox.frag.spv
 SHADERS+=shaders/skybox.vert.spv
 
-CC=gcc
+CC=clang
 CFLAGS=-Wall -O3 -std=gnu17 -I/usr/X11/include
 LDFLAGS=-Wold-style-definition -L/usr/X11/lib -lvulkan -lX11 -lm -lpthread -lopenvr_api
 

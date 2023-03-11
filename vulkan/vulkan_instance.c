@@ -107,6 +107,18 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 		.enabledExtensionCount=sizeof(Extensions)/sizeof(void *),
 		.ppEnabledExtensionNames=Extensions,
 #ifdef _DEBUG
+		.pNext=&(VkValidationFeaturesEXT)
+		{
+			.sType=VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
+			.enabledValidationFeatureCount=2,
+			.pEnabledValidationFeatures=(VkValidationFeatureEnableEXT[])
+			{
+				VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
+				VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT,
+//				VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
+//				VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
+			},
+		},
 		.enabledLayerCount=1,
 		.ppEnabledLayerNames=(const char *[]) { "VK_LAYER_KHRONOS_validation" },
 #endif

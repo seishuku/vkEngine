@@ -49,7 +49,7 @@ uint64_t rdtsc(void)
 	return (uint64_t)l|((uint64_t)h<<32);
 }
 
-unsigned long long GetFrequency(void)
+uint64_t GetFrequency(void)
 {
 	uint64_t StartTicks, StopTicks;
 	struct timeval TimeStart, TimeStop;
@@ -68,7 +68,7 @@ unsigned long long GetFrequency(void)
 
 void DelayUS(uint64_t us)
 {
-	struct timeval TimeStart, TimeStop;
+	struct timeval TimeStart, TimeCurrent;
 
 	gettimeofday(&TimeStart, NULL);
 

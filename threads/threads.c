@@ -33,7 +33,7 @@ void *Thread_Worker(void *Data)
 		pthread_mutex_lock(&Worker->Mutex);
 
 		// Check if there are any jobs
-		while(List_GetCount(&Worker->Jobs)==0||Worker->Pause)
+		while((List_GetCount(&Worker->Jobs)==0&&!Worker->Stop)||Worker->Pause)
 			pthread_cond_wait(&Worker->Condition, &Worker->Mutex);
 
 		ThreadJob_t Job={ NULL, NULL };
@@ -158,7 +158,7 @@ bool Thread_Start(ThreadWorker_t *Worker)
 		return false;
 	}
 
-	pthread_detach(Worker->Thread);
+//	pthread_detach(Worker->Thread);
 
 	return true;
 }
@@ -166,14 +166,18 @@ bool Thread_Start(ThreadWorker_t *Worker)
 // Pauses thread (if a job is currently running, it will finish first)
 void Thread_Pause(ThreadWorker_t *Worker)
 {
+	pthread_mutex_lock(&Worker->Mutex);
 	Worker->Pause=true;
+	pthread_mutex_unlock(&Worker->Mutex);
 }
 
 // Resume running jobs
 void Thread_Resume(ThreadWorker_t *Worker)
 {
+	pthread_mutex_lock(&Worker->Mutex);
 	Worker->Pause=false;
 	pthread_cond_signal(&Worker->Condition); // TODO: Is this actually needed? It seems to pause and resume fine with out it.
+	pthread_mutex_unlock(&Worker->Mutex);
 }
 
 // Stops thread and waits for it to exit and destorys objects.
@@ -187,6 +191,8 @@ bool Thread_Destroy(ThreadWorker_t *Worker)
 
 	// Stop the thread
 	Worker->Stop=true;
+
+	pthread_join(Worker->Thread, NULL);
 
 	// Destroy the mutex
 	pthread_mutex_destroy(&Worker->Mutex);

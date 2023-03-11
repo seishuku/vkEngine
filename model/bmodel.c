@@ -395,8 +395,8 @@ void BuildMemoryBuffersBModel(VkuContext_t *Context, BModel_t *Model)
 	vkuOneShotCommandBufferEnd(Context, CopyCommand);
 
 	// Delete staging data
-	vkFreeMemory(Context->Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
 	vkDestroyBuffer(Context->Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
+	vkFreeMemory(Context->Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
 
 	for(uint32_t i=0;i<Model->NumMesh;i++)
 	{
@@ -427,7 +427,7 @@ void BuildMemoryBuffersBModel(VkuContext_t *Context, BModel_t *Model)
 		vkuOneShotCommandBufferEnd(Context, CopyCommand);
 
 		// Delete staging data
-		vkFreeMemory(Context->Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
 		vkDestroyBuffer(Context->Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
+		vkFreeMemory(Context->Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
 	}
 }

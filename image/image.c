@@ -454,6 +454,7 @@ static bool _HalfImage(VkuImage_t *Src, VkuImage_t *Dst)
 					break;
 
 				case 16:
+				{
 					uint16_t p0=((uint16_t *)Src->Data)[indexSrc00];
 					uint16_t p1=((uint16_t *)Src->Data)[indexSrc10];
 					uint16_t p2=((uint16_t *)Src->Data)[indexSrc01];
@@ -463,6 +464,7 @@ static bool _HalfImage(VkuImage_t *Src, VkuImage_t *Dst)
 					((uint16_t *)Dst->Data)[indexDst]|=(uint16_t)((((p0>>0x5)&0x1F)+((p1>>0x5)&0x1F)+((p2>>0x5)&0x1F)+((p3>>0x5)&0x1F))>>2)<<0x5;
 					((uint16_t *)Dst->Data)[indexDst]|=(uint16_t)((((p0>>0xA)&0x1F)+((p1>>0xA)&0x1F)+((p2>>0xA)&0x1F)+((p3>>0xA)&0x1F))>>2)<<0xA;
 					break;
+				}
 
 				case 8:
 					Dst->Data[indexDst]=(Src->Data[indexSrc00]+
@@ -975,8 +977,8 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		vkuOneShotCommandBufferEnd(Context, CommandBuffer);
 
 		// Delete staging buffers
-		vkFreeMemory(Context->Device, StagingBuffer.DeviceMemory, VK_NULL_HANDLE);
 		vkDestroyBuffer(Context->Device, StagingBuffer.Buffer, VK_NULL_HANDLE);
+		vkFreeMemory(Context->Device, StagingBuffer.DeviceMemory, VK_NULL_HANDLE);
 	}
 	else // Otherwise it's a 2D texture
 	{
@@ -1027,8 +1029,8 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		vkuOneShotCommandBufferEnd(Context, CommandBuffer);
 
 		// Delete staging buffers
-		vkFreeMemory(Context->Device, StagingBuffer.DeviceMemory, VK_NULL_HANDLE);
 		vkDestroyBuffer(Context->Device, StagingBuffer.Buffer, VK_NULL_HANDLE);
+		vkFreeMemory(Context->Device, StagingBuffer.DeviceMemory, VK_NULL_HANDLE);
 	}
 
 	// Create texture sampler object
