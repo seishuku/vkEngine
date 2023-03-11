@@ -28,7 +28,7 @@ extern PFN_vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR;
 #define VKU_MAX_DESCRIPTORSET_BINDINGS 16
 
 // This defines how many frames in flight
-#define VKU_MAX_FRAME_COUNT 2
+#define VKU_MAX_FRAME_COUNT 3
 
 typedef struct
 {
@@ -199,6 +199,7 @@ typedef struct
 	VkExtent2D Extent;
 	VkSurfaceFormatKHR SurfaceFormat;
 
+	uint32_t NumImages;
 	VkImage Image[VKU_MAX_FRAME_COUNT];
 	VkImageView ImageView[VKU_MAX_FRAME_COUNT];
 } VkuSwapchain_t;

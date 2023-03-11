@@ -327,7 +327,7 @@ bool CreatePipeline(void)
 		},
 	}, 0, &RenderPass);
 
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
 		vkuCreateHostBuffer(&Context, &PerFrame[i].uboBuffer[0], sizeof(UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 		vkMapMemory(Context.Device, PerFrame[i].uboBuffer[0].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&PerFrame[i].Main_UBO[0]);
@@ -426,7 +426,7 @@ bool CreateCompositePipeline(void)
 		}
 	}, 0, &CompositeRenderPass);
 
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
 		vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
 		{
@@ -444,11 +444,16 @@ bool CreateCompositePipeline(void)
 			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 			.maxSets=1,
 			.poolSizeCount=1,
-			.pPoolSizes=(VkDescriptorPoolSize[]) { { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 } },
+			.pPoolSizes=(VkDescriptorPoolSize[]) { { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2 } },
 		}, VK_NULL_HANDLE, &CompositeDescriptorPool[i]);
 
 		vkuInitDescriptorSet(&CompositeDescriptorSet[i], &Context);
+
 		vkuDescriptorSet_AddBinding(&CompositeDescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+		if(IsVR)
+			vkuDescriptorSet_AddBinding(&CompositeDescriptorSet[i], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+
 		vkuAssembleDescriptorSetLayout(&CompositeDescriptorSet[i]);
 	}
 
@@ -465,13 +470,21 @@ bool CreateCompositePipeline(void)
 	vkuPipeline_SetRenderPass(&CompositePipeline, CompositeRenderPass);
 
 	CompositePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	CompositePipeline.CullMode=VK_CULL_MODE_NONE;
+	CompositePipeline.CullMode=VK_CULL_MODE_FRONT_BIT;
 
 	if(!vkuPipeline_AddStage(&CompositePipeline, "./shaders/composite.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
-	if(!vkuPipeline_AddStage(&CompositePipeline, "./shaders/composite.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-		return false;
+	if(IsVR)
+	{
+		if(!vkuPipeline_AddStage(&CompositePipeline, "./shaders/compositeVR.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+			return false;
+	}
+	else
+	{
+		if(!vkuPipeline_AddStage(&CompositePipeline, "./shaders/composite.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+			return false;
+	}
 
 	if(!vkuAssemblePipeline(&CompositePipeline))
 		return false;
@@ -520,7 +533,7 @@ void GenerateSkyParams(void)
 	Skybox_UBO.uStarDensity=8.0f;
 
 	// Copy it out to the other eyes and frames
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
 		memcpy(PerFrame[i].Skybox_UBO[0], &Skybox_UBO, sizeof(Skybox_UBO_t));
 		memcpy(PerFrame[i].Skybox_UBO[1], &Skybox_UBO, sizeof(Skybox_UBO_t));
@@ -582,7 +595,7 @@ void Thread_Constructor(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
 
-	for(uint32_t Frame=0;Frame<VKU_MAX_FRAME_COUNT;Frame++)
+	for(uint32_t Frame=0;Frame<Swapchain.NumImages;Frame++)
 	{
 		for(uint32_t Eye=0;Eye<2;Eye++)
 		{
@@ -635,7 +648,7 @@ void Thread_Destructor(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
 
-	for(uint32_t Frame=0;Frame<VKU_MAX_FRAME_COUNT;Frame++)
+	for(uint32_t Frame=0;Frame<Swapchain.NumImages;Frame++)
 	{
 		for(uint32_t Eye=0;Eye<2;Eye++)
 		{
@@ -870,7 +883,7 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 void Render(void)
 {
 	static uint32_t FrameIndex=0;
-	uint32_t Index=FrameIndex%VKU_MAX_FRAME_COUNT;
+	uint32_t Index=FrameIndex%Swapchain.NumImages;
 	uint32_t imageIndex;
 	matrix Pose;
 
@@ -950,13 +963,17 @@ void Render(void)
 	vkCmdBindPipeline(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CompositePipeline.Pipeline);
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet[Index], 0, &ColorResolve[0]);
+
+	if(IsVR)
+		vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet[Index], 1, &ColorResolve[1]);
+
 	vkuAllocateUpdateDescriptorSet(&CompositeDescriptorSet[Index], CompositeDescriptorPool[Index]);
 	vkCmdBindDescriptorSets(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CompositePipelineLayout, 0, 1, &CompositeDescriptorSet[Index].DescriptorSet, 0, VK_NULL_HANDLE);
 
 	vkCmdDraw(PerFrame[Index].CommandBuffer, 3, 1, 0, 0);
 
 	// Draw text in the compositing renderpass
-	Font_Print(PerFrame[Index].CommandBuffer, 0, 0.0f, 16.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep);
+	Font_Print(PerFrame[Index].CommandBuffer, 0, 0.0f, 32.0f, "Number of frames: %d\nFPS: %0.1f\n\x1B[91mFrame time: %0.5fms", Swapchain.NumImages, fps, fTimeStep);
 
 	vkCmdEndRenderPass(PerFrame[Index].CommandBuffer);
 	//////
@@ -1145,7 +1162,7 @@ bool Init(void)
 	if(IsVR)
 		CreateFramebuffers(1, rtWidth, rtHeight);
 
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
 		// Create needed fence and semaphores for rendering
 		// Wait fence for command queue, to signal when we can submit commands again
@@ -1239,14 +1256,14 @@ void RecreateSwapchain(void)
 			vkDestroyFramebuffer(Context.Device, Framebuffers[1], VK_NULL_HANDLE);
 		}
 
-		for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+		for(uint32_t i=0;i<Swapchain.NumImages;i++)
 			vkDestroyFramebuffer(Context.Device, CompositeFramebuffers[i], VK_NULL_HANDLE);
 			
 		// Destroy the swapchain
 		vkuDestroySwapchain(&Context, &Swapchain);
 
 		// Recreate the swapchain
-		vkuCreateSwapchain(&Context, &Swapchain, Width, Height, false);
+		vkuCreateSwapchain(&Context, &Swapchain, Width, Height, VK_TRUE);
 
 		// Recreate the framebuffer
 		CreateFramebuffers(0, rtWidth, rtHeight);
@@ -1254,7 +1271,7 @@ void RecreateSwapchain(void)
 		if(IsVR)
 			CreateFramebuffers(1, rtWidth, rtHeight);
 
-		for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+		for(uint32_t i=0;i<Swapchain.NumImages;i++)
 		{
 			vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
 			{
@@ -1307,7 +1324,7 @@ void Destroy(void)
 	}
 
 	// Compositing pipeline
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
 		vkDestroyDescriptorSetLayout(Context.Device, CompositeDescriptorSet[i].DescriptorSetLayout, VK_NULL_HANDLE);
 		vkDestroyDescriptorPool(Context.Device, CompositeDescriptorPool[i], VK_NULL_HANDLE);
@@ -1357,7 +1374,7 @@ void Destroy(void)
 	//////////
 
 	// Main render destruction
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
 		vkUnmapMemory(Context.Device, PerFrame[i].uboBuffer[0].DeviceMemory);
 		vkuDestroyBuffer(&Context, &PerFrame[i].uboBuffer[0]);
@@ -1409,7 +1426,7 @@ void Destroy(void)
 	}
 
 
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
 		vkDestroyFence(Context.Device, PerFrame[i].FrameFence, VK_NULL_HANDLE);
 
@@ -1421,7 +1438,7 @@ void Destroy(void)
 	//////////
 
 	// Destroy command pools
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 		vkDestroyCommandPool(Context.Device, PerFrame[i].CommandPool, VK_NULL_HANDLE);
 
 	DBGPRINTF(DEBUG_INFO"Remaining Vulkan memory blocks:\n");

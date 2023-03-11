@@ -247,12 +247,6 @@
     <GLSL Include="shaders\skybox.vert">
       <Filter>Shaders</Filter>
     </GLSL>
-    <GLSL Include="shaders\line.frag">
-      <Filter>Shaders</Filter>
-    </GLSL>
-    <GLSL Include="shaders\line.vert">
-      <Filter>Shaders</Filter>
-    </GLSL>
     <GLSL Include="shaders\particle.frag">
       <Filter>Shaders</Filter>
     </GLSL>
@@ -263,12 +257,6 @@
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\shadow.vert">
-      <Filter>Shaders</Filter>
-    </GLSL>
-    <GLSL Include="shaders\sphere.vert">
-      <Filter>Shaders</Filter>
-    </GLSL>
-    <GLSL Include="shaders\sphere.frag">
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\bezier.frag">
@@ -284,6 +272,9 @@
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\composite.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\compositeVR.frag">
       <Filter>Shaders</Filter>
     </GLSL>
   </ItemGroup>

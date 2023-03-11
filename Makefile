@@ -41,18 +41,24 @@ OBJS+=shadow.o
 OBJS+=skybox.o
 OBJS+=engine.o
 
-SHADERS=shaders/shadow.vert.spv
-SHADERS+=shaders/particle.vert.spv
-SHADERS+=shaders/particle.geom.spv
-SHADERS+=shaders/particle.frag.spv
+SHADERS=shaders/bezier.frag.spv
+SHADERS+=shaders/bezier.geom.spv
+SHADERS+=shaders/bezier.vert.spv
+SHADERS+=shaders/composite.frag.spv
+SHADERS+=shaders/compositeVR.frag.spv
+SHADERS+=shaders/composite.vert.spv
 SHADERS+=shaders/font.frag.spv
 SHADERS+=shaders/font.vert.spv
 SHADERS+=shaders/lighting.frag.spv
 SHADERS+=shaders/lighting.vert.spv
+SHADERS+=shaders/particle.frag.spv
+SHADERS+=shaders/particle.geom.spv
+SHADERS+=shaders/particle.vert.spv
+SHADERS+=shaders/shadow.vert.spv
 SHADERS+=shaders/skybox.frag.spv
 SHADERS+=shaders/skybox.vert.spv
 
-CC=clang
+CC=gcc
 CFLAGS=-Wall -O3 -std=gnu17 -I/usr/X11/include
 LDFLAGS=-Wold-style-definition -L/usr/X11/lib -lvulkan -lX11 -lm -lpthread -lopenvr_api
 

@@ -126,7 +126,7 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 		.sType=VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
 		.pNext=VK_NULL_HANDLE,
 		.surface=Context->Surface,
-		.minImageCount=VKU_MAX_FRAME_COUNT,
+		.minImageCount=SurfCaps.minImageCount,
 		.imageFormat=Swapchain->SurfaceFormat.format,
 		.imageColorSpace=Swapchain->SurfaceFormat.colorSpace,
 		.imageExtent=Swapchain->Extent,
@@ -143,19 +143,23 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 	}, VK_NULL_HANDLE, &Swapchain->Swapchain);
 
 	// Get swap chain image count
-	uint32_t SwapchainImageCount=0;
-	vkGetSwapchainImagesKHR(Context->Device, Swapchain->Swapchain, &SwapchainImageCount, VK_NULL_HANDLE);
+	Swapchain->NumImages=0;
+	vkGetSwapchainImagesKHR(Context->Device, Swapchain->Swapchain, &Swapchain->NumImages, VK_NULL_HANDLE);
 
-	if(SwapchainImageCount!=VKU_MAX_FRAME_COUNT)
+	// Check to make sure the driver doesn't want more than what we can support
+	if(Swapchain->NumImages==0||Swapchain->NumImages>VKU_MAX_FRAME_COUNT)
+	{
+		DBGPRINTF(DEBUG_ERROR, "Swapchain minimum image count is greater than supported number of images. (requested: %d, minimum: %d", VKU_MAX_FRAME_COUNT, SurfCaps.minImageCount);
 		return VK_FALSE;
+	}
 
 	// Get the swap chain images
-	vkGetSwapchainImagesKHR(Context->Device, Swapchain->Swapchain, &SwapchainImageCount, Swapchain->Image);
+	vkGetSwapchainImagesKHR(Context->Device, Swapchain->Swapchain, &Swapchain->NumImages, Swapchain->Image);
 
 	// Create imageviews and transition to correct image layout
 	VkCommandBuffer CommandBuffer=vkuOneShotCommandBufferBegin(Context);
 
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<Swapchain->NumImages;i++)
 	{
 		vkuTransitionLayout(CommandBuffer, Swapchain->Image[i], 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
@@ -186,7 +190,7 @@ void vkuDestroySwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain)
 	if(!Context||!Swapchain)
 		return;
 
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<Swapchain->NumImages;i++)
 		vkDestroyImageView(Context->Device, Swapchain->ImageView[i], VK_NULL_HANDLE);
 
 	vkDestroySwapchainKHR(Context->Device, Swapchain->Swapchain, VK_NULL_HANDLE);

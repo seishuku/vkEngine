@@ -12,13 +12,14 @@
 extern VkuContext_t Context;
 extern VkRenderPass RenderPass;
 extern VkSampleCountFlags MSAA;
+extern VkuSwapchain_t Swapchain;
 
 VkPipelineLayout SkyboxPipelineLayout;
 VkuPipeline_t SkyboxPipeline;
 
 bool CreateSkyboxPipeline(void)
 {
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
 		vkuCreateHostBuffer(&Context, &PerFrame[i].Skybox_UBO_Buffer[0], sizeof(Skybox_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 		vkMapMemory(Context.Device, PerFrame[i].Skybox_UBO_Buffer[0].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&PerFrame[i].Skybox_UBO[0]);
@@ -66,7 +67,7 @@ bool CreateSkyboxPipeline(void)
 
 void DestroySkybox(void)
 {
-	for(uint32_t i=0;i<VKU_MAX_FRAME_COUNT;i++)
+	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
 		vkUnmapMemory(Context.Device, PerFrame[i].Skybox_UBO_Buffer[0].DeviceMemory);
 		vkuDestroyBuffer(&Context, &PerFrame[i].Skybox_UBO_Buffer[0]);

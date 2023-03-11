@@ -157,20 +157,17 @@
     <GLSL Include="shaders\bezier.vert" />
     <GLSL Include="shaders\composite.frag" />
     <GLSL Include="shaders\composite.vert" />
+    <GLSL Include="shaders\compositeVR.frag" />
     <GLSL Include="shaders\shadow.vert" />
     <GLSL Include="shaders\font.frag" />
     <GLSL Include="shaders\font.vert" />
     <GLSL Include="shaders\lighting.frag" />
     <GLSL Include="shaders\lighting.vert" />
-    <GLSL Include="shaders\line.frag" />
-    <GLSL Include="shaders\line.vert" />
     <GLSL Include="shaders\particle.frag" />
     <GLSL Include="shaders\particle.geom" />
     <GLSL Include="shaders\particle.vert" />
     <GLSL Include="shaders\skybox.frag" />
     <GLSL Include="shaders\skybox.vert" />
-    <GLSL Include="shaders\sphere.frag" />
-    <GLSL Include="shaders\sphere.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
