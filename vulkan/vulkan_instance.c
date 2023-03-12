@@ -100,6 +100,16 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 #endif
 	};
 
+#ifdef _DEBUG
+	VkValidationFeatureEnableEXT enabledValidationFeatures[]=
+	{
+		VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
+//		VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
+//		VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
+	};
+#endif
+
+
 	VkInstanceCreateInfo InstanceInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
@@ -110,14 +120,8 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 		.pNext=&(VkValidationFeaturesEXT)
 		{
 			.sType=VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
-			.enabledValidationFeatureCount=2,
-			.pEnabledValidationFeatures=(VkValidationFeatureEnableEXT[])
-			{
-				VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
-				VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT,
-//				VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
-//				VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
-			},
+			.pEnabledValidationFeatures=enabledValidationFeatures,
+			.enabledValidationFeatureCount=sizeof(enabledValidationFeatures)/sizeof(VkValidationFeatureEnableEXT),
 		},
 		.enabledLayerCount=1,
 		.ppEnabledLayerNames=(const char *[]) { "VK_LAYER_KHRONOS_validation" },

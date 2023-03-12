@@ -1,6 +1,8 @@
 #ifndef __PERFRAME_H__
 #define __PERFRAME_H__
 
+#include "skybox.h"
+
 typedef struct
 {
 	matrix HMD;
@@ -13,6 +15,17 @@ typedef struct
 
 typedef struct
 {
+	// Thresholding shader per-frame data
+	VkDescriptorPool ThresholdDescriptorPool;
+	VkuDescriptorSet_t ThresholdDescriptorSet;
+	//////
+
+	// Compositing shader per-frame data
+	VkDescriptorPool CompositeDescriptorPool;
+	VkuDescriptorSet_t CompositeDescriptorSet;
+	VkFramebuffer CompositeFramebuffer;
+	//////
+
 	// Skybox per-frame, per-eye data
 	Skybox_UBO_t *Skybox_UBO[2];
 	VkuBuffer_t Skybox_UBO_Buffer[2];

@@ -102,6 +102,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="camera\camera.c" />
+    <ClCompile Include="composite.c" />
     <ClCompile Include="engine.c" />
     <ClCompile Include="font\font.c" />
     <ClCompile Include="image\image.c" />
@@ -131,6 +132,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera\camera.h" />
+    <ClInclude Include="composite.h" />
     <ClInclude Include="font\font.h" />
     <ClInclude Include="image\image.h" />
     <ClInclude Include="math\math.h" />
@@ -168,6 +170,8 @@
     <GLSL Include="shaders\particle.vert" />
     <GLSL Include="shaders\skybox.frag" />
     <GLSL Include="shaders\skybox.vert" />
+    <GLSL Include="shaders\threshold.frag" />
+    <GLSL Include="shaders\threshold.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -165,6 +165,9 @@
     <ClCompile Include="perframe.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="composite.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
@@ -227,6 +230,9 @@
     <ClInclude Include="perframe.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="composite.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <GLSL Include="shaders\font.frag">
@@ -275,6 +281,12 @@
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\compositeVR.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\threshold.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\threshold.vert">
       <Filter>Shaders</Filter>
     </GLSL>
   </ItemGroup>

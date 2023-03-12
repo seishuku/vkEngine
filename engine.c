@@ -23,6 +23,7 @@
 #include "textures.h"
 #include "skybox.h"
 #include "shadow.h"
+#include "composite.h"
 #include "perframe.h"
 
 uint32_t Width=1280, Height=720;
@@ -54,9 +55,11 @@ VkuSwapchain_t Swapchain;
 VkSampleCountFlags MSAA=VK_SAMPLE_COUNT_4_BIT;
 
 // Colorbuffer image
-VkFormat ColorFormat=VK_FORMAT_R8G8B8A8_SRGB;
+VkFormat ColorFormat=VK_FORMAT_R32G32B32A32_SFLOAT;
 VkuImage_t ColorImage[2];		// left and right eye color buffer
+
 VkuImage_t ColorResolve[2];		// left and right eye MSAA resolve color buffer
+VkuImage_t ColorBlur[2];		// left and right eye blur color buffer
 
 // Depth buffer image
 VkFormat DepthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
@@ -65,21 +68,10 @@ VkuImage_t DepthImage[2];		// left and right eye depth buffers
 // Primary framebuffers
 VkFramebuffer Framebuffers[2];	// left and right eye frame buffers
 
-// Primary RenderPass
-VkRenderPass RenderPass;
-
 // Primary rendering pipeline stuff
 VkPipelineLayout PipelineLayout;
 VkuPipeline_t Pipeline;
-//////
-
-// Compositing pipeline stuff
-VkDescriptorPool CompositeDescriptorPool[VKU_MAX_FRAME_COUNT];
-VkuDescriptorSet_t CompositeDescriptorSet[VKU_MAX_FRAME_COUNT];
-VkPipelineLayout CompositePipelineLayout;
-VkuPipeline_t CompositePipeline;
-VkRenderPass CompositeRenderPass;
-VkFramebuffer CompositeFramebuffers[VKU_MAX_FRAME_COUNT];
+VkRenderPass RenderPass;
 //////
 
 // Asteroid data
@@ -107,18 +99,19 @@ typedef struct
 	} PerFrame[VKU_MAX_FRAME_COUNT];
 } ThreadData_t;
 
-ThreadWorker_t Thread[4];
-ThreadData_t ThreadData[4];
+#define NUM_THREADS 3
+ThreadWorker_t Thread[NUM_THREADS];
+ThreadData_t ThreadData[NUM_THREADS];
 pthread_barrier_t ThreadBarrier;
 
 void RecreateSwapchain(void);
 
-bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeight)
+void vkuCreateTexture2D(VkuImage_t *Image, uint32_t Width, uint32_t Height, VkFormat Format, VkSampleCountFlagBits Samples)
 {
-	vkuCreateImageBuffer(&Context, &ColorImage[Eye],
-						 VK_IMAGE_TYPE_2D, ColorFormat, 1, 1, targetWidth, targetHeight, 1,
-						 MSAA, VK_IMAGE_TILING_OPTIMAL,
-						 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+	vkuCreateImageBuffer(&Context, Image,
+						 VK_IMAGE_TYPE_2D, Format, 1, 1, Width, Height, 1,
+						 Samples, VK_IMAGE_TILING_OPTIMAL,
+						 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 						 0);
 
@@ -126,8 +119,8 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.pNext=NULL,
-		.image=ColorImage[Eye].Image,
-		.format=ColorFormat,
+		.image=Image->Image,
+		.format=Format,
 		.components.r=VK_COMPONENT_SWIZZLE_R,
 		.components.g=VK_COMPONENT_SWIZZLE_G,
 		.components.b=VK_COMPONENT_SWIZZLE_B,
@@ -139,33 +132,7 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 		.subresourceRange.layerCount=1,
 		.viewType=VK_IMAGE_VIEW_TYPE_2D,
 		.flags=0,
-	}, NULL, &ColorImage[Eye].View);
-
-	vkuCreateImageBuffer(&Context, &ColorResolve[Eye],
-						 VK_IMAGE_TYPE_2D, ColorFormat, 1, 1, targetWidth, targetHeight, 1,
-						 VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
-						 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-						 0);
-
-	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.pNext=NULL,
-		.image=ColorResolve[Eye].Image,
-		.format=ColorFormat,
-		.components.r=VK_COMPONENT_SWIZZLE_R,
-		.components.g=VK_COMPONENT_SWIZZLE_G,
-		.components.b=VK_COMPONENT_SWIZZLE_B,
-		.components.a=VK_COMPONENT_SWIZZLE_A,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.levelCount=1,
-		.subresourceRange.baseArrayLayer=0,
-		.subresourceRange.layerCount=1,
-		.viewType=VK_IMAGE_VIEW_TYPE_2D,
-		.flags=0,
-	}, NULL, &ColorResolve[Eye].View);
+	}, NULL, &Image->View);
 
 	vkCreateSampler(Context.Device, &(VkSamplerCreateInfo)
 	{
@@ -173,9 +140,9 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 		.magFilter=VK_FILTER_LINEAR,
 		.minFilter=VK_FILTER_NEAREST,
 		.mipmapMode=VK_FILTER_LINEAR,
-		.addressModeU=VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		.addressModeV=VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		.addressModeW=VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.addressModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.mipLodBias=0.0f,
 		.compareOp=VK_COMPARE_OP_NEVER,
 		.minLod=0.0f,
@@ -183,7 +150,45 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 		.maxAnisotropy=1.0f,
 		.anisotropyEnable=VK_FALSE,
 		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-	}, VK_NULL_HANDLE, &ColorResolve[Eye].Sampler);
+	}, VK_NULL_HANDLE, &Image->Sampler);
+}
+
+void vkuCreateImage2D(VkuImage_t *Image, uint32_t Width, uint32_t Height, VkFormat Format, VkSampleCountFlagBits Samples)
+{
+	vkuCreateImageBuffer(&Context, Image,
+						 VK_IMAGE_TYPE_2D, Format, 1, 1, Width, Height, 1,
+						 Samples, VK_IMAGE_TILING_OPTIMAL,
+						 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+						 0);
+
+	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+		.pNext=NULL,
+		.image=Image->Image,
+		.format=Format,
+		.components.r=VK_COMPONENT_SWIZZLE_R,
+		.components.g=VK_COMPONENT_SWIZZLE_G,
+		.components.b=VK_COMPONENT_SWIZZLE_B,
+		.components.a=VK_COMPONENT_SWIZZLE_A,
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+		.subresourceRange.baseMipLevel=0,
+		.subresourceRange.levelCount=1,
+		.subresourceRange.baseArrayLayer=0,
+		.subresourceRange.layerCount=1,
+		.viewType=VK_IMAGE_VIEW_TYPE_2D,
+		.flags=0,
+	}, NULL, &Image->View);
+}
+
+bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeight)
+{
+	vkuCreateImage2D(&ColorImage[Eye], targetWidth, targetHeight, ColorFormat, MSAA);
+
+	vkuCreateTexture2D(&ColorResolve[Eye], targetWidth, targetHeight, ColorFormat, VK_SAMPLE_COUNT_1_BIT);
+
+	vkuCreateTexture2D(&ColorBlur[Eye], targetWidth>>2, targetHeight>>2, ColorFormat, VK_SAMPLE_COUNT_1_BIT);
 
 	vkuCreateImageBuffer(&Context, &DepthImage[Eye],
 						 VK_IMAGE_TYPE_2D, DepthFormat, 1, 1, targetWidth, targetHeight, 1,
@@ -221,6 +226,10 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 		.height=targetHeight,
 		.layers=1,
 	}, 0, &Framebuffers[Eye]);
+
+	VkCommandBuffer Cmd=vkuOneShotCommandBufferBegin(&Context);
+	vkuTransitionLayout(Cmd, ColorBlur[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuOneShotCommandBufferEnd(&Context, Cmd);
 
 	return true;
 }
@@ -285,7 +294,7 @@ bool CreatePipeline(void)
 				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			},
 		},
-		.dependencyCount=4,
+		.dependencyCount=3,
 		.pDependencies=(VkSubpassDependency[])
 		{
 			{
@@ -305,15 +314,6 @@ bool CreatePipeline(void)
 				.srcAccessMask=0,
 				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT|VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
 				.dependencyFlags=0,
-			},
-			{
-				.srcSubpass=VK_SUBPASS_EXTERNAL,
-				.dstSubpass=0,
-				.srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
-				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
 			},
 			{
 				.srcSubpass=0,
@@ -394,104 +394,6 @@ bool CreatePipeline(void)
 	return true;
 }
 
-bool CreateCompositePipeline(void)
-{
-	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-		.attachmentCount=1,
-		.pAttachments=(VkAttachmentDescription[])
-		{
-			{
-				.format=Swapchain.SurfaceFormat.format,
-				.samples=VK_SAMPLE_COUNT_1_BIT,
-				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-			}
-		},
-		.subpassCount=1,
-		.pSubpasses=&(VkSubpassDescription)
-		{
-			.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS,
-			.colorAttachmentCount=1,
-			.pColorAttachments=&(VkAttachmentReference)
-			{
-				.attachment=0,
-				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			}
-		}
-	}, 0, &CompositeRenderPass);
-
-	for(uint32_t i=0;i<Swapchain.NumImages;i++)
-	{
-		vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-			.renderPass=CompositeRenderPass,
-			.attachmentCount=1,
-			.pAttachments=(VkImageView[]){ Swapchain.ImageView[i] },
-			.width=Width,
-			.height=Height,
-			.layers=1,
-		}, 0, &CompositeFramebuffers[i]);
-
-		vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-			.maxSets=1,
-			.poolSizeCount=1,
-			.pPoolSizes=(VkDescriptorPoolSize[]) { { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2 } },
-		}, VK_NULL_HANDLE, &CompositeDescriptorPool[i]);
-
-		vkuInitDescriptorSet(&CompositeDescriptorSet[i], &Context);
-
-		vkuDescriptorSet_AddBinding(&CompositeDescriptorSet[i], 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-
-		if(IsVR)
-			vkuDescriptorSet_AddBinding(&CompositeDescriptorSet[i], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-
-		vkuAssembleDescriptorSetLayout(&CompositeDescriptorSet[i]);
-	}
-
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=1,
-		.pSetLayouts=&CompositeDescriptorSet[0].DescriptorSetLayout,
-	}, 0, &CompositePipelineLayout);
-
-	vkuInitPipeline(&CompositePipeline, &Context);
-
-	vkuPipeline_SetPipelineLayout(&CompositePipeline, CompositePipelineLayout);
-	vkuPipeline_SetRenderPass(&CompositePipeline, CompositeRenderPass);
-
-	CompositePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	CompositePipeline.CullMode=VK_CULL_MODE_FRONT_BIT;
-
-	if(!vkuPipeline_AddStage(&CompositePipeline, "./shaders/composite.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
-		return false;
-
-	if(IsVR)
-	{
-		if(!vkuPipeline_AddStage(&CompositePipeline, "./shaders/compositeVR.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-			return false;
-	}
-	else
-	{
-		if(!vkuPipeline_AddStage(&CompositePipeline, "./shaders/composite.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-			return false;
-	}
-
-	if(!vkuAssemblePipeline(&CompositePipeline))
-		return false;
-
-	return true;
-}
-
 float RandFloat(void)
 {
 	return (float)rand()/RAND_MAX;
@@ -525,7 +427,8 @@ void GenerateSkyParams(void)
 	Vec4_Set(Skybox_UBO.uSunPosition, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
 	Vec3_Normalize(Skybox_UBO.uSunPosition);
 
-	Vec4_Set(Skybox_UBO.uSunColor, min(1.0f, RandFloat()+0.5f), min(1.0f, RandFloat()+0.5f), min(1.0f, RandFloat()+0.5f), 0.0f);
+	const float MaxSun=5.0f;
+	Vec4_Set(Skybox_UBO.uSunColor, min(MaxSun, RandFloat()*MaxSun+0.5f), min(MaxSun, RandFloat()*MaxSun+0.5f), min(MaxSun, RandFloat()*MaxSun+0.5f), 0.0f);
 	Skybox_UBO.uSunSize=1.0f/(RandFloat()*1000.0f+100.0f);
 	Skybox_UBO.uSunFalloff=RandFloat()*16.0f+8.0f;
 
@@ -862,10 +765,6 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	ThreadData[2].Eye=Eye;
 	Thread_AddJob(&Thread[2], Thread_Particles, (void *)&ThreadData[2]);
 
-	//ThreadData[3].Index=Index;
-	//ThreadData[3].Eye=Eye;
-	//Thread_AddJob(&Thread[3], Thread_Font, (void *)&ThreadData[3]);
-
 	pthread_barrier_wait(&ThreadBarrier);
 
 	// Execute the secondary command buffers from the threads
@@ -873,8 +772,7 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	{
 		ThreadData[0].PerFrame[Index].SecCommandBuffer[Eye],
 		ThreadData[1].PerFrame[Index].SecCommandBuffer[Eye],
-		ThreadData[2].PerFrame[Index].SecCommandBuffer[Eye],
-//		ThreadData[3].PerFrame[Index].SecCommandBuffer[Eye]
+		ThreadData[2].PerFrame[Index].SecCommandBuffer[Eye]
 	});
 
 	vkCmdEndRenderPass(CommandBuffer);
@@ -944,38 +842,8 @@ void Render(void)
 	if(IsVR)
 		EyeRender(PerFrame[Index].CommandBuffer, Index, 1, Pose);
 
-	//// TeStInG sTuFf
-	vkResetDescriptorPool(Context.Device, CompositeDescriptorPool[Index], 0);
-
-	vkCmdBeginRenderPass(PerFrame[Index].CommandBuffer, &(VkRenderPassBeginInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-		.renderPass=CompositeRenderPass,
-		.framebuffer=CompositeFramebuffers[Index],
-		.clearValueCount=1,
-		.pClearValues=(VkClearValue[]){ { 1.0f, 0.0f, 0.0f, 1.0f } },
-		.renderArea={ { 0, 0 }, { Width, Height } },
-	}, VK_SUBPASS_CONTENTS_INLINE);
-
-	vkCmdSetViewport(PerFrame[Index].CommandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)Width, (float)Height, 0.0f, 1.0f });
-	vkCmdSetScissor(PerFrame[Index].CommandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { Width, Height } });
-
-	vkCmdBindPipeline(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CompositePipeline.Pipeline);
-
-	vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet[Index], 0, &ColorResolve[0]);
-
-	if(IsVR)
-		vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet[Index], 1, &ColorResolve[1]);
-
-	vkuAllocateUpdateDescriptorSet(&CompositeDescriptorSet[Index], CompositeDescriptorPool[Index]);
-	vkCmdBindDescriptorSets(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CompositePipelineLayout, 0, 1, &CompositeDescriptorSet[Index].DescriptorSet, 0, VK_NULL_HANDLE);
-
-	vkCmdDraw(PerFrame[Index].CommandBuffer, 3, 1, 0, 0);
-
-	// Draw text in the compositing renderpass
-	Font_Print(PerFrame[Index].CommandBuffer, 0, 0.0f, 32.0f, "Number of frames: %d\nFPS: %0.1f\n\x1B[91mFrame time: %0.5fms", Swapchain.NumImages, fps, fTimeStep);
-
-	vkCmdEndRenderPass(PerFrame[Index].CommandBuffer);
+	// Final drawing compositing
+	CompositeDraw(Index);
 	//////
 
 	if(IsVR)
@@ -1067,7 +935,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 
 bool Init(void)
 {
-	ColorFormat=Swapchain.SurfaceFormat.format;
+//	ColorFormat=Swapchain.SurfaceFormat.format;
 
 	Event_Add(EVENT_KEYDOWN, Event_KeyDown);
 	Event_Add(EVENT_KEYUP, Event_KeyUp);
@@ -1141,9 +1009,6 @@ bool Init(void)
 	CreateSkyboxPipeline();
 	GenerateSkyParams();
 
-	// Create compositing pipeline
-	CreateCompositePipeline();
-
 	InitShadowPipeline();
 	InitShadowMap();
 
@@ -1159,9 +1024,14 @@ bool Init(void)
 	// This needs to be done after the render pass is created
 	CreateFramebuffers(0, rtWidth, rtHeight);
 
+	// Create compositing pipeline
+	CreateCompositePipeline();
+
+	// Second eye framebuffer for VR
 	if(IsVR)
 		CreateFramebuffers(1, rtWidth, rtHeight);
 
+	// Other per-frame data
 	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
 		// Create needed fence and semaphores for rendering
@@ -1192,7 +1062,8 @@ bool Init(void)
 		}, &PerFrame[i].CommandBuffer);
 	}
 
-	for(uint32_t i=0;i<4;i++)
+	// Set up and initalize threads
+	for(uint32_t i=0;i<NUM_THREADS;i++)
 	{
 		Thread_Init(&Thread[i]);
 		Thread_AddConstructor(&Thread[i], Thread_Constructor, (void *)&ThreadData[i]);
@@ -1200,7 +1071,8 @@ bool Init(void)
 		Thread_Start(&Thread[i]);
 	}
 
-	pthread_barrier_init(&ThreadBarrier, NULL, 4);
+	// Synchronization barrier, count is number of threads+main thread
+	pthread_barrier_init(&ThreadBarrier, NULL, NUM_THREADS+1);
 
 	return true;
 }
@@ -1257,7 +1129,7 @@ void RecreateSwapchain(void)
 		}
 
 		for(uint32_t i=0;i<Swapchain.NumImages;i++)
-			vkDestroyFramebuffer(Context.Device, CompositeFramebuffers[i], VK_NULL_HANDLE);
+			vkDestroyFramebuffer(Context.Device, PerFrame[i].CompositeFramebuffer, VK_NULL_HANDLE);
 			
 		// Destroy the swapchain
 		vkuDestroySwapchain(&Context, &Swapchain);
@@ -1282,7 +1154,7 @@ void RecreateSwapchain(void)
 				.width=Width,
 				.height=Height,
 				.layers=1,
-			}, 0, &CompositeFramebuffers[i]);
+			}, 0, &PerFrame[i].CompositeFramebuffer);
 		}
 	}
 }
@@ -1293,7 +1165,7 @@ void Destroy(void)
 
 	DestroyOpenVR();
 
-	for(uint32_t i=0;i<4;i++)
+	for(uint32_t i=0;i<NUM_THREADS;i++)
 		Thread_Destroy(&Thread[i]);
 
 	if(Context.PipelineCache)
@@ -1326,9 +1198,9 @@ void Destroy(void)
 	// Compositing pipeline
 	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
-		vkDestroyDescriptorSetLayout(Context.Device, CompositeDescriptorSet[i].DescriptorSetLayout, VK_NULL_HANDLE);
-		vkDestroyDescriptorPool(Context.Device, CompositeDescriptorPool[i], VK_NULL_HANDLE);
-		vkDestroyFramebuffer(Context.Device, CompositeFramebuffers[i], VK_NULL_HANDLE);
+		vkDestroyDescriptorSetLayout(Context.Device, PerFrame[i].CompositeDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
+		vkDestroyDescriptorPool(Context.Device, PerFrame[i].CompositeDescriptorPool, VK_NULL_HANDLE);
+		vkDestroyFramebuffer(Context.Device, PerFrame[i].CompositeFramebuffer, VK_NULL_HANDLE);
 	}
 
 	vkDestroyPipeline(Context.Device, CompositePipeline.Pipeline, VK_NULL_HANDLE);

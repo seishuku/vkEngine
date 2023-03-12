@@ -39,6 +39,7 @@ OBJS+=utils/memzone.o
 OBJS+=perframe.o
 OBJS+=shadow.o
 OBJS+=skybox.o
+OBJS+=composite.o
 OBJS+=engine.o
 
 SHADERS=shaders/bezier.frag.spv
