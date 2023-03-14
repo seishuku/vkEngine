@@ -60,6 +60,7 @@ VkuImage_t ColorImage[2];		// left and right eye color buffer
 
 VkuImage_t ColorResolve[2];		// left and right eye MSAA resolve color buffer
 VkuImage_t ColorBlur[2];		// left and right eye blur color buffer
+VkuImage_t ColorTemp[2];		// left and right eye blur color buffer
 
 // Depth buffer image
 VkFormat DepthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
@@ -188,6 +189,7 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 
 	vkuCreateTexture2D(&ColorResolve[Eye], targetWidth, targetHeight, ColorFormat, VK_SAMPLE_COUNT_1_BIT);
 
+	vkuCreateTexture2D(&ColorTemp[Eye], targetWidth>>2, targetHeight>>2, ColorFormat, VK_SAMPLE_COUNT_1_BIT);
 	vkuCreateTexture2D(&ColorBlur[Eye], targetWidth>>2, targetHeight>>2, ColorFormat, VK_SAMPLE_COUNT_1_BIT);
 
 	vkuCreateImageBuffer(&Context, &DepthImage[Eye],
@@ -229,6 +231,7 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 
 	VkCommandBuffer Cmd=vkuOneShotCommandBufferBegin(&Context);
 	vkuTransitionLayout(Cmd, ColorBlur[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuTransitionLayout(Cmd, ColorTemp[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuOneShotCommandBufferEnd(&Context, Cmd);
 
 	return true;

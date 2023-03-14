@@ -244,8 +244,8 @@ void vkuTransitionLayout(VkCommandBuffer CommandBuffer, VkImage Image, uint32_t 
 			break;
 
 		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-			if(SrcAccessMask==0)
-				SrcAccessMask=VK_ACCESS_HOST_WRITE_BIT|VK_ACCESS_TRANSFER_WRITE_BIT;
+//			if(SrcAccessMask==0)
+//				SrcAccessMask=VK_ACCESS_HOST_WRITE_BIT|VK_ACCESS_TRANSFER_WRITE_BIT;
 
 			DstAccessMask=VK_ACCESS_SHADER_READ_BIT;
 			DstStageFlag=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;

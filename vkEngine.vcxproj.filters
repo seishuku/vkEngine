@@ -277,16 +277,16 @@
     <GLSL Include="shaders\composite.frag">
       <Filter>Shaders</Filter>
     </GLSL>
-    <GLSL Include="shaders\composite.vert">
-      <Filter>Shaders</Filter>
-    </GLSL>
     <GLSL Include="shaders\compositeVR.frag">
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\threshold.frag">
       <Filter>Shaders</Filter>
     </GLSL>
-    <GLSL Include="shaders\threshold.vert">
+    <GLSL Include="shaders\gaussian.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\fullscreen.vert">
       <Filter>Shaders</Filter>
     </GLSL>
   </ItemGroup>

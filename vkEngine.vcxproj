@@ -158,8 +158,9 @@
     <GLSL Include="shaders\bezier.geom" />
     <GLSL Include="shaders\bezier.vert" />
     <GLSL Include="shaders\composite.frag" />
-    <GLSL Include="shaders\composite.vert" />
     <GLSL Include="shaders\compositeVR.frag" />
+    <GLSL Include="shaders\fullscreen.vert" />
+    <GLSL Include="shaders\gaussian.frag" />
     <GLSL Include="shaders\shadow.vert" />
     <GLSL Include="shaders\font.frag" />
     <GLSL Include="shaders\font.vert" />
@@ -171,7 +172,6 @@
     <GLSL Include="shaders\skybox.frag" />
     <GLSL Include="shaders\skybox.vert" />
     <GLSL Include="shaders\threshold.frag" />
-    <GLSL Include="shaders\threshold.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

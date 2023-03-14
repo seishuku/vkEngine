@@ -20,6 +20,13 @@ typedef struct
 	VkuDescriptorSet_t ThresholdDescriptorSet;
 	//////
 
+	// Gaussian blur shader per-frame data
+	VkDescriptorPool GaussianVDescriptorPool;
+	VkuDescriptorSet_t GaussianVDescriptorSet;
+	VkDescriptorPool GaussianHDescriptorPool;
+	VkuDescriptorSet_t GaussianHDescriptorSet;
+	//////
+
 	// Compositing shader per-frame data
 	VkDescriptorPool CompositeDescriptorPool;
 	VkuDescriptorSet_t CompositeDescriptorSet;
