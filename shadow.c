@@ -169,7 +169,7 @@ void ShadowUpdateMap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 		.renderPass=ShadowRenderPass,
 		.framebuffer=ShadowFrameBuffer,
 		.clearValueCount=1,
-		.pClearValues=(VkClearValue[]){ { 1.0f, 0 } },
+		.pClearValues=(VkClearValue[]){ {{{ 1.0f, 0 }}} },
 		.renderArea.offset=(VkOffset2D){ 0, 0 },
 		.renderArea.extent=(VkExtent2D){ ShadowSize, ShadowSize },
 	}, VK_SUBPASS_CONTENTS_INLINE);

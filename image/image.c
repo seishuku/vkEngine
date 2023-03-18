@@ -282,7 +282,7 @@ static bool _Resize(VkuImage_t *Src, VkuImage_t *Dst)
 					else
 						xPercent=(ix+1)-fx;
 
-					float Percent=xPercent*xPercent;
+					float Percent=xPercent*yPercent;
 					Sum+=Percent;
 
 					uint32_t Index=min(Src->Height-1, iy)*Src->Width+min(Src->Width-1, ix);

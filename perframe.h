@@ -16,21 +16,21 @@ typedef struct
 typedef struct
 {
 	// Thresholding shader per-frame data
-	VkDescriptorPool ThresholdDescriptorPool;
 	VkuDescriptorSet_t ThresholdDescriptorSet;
 	//////
 
 	// Gaussian blur shader per-frame data
-	VkDescriptorPool GaussianVDescriptorPool;
 	VkuDescriptorSet_t GaussianVDescriptorSet;
-	VkDescriptorPool GaussianHDescriptorPool;
 	VkuDescriptorSet_t GaussianHDescriptorSet;
 	//////
 
 	// Compositing shader per-frame data
-	VkDescriptorPool CompositeDescriptorPool;
 	VkuDescriptorSet_t CompositeDescriptorSet;
 	VkFramebuffer CompositeFramebuffer;
+	//////
+
+	// Volume render per-frame, per-eye data
+	VkuDescriptorSet_t VolumeDescriptorSet;
 	//////
 
 	// Skybox per-frame, per-eye data
@@ -44,6 +44,9 @@ typedef struct
 	VkuBuffer_t uboBuffer[2];
 	VkuDescriptorSet_t DescriptorSet;
 	//////
+
+	// Descriptor pool
+	VkDescriptorPool DescriptorPool;
 
 	// Command buffer
 	VkCommandPool CommandPool;

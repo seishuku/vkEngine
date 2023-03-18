@@ -107,18 +107,8 @@ bool CreateThresholdPipeline(void)
 
 	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
-		vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-			.maxSets=1,
-			.poolSizeCount=1,
-			.pPoolSizes=(VkDescriptorPoolSize[]){ { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2 } },
-		}, VK_NULL_HANDLE, &PerFrame[i].ThresholdDescriptorPool);
-
 		vkuInitDescriptorSet(&PerFrame[i].ThresholdDescriptorSet, &Context);
-
 		vkuDescriptorSet_AddBinding(&PerFrame[i].ThresholdDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-
 		vkuAssembleDescriptorSetLayout(&PerFrame[i].ThresholdDescriptorSet);
 	}
 
@@ -227,32 +217,12 @@ bool CreateGaussianPipeline(void)
 
 	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
-		vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-			.maxSets=1,
-			.poolSizeCount=1,
-			.pPoolSizes=(VkDescriptorPoolSize[]){ { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2 } },
-		}, VK_NULL_HANDLE, &PerFrame[i].GaussianVDescriptorPool);
-
 		vkuInitDescriptorSet(&PerFrame[i].GaussianVDescriptorSet, &Context);
-
 		vkuDescriptorSet_AddBinding(&PerFrame[i].GaussianVDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-
 		vkuAssembleDescriptorSetLayout(&PerFrame[i].GaussianVDescriptorSet);
 
-		vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-			.maxSets=1,
-			.poolSizeCount=1,
-			.pPoolSizes=(VkDescriptorPoolSize[]){ { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2 } },
-		}, VK_NULL_HANDLE, &PerFrame[i].GaussianHDescriptorPool);
-
 		vkuInitDescriptorSet(&PerFrame[i].GaussianHDescriptorSet, &Context);
-
 		vkuDescriptorSet_AddBinding(&PerFrame[i].GaussianHDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-
 		vkuAssembleDescriptorSetLayout(&PerFrame[i].GaussianHDescriptorSet);
 	}
 
@@ -334,14 +304,6 @@ bool CreateCompositePipeline(void)
 			.layers=1,
 		}, 0, &PerFrame[i].CompositeFramebuffer);
 
-		vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-			.maxSets=1,
-			.poolSizeCount=1,
-			.pPoolSizes=(VkDescriptorPoolSize[]) { { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2 } },
-		}, VK_NULL_HANDLE, &PerFrame[i].CompositeDescriptorPool);
-
 		vkuInitDescriptorSet(&PerFrame[i].CompositeDescriptorSet, &Context);
 
 		vkuDescriptorSet_AddBinding(&PerFrame[i].CompositeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -393,15 +355,13 @@ void CompositeDraw(uint32_t Index)
 	// Threshold and down sample to 1/4 original image size
 	// Input = ColorResolve
 	// Output = ColorBlur
-	vkResetDescriptorPool(Context.Device, PerFrame[Index].ThresholdDescriptorPool, 0);
-
 	vkCmdBeginRenderPass(PerFrame[Index].CommandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=ThresholdRenderPass,
 		.framebuffer=ThresholdFramebuffer,
 		.clearValueCount=1,
-		.pClearValues=(VkClearValue[]){ { 1.0f, 0.0f, 0.0f, 1.0f } },
+		.pClearValues=(VkClearValue[]){ {{{ 1.0f, 0.0f, 0.0f, 1.0f }}} },
 		.renderArea={ { 0, 0 }, { rtWidth>>2, rtHeight>>2 } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -412,7 +372,7 @@ void CompositeDraw(uint32_t Index)
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&PerFrame[Index].ThresholdDescriptorSet, 0, &ColorResolve[0]);
 
-	vkuAllocateUpdateDescriptorSet(&PerFrame[Index].ThresholdDescriptorSet, PerFrame[Index].ThresholdDescriptorPool);
+	vkuAllocateUpdateDescriptorSet(&PerFrame[Index].ThresholdDescriptorSet, PerFrame[Index].DescriptorPool);
 	vkCmdBindDescriptorSets(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ThresholdPipelineLayout, 0, 1, &PerFrame[Index].ThresholdDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
 	vkCmdDraw(PerFrame[Index].CommandBuffer, 3, 1, 0, 0);
@@ -423,15 +383,13 @@ void CompositeDraw(uint32_t Index)
 	// Gaussian blur (vertical)
 	// Input = ColorBlur
 	// Output = ColorTemp
-	vkResetDescriptorPool(Context.Device, PerFrame[Index].GaussianVDescriptorPool, 0);
-
 	vkCmdBeginRenderPass(PerFrame[Index].CommandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=GaussianRenderPass,
 		.framebuffer=GaussianFramebufferTemp,
 		.clearValueCount=1,
-		.pClearValues=(VkClearValue[]){ { 1.0f, 0.0f, 0.0f, 1.0f } },
+		.pClearValues=(VkClearValue[]){ {{{ 1.0f, 0.0f, 0.0f, 1.0f }}} },
 		.renderArea={ { 0, 0 }, { rtWidth>>2, rtHeight>>2 } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -444,7 +402,7 @@ void CompositeDraw(uint32_t Index)
 
 	vkCmdPushConstants(PerFrame[Index].CommandBuffer, GaussianPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &(vec2){ 1.0f, 0.0 });
 
-	vkuAllocateUpdateDescriptorSet(&PerFrame[Index].GaussianVDescriptorSet, PerFrame[Index].GaussianVDescriptorPool);
+	vkuAllocateUpdateDescriptorSet(&PerFrame[Index].GaussianVDescriptorSet, PerFrame[Index].DescriptorPool);
 	vkCmdBindDescriptorSets(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GaussianPipelineLayout, 0, 1, &PerFrame[Index].GaussianVDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
 	vkCmdDraw(PerFrame[Index].CommandBuffer, 3, 1, 0, 0);
@@ -455,15 +413,13 @@ void CompositeDraw(uint32_t Index)
 	// Gaussian blur (horizontal)
 	// Input = ColorBlur
 	// Output = ColorTemp
-	vkResetDescriptorPool(Context.Device, PerFrame[Index].GaussianHDescriptorPool, 0);
-
 	vkCmdBeginRenderPass(PerFrame[Index].CommandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=GaussianRenderPass,
 		.framebuffer=GaussianFramebufferBlur,
 		.clearValueCount=1,
-		.pClearValues=(VkClearValue[]){ { 1.0f, 0.0f, 0.0f, 1.0f } },
+		.pClearValues=(VkClearValue[]){ {{{ 1.0f, 0.0f, 0.0f, 1.0f }}} },
 		.renderArea={ { 0, 0 }, { rtWidth>>2, rtHeight>>2 } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -476,7 +432,7 @@ void CompositeDraw(uint32_t Index)
 
 	vkCmdPushConstants(PerFrame[Index].CommandBuffer, GaussianPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &(vec2){ 0.0f, 1.0 });
 
-	vkuAllocateUpdateDescriptorSet(&PerFrame[Index].GaussianHDescriptorSet, PerFrame[Index].GaussianHDescriptorPool);
+	vkuAllocateUpdateDescriptorSet(&PerFrame[Index].GaussianHDescriptorSet, PerFrame[Index].DescriptorPool);
 	vkCmdBindDescriptorSets(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GaussianPipelineLayout, 0, 1, &PerFrame[Index].GaussianHDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
 	vkCmdDraw(PerFrame[Index].CommandBuffer, 3, 1, 0, 0);
@@ -487,15 +443,13 @@ void CompositeDraw(uint32_t Index)
 	// Draw final composited image
 	// Input = ColorResolve, ColorBlur
 	// Output = Swapchain
-	vkResetDescriptorPool(Context.Device, PerFrame[Index].CompositeDescriptorPool, 0);
-
 	vkCmdBeginRenderPass(PerFrame[Index].CommandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=CompositeRenderPass,
 		.framebuffer=PerFrame[Index].CompositeFramebuffer,
 		.clearValueCount=1,
-		.pClearValues=(VkClearValue[]){ { 0.0f, 0.0f, 0.0f, 1.0f } },
+		.pClearValues=(VkClearValue[]){ {{{ 0.0f, 0.0f, 0.0f, 1.0f }}} },
 		.renderArea={ { 0, 0 }, { Width, Height } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -507,7 +461,7 @@ void CompositeDraw(uint32_t Index)
 	vkuDescriptorSet_UpdateBindingImageInfo(&PerFrame[Index].CompositeDescriptorSet, 0, &ColorResolve[0]);
 	vkuDescriptorSet_UpdateBindingImageInfo(&PerFrame[Index].CompositeDescriptorSet, 1, &ColorBlur[0]);
 
-	vkuAllocateUpdateDescriptorSet(&PerFrame[Index].CompositeDescriptorSet, PerFrame[Index].CompositeDescriptorPool);
+	vkuAllocateUpdateDescriptorSet(&PerFrame[Index].CompositeDescriptorSet, PerFrame[Index].DescriptorPool);
 	vkCmdBindDescriptorSets(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CompositePipelineLayout, 0, 1, &PerFrame[Index].CompositeDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
 	vkCmdDraw(PerFrame[Index].CommandBuffer, 3, 1, 0, 0);

@@ -289,5 +289,11 @@
     <GLSL Include="shaders\fullscreen.vert">
       <Filter>Shaders</Filter>
     </GLSL>
+    <GLSL Include="shaders\volume.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\volume.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
   </ItemGroup>
 </Project>

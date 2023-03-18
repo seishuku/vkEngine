@@ -75,6 +75,11 @@ VkuPipeline_t Pipeline;
 VkRenderPass RenderPass;
 //////
 
+// Volume rendering
+VkPipelineLayout VolumePipelineLayout;
+VkuPipeline_t VolumePipeline;
+//////
+
 // Asteroid data
 VkuBuffer_t Asteroid_Instance;
 
@@ -139,8 +144,8 @@ void vkuCreateTexture2D(VkuImage_t *Image, uint32_t Width, uint32_t Height, VkFo
 	{
 		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 		.magFilter=VK_FILTER_LINEAR,
-		.minFilter=VK_FILTER_NEAREST,
-		.mipmapMode=VK_FILTER_LINEAR,
+		.minFilter=VK_FILTER_LINEAR,
+		.mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR,
 		.addressModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
@@ -195,7 +200,7 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 	vkuCreateImageBuffer(&Context, &DepthImage[Eye],
 						 VK_IMAGE_TYPE_2D, DepthFormat, 1, 1, targetWidth, targetHeight, 1,
 						 MSAA, VK_IMAGE_TILING_OPTIMAL,
-						 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+						 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 						 0);
 
@@ -209,7 +214,7 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 		.components.g=VK_COMPONENT_SWIZZLE_G,
 		.components.b=VK_COMPONENT_SWIZZLE_B,
 		.components.a=VK_COMPONENT_SWIZZLE_A,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT,
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
 		.subresourceRange.baseMipLevel=0,
 		.subresourceRange.levelCount=1,
 		.subresourceRange.baseArrayLayer=0,
@@ -217,6 +222,24 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 		.viewType=VK_IMAGE_VIEW_TYPE_2D,
 		.flags=0,
 	}, NULL, &DepthImage[Eye].View);
+
+	vkCreateSampler(Context.Device, &(VkSamplerCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+		.magFilter=VK_FILTER_LINEAR,
+		.minFilter=VK_FILTER_LINEAR,
+		.mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.addressModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.mipLodBias=0.0f,
+		.compareOp=VK_COMPARE_OP_NEVER,
+		.minLod=0.0f,
+		.maxLod=VK_LOD_CLAMP_NONE,
+		.maxAnisotropy=1.0f,
+		.anisotropyEnable=VK_FALSE,
+		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+	}, VK_NULL_HANDLE, &DepthImage[Eye].Sampler);
 
 	vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
 	{
@@ -397,9 +420,60 @@ bool CreatePipeline(void)
 	return true;
 }
 
+bool CreateVolumePipeline(void)
+{
+	for(uint32_t i=0;i<Swapchain.NumImages;i++)
+	{
+		vkuInitDescriptorSet(&PerFrame[i].VolumeDescriptorSet, &Context);
+//		vkuDescriptorSet_AddBinding(&PerFrame[i].VolumeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+		vkuAssembleDescriptorSetLayout(&PerFrame[i].VolumeDescriptorSet);
+	}
+
+	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+		.setLayoutCount=1,
+		.pSetLayouts=&PerFrame[0].VolumeDescriptorSet.DescriptorSetLayout, // Just use the first in the set, they're all the same layout
+		.pushConstantRangeCount=1,
+		.pPushConstantRanges=&(VkPushConstantRange)
+		{
+			.offset=0,
+			.size=sizeof(matrix)*2+sizeof(uint32_t),
+			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
+	}, 0, &VolumePipelineLayout);
+
+	vkuInitPipeline(&VolumePipeline, &Context);
+
+	vkuPipeline_SetPipelineLayout(&VolumePipeline, VolumePipelineLayout);
+	vkuPipeline_SetRenderPass(&VolumePipeline, RenderPass);
+
+	VolumePipeline.DepthTest=VK_TRUE;
+//	VolumePipeline.DepthWrite=VK_FALSE;
+	VolumePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+	VolumePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
+	VolumePipeline.RasterizationSamples=MSAA;
+
+	VolumePipeline.Blend=VK_TRUE;
+	VolumePipeline.SrcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
+	VolumePipeline.DstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+	VolumePipeline.ColorBlendOp=VK_BLEND_OP_ADD;
+
+	if(!vkuPipeline_AddStage(&VolumePipeline, "./shaders/volume.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+		return false;
+
+	if(!vkuPipeline_AddStage(&VolumePipeline, "./shaders/volume.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+		return false;
+
+	if(!vkuAssemblePipeline(&VolumePipeline))
+		return false;
+
+	return true;
+}
+
 float RandFloat(void)
 {
-	return (float)rand()/RAND_MAX;
+	return (float)rand()/(float)RAND_MAX;
 }
 
 bool SphereSphereIntersect(vec3 PositionA, float RadiusA, vec3 PositionB, float RadiusB)
@@ -662,6 +736,8 @@ void Thread_Skybox(void *Arg)
 	pthread_barrier_wait(&ThreadBarrier);
 }
 
+uint32_t uFrame=0;
+
 void Thread_Particles(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
@@ -689,34 +765,26 @@ void Thread_Particles(void *Arg)
 	MatrixMult(PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->HMD, Modelview);
 	ParticleSystem_Draw(&ParticleSystem, Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Data->PerFrame[Data->Index].DescriptorPool[Data->Eye], Modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
 
-	vkEndCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye]);
+	vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, VolumePipeline.Pipeline);
 
-	pthread_barrier_wait(&ThreadBarrier);
-}
-
-void Thread_Font(void *Arg)
-{
-	ThreadData_t *Data=(ThreadData_t *)Arg;
-
-	vkResetCommandPool(Context.Device, Data->PerFrame[Data->Index].CommandPool[Data->Eye], 0);
-
-	vkBeginCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], &(VkCommandBufferBeginInfo)
+	struct
 	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
-		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-			.pNext=NULL,
-			.renderPass=RenderPass,
-			.framebuffer=Framebuffers[Data->Eye]
-		}
-	});
+		matrix modelview;
+		matrix projection;
+		uint32_t uFrame;
+	} VolumePC;
 
-	vkCmdSetViewport(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)rtWidth, (float)rtHeight, 0.0f, 1.0f });
-	vkCmdSetScissor(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { rtWidth, rtHeight } });
+	memcpy(VolumePC.modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview, sizeof(matrix));
+	memcpy(VolumePC.projection, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection, sizeof(matrix));
+	VolumePC.uFrame=uFrame++;
 
-	Font_Print(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Data->Eye, 0.0f, 16.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep);
+	vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VolumePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VolumePC), &VolumePC);
+
+//	vkuDescriptorSet_UpdateBindingImageInfo(&PerFrame[Data->Index].VolumeDescriptorSet, 0, &DepthImage[Data->Eye]);
+	vkuAllocateUpdateDescriptorSet(&PerFrame[Data->Index].VolumeDescriptorSet, Data->PerFrame[Data->Index].DescriptorPool[Data->Eye]);
+	vkCmdBindDescriptorSets(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, VolumePipelineLayout, 0, 1, &PerFrame[Data->Index].VolumeDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
+
+	vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 12*3, 1, 0, 0);
 
 	vkEndCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye]);
 
@@ -751,7 +819,7 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 		.renderPass=RenderPass,
 		.framebuffer=Framebuffers[Eye],
 		.clearValueCount=2,
-		.pClearValues=(VkClearValue[]){ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0 } },
+		.pClearValues=(VkClearValue[]){ {{{ 0.0f, 0.0f, 0.0f, 1.0f }}}, {{{ 0.0f, 0 }}} },
 		.renderArea=(VkRect2D){ { 0, 0 }, { rtWidth, rtHeight } },
 	}, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
@@ -828,6 +896,7 @@ void Render(void)
 
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(Context.Device, 1, &PerFrame[Index].FrameFence);
+	vkResetDescriptorPool(Context.Device, PerFrame[Index].DescriptorPool, 0);
 	vkResetCommandPool(Context.Device, PerFrame[Index].CommandPool, 0);
 
 	// Start recording the commands
@@ -1029,6 +1098,7 @@ bool Init(void)
 
 	// Create compositing pipeline
 	CreateCompositePipeline();
+	CreateVolumePipeline();
 
 	// Second eye framebuffer for VR
 	if(IsVR)
@@ -1046,6 +1116,33 @@ bool Init(void)
 
 		// Semaphore for render complete, to signal when we can render again
 		vkCreateSemaphore(Context.Device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &PerFrame[i].RenderCompleteSemaphore);
+
+		// Per-frame descriptor pool for main thread
+		vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+			.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
+			.poolSizeCount=4,
+			.pPoolSizes=(VkDescriptorPoolSize[])
+			{
+				{
+					.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+					.descriptorCount=1024, // Max number of this descriptor type that can be in each descriptor set?
+				},
+				{
+					.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+					.descriptorCount=1024,
+				},
+				{
+					.type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+					.descriptorCount=1024,
+				},
+				{
+					.type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+					.descriptorCount=1024,
+				},
+			},
+		}, VK_NULL_HANDLE, &PerFrame[i].DescriptorPool);
 
 		// Create per-frame command pools
 		vkCreateCommandPool(Context.Device, &(VkCommandPoolCreateInfo)
@@ -1202,7 +1299,6 @@ void Destroy(void)
 	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
 		vkDestroyDescriptorSetLayout(Context.Device, PerFrame[i].CompositeDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
-		vkDestroyDescriptorPool(Context.Device, PerFrame[i].CompositeDescriptorPool, VK_NULL_HANDLE);
 		vkDestroyFramebuffer(Context.Device, PerFrame[i].CompositeFramebuffer, VK_NULL_HANDLE);
 	}
 

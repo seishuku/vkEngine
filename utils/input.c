@@ -23,11 +23,11 @@ void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle
 	Vec3_Sets(Particle->pos, 0.0f);
 
 	// Simple -1.0 to 1.0 random spherical pattern, scaled by 100, fairly short lifespan.
-	Vec3_Set(Particle->vel, ((float)rand()/RAND_MAX)*2.0f-1.0f, ((float)rand()/RAND_MAX)*2.0f-1.0f, ((float)rand()/RAND_MAX)*2.0f-1.0f);
+	Vec3_Set(Particle->vel, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
 	Vec3_Normalize(Particle->vel);
 	Vec3_Muls(Particle->vel, 10.0f);
 
-	Particle->life=((float)rand()/RAND_MAX)*2.5f+0.01f;
+	Particle->life=((float)rand()/(float)RAND_MAX)*2.5f+0.01f;
 }
 
 // Launch a "missle"

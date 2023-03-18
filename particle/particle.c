@@ -179,17 +179,17 @@ void ParticleSystem_ResetEmitter(ParticleSystem_t *System, uint32_t ID)
 					else
 					{
 						float SeedRadius=30.0f;
-						float theta=((float)rand()/RAND_MAX)*2.0f*PI;
-						float r=((float)rand()/RAND_MAX)*SeedRadius;
+						float theta=((float)rand()/(float)RAND_MAX)*2.0f*PI;
+						float r=((float)rand()/(float)RAND_MAX)*SeedRadius;
 
 						// Set particle start position to emitter position
 						Vec3_Setv(Emitter->Particles[j].pos, Emitter->Position);
 
 						Emitter->Particles[j].vel[0]=r*sinf(theta);
-						Emitter->Particles[j].vel[1]=((float)rand()/RAND_MAX)*100.0f;
+						Emitter->Particles[j].vel[1]=((float)rand()/(float)RAND_MAX)*100.0f;
 						Emitter->Particles[j].vel[2]=r*cosf(theta);
 
-						Emitter->Particles[j].life=((float)rand()/RAND_MAX)*0.999f+0.001f;
+						Emitter->Particles[j].life=((float)rand()/(float)RAND_MAX)*0.999f+0.001f;
 					}
 				}
 			}
@@ -336,17 +336,17 @@ void ParticleSystem_Step(ParticleSystem_t *System, float dt)
 				else
 				{
 					float SeedRadius=30.0f;
-					float theta=((float)rand()/RAND_MAX)*2.0f*PI;
-					float r=((float)rand()/RAND_MAX)*SeedRadius;
+					float theta=((float)rand()/(float)RAND_MAX)*2.0f*PI;
+					float r=((float)rand()/(float)RAND_MAX)*SeedRadius;
 
 					// Set particle start position to emitter position
 					Vec3_Setv(Emitter->Particles[j].pos, Emitter->Position);
 
 					Emitter->Particles[j].vel[0]=r*sinf(theta);
-					Emitter->Particles[j].vel[1]=((float)rand()/RAND_MAX)*100.0f;
+					Emitter->Particles[j].vel[1]=((float)rand()/(float)RAND_MAX)*100.0f;
 					Emitter->Particles[j].vel[2]=r*cosf(theta);
 
-					Emitter->Particles[j].life=((float)rand()/RAND_MAX)*0.999f+0.001f;
+					Emitter->Particles[j].life=((float)rand()/(float)RAND_MAX)*0.999f+0.001f;
 				}
 			}
 			else

@@ -142,7 +142,7 @@ bool TGA_Write(const char *filename, VkuImage_t *Image, bool rle)
 	fwrite(&ColorMapLength, sizeof(uint16_t), 1, stream);
 	fwrite(&ColorMapDepth, sizeof(uint8_t), 1, stream);
 	fwrite(&XOffset, sizeof(uint16_t), 1, stream);
-	fwrite(&XOffset, sizeof(uint16_t), 1, stream);
+	fwrite(&YOffset, sizeof(uint16_t), 1, stream);
 	fwrite(&Width, sizeof(uint16_t), 1, stream);
 	fwrite(&Height, sizeof(uint16_t), 1, stream);
 	fwrite(&Depth, sizeof(uint8_t), 1, stream);
