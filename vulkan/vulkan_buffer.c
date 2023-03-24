@@ -73,15 +73,84 @@ VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, VkuImage_t *Image,
 	return VK_TRUE;
 }
 
+void vkuCreateTexture2D(VkuContext_t *Context, VkuImage_t *Image, uint32_t Width, uint32_t Height, VkFormat Format, VkSampleCountFlagBits Samples)
+{
+	// Set up some typical usage flags
+	VkBufferUsageFlags UsageFlags=VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	VkImageAspectFlags AspectFlags=VK_IMAGE_ASPECT_COLOR_BIT;
+
+	// If the format is in a range of depth formats, select depth/stencil attachment.
+	// Otherwise it's a color format and thus color attachment.
+	if(Format>=VK_FORMAT_D16_UNORM&&Format<=VK_FORMAT_D32_SFLOAT_S8_UINT)
+	{
+		UsageFlags|=VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+		AspectFlags=VK_IMAGE_ASPECT_DEPTH_BIT;
+
+		if(Format>=VK_FORMAT_S8_UINT)
+			AspectFlags|=VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+	else
+		UsageFlags|=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+	// Create the image buffer and memory
+	vkuCreateImageBuffer(Context, Image,
+						 VK_IMAGE_TYPE_2D, Format, 1, 1, Width, Height, 1,
+						 Samples, VK_IMAGE_TILING_OPTIMAL, UsageFlags,
+						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
+
+	// Create image view for the image buffer
+	vkCreateImageView(Context->Device, &(VkImageViewCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.pNext=NULL,
+			.image=Image->Image,
+			.format=Format,
+			.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
+			.subresourceRange.aspectMask=AspectFlags,
+			.subresourceRange.baseMipLevel=0,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.baseArrayLayer=0,
+			.subresourceRange.layerCount=1,
+			.viewType=VK_IMAGE_VIEW_TYPE_2D,
+			.flags=0,
+	}, NULL, &Image->View);
+
+	vkCreateSampler(Context->Device, &(VkSamplerCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+			.magFilter=VK_FILTER_LINEAR,
+			.minFilter=VK_FILTER_LINEAR,
+			.mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR,
+			.addressModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			.mipLodBias=0.0f,
+			.compareOp=VK_COMPARE_OP_NEVER,
+			.minLod=0.0f,
+			.maxLod=VK_LOD_CLAMP_NONE,
+			.maxAnisotropy=1.0f,
+			.anisotropyEnable=VK_FALSE,
+			.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+	}, VK_NULL_HANDLE, &Image->Sampler);
+}
+
 void vkuDestroyImageBuffer(VkuContext_t *Context, VkuImage_t *Image)
 {
 	if(Context==NULL||Image==NULL)
 		return;
 
-	vkDestroySampler(Context->Device, Image->Sampler, VK_NULL_HANDLE);
-	vkDestroyImageView(Context->Device, Image->View, VK_NULL_HANDLE);
-	vkDestroyImage(Context->Device, Image->Image, VK_NULL_HANDLE);
-	vkuMem_Free(VkZone, Image->DeviceMemory);
+	if(Image->Sampler)
+		vkDestroySampler(Context->Device, Image->Sampler, VK_NULL_HANDLE);
+
+	if(Image->View)
+		vkDestroyImageView(Context->Device, Image->View, VK_NULL_HANDLE);
+
+	if(Image->Image)
+		vkDestroyImage(Context->Device, Image->Image, VK_NULL_HANDLE);
+
+	if(Image->DeviceMemory)
+		vkuMem_Free(VkZone, Image->DeviceMemory);
 }
 
 VkBool32 vkuCreateHostBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags)
@@ -164,7 +233,8 @@ void vkuDestroyBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer)
 	if(Context==NULL||Buffer==NULL)
 		return;
 
-	vkDestroyBuffer(Context->Device, Buffer->Buffer, VK_NULL_HANDLE);
+	if(Buffer->Buffer)
+		vkDestroyBuffer(Context->Device, Buffer->Buffer, VK_NULL_HANDLE);
 
 	if(Buffer->DeviceMemory)
 		vkFreeMemory(Context->Device, Buffer->DeviceMemory, VK_NULL_HANDLE);

@@ -71,17 +71,19 @@ VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *Descriptor
 }
 
 // Initalize the descriptor set layout structures
-VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *DescriptorSetLayout, VkuContext_t *Context)
+VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *DescriptorSet, VkuContext_t *Context)
 {
-	if(!DescriptorSetLayout||!Context)
+	if(!DescriptorSet||!Context)
 		return VK_FALSE;
 
-	DescriptorSetLayout->Device=Context->Device;
+	DescriptorSet->Device=Context->Device;
 
-	DescriptorSetLayout->NumBindings=0;
+	DescriptorSet->NumBindings=0;
 
-	memset(DescriptorSetLayout->Bindings, 0, sizeof(VkDescriptorSetLayout)*VKU_MAX_DESCRIPTORSET_BINDINGS);
-	memset(DescriptorSetLayout->WriteDescriptorSet, 0, sizeof(VkWriteDescriptorSet)*VKU_MAX_DESCRIPTORSET_BINDINGS);
+	memset(DescriptorSet->Bindings, 0, sizeof(VkDescriptorSetLayout)*VKU_MAX_DESCRIPTORSET_BINDINGS);
+	memset(DescriptorSet->WriteDescriptorSet, 0, sizeof(VkWriteDescriptorSet)*VKU_MAX_DESCRIPTORSET_BINDINGS);
+
+	DescriptorSet->DescriptorSet=VK_NULL_HANDLE;
 
 	return VK_TRUE;
 }
@@ -115,7 +117,7 @@ VkBool32 vkuAllocateUpdateDescriptorSet(VkuDescriptorSet_t *DescriptorSet, VkDes
 		.pSetLayouts=&DescriptorSet->DescriptorSetLayout,
 	};
 
-//	if(!DescriptorSet->DescriptorSet)
+	//if(DescriptorSet->DescriptorSet==VK_NULL_HANDLE)
 		vkAllocateDescriptorSets(DescriptorSet->Device, &AllocateInfo, &DescriptorSet->DescriptorSet);
 
 	// Need to update destination set handle now that one has been allocated.

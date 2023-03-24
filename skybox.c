@@ -14,6 +14,7 @@ extern VkRenderPass RenderPass;
 extern VkSampleCountFlags MSAA;
 extern VkuSwapchain_t Swapchain;
 
+VkuDescriptorSet_t SkyboxDescriptorSet;
 VkPipelineLayout SkyboxPipelineLayout;
 VkuPipeline_t SkyboxPipeline;
 
@@ -26,17 +27,17 @@ bool CreateSkyboxPipeline(void)
 
 		vkuCreateHostBuffer(&Context, &PerFrame[i].Skybox_UBO_Buffer[1], sizeof(Skybox_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 		vkMapMemory(Context.Device, PerFrame[i].Skybox_UBO_Buffer[1].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&PerFrame[i].Skybox_UBO[1]);
-
-		vkuInitDescriptorSet(&PerFrame[i].SkyboxDescriptorSet, &Context);
-		vkuDescriptorSet_AddBinding(&PerFrame[i].SkyboxDescriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
-		vkuAssembleDescriptorSetLayout(&PerFrame[i].SkyboxDescriptorSet);
 	}
+
+	vkuInitDescriptorSet(&SkyboxDescriptorSet, &Context);
+	vkuDescriptorSet_AddBinding(&SkyboxDescriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuAssembleDescriptorSetLayout(&SkyboxDescriptorSet);
 
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
-		.pSetLayouts=&PerFrame[0].SkyboxDescriptorSet.DescriptorSetLayout,
+		.pSetLayouts=&SkyboxDescriptorSet.DescriptorSetLayout,
 		.pushConstantRangeCount=0,
 	}, 0, &SkyboxPipelineLayout);
 
@@ -56,9 +57,6 @@ bool CreateSkyboxPipeline(void)
 	if(!vkuPipeline_AddStage(&SkyboxPipeline, "./shaders/skybox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
-	//vkuPipeline_AddVertexBinding(&SkyboxPipeline, 0, sizeof(float)*4, VK_VERTEX_INPUT_RATE_VERTEX);
-	//vkuPipeline_AddVertexAttribute(&SkyboxPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-
 	if(!vkuAssemblePipeline(&SkyboxPipeline))
 		return false;
 
@@ -74,10 +72,9 @@ void DestroySkybox(void)
 
 		vkUnmapMemory(Context.Device, PerFrame[i].Skybox_UBO_Buffer[1].DeviceMemory);
 		vkuDestroyBuffer(&Context, &PerFrame[i].Skybox_UBO_Buffer[1]);
-
-		vkDestroyDescriptorSetLayout(Context.Device, PerFrame[i].SkyboxDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
 	}
 
+	vkDestroyDescriptorSetLayout(Context.Device, SkyboxDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
 	vkDestroyPipeline(Context.Device, SkyboxPipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, SkyboxPipelineLayout, VK_NULL_HANDLE);
 }

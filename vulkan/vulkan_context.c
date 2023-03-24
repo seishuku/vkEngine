@@ -9,6 +9,25 @@
 
 PFN_vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR=VK_NULL_HANDLE;
 
+// Debug messenger callback function
+#ifdef _DEBUG
+VkDebugUtilsMessengerEXT debugMessenger;
+
+static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
+{
+	if(messageSeverity&VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+		DBGPRINTF(DEBUG_ERROR, "\n%s\n", pCallbackData->pMessage);
+	else if(messageSeverity&VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+		DBGPRINTF(DEBUG_WARNING, "\n%s\n", pCallbackData->pMessage);
+	else if(messageSeverity&VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
+		DBGPRINTF(DEBUG_INFO, "\n%s\n", pCallbackData->pMessage);
+	else
+		DBGPRINTF(DEBUG_WARNING, "\n%s\n", pCallbackData->pMessage);
+
+	return VK_FALSE;
+}
+#endif
+
 // Creates a Vulkan Context
 VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 {
@@ -281,6 +300,17 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		.queueFamilyIndex=Context->QueueFamilyIndex,
 	}, VK_NULL_HANDLE, &Context->CommandPool);
 
+#ifdef _DEBUG
+	if(vkCreateDebugUtilsMessengerEXT(Instance, &(VkDebugUtilsMessengerCreateInfoEXT)
+	{
+		.sType=VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+		.messageSeverity=VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT|VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT|VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+		.messageType=VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT|VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT|VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+		.pfnUserCallback=debugCallback
+	}, VK_NULL_HANDLE, &debugMessenger)!=VK_SUCCESS)
+		return false;
+#endif
+
 	return VK_TRUE;
 }
 
@@ -301,4 +331,8 @@ void DestroyVulkan(VkInstance Instance, VkuContext_t *Context)
 
 	// Destroy rendering surface
 	vkDestroySurfaceKHR(Instance, Context->Surface, VK_NULL_HANDLE);
+
+#ifdef _DEBUG
+	vkDestroyDebugUtilsMessengerEXT(Instance, debugMessenger, VK_NULL_HANDLE);
+#endif
 }

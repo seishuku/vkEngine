@@ -77,16 +77,16 @@ $(TARGET): $(OBJS)
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 %.frag.spv: %.frag
-	glslangValidator -V $< -o $@
+	glslc --target-env=vulkan1.2 -O $< -o $@
 
 %.vert.spv: %.vert
-	glslangValidator -V $< -o $@
+	glslc --target-env=vulkan1.2 -O $< -o $@
 
 %.geom.spv: %.geom
-	glslangValidator -V $< -o $@
+	glslc --target-env=vulkan1.2 -O $< -o $@
 
 %.comp.spv: %.comp
-	glslangValidator -V $< -o $@
+	glslc --target-env=vulkan1.2 -O $< -o $@
 
 clean:
 	$(RM) $(TARGET) $(OBJS) $(SHADERS)
