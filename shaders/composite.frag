@@ -10,5 +10,4 @@ layout(location=0) out vec4 Output;
 void main(void)
 {
 	Output=1.0-exp(-(texture(original, UV)+texture(blur, UV))*1.0);
-//	Output=texture(blur, UV);
 }

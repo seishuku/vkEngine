@@ -16,6 +16,6 @@ extern VkFramebuffer GaussianFramebufferBlur;
 bool CreateCompositePipeline(void);
 void CreateCompositeFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeight);
 void DestroyComposite(void);
-void CompositeDraw(uint32_t Index);
+void CompositeDraw(uint32_t Index, uint32_t Eye);
 
 #endif

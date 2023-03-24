@@ -778,11 +778,15 @@ void Render(void)
 		EyeRender(PerFrame[Index].CommandBuffer, Index, 1, Pose);
 
 	// Final drawing compositing
-	CompositeDraw(Index);
+	CompositeDraw(Index, 0);
 	//////
 
 	if(IsVR)
 	{
+		// Other eye compositing
+		CompositeDraw(Index, 1);
+
+		// Transition layouts into transfer source for OpenVR
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 	}
@@ -820,6 +824,7 @@ void Render(void)
 		return;
 	}
 
+	// Send eye images over to OpenVR
 	if(IsVR)
 	{
 		VRTextureBounds_t bounds={ 0.0f, 0.0f, 1.0f, 1.0f };
