@@ -219,6 +219,7 @@ void vkuDestroyBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer);
 void vkuTransitionLayout(VkCommandBuffer CommandBuffer, VkImage Image, uint32_t levelCount, uint32_t baseLevel, uint32_t layerCount, uint32_t baseLayer, VkImageLayout oldLayout, VkImageLayout newLayout);
 
 VkCommandBuffer vkuOneShotCommandBufferBegin(VkuContext_t *Context);
+VkBool32 vkuOneShotCommandBufferFlush(VkuContext_t *Context, VkCommandBuffer CommandBuffer);
 VkBool32 vkuOneShotCommandBufferEnd(VkuContext_t *Context, VkCommandBuffer CommandBuffer);
 
 VkBool32 vkuPipeline_AddVertexBinding(VkuPipeline_t *Pipeline, uint32_t Binding, uint32_t Stride, VkVertexInputRate InputRate);

@@ -82,6 +82,12 @@
     <Filter Include="Source Files\camera">
       <UniqueIdentifier>{3c6294bb-196d-4d97-a5e5-63e2e9019398}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\audio">
+      <UniqueIdentifier>{10dca050-ae3d-49b8-9a58-90b1ba00a1b9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\audio">
+      <UniqueIdentifier>{9721b6a2-fc81-437e-9309-e0fce1b14420}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="engine.c">
@@ -168,13 +174,16 @@
     <ClCompile Include="composite.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="audio\audio.c">
+      <Filter>Source Files\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="audio\wave.c">
+      <Filter>Source Files\audio</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
       <Filter>Header Files\math</Filter>
-    </ClInclude>
-    <ClInclude Include="font\font.h">
-      <Filter>Header Files\font</Filter>
     </ClInclude>
     <ClInclude Include="image\image.h">
       <Filter>Header Files\image</Filter>
@@ -231,6 +240,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="composite.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="font\font.h">
+      <Filter>Header Files\font</Filter>
+    </ClInclude>
+    <ClInclude Include="audio\audio.h">
+      <Filter>Header Files\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="sounds.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

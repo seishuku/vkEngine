@@ -1,6 +1,8 @@
 #ifndef __PERFRAME_H__
 #define __PERFRAME_H__
 
+#include "vulkan/vulkan.h"
+#include "math/math.h"
 #include "skybox.h"
 
 typedef struct
@@ -11,7 +13,7 @@ typedef struct
 	matrix light_mvp;
 	vec4 light_color;
 	vec4 light_direction;
-} UBO_t;
+} Main_UBO_t;
 
 typedef struct
 {
@@ -21,8 +23,8 @@ typedef struct
 	//////
 
 	// Main render per-frame, per-eye data
-	UBO_t *Main_UBO[2];
-	VkuBuffer_t uboBuffer[2];
+	Main_UBO_t *Main_UBO[2];
+	VkuBuffer_t Main_UBO_Buffer[2];
 	//////
 
 	// Compositor framebuffer

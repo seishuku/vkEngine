@@ -25,6 +25,7 @@
 #define BUFFER_OFFSET(x) ((char *)NULL+(x))
 #endif
 
+#include <stdint.h>
 #include "../utils/memzone.h"
 
 extern MemZone_t *Zone;

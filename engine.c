@@ -18,12 +18,14 @@
 #include "threads/threads.h"
 #include "vr/vr.h"
 #include "font/font.h"
+#include "audio/audio.h"
 #include "models.h"
 #include "textures.h"
 #include "skybox.h"
 #include "shadow.h"
 #include "composite.h"
 #include "perframe.h"
+#include "sounds.h"
 
 uint32_t Width=1920, Height=1080;
 
@@ -40,8 +42,11 @@ extern float fps, fTimeStep, fTime;
 
 ParticleSystem_t ParticleSystem;
 
-BModel_t Model[NUM_MODELS];
+BModel_t Models[NUM_MODELS];
+
 VkuImage_t Textures[NUM_TEXTURES];
+
+Sample_t Sounds[NUM_SOUNDS];
 
 // Swapchain
 VkuSwapchain_t Swapchain;
@@ -50,7 +55,7 @@ VkuSwapchain_t Swapchain;
 VkSampleCountFlags MSAA=VK_SAMPLE_COUNT_4_BIT;
 
 // Colorbuffer image
-VkFormat ColorFormat=VK_FORMAT_R32G32B32A32_SFLOAT;
+VkFormat ColorFormat=VK_FORMAT_R16G16B16A16_SFLOAT;
 VkuImage_t ColorImage[2];		// left and right eye color buffer
 
 // Depth buffer image
@@ -92,8 +97,8 @@ typedef struct
 	uint32_t Index, Eye;
 	struct
 	{
-		VkCommandPool CommandPool[2];
 		VkDescriptorPool DescriptorPool[2];
+		VkCommandPool CommandPool[2];
 		VkCommandBuffer SecCommandBuffer[2];
 	} PerFrame[VKU_MAX_FRAME_COUNT];
 } ThreadData_t;
@@ -220,11 +225,11 @@ bool CreatePipeline(void)
 
 	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
-		vkuCreateHostBuffer(&Context, &PerFrame[i].uboBuffer[0], sizeof(UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		vkMapMemory(Context.Device, PerFrame[i].uboBuffer[0].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&PerFrame[i].Main_UBO[0]);
+		vkuCreateHostBuffer(&Context, &PerFrame[i].Main_UBO_Buffer[0], sizeof(Main_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+		vkMapMemory(Context.Device, PerFrame[i].Main_UBO_Buffer[0].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&PerFrame[i].Main_UBO[0]);
 
-		vkuCreateHostBuffer(&Context, &PerFrame[i].uboBuffer[1], sizeof(UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		vkMapMemory(Context.Device, PerFrame[i].uboBuffer[1].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&PerFrame[i].Main_UBO[1]);
+		vkuCreateHostBuffer(&Context, &PerFrame[i].Main_UBO_Buffer[1], sizeof(Main_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+		vkMapMemory(Context.Device, PerFrame[i].Main_UBO_Buffer[1].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&PerFrame[i].Main_UBO[1]);
 	}
 
 	vkuInitDescriptorSet(&DescriptorSet, &Context);
@@ -233,6 +238,7 @@ bool CreatePipeline(void)
 	vkuDescriptorSet_AddBinding(&DescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&DescriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&DescriptorSet, 3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&DescriptorSet, 4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
 
 	vkuAssembleDescriptorSetLayout(&DescriptorSet);
 
@@ -289,19 +295,20 @@ bool CreateVolumePipeline(void)
 {
 	vkuInitDescriptorSet(&VolumeDescriptorSet, &Context);
 	vkuDescriptorSet_AddBinding(&VolumeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&VolumeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&VolumeDescriptorSet);
 
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
-		.pSetLayouts=&VolumeDescriptorSet.DescriptorSetLayout, // Just use the first in the set, they're all the same layout
+		.pSetLayouts=&VolumeDescriptorSet.DescriptorSetLayout,
 		.pushConstantRangeCount=1,
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
 			.offset=0,
-			.size=sizeof(matrix)*2+sizeof(uint32_t)+sizeof(vec4),
-			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+			.size=sizeof(uint32_t),
+			.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 	}, 0, &VolumePipelineLayout);
 
@@ -459,9 +466,9 @@ void Thread_Constructor(void *Arg)
 			vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-					.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
-					.poolSizeCount=4,
-					.pPoolSizes=(VkDescriptorPoolSize[])
+				.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
+				.poolSizeCount=4,
+				.pPoolSizes=(VkDescriptorPoolSize[])
 				{
 					{
 						.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -533,7 +540,8 @@ void Thread_Main(void *Arg)
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet, 0, &Textures[2*i+0]);
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet, 1, &Textures[2*i+1]);
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet, 2, &ShadowDepth);
-		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet, 3, PerFrame[Data->Index].uboBuffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet, 3, PerFrame[Data->Index].Main_UBO_Buffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet, 4, PerFrame[Data->Index].Skybox_UBO_Buffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
 		vkuAllocateUpdateDescriptorSet(&DescriptorSet, Data->PerFrame[Data->Index].DescriptorPool[Data->Eye]);
 
 		vkCmdBindDescriptorSets(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
@@ -546,12 +554,12 @@ void Thread_Main(void *Arg)
 		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(matrix), &local);
 
 		// Bind model data buffers and draw the triangles
-		vkCmdBindVertexBuffers(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &Model[i].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
+		vkCmdBindVertexBuffers(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &Models[i].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
 
-		for(uint32_t j=0;j<Model[i].NumMesh;j++)
+		for(uint32_t j=0;j<Models[i].NumMesh;j++)
 		{
-			vkCmdBindIndexBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Model[i].Mesh[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Model[i].Mesh[j].NumFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*i);
+			vkCmdBindIndexBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Models[i].Mesh[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Models[i].Mesh[j].NumFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*i);
 		}
 	}
 
@@ -585,7 +593,8 @@ void Thread_Skybox(void *Arg)
 
 	vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipeline.Pipeline);
 
-	vkuDescriptorSet_UpdateBindingBufferInfo(&SkyboxDescriptorSet, 0, PerFrame[Data->Index].Skybox_UBO_Buffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&SkyboxDescriptorSet, 0, PerFrame[Data->Index].Main_UBO_Buffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&SkyboxDescriptorSet, 1, PerFrame[Data->Index].Skybox_UBO_Buffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
 	vkuAllocateUpdateDescriptorSet(&SkyboxDescriptorSet, Data->PerFrame[Data->Index].DescriptorPool[Data->Eye]);
 
 	vkCmdBindDescriptorSets(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipelineLayout, 0, 1, &SkyboxDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
@@ -628,21 +637,11 @@ void Thread_Particles(void *Arg)
 
 	vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, VolumePipeline.Pipeline);
 
-	struct
-	{
-		matrix modelview;
-		matrix projection;
-		vec4 uSunPosition;
-	} VolumePC;
-
-	memcpy(VolumePC.modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview, sizeof(matrix));
-	memcpy(VolumePC.projection, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection, sizeof(matrix));
-	Vec3_Setv(VolumePC.uSunPosition, PerFrame[Data->Index].Skybox_UBO[Data->Eye]->uSunPosition);
-	VolumePC.uSunPosition[3]=(float)uFrame++;
-
-	vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VolumePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VolumePC), &VolumePC);
+	uFrame++;
+	vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VolumePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t), &uFrame);
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&VolumeDescriptorSet, 0, &Textures[TEXTURE_VOLUME]);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&VolumeDescriptorSet, 1, PerFrame[Data->Index].Main_UBO_Buffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
 	vkuAllocateUpdateDescriptorSet(&VolumeDescriptorSet, Data->PerFrame[Data->Index].DescriptorPool[Data->Eye]);
 	vkCmdBindDescriptorSets(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, VolumePipelineLayout, 0, 1, &VolumeDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
@@ -663,10 +662,6 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	CameraUpdate(&Camera, fTimeStep, PerFrame[Index].Main_UBO[Eye]->modelview);
 
 	memcpy(PerFrame[Index].Main_UBO[Eye]->HMD, Pose, sizeof(matrix));
-	memcpy(PerFrame[Index].Skybox_UBO[Eye]->HMD, PerFrame[Index].Main_UBO[Eye]->HMD, sizeof(matrix));
-
-	memcpy(PerFrame[Index].Skybox_UBO[Eye]->modelview, PerFrame[Index].Main_UBO[Eye]->modelview, sizeof(matrix));
-	memcpy(PerFrame[Index].Skybox_UBO[Eye]->projection, PerFrame[Index].Main_UBO[Eye]->projection, sizeof(matrix));
 
 	Vec3_Setv(PerFrame[Index].Main_UBO[Eye]->light_color, PerFrame[Index].Skybox_UBO[Eye]->uSunColor);
 	Vec3_Setv(PerFrame[Index].Main_UBO[Eye]->light_direction, PerFrame[Index].Skybox_UBO[Eye]->uSunPosition);
@@ -1041,6 +1036,8 @@ VkBool32 LoadVolume(VkuContext_t *Context, VkuImage_t *Image)
 
 bool Init(void)
 {
+	srand(123);
+
 	Event_Add(EVENT_KEYDOWN, Event_KeyDown);
 	Event_Add(EVENT_KEYUP, Event_KeyUp);
 	Event_Add(EVENT_MOUSE, Event_Mouse);
@@ -1052,24 +1049,36 @@ bool Init(void)
 
 	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 2.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
 
+	if(!Audio_Init())
+		return false;
+
+	if(!Audio_LoadStatic("./assets/pew1.wav", &Sounds[SOUND_PEW1]))
+		return false;
+
+	if(!Audio_LoadStatic("./assets/pew2.wav", &Sounds[SOUND_PEW2]))
+		return false;
+
+	if(!Audio_LoadStatic("./assets/pew3.wav", &Sounds[SOUND_PEW3]))
+		return false;
+
 	// Load models
-	if(LoadBModel(&Model[MODEL_ASTEROID1], "./assets/asteroid1.bmodel"))
-		BuildMemoryBuffersBModel(&Context, &Model[MODEL_ASTEROID1]);
+	if(LoadBModel(&Models[MODEL_ASTEROID1], "./assets/asteroid1.bmodel"))
+		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID1]);
 	else
 		return false;
 
-	if(LoadBModel(&Model[MODEL_ASTEROID2], "./assets/asteroid2.bmodel"))
-		BuildMemoryBuffersBModel(&Context, &Model[MODEL_ASTEROID2]);
+	if(LoadBModel(&Models[MODEL_ASTEROID2], "./assets/asteroid2.bmodel"))
+		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID2]);
 	else
 		return false;
 
-	if(LoadBModel(&Model[MODEL_ASTEROID3], "./assets/asteroid3.bmodel"))
-		BuildMemoryBuffersBModel(&Context, &Model[MODEL_ASTEROID3]);
+	if(LoadBModel(&Models[MODEL_ASTEROID3], "./assets/asteroid3.bmodel"))
+		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID3]);
 	else
 		return false;
 
-	if(LoadBModel(&Model[MODEL_ASTEROID4], "./assets/asteroid4.bmodel"))
-		BuildMemoryBuffersBModel(&Context, &Model[MODEL_ASTEROID4]);
+	if(LoadBModel(&Models[MODEL_ASTEROID4], "./assets/asteroid4.bmodel"))
+		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID4]);
 	else
 		return false;
 
@@ -1077,8 +1086,8 @@ bool Init(void)
 
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		for(uint32_t j=0;j<Model[i].NumMesh;j++)
-			TriangleCount+=Model[i].Mesh[j].NumFace;
+		for(uint32_t j=0;j<Models[i].NumMesh;j++)
+			TriangleCount+=Models[i].Mesh[j].NumFace;
 	}
 
 	TriangleCount*=NUM_ASTEROIDS;
@@ -1104,8 +1113,8 @@ bool Init(void)
 	CreateSkyboxPipeline();
 	GenerateSkyParams();
 
-	InitShadowPipeline();
-	InitShadowMap();
+	CreateShadowPipeline();
+	CreateShadowMap();
 
 	// Create compositing pipeline
 	CreateCompositePipeline();
@@ -1266,6 +1275,12 @@ void Destroy(void)
 {
 	vkDeviceWaitIdle(Context.Device);
 
+	Audio_Destroy();
+
+	Zone_Free(Zone, Sounds[SOUND_PEW1].data);
+	Zone_Free(Zone, Sounds[SOUND_PEW2].data);
+	Zone_Free(Zone, Sounds[SOUND_PEW3].data);
+
 	DestroyOpenVR();
 
 	for(uint32_t i=0;i<NUM_THREADS;i++)
@@ -1326,12 +1341,12 @@ void Destroy(void)
 	// 3D Model destruction
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		vkuDestroyBuffer(&Context, &Model[i].VertexBuffer);
+		vkuDestroyBuffer(&Context, &Models[i].VertexBuffer);
 
-		for(uint32_t j=0;j<Model[i].NumMesh;j++)
-			vkuDestroyBuffer(&Context, &Model[i].Mesh[j].IndexBuffer);
+		for(uint32_t j=0;j<Models[i].NumMesh;j++)
+			vkuDestroyBuffer(&Context, &Models[i].Mesh[j].IndexBuffer);
 
-		FreeBModel(&Model[i]);
+		FreeBModel(&Models[i]);
 	}
 	//////////
 
@@ -1348,11 +1363,11 @@ void Destroy(void)
 	// Main render destruction
 	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
-		vkUnmapMemory(Context.Device, PerFrame[i].uboBuffer[0].DeviceMemory);
-		vkuDestroyBuffer(&Context, &PerFrame[i].uboBuffer[0]);
+		vkUnmapMemory(Context.Device, PerFrame[i].Main_UBO_Buffer[0].DeviceMemory);
+		vkuDestroyBuffer(&Context, &PerFrame[i].Main_UBO_Buffer[0]);
 
-		vkUnmapMemory(Context.Device, PerFrame[i].uboBuffer[1].DeviceMemory);
-		vkuDestroyBuffer(&Context, &PerFrame[i].uboBuffer[1]);
+		vkUnmapMemory(Context.Device, PerFrame[i].Main_UBO_Buffer[1].DeviceMemory);
+		vkuDestroyBuffer(&Context, &PerFrame[i].Main_UBO_Buffer[1]);
 	}
 
 	vkDestroyDescriptorSetLayout(Context.Device, DescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);

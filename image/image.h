@@ -1,6 +1,8 @@
 #ifndef __IMAGE_H__
 #define __IMAGE_H__
 
+#include "../vulkan/vulkan.h"
+
 // Image flags
 #define IMAGE_NONE										0x00000000
 #define IMAGE_MIPMAP									0x00000002

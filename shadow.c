@@ -28,16 +28,13 @@ VkuImage_t ShadowDepth;
 VkFramebuffer ShadowFrameBuffer;
 VkFormat ShadowDepthFormat=VK_FORMAT_D32_SFLOAT;
 
-void InitShadowMap(void)
+void CreateShadowMap(void)
 {
 	// Depth render target
-	vkuCreateImageBuffer(&Context, &ShadowDepth,
-						 VK_IMAGE_TYPE_2D, ShadowDepthFormat, 1, 1, ShadowSize, ShadowSize, 1,
-						 VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
-						 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT|VK_IMAGE_USAGE_SAMPLED_BIT,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
+	vkuCreateTexture2D(&Context, &ShadowDepth, ShadowSize, ShadowSize, ShadowDepthFormat, VK_SAMPLE_COUNT_1_BIT);
 
-	// Depth texture sampler
+	// Need compare ops, so recreate the sampler
+	vkDestroySampler(Context.Device, ShadowDepth.Sampler, VK_NULL_HANDLE);
 	vkCreateSampler(Context.Device, &(VkSamplerCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -57,20 +54,6 @@ void InitShadowMap(void)
 		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
 	}, VK_NULL_HANDLE, &ShadowDepth.Sampler);
 
-	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.viewType=VK_IMAGE_VIEW_TYPE_2D,
-		.format=ShadowDepthFormat,
-		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.baseArrayLayer=0,
-		.subresourceRange.layerCount=1,
-		.subresourceRange.levelCount=1,
-		.image=ShadowDepth.Image,
-	}, VK_NULL_HANDLE, &ShadowDepth.View);
-
 	vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -83,7 +66,7 @@ void InitShadowMap(void)
 	}, 0, &ShadowFrameBuffer);
 }
 
-bool InitShadowPipeline(void)
+bool CreateShadowPipeline(void)
 {
 	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
 	{
@@ -122,7 +105,7 @@ bool InitShadowPipeline(void)
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
 			.offset=0,
-			.size=sizeof(Shadow_UBO),
+			.size=sizeof(Shadow_UBO_t),
 			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 	}, 0, &ShadowPipelineLayout);
@@ -204,15 +187,15 @@ void ShadowUpdateMap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 		MatrixRotate(fTime, 1.0f, 0.0f, 0.0f, Shadow_UBO.local);
 		MatrixRotate(fTime, 0.0f, 1.0f, 0.0f, Shadow_UBO.local);
 
-		vkCmdPushConstants(CommandBuffer, ShadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Shadow_UBO), &Shadow_UBO);
+		vkCmdPushConstants(CommandBuffer, ShadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Shadow_UBO_t), &Shadow_UBO);
 
 		// Bind model data buffers and draw the triangles
-		vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &Model[j].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
+		vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &Models[j].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
 
-		for(uint32_t k=0;k<Model[j].NumMesh;k++)
+		for(uint32_t k=0;k<Models[j].NumMesh;k++)
 		{
-			vkCmdBindIndexBuffer(CommandBuffer, Model[j].Mesh[k].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(CommandBuffer, Model[j].Mesh[k].NumFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*j);
+			vkCmdBindIndexBuffer(CommandBuffer, Models[j].Mesh[k].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(CommandBuffer, Models[j].Mesh[k].NumFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*j);
 		}
 	}
 

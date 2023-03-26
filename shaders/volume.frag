@@ -5,28 +5,22 @@ layout(location=1) flat in float Scale;
 
 layout(binding=0) uniform sampler3D Volume;
 
-layout(push_constant) uniform pc
+layout(binding=1) uniform MainUBO
 {
-    mat4 mv;
-    mat4 proj;
-	vec4 uSunPosition;
+	mat4 HMD;
+	mat4 projection;
+    mat4 modelview;
+	mat4 light_mvp;
+	vec4 light_color;
+	vec4 light_direction;
+};
+
+layout(push_constant) uniform PC
+{
+	uint uFrame;
 };
 
 layout(location=0) out vec4 Output;
-
-float getSample(vec3 position)
-{
-	return texture(Volume, position*0.5+0.5).r;
-}
-
-vec3 computeGradient(vec3 position, float step)
-{
-	return normalize(vec3(
-		getSample(vec3(position.x+step, position.y, position.z))-getSample(vec3(position.x-step, position.y, position.z)),
-		getSample(vec3(position.x, position.y+step, position.z))-getSample(vec3(position.x, position.y-step, position.z)),
-		getSample(vec3(position.x, position.y, position.z+step))-getSample(vec3(position.x, position.y, position.z-step))
-	));
-}
 
 vec2 intersectBox(vec3 origin, vec3 direction)
 {
@@ -81,15 +75,10 @@ vec3 TurboColormap(in float x)
 	);
 }
 
-vec3 transformDir(mat4 transform, vec3 dir)
-{
-	return normalize(transform * vec4(dir, 0.0)).xyz;
-}
-
 void main()
 {
-    vec3 ray_origin=-inverse(mv)[3].xyz/Scale;
-    vec3 ray_direction=normalize(inverse(mv)[3].xyz-Position);
+    vec3 ray_origin=-inverse(modelview)[3].xyz/Scale;
+    vec3 ray_direction=normalize(inverse(modelview)[3].xyz-Position);
 
     vec2 hit=intersectBox(ray_origin, ray_direction);
 
@@ -104,18 +93,17 @@ void main()
 	vec3 dt_vec=1.0/(vec3(Scale)*abs(ray_direction));
 	float stepSize=min(dt_vec.x, min(dt_vec.y, dt_vec.z))*4.0;
 
-	uint seed=uint(gl_FragCoord.x*1452.0+gl_FragCoord.y*734.0+uSunPosition.w*9525.0);
+	uint seed=uint(gl_FragCoord.x*1452.0+gl_FragCoord.y*734.0+uFrame*9525.0);
 	float random=randomFloat(seed);
 
 	Output=vec4(0.0);
-	vec3 pos;
 
 	for(float dist=hit.x;dist<hit.y;dist+=stepSize)
 	{
-		pos=ray_origin+ray_direction*(dist+stepSize*random);
+		vec3 pos=ray_origin+ray_direction*(dist+stepSize*random);
 
-		float val=getSample(pos);
-		vec4 val_color=vec4(TurboColormap(val), pow(val, 1.0));
+		float val=texture(Volume, pos*0.5+0.5).r;
+		vec4 val_color=vec4(TurboColormap(val*5.0), val);
 
 		Output.rgb+=(1.0-Output.a)*val_color.rgb*val_color.a;
 		Output.a+=(1.0-Output.a)*val_color.a;
@@ -124,6 +112,6 @@ void main()
 			break;
 	}
 
-	vec4 depth=proj*mv*vec4(ray_origin+ray_direction*hit.x, 1.0);
+	vec4 depth=projection*modelview*vec4(ray_origin+ray_direction*hit.x, 1.0);
 	gl_FragDepth=depth.z/depth.w;
 }

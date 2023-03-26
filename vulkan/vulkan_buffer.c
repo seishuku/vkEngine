@@ -375,6 +375,54 @@ VkCommandBuffer vkuOneShotCommandBufferBegin(VkuContext_t *Context)
 	return CommandBuffer;
 }
 
+VkBool32 vkuOneShotCommandBufferFlush(VkuContext_t *Context, VkCommandBuffer CommandBuffer)
+{
+	VkFence Fence=VK_NULL_HANDLE;
+
+	// End command buffer and submit
+	VkResult Result=vkEndCommandBuffer(CommandBuffer);
+
+	if(Result!=VK_SUCCESS)
+		return VK_FALSE;
+
+	Result=vkCreateFence(Context->Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &Fence);
+
+	if(Result!=VK_SUCCESS)
+		return VK_FALSE;
+
+	Result=vkQueueSubmit(Context->Queue, 1, &(VkSubmitInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.commandBufferCount=1,
+		.pCommandBuffers=&CommandBuffer,
+	}, Fence);
+
+	if(Result!=VK_SUCCESS)
+		return VK_FALSE;
+
+	// Wait for it to finish
+	Result=vkWaitForFences(Context->Device, 1, &Fence, VK_TRUE, UINT64_MAX);
+
+	if(Result!=VK_SUCCESS)
+		return VK_FALSE;
+
+	vkDestroyFence(Context->Device, Fence, VK_NULL_HANDLE);
+
+	// Reset command buffer state before restarting
+	vkResetCommandBuffer(CommandBuffer, 0);
+
+	// Restart recording command buffer
+	Result=vkBeginCommandBuffer(CommandBuffer, &(VkCommandBufferBeginInfo) {.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO });
+
+	if(Result!=VK_SUCCESS)
+	{
+		vkFreeCommandBuffers(Context->Device, Context->CommandPool, 1, &CommandBuffer);
+		return VK_FALSE;
+	}
+
+	return VK_TRUE;
+}
+
 VkBool32 vkuOneShotCommandBufferEnd(VkuContext_t *Context, VkCommandBuffer CommandBuffer)
 {
 	VkFence Fence=VK_NULL_HANDLE;

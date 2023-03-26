@@ -15,6 +15,14 @@
 #define max(a, b) ((a)>(b)?(a):(b))
 #endif
 
+#ifndef DEG2RAD
+#define DEG2RAD 57.29578049044297f
+#endif
+
+#ifndef RAD2DEG
+#define RAD2DEG 0.01745329222222f
+#endif
+
 typedef float vec2[2];
 typedef float vec3[3];
 typedef float vec4[4];

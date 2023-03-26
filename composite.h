@@ -1,6 +1,8 @@
 #ifndef __COMPOSITE_H__
 #define __COMPOSITE_H__
 
+#include "vulkan/vulkan.h"
+
 extern VkuImage_t ColorResolve[2];
 extern VkuImage_t ColorBlur[2];
 extern VkuImage_t ColorTemp[2];

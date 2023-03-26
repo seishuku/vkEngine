@@ -1,6 +1,8 @@
 #ifndef __MODELS_H__
 #define __MODELS_H__
 
+#include "model/bmodel.h"
+
 enum
 {
 	MODEL_ASTEROID1,
@@ -10,6 +12,6 @@ enum
 	NUM_MODELS
 };
 
-extern BModel_t Model[NUM_MODELS];
+extern BModel_t Models[NUM_MODELS];
 
 #endif

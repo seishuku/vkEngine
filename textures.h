@@ -1,6 +1,8 @@
 #ifndef __TEXTURES_H__
 #define __TEXTURES_H__
 
+#include "vulkan/vulkan.h"
+
 enum
 {
 	TEXTURE_ASTEROID1,

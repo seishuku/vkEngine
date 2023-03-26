@@ -406,7 +406,7 @@ int main(int argc, char **argv)
 	SetRect(&Rect, 0, 0, Width, Height);
 	AdjustWindowRect(&Rect, WS_POPUP, FALSE);
 
-	Context.hWnd=CreateWindow(szAppName, szAppName, WS_POPUP|WS_CLIPSIBLINGS, CW_USEDEFAULT, CW_USEDEFAULT, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
+	Context.hWnd=CreateWindow(szAppName, szAppName, WS_POPUP|WS_CLIPSIBLINGS, 0, 0, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
 
 	RegisterRawInput(Context.hWnd);
 

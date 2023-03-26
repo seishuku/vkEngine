@@ -8,6 +8,8 @@
 #include "../camera/camera.h"
 #include "list.h"
 #include "../particle/particle.h"
+#include "../audio/audio.h"
+#include "../sounds.h"
 #include "input.h"
 
 // External data from engine.c
@@ -70,6 +72,7 @@ void Event_KeyDown(void *Arg)
 	switch(*Key)
 	{
 		case KB_SPACE:
+						Audio_PlaySample(&Sounds[rand()%SOUND_PEW3], false);
 						FireParticleEmitter(Camera.Position, Camera.Forward);
 						break;
 		case KB_P:		GenerateSkyParams();	break;

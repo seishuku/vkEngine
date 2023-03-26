@@ -17,19 +17,6 @@ extern VkRenderPass RenderPass;
 extern VkSampleCountFlags MSAA;
 
 extern VkuMemZone_t *VkZone;
-
-typedef struct
-{
-	matrix HMD;
-	matrix projection;
-	matrix modelview;
-	matrix light_mvp;
-	vec4 light_color;
-	vec4 light_direction;
-} UBO_t;
-
-extern UBO_t *Main_UBO[2];
-
 ////////////////////////////
 
 VkuDescriptorSet_t ParticleDescriptorSet;

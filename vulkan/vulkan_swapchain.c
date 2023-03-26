@@ -78,14 +78,6 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 
 	Zone_Free(Zone, PresentModes);
 
-	// Find the transformation of the surface
-
-	// We prefer a non-rotated transform
-	VkSurfaceTransformFlagsKHR Pretransform=VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-
-	if(!(SurfCaps.supportedTransforms&VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR))
-		Pretransform=SurfCaps.currentTransform;
-
 	// Find a supported composite alpha format (not all devices support alpha opaque)
 	// Simply select the first composite alpha format available
 	VkCompositeAlphaFlagBitsKHR CompositeAlpha=VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -120,21 +112,23 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 	{
 		.sType=VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
 		.pNext=VK_NULL_HANDLE,
+		.flags=0,
 		.surface=Context->Surface,
 		.minImageCount=SurfCaps.minImageCount,
 		.imageFormat=Swapchain->SurfaceFormat.format,
 		.imageColorSpace=Swapchain->SurfaceFormat.colorSpace,
 		.imageExtent=Swapchain->Extent,
-		.imageUsage=ImageUsage,
-		.preTransform=Pretransform,
 		.imageArrayLayers=1,
+		.imageUsage=ImageUsage,
 		.imageSharingMode=VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount=0,
 		.pQueueFamilyIndices=VK_NULL_HANDLE,
+		.preTransform=VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+		.compositeAlpha=CompositeAlpha,
 		.presentMode=SwapchainPresentMode,
 		// Setting clipped to VK_TRUE allows the implementation to discard rendering outside of the surface area
 		.clipped=VK_TRUE,
-		.compositeAlpha=CompositeAlpha,
+		.oldSwapchain=VK_NULL_HANDLE,
 	}, VK_NULL_HANDLE, &Swapchain->Swapchain);
 
 	// Get swap chain image count

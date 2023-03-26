@@ -1,6 +1,11 @@
 #ifndef __PARTICLE_H__
 #define __PARTICLE_H__
 
+#include <stdint.h>
+#include "../utils/list.h"
+#include "../math/math.h"
+#include "../vulkan/vulkan.h"
+
 typedef struct
 {
 	uint32_t ID;

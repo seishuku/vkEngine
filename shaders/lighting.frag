@@ -6,7 +6,7 @@ layout (location=2) in mat3 Tangent;
 layout (location=5) in mat4 iMatrix;
 layout (location=9) in vec4 Shadow;
 
-layout (binding=3) uniform ubo
+layout (binding=3) uniform MainUBO
 {
 	mat4 HMD;
 	mat4 projection;
@@ -14,6 +14,26 @@ layout (binding=3) uniform ubo
 	mat4 light_mvp;
 	vec4 light_color;
 	vec4 light_direction;
+};
+
+layout (binding=4) uniform SkyboxUBO
+{
+	vec4 uOffset;
+
+	vec3 uNebulaAColor;
+	float uNebulaADensity;
+	vec3 uNebulaBColor;
+	float uNebulaBDensity;
+
+	float uStarsScale;
+	float uStarDensity;
+	vec2 pad0;
+
+	vec4 uSunPosition;
+	float uSunSize;
+	float uSunFalloff;
+	vec2 pad1;
+	vec4 uSunColor;
 };
 
 layout (push_constant) uniform pc
@@ -52,5 +72,5 @@ void main()
 	vec4 Base=texture(TexBase, UV);
 	vec3 n=normalize(iMatrix*local*vec4(Tangent*(2*texture(TexNormal, UV)-1).xyz, 0.0)).xyz;
 
-	Output=vec4(Base.xyz*light_color.xyz*max(0.045, dot(n, light_direction.xyz)*ShadowPCF(Shadow)), 1.0);
+	Output=vec4(Base.xyz*light_color.xyz*max(0.01, dot(n, light_direction.xyz)*ShadowPCF(Shadow)), 1.0);
 }

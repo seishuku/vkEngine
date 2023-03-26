@@ -1,11 +1,11 @@
 #ifndef __SKYBOX_H__
 #define __SKYBOX_H__
 
+#include "vulkan/vulkan.h"
+#include "math/math.h"
+
 typedef struct
 {
-	matrix HMD;
-	matrix projection;
-	matrix modelview;
 	vec4 uOffset;
 
 	vec3 uNebulaAColor;
