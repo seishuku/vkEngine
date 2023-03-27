@@ -11,6 +11,8 @@
 #endif
 
 #include <vulkan/vulkan.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #define vkCreateDebugUtilsMessengerEXT _vkCreateDebugUtilsMessengerEXT
 extern PFN_vkCreateDebugUtilsMessengerEXT _vkCreateDebugUtilsMessengerEXT;
@@ -29,6 +31,11 @@ extern PFN_vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR;
 
 // This defines how many frames in flight
 #define VKU_MAX_FRAME_COUNT 4
+
+#define VKU_MAX_FRAMEBUFFER_ATTACHMENTS 8
+
+#define VKU_MAX_RENDERPASS_ATTACHMENTS 8
+#define VKU_MAX_RENDERPASS_SUBPASS_DEPENDENCIES 8
 
 typedef struct
 {
@@ -204,6 +211,49 @@ typedef struct
 	VkImageView ImageView[VKU_MAX_FRAME_COUNT];
 } VkuSwapchain_t;
 
+typedef struct
+{
+	VkDevice Device;
+	VkRenderPass RenderPass;
+
+	VkFramebuffer Framebuffer;
+
+	uint32_t NumAttachments;
+	VkImageView Attachments[VKU_MAX_FRAMEBUFFER_ATTACHMENTS];
+} VkuFramebuffer_t;
+
+typedef enum
+{
+	VKU_RENDERPASS_ATTACHMENT_INPUT=0,
+	VKU_RENDERPASS_ATTACHMENT_COLOR,
+	VKU_RENDERPASS_ATTACHMENT_DEPTH,
+	VKU_RENDERPASS_ATTACHMENT_RESOLVE
+} VkuRenderPassAttachmentType;
+
+typedef struct
+{
+	VkuRenderPassAttachmentType Type;
+	VkFormat Format;
+	VkSampleCountFlagBits Samples;
+	VkAttachmentLoadOp LoadOp;
+	VkAttachmentStoreOp StoreOp;
+	VkImageLayout SubpassLayout;
+	VkImageLayout FinalLayout;
+} VkuRenderPassAttachments_t;
+
+typedef struct
+{
+	VkDevice Device;
+
+	VkRenderPass RenderPass;
+
+	uint32_t NumAttachments;
+	VkuRenderPassAttachments_t Attachments[VKU_MAX_RENDERPASS_ATTACHMENTS];
+
+	uint32_t NumSubpassDependencies;
+	VkSubpassDependency SubpassDependencies[VKU_MAX_RENDERPASS_SUBPASS_DEPENDENCIES];
+} VkuRenderPass_t;
+
 VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile);
 
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask);
@@ -249,5 +299,14 @@ void DestroyVulkan(VkInstance Instance, VkuContext_t *Context);
 
 VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, uint32_t Width, uint32_t Height, VkBool32 VSync);
 void vkuDestroySwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain);
+
+VkBool32 vkuFramebufferAddAttachment(VkuFramebuffer_t *Framebuffer, VkImageView Attachment);
+VkBool32 vkuInitFramebuffer(VkuFramebuffer_t *Framebuffer, VkuContext_t *Context, VkRenderPass RenderPass);
+VkBool32 vkuFramebufferCreate(VkuFramebuffer_t *Framebuffer, VkExtent2D Size);
+
+VkBool32 vkuRenderPass_AddAttachment(VkuRenderPass_t *RenderPass, VkuRenderPassAttachmentType Type, VkFormat Format, VkSampleCountFlagBits Samples, VkAttachmentLoadOp LoadOp, VkAttachmentStoreOp StoreOp, VkImageLayout SubpassLayout, VkImageLayout FinalLayout);
+VkBool32 vkuRenderPass_AddSubpassDependency(VkuRenderPass_t *RenderPass, uint32_t SourceSubpass, uint32_t DestinationSubpass, VkPipelineStageFlags SourceStageMask, VkPipelineStageFlags DestinationStageMask, VkAccessFlags SourceAccessMask, VkAccessFlags DestinationAccessMask, VkDependencyFlags DependencyFlags);
+VkBool32 vkuInitRenderPass(VkuContext_t *Context, VkuRenderPass_t *RenderPass);
+VkBool32 vkuCreateRenderPass(VkuRenderPass_t *RenderPass);
 
 #endif

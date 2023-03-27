@@ -13,7 +13,7 @@
 
 // External data from engine.c
 extern VkuContext_t Context;
-extern VkRenderPass RenderPass;
+extern VkuRenderPass_t RenderPass;
 extern VkSampleCountFlags MSAA;
 
 extern VkuMemZone_t *VkZone;
@@ -259,7 +259,7 @@ bool ParticleSystem_Init(ParticleSystem_t *System)
 	vkuInitPipeline(&ParticlePipeline, &Context);
 
 	vkuPipeline_SetPipelineLayout(&ParticlePipeline, ParticlePipelineLayout);
-	vkuPipeline_SetRenderPass(&ParticlePipeline, RenderPass);
+	vkuPipeline_SetRenderPass(&ParticlePipeline, RenderPass.RenderPass);
 
 	ParticlePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 	ParticlePipeline.CullMode=VK_CULL_MODE_BACK_BIT;

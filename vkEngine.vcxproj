@@ -130,9 +130,11 @@
     <ClCompile Include="vulkan\vulkan_buffer.c" />
     <ClCompile Include="vulkan\vulkan_context.c" />
     <ClCompile Include="vulkan\vulkan_descriptorset.c" />
+    <ClCompile Include="vulkan\vulkan_framebuffer.c" />
     <ClCompile Include="vulkan\vulkan_instance.c" />
     <ClCompile Include="vulkan\vulkan_mem.c" />
     <ClCompile Include="vulkan\vulkan_pipeline.c" />
+    <ClCompile Include="vulkan\vulkan_renderpass.c" />
     <ClCompile Include="vulkan\vulkan_swapchain.c" />
   </ItemGroup>
   <ItemGroup>

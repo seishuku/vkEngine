@@ -10,7 +10,7 @@
 #include "perframe.h"
 
 extern VkuContext_t Context;
-extern VkRenderPass RenderPass;
+extern VkuRenderPass_t RenderPass;
 extern VkSampleCountFlags MSAA;
 extern VkuSwapchain_t Swapchain;
 
@@ -45,7 +45,7 @@ bool CreateSkyboxPipeline(void)
 	vkuInitPipeline(&SkyboxPipeline, &Context);
 
 	vkuPipeline_SetPipelineLayout(&SkyboxPipeline, SkyboxPipelineLayout);
-	vkuPipeline_SetRenderPass(&SkyboxPipeline, RenderPass);
+	vkuPipeline_SetRenderPass(&SkyboxPipeline, RenderPass.RenderPass);
 
 	SkyboxPipeline.DepthTest=VK_TRUE;
 	SkyboxPipeline.CullMode=VK_CULL_MODE_BACK_BIT;

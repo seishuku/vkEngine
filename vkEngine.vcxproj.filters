@@ -180,6 +180,12 @@
     <ClCompile Include="audio\wave.c">
       <Filter>Source Files\audio</Filter>
     </ClCompile>
+    <ClCompile Include="vulkan\vulkan_framebuffer.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="vulkan\vulkan_renderpass.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
