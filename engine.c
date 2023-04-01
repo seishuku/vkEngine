@@ -1101,7 +1101,7 @@ bool Init(void)
 	if(VkZone==NULL)
 		return false;
 
-	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 2.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
+	CameraInit(&Camera, (float[]) { 0.0f, 0.0f, 100.0f }, (float[]) { -1.0f, 0.0f, 0.0f }, (float[3]) { 0.0f, 1.0f, 0.0f });
 
 	if(!Audio_Init())
 		return false;
