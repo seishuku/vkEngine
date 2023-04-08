@@ -239,7 +239,7 @@ VkBool32 vkuInitPipeline(VkuPipeline_t *Pipeline, VkuContext_t *Context)
 	return VK_TRUE;
 }
 
-VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline)
+VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline, void *pNext)
 {
 	if(!Pipeline)
 		return VK_FALSE;
@@ -247,6 +247,7 @@ VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline)
 	VkResult Result=vkCreateGraphicsPipelines(Pipeline->Device, Pipeline->PipelineCache, 1, &(VkGraphicsPipelineCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+		.pNext=pNext,
 		.stageCount=Pipeline->NumStages,
 		.pStages=Pipeline->Stages,
 		.pVertexInputState=&(VkPipelineVertexInputStateCreateInfo)

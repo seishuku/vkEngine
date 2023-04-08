@@ -278,7 +278,7 @@ VkBool32 vkuPipeline_AddStage(VkuPipeline_t *Pipeline, const char *ShaderFilenam
 VkBool32 vkuPipeline_SetRenderPass(VkuPipeline_t *Pipeline, VkRenderPass RenderPass);
 VkBool32 vkuPipeline_SetPipelineLayout(VkuPipeline_t *Pipeline, VkPipelineLayout PipelineLayout);
 VkBool32 vkuInitPipeline(VkuPipeline_t *Pipeline, VkuContext_t *Context);
-VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline);
+VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline, void *pNext);
 
 VkBool32 vkuDescriptorSet_AddBinding(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorType Type, VkShaderStageFlags Stage);
 VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkuImage_t *Image);

@@ -137,8 +137,14 @@ bool CreateShadowPipeline(void)
 	vkuPipeline_AddVertexAttribute(&ShadowPipeline, 3, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*2);
 	vkuPipeline_AddVertexAttribute(&ShadowPipeline, 4, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*3);
 
+	VkPipelineRenderingCreateInfo PipelineRenderingCreateInfo=
+	{
+		.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+		.depthAttachmentFormat=ShadowDepthFormat,
+	};
+
 	// Assemble the pipeline
-	if(!vkuAssemblePipeline(&ShadowPipeline))
+	if(!vkuAssemblePipeline(&ShadowPipeline, &PipelineRenderingCreateInfo))
 		return false;
 
 	return true;

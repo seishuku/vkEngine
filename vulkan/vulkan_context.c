@@ -149,6 +149,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 
 	VkBool32 SwapchainExtension=VK_FALSE;
 	VkBool32 PushDescriptorExtension=VK_FALSE;
+	VkBool32 DynamicRenderingExtension=VK_FALSE;
 
 	for(uint32_t i=0;i<ExtensionCount;i++)
 	{
@@ -166,6 +167,11 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 				DBGPRINTF(DEBUG_INFO, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME" extension is supported!\n");
 				PushDescriptorExtension=VK_TRUE;
 			}
+		}
+		else if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME" extension is supported!\n");
+			DynamicRenderingExtension=VK_TRUE;
 		}
 	}
 
@@ -213,12 +219,20 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	{
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 //		VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
+//		VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+	};
+
+	const VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_feature=
+	{
+		.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
+		.dynamicRendering=VK_TRUE,
 	};
 
 	// Create the logical device from the physical device and queue index from above
 	if(vkCreateDevice(Context->PhysicalDevice, &(VkDeviceCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+		.pNext=&dynamic_rendering_feature,
 		.pEnabledFeatures=&Features,
 		.enabledExtensionCount=sizeof(Extensions)/sizeof(void *),
 		.ppEnabledExtensionNames=Extensions,

@@ -9,11 +9,6 @@ extern VkuImage_t ColorTemp[2];
 
 extern VkPipelineLayout CompositePipelineLayout;
 extern VkuPipeline_t CompositePipeline;
-extern VkRenderPass CompositeRenderPass;
-
-extern VkFramebuffer ThresholdFramebuffer;
-extern VkFramebuffer GaussianFramebufferTemp;
-extern VkFramebuffer GaussianFramebufferBlur;
 
 bool CreateCompositePipeline(void);
 void CreateCompositeFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeight);

@@ -10,9 +10,10 @@
 #include "perframe.h"
 
 extern VkuContext_t Context;
-extern VkuRenderPass_t RenderPass;
+//extern VkuRenderPass_t RenderPass;
 extern VkSampleCountFlags MSAA;
 extern VkuSwapchain_t Swapchain;
+extern VkFormat ColorFormat, DepthFormat;
 
 VkuDescriptorSet_t SkyboxDescriptorSet;
 VkPipelineLayout SkyboxPipelineLayout;
@@ -45,7 +46,6 @@ bool CreateSkyboxPipeline(void)
 	vkuInitPipeline(&SkyboxPipeline, &Context);
 
 	vkuPipeline_SetPipelineLayout(&SkyboxPipeline, SkyboxPipelineLayout);
-	vkuPipeline_SetRenderPass(&SkyboxPipeline, RenderPass.RenderPass);
 
 	SkyboxPipeline.DepthTest=VK_TRUE;
 	SkyboxPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
@@ -58,7 +58,15 @@ bool CreateSkyboxPipeline(void)
 	if(!vkuPipeline_AddStage(&SkyboxPipeline, "./shaders/skybox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
-	if(!vkuAssemblePipeline(&SkyboxPipeline))
+	VkPipelineRenderingCreateInfo PipelineRenderingCreateInfo=
+	{
+		.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+		.colorAttachmentCount=1,
+		.pColorAttachmentFormats=&ColorFormat,
+		.depthAttachmentFormat=DepthFormat,
+	};
+
+	if(!vkuAssemblePipeline(&SkyboxPipeline, &PipelineRenderingCreateInfo))
 		return false;
 
 	return true;

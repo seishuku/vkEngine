@@ -21,10 +21,16 @@ OBJS+=camera/camera.o
 OBJS+=vulkan/vulkan_buffer.o
 OBJS+=vulkan/vulkan_context.o
 OBJS+=vulkan/vulkan_descriptorset.o
+OBJS+=vulkan/vulkan_framebuffer.o
 OBJS+=vulkan/vulkan_instance.o
 OBJS+=vulkan/vulkan_mem.o
 OBJS+=vulkan/vulkan_pipeline.o
+OBJS+=vulkan/vulkan_renderpass.o
 OBJS+=vulkan/vulkan_swapchain.o
+
+# Audio
+OBJS+=audio/audio.o
+OBJS+=audio/wave.o
 
 # core stuff
 OBJS+=vr/vr.o
@@ -63,7 +69,7 @@ SHADERS+=shaders/threshold.frag.spv
 
 CC=clang
 CFLAGS=-Wall -O3 -std=gnu17 -I/usr/X11/include
-LDFLAGS=-Wold-style-definition -L/usr/X11/lib -lvulkan -lX11 -lm -lpthread -lopenvr_api
+LDFLAGS=-Wold-style-definition -L/usr/X11/lib -lvulkan -lX11 -lm -lpthread -lopenvr_api -lportaudio
 
 all: $(TARGET) $(SHADERS)
 

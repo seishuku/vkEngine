@@ -11,9 +11,8 @@
 #include "font.h"
 
 extern VkuContext_t Context;
-extern VkRenderPass CompositeRenderPass;
-extern VkRenderPass RenderPass;
 extern VkSampleCountFlags MSAA;
+extern VkuSwapchain_t Swapchain;
 
 extern uint32_t Width, Height;
 
@@ -123,7 +122,6 @@ void Font_Print(VkCommandBuffer CommandBuffer, uint32_t Eye, float x, float y, c
 		vkuInitPipeline(&FontPipeline, &Context);
 
 		vkuPipeline_SetPipelineLayout(&FontPipeline, FontPipelineLayout);
-		vkuPipeline_SetRenderPass(&FontPipeline, CompositeRenderPass);
 
 		FontPipeline.Topology=VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY;
 //		FontPipeline.RasterizationSamples=MSAA;
@@ -141,7 +139,14 @@ void Font_Print(VkCommandBuffer CommandBuffer, uint32_t Eye, float x, float y, c
 		vkuPipeline_AddVertexAttribute(&FontPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
 		vkuPipeline_AddVertexAttribute(&FontPipeline, 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*1);
 
-		if(!vkuAssemblePipeline(&FontPipeline))
+		VkPipelineRenderingCreateInfo PipelineRenderingCreateInfo=
+		{
+			.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+			.colorAttachmentCount=1,
+			.pColorAttachmentFormats=&Swapchain.SurfaceFormat.format,
+		};
+
+		if(!vkuAssemblePipeline(&FontPipeline, &PipelineRenderingCreateInfo))
 			return;
 
 		// Initalize a list for building a list of control points to feed to the Bezier shader
