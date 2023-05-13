@@ -11,8 +11,9 @@ OBJS+=image/image.o
 # math
 OBJS+=math/math.o
 
-# particle
+# physics
 OBJS+=particle/particle.o
+OBJS+=physics/physics.o
 
 # camera
 OBJS+=camera/camera.o

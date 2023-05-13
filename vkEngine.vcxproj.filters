@@ -88,6 +88,12 @@
     <Filter Include="Source Files\audio">
       <UniqueIdentifier>{9721b6a2-fc81-437e-9309-e0fce1b14420}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\physics">
+      <UniqueIdentifier>{02654779-bbb6-4ce1-8500-673199a2ce85}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\physics">
+      <UniqueIdentifier>{65506bdd-4233-4db9-ba7a-2939d0db18db}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="engine.c">
@@ -186,6 +192,9 @@
     <ClCompile Include="vulkan\vulkan_renderpass.c">
       <Filter>Source Files\vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="physics\physics.c">
+      <Filter>Source Files\physics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">
@@ -256,6 +265,9 @@
     </ClInclude>
     <ClInclude Include="sounds.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="physics\physics.h">
+      <Filter>Header Files\physics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

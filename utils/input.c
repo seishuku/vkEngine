@@ -10,6 +10,7 @@
 #include "../particle/particle.h"
 #include "../audio/audio.h"
 #include "../sounds.h"
+#include "../physics/physics.h"
 #include "input.h"
 
 // External data from engine.c
@@ -17,6 +18,10 @@ void GenerateSkyParams(void);
 extern Camera_t Camera;
 extern ParticleSystem_t ParticleSystem;
 float RandFloat(void);
+
+#define NUM_ASTEROIDS 1000
+extern RigidBody_t Asteroids[NUM_ASTEROIDS];
+
 //////////////////////////////
 
 // Emitter callback for the launched emitter's particles
@@ -90,6 +95,10 @@ void Event_KeyDown(void *Arg)
 		case KB_RIGHT:	Camera.key_right=true;	break;
 		case KB_LSHIFT:
 		case KB_RSHIFT:	Camera.shift=true;		break;
+		case KB_Z:		
+						for(int i=0;i<NUM_ASTEROIDS;i++)
+							explode(&Asteroids[i]);
+						break;
 		default:		break;
 	}
 }

@@ -102,13 +102,14 @@ void main()
 	{
 		vec3 pos=ray_origin+ray_direction*(dist+stepSize*random);
 
-		float val=texture(Volume, pos*0.5+0.5).r;
+		float d=clamp(1.0-length(pos), 0.0, 1.0);
+		float val=texture(Volume, pos*0.5+0.5).r*d;
 		vec4 val_color=vec4(TurboColormap(val*5.0), val);
 
 		Output.rgb+=(1.0-Output.a)*val_color.rgb*val_color.a;
 		Output.a+=(1.0-Output.a)*val_color.a;
 
-		if(Output.a>=0.95)
+		if(Output.a>=0.8)
 			break;
 	}
 }

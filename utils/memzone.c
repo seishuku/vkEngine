@@ -56,6 +56,10 @@ void Zone_Free(MemZone_t *Zone, void *Ptr)
 
 	MemBlock_t *Block=(MemBlock_t *)((uint8_t *)Ptr-HEADER_SIZE);
 
+#ifdef _DEBUG
+	DBGPRINTF(DEBUG_WARNING, "Zone freed block - Location: 0x%p Size: %0.3fKB\n", Ptr, (float)Block->Size/1000.0f);
+#endif
+
 	if(!Block->Free)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Attempting to free already freed pointer.\n");

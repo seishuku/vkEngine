@@ -117,6 +117,7 @@
     <ClCompile Include="model\bmodel.c" />
     <ClCompile Include="particle\particle.c" />
     <ClCompile Include="perframe.c" />
+    <ClCompile Include="physics\physics.c" />
     <ClCompile Include="shadow.c" />
     <ClCompile Include="skybox.c" />
     <ClCompile Include="system\win32.c" />
@@ -148,6 +149,7 @@
     <ClInclude Include="model\bmodel.h" />
     <ClInclude Include="particle\particle.h" />
     <ClInclude Include="perframe.h" />
+    <ClInclude Include="physics\physics.h" />
     <ClInclude Include="shadow.h" />
     <ClInclude Include="skybox.h" />
     <ClInclude Include="sounds.h" />

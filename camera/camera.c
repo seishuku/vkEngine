@@ -5,6 +5,7 @@
 #include "../vulkan/vulkan.h"
 #include "../system/system.h"
 #include "../math/math.h"
+#include "../physics/physics.h"
 #include "../camera/camera.h"
 
 // Camera collision stuff
@@ -126,6 +127,7 @@ int32_t SphereBBOXIntersection(const vec3 Center, const float Radius, const vec3
 	return 0;
 }
 
+// Camera<->triangle mesh collision detection and response
 void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32_t NumFace)
 {
 	float distance=0.0f;
@@ -167,6 +169,83 @@ void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32
 				Camera->View[2]+=Offset[2];
 			}
 		}
+	}
+}
+
+// Camera<->Rigid body collision detection and response
+void CameraRigidBodyCollision(Camera_t *Camera, RigidBody_t *Body)
+{
+	const float Camera_Mass=10.0f;
+	const float Camera_invMass=1.0f/Camera_Mass;
+
+	vec3 center;
+	Vec3_Setv(center, Body->Position);
+	Vec3_Subv(center, Camera->Position);
+	float distance_squared=Vec3_Dot(center, center);
+
+	float radius_sum=Camera->Radius+Body->Radius;
+	float radius_sum_squared=radius_sum*radius_sum;
+
+	if(distance_squared<radius_sum_squared)
+	{
+		float distance=sqrtf(distance_squared);
+		float penetration=radius_sum-distance;
+
+		distance=1.0f/distance;
+
+		// calculate the collision normal
+		vec3 normal;
+		Vec3_Setv(normal, Body->Position);
+		Vec3_Subv(normal, Camera->Position);
+		Vec3_Muls(normal, distance);
+
+		// calculate the relative velocity
+		vec3 rel_velocity;
+		Vec3_Setv(rel_velocity, Body->Velocity);
+		Vec3_Subv(rel_velocity, Camera->Velocity);
+
+		float vel_along_normal=Vec3_Dot(rel_velocity, normal);
+
+		// ignore the collision if the bodies are moving apart
+		if(vel_along_normal>0.0f)
+			return;
+
+		// calculate the restitution coefficient
+		float elasticity=1.0f; // typical values range from 0.1 to 1.0
+
+		// calculate the impulse scalar
+		float j=-(1.0f+elasticity)*vel_along_normal/(Camera_invMass+Body->invMass);
+
+		// apply the impulse
+		vec3 camera_impulse;
+		Vec3_Setv(camera_impulse, normal);
+		Vec3_Muls(camera_impulse, Camera_invMass);
+		Vec3_Muls(camera_impulse, j);
+		Vec3_Subv(Camera->Velocity, camera_impulse);
+
+		vec3 body_impulse;
+		Vec3_Setv(body_impulse, normal);
+		Vec3_Muls(body_impulse, Body->invMass);
+		Vec3_Muls(body_impulse, j);
+		Vec3_Addv(Body->Velocity, body_impulse);
+
+		// correct the position of the bodies to resolve the collision
+		float k=1.0f; // typical values range from 0.01 to 0.1
+		float percent=1.0f; // typical values range from 0.1 to 0.3
+		float correction=penetration/(Camera_invMass+Body->invMass)*percent*k;
+
+		vec3 camera_correction;
+		Vec3_Setv(camera_correction, normal);
+		Vec3_Muls(camera_correction, Camera_invMass);
+		Vec3_Muls(camera_correction, correction);
+		Vec3_Subv(Camera->Position, camera_correction);
+		Vec3_Subv(Camera->View, camera_correction);
+
+		vec3 body_correction;
+		Vec3_Setv(body_correction, normal);
+		Vec3_Muls(body_correction, Body->invMass);
+		Vec3_Muls(body_correction, correction);
+		Vec3_Addv(Body->Position, body_correction);
 	}
 }
 
@@ -296,7 +375,7 @@ void CameraUpdate(Camera_t *Camera, float Time, matrix out)
 	if(Camera->key_down)
 		Camera->Pitch-=Time*0.125f;
 
-	const float Damp=0.91f;//Time*65.0f;
+	const float Damp=0.93f;//Time*65.0f;
 	Camera->Velocity[0]*=Damp;
 	Camera->Velocity[1]*=Damp;
 	Camera->Velocity[2]*=Damp;

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "../math/math.h"
+#include "../physics/physics.h"
 
 typedef struct
 {
@@ -41,6 +42,7 @@ typedef struct
 void CameraInit(Camera_t *Camera, const vec3 Position, const vec3 View, const vec3 Up);
 void CameraUpdate(Camera_t *Camera, float Time, matrix out);
 void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32_t NumFace);
+void CameraRigidBodyCollision(Camera_t *Camera, RigidBody_t *Body);
 int32_t CameraLoadPath(char *filename, CameraPath_t *Path);
 void CameraInterpolatePath(CameraPath_t *Path, Camera_t *Camera, float TimeStep, matrix out);
 void CameraDeletePath(CameraPath_t *Path);

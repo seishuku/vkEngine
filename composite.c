@@ -231,9 +231,8 @@ void CompositeDraw(uint32_t Index, uint32_t Eye)
 			.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
 			.imageView=ColorBlur[Eye].View,
 			.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 			.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-			.clearValue=(VkClearValue){ .color.float32={ 0.0f, 0.0f, 0.0f, 1.0f } },
 		},
 	});
 
@@ -269,9 +268,8 @@ void CompositeDraw(uint32_t Index, uint32_t Eye)
 			.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
 			.imageView=ColorTemp[Eye].View,
 			.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 			.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-			.clearValue=(VkClearValue){ .color.float32={ 0.0f, 0.0f, 0.0f, 1.0f } },
 		},
 	});
 
@@ -310,9 +308,8 @@ void CompositeDraw(uint32_t Index, uint32_t Eye)
 			.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
 			.imageView=ColorBlur[Eye].View,
 			.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 			.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-			.clearValue=(VkClearValue){ .color.float32={ 0.0f, 0.0f, 0.0f, 1.0f } },
 		},
 	});
 
@@ -356,9 +353,8 @@ void CompositeDraw(uint32_t Index, uint32_t Eye)
 				.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
 				.imageView=Swapchain.ImageView[Index],
 				.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-				.clearValue=(VkClearValue){ .color.float32={ 0.0f, 0.0f, 0.0f, 1.0f } },
 			},
 		});
 
@@ -385,7 +381,5 @@ void CompositeDraw(uint32_t Index, uint32_t Eye)
 		Font_Print(PerFrame[Index].CommandBuffer, 0, 0.0f, 16.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep);
 
 		vkCmdEndRendering(PerFrame[Index].CommandBuffer);
-
-		vkuTransitionLayout(PerFrame[Index].CommandBuffer, Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 	}
 }

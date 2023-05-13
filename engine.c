@@ -19,6 +19,7 @@
 #include "vr/vr.h"
 #include "font/font.h"
 #include "audio/audio.h"
+#include "physics/physics.h"
 #include "models.h"
 #include "textures.h"
 #include "skybox.h"
@@ -37,6 +38,7 @@ VkuContext_t Context;
 VkuMemZone_t *VkZone;
 
 Camera_t Camera;
+matrix ModelView;
 
 extern float fps, fTimeStep, fTime;
 
@@ -77,15 +79,8 @@ VkuPipeline_t VolumePipeline;
 // Asteroid data
 VkuBuffer_t Asteroid_Instance;
 
-typedef struct
-{
-	vec3 Position;
-	float Radius;
-	vec3 Rotate;
-} Asteroid_t;
-
 #define NUM_ASTEROIDS 1000
-Asteroid_t Asteroids[NUM_ASTEROIDS];
+RigidBody_t Asteroids[NUM_ASTEROIDS];
 //////
 
 typedef struct
@@ -310,7 +305,7 @@ void GenerateSkyParams(void)
 
 	uint32_t i=0, tries=0;
 
-	memset(Asteroids, 0, sizeof(Asteroid_t)*NUM_ASTEROIDS);
+	memset(Asteroids, 0, sizeof(RigidBody_t)*NUM_ASTEROIDS);
 
 	while(i<NUM_ASTEROIDS)
 	{
@@ -318,9 +313,8 @@ void GenerateSkyParams(void)
 		Vec3_Set(RandomVec, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
 		Vec3_Normalize(RandomVec);
 
-		Asteroid_t Asteroid;
+		RigidBody_t Asteroid;
 		Vec3_Set(Asteroid.Position, RandomVec[0]*(RandFloat()*1000.0f+50.0f), RandomVec[1]*(RandFloat()*1000.0f+50.0f), RandomVec[2]*(RandFloat()*1000.0f+50.0f));
-		Vec3_Set(Asteroid.Rotate, RandFloat()*PI*2.0f, RandFloat()*PI*2.0f, RandFloat()*PI*2.0f);
 		Asteroid.Radius=(RandFloat()*20.0f+0.01f)*2.0f;
 
 		bool overlapping=false;
@@ -342,12 +336,24 @@ void GenerateSkyParams(void)
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
 	{
+		vec3 RandomVec;
+		Vec3_Set(RandomVec, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
+		Vec3_Normalize(RandomVec);
+
 		MatrixIdentity(&Data[16*i]);
 		MatrixTranslatev(Asteroids[i].Position, &Data[16*i]);
-		MatrixRotate(Asteroids[i].Rotate[0], 1.0f, 0.0f, 0.0f, &Data[16*i]);
-		MatrixRotate(Asteroids[i].Rotate[1], 0.0f, 1.0f, 0.0f, &Data[16*i]);
-		MatrixRotate(Asteroids[i].Rotate[2], 0.0f, 0.0f, 1.0f, &Data[16*i]);
+		MatrixRotate(RandFloat()*PI*2.0f, 1.0f, 0.0f, 0.0f, &Data[16*i]);
+		MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 1.0f, 0.0f, &Data[16*i]);
+		MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 0.0f, 1.0f, &Data[16*i]);
 		MatrixScale(Asteroids[i].Radius/2.0f, Asteroids[i].Radius/2.0f, Asteroids[i].Radius/2.0f, &Data[16*i]);
+
+		Vec3_Setv(Asteroids[i].Velocity, RandomVec);
+		Vec3_Muls(Asteroids[i].Velocity, 10.0f);
+
+		Vec3_Sets(Asteroids[i].Force, 0.0f);
+
+		Asteroids[i].Mass=(1.0f/3000.0f)*(1.33333333f*PI*Asteroids[i].Radius);
+		Asteroids[i].invMass=1.0f/Asteroids[i].Mass;
 	}
 
 	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
@@ -437,11 +443,9 @@ void Thread_Main(void *Arg)
 			.pNext=&(VkCommandBufferInheritanceRenderingInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-				.flags=0,
 				.colorAttachmentCount=1,
 				.pColorAttachmentFormats=&ColorFormat,
 				.depthAttachmentFormat=DepthFormat,
-				.stencilAttachmentFormat=VK_FORMAT_UNDEFINED,
 				.rasterizationSamples=MSAA
 			},
 		}
@@ -506,11 +510,9 @@ void Thread_Skybox(void *Arg)
 			.pNext=&(VkCommandBufferInheritanceRenderingInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-				.flags=0,
 				.colorAttachmentCount=1,
 				.pColorAttachmentFormats=&ColorFormat,
 				.depthAttachmentFormat=DepthFormat,
-				.stencilAttachmentFormat=VK_FORMAT_UNDEFINED,
 				.rasterizationSamples=MSAA
 			},
 		}
@@ -553,11 +555,9 @@ void Thread_Particles(void *Arg)
 			.pNext=&(VkCommandBufferInheritanceRenderingInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-				.flags=0,
 				.colorAttachmentCount=1,
 				.pColorAttachmentFormats=&ColorFormat,
 				.depthAttachmentFormat=DepthFormat,
-				.stencilAttachmentFormat=VK_FORMAT_UNDEFINED,
 				.rasterizationSamples=MSAA
 			},
 		}
@@ -593,8 +593,7 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	memcpy(PerFrame[Index].Main_UBO[Eye]->projection, &EyeProjection[Eye], sizeof(matrix));
 
 	// Set up the modelview matrix
-	MatrixIdentity(PerFrame[Index].Main_UBO[Eye]->modelview);
-	CameraUpdate(&Camera, fTimeStep, PerFrame[Index].Main_UBO[Eye]->modelview);
+	memcpy(PerFrame[Index].Main_UBO[Eye]->modelview, ModelView, sizeof(matrix));
 
 	memcpy(PerFrame[Index].Main_UBO[Eye]->HMD, Pose, sizeof(matrix));
 
@@ -611,7 +610,6 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 		.flags=VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT,
 		.renderArea=(VkRect2D){ { 0, 0 }, { rtWidth, rtHeight } },
 		.layerCount=1,
-		.viewMask=0,
 		.colorAttachmentCount=1,
 		.pColorAttachments=&(VkRenderingAttachmentInfo)
 		{
@@ -659,7 +657,6 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 		ThreadData[2].PerFrame[Index].SecCommandBuffer[Eye]
 	});
 
-//	vkCmdEndRenderPass(CommandBuffer);
 	vkCmdEndRendering(CommandBuffer);
 }
 
@@ -668,6 +665,38 @@ void Render(void)
 	static uint32_t Index=0;
 	uint32_t imageIndex;
 	matrix Pose;
+
+	MatrixIdentity(ModelView);
+	CameraUpdate(&Camera, fTimeStep, ModelView);
+
+	// Loop through objects, integrate and check/resolve collisions
+	for(int i=0;i<NUM_ASTEROIDS;i++)
+	{
+		const int subSteps=4;
+		const float inv_subSteps=1.0f/(float)subSteps;
+
+		for(int steps=0;steps<subSteps;steps++)
+			integrate(&Asteroids[i], fTimeStep*inv_subSteps);
+	}
+
+	for(int i=0;i<NUM_ASTEROIDS;i++)
+	{
+		CameraRigidBodyCollision(&Camera, &Asteroids[i]);
+
+		for(int j=i+1;j<NUM_ASTEROIDS;j++)
+			sphere_sphere_collision(&Asteroids[i], &Asteroids[j]);
+	}
+	//////
+
+	// Update instance positions
+	float *Data=NULL;
+	vkMapMemory(Context.Device, Asteroid_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Data);
+
+	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
+		Vec3_Setv(&Data[16*i+12], Asteroids[i].Position);
+
+	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
+	//////
 
 	if(!IsVR)
 	{
@@ -748,6 +777,8 @@ void Render(void)
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 	}
+
+	vkuTransitionLayout(PerFrame[Index].CommandBuffer, Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
 	vkEndCommandBuffer(PerFrame[Index].CommandBuffer);
 
@@ -924,11 +955,10 @@ VkBool32 LoadVolume(VkuContext_t *Context, VkuImage_t *Image)
 			((float)z-(Image->Depth>>1))/Image->Depth,
 		};
 
-		float d=min(1.0f, max(0.0f, 1.0f-Vec3_Length(v)));
 		Vec3_Muls(v, Scale);
 		float p=nebula(v);
 
-		((uint8_t *)Data)[i]=(uint8_t)(p*d*d*255.0f);
+		((uint8_t *)Data)[i]=(uint8_t)(p*255.0f);
 	}
 
 	vkUnmapMemory(Context->Device, StagingBuffer.DeviceMemory);
@@ -1069,19 +1099,22 @@ bool Init(void)
 
 	LoadVolume(&Context, &Textures[TEXTURE_VOLUME]);
 
-	// Create primary pipeline and renderpass
+	// Create primary pipeline
 	CreatePipeline();
 
-	// Create skybox pipeline (uses renderpass from main pipeline)
+	// Create skybox pipeline
 	CreateSkyboxPipeline();
 	GenerateSkyParams();
 
+	// Create volumetric rendering pipeline
+	CreateVolumePipeline();
+
+	// Create shadow map pipeline
 	CreateShadowPipeline();
 	CreateShadowMap();
 
 	// Create compositing pipeline
 	CreateCompositePipeline();
-	CreateVolumePipeline();
 
 	if(!ParticleSystem_Init(&ParticleSystem))
 		return false;
@@ -1092,7 +1125,6 @@ bool Init(void)
 	ParticleSystem_AddEmitter(&ParticleSystem, Zero, Zero, Zero, 0.0f, 100, true, NULL);
 
 	// Create primary frame buffers, depth image
-	// This needs to be done after the render pass is created
 	CreateFramebuffers(0, rtWidth, rtHeight);
 	CreateCompositeFramebuffers(0, rtWidth, rtHeight);
 
