@@ -94,7 +94,7 @@ typedef struct
 	} PerFrame[VKU_MAX_FRAME_COUNT];
 } ThreadData_t;
 
-#define NUM_THREADS 3
+#define NUM_THREADS 4
 ThreadWorker_t Thread[NUM_THREADS];
 ThreadData_t ThreadData[NUM_THREADS];
 pthread_barrier_t ThreadBarrier;
@@ -347,8 +347,9 @@ void GenerateSkyParams(void)
 		MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 0.0f, 1.0f, &Data[16*i]);
 		MatrixScale(Asteroids[i].Radius/2.0f, Asteroids[i].Radius/2.0f, Asteroids[i].Radius/2.0f, &Data[16*i]);
 
-		Vec3_Setv(Asteroids[i].Velocity, RandomVec);
-		Vec3_Muls(Asteroids[i].Velocity, 10.0f);
+		Vec3_Sets(Asteroids[i].Velocity, 0.0f);
+//		Vec3_Setv(Asteroids[i].Velocity, RandomVec);
+//		Vec3_Muls(Asteroids[i].Velocity, 10.0f);
 
 		Vec3_Sets(Asteroids[i].Force, 0.0f);
 
@@ -660,15 +661,8 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	vkCmdEndRendering(CommandBuffer);
 }
 
-void Render(void)
+void Thread_Physics(void *Arg)
 {
-	static uint32_t Index=0;
-	uint32_t imageIndex;
-	matrix Pose;
-
-	MatrixIdentity(ModelView);
-	CameraUpdate(&Camera, fTimeStep, ModelView);
-
 	// Loop through objects, integrate and check/resolve collisions
 	for(int i=0;i<NUM_ASTEROIDS;i++)
 	{
@@ -676,16 +670,18 @@ void Render(void)
 		const float inv_subSteps=1.0f/(float)subSteps;
 
 		for(int steps=0;steps<subSteps;steps++)
-			integrate(&Asteroids[i], fTimeStep*inv_subSteps);
-	}
-
-	for(int i=0;i<NUM_ASTEROIDS;i++)
-	{
-		CameraRigidBodyCollision(&Camera, &Asteroids[i]);
+			PhysicsIntegrate(&Asteroids[i], fTimeStep*inv_subSteps);
 
 		for(int j=i+1;j<NUM_ASTEROIDS;j++)
-			sphere_sphere_collision(&Asteroids[i], &Asteroids[j]);
+			PhysicsSphereToSphereCollisionResponse(&Asteroids[i], &Asteroids[j]);
+
+		CameraRigidBodyCollisionResponse(&Camera, &Asteroids[i]);
 	}
+	//////
+
+	// Update camera and modelview matrix
+	MatrixIdentity(ModelView);
+	CameraUpdate(&Camera, fTimeStep, ModelView);
 	//////
 
 	// Update instance positions
@@ -697,6 +693,17 @@ void Render(void)
 
 	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
 	//////
+
+	pthread_barrier_wait(&ThreadBarrier);
+}
+	
+void Render(void)
+{
+	static uint32_t Index=0;
+	uint32_t imageIndex;
+	matrix Pose;
+
+	Thread_AddJob(&Thread[3], Thread_Physics, NULL);
 
 	if(!IsVR)
 	{
@@ -1052,6 +1059,9 @@ bool Init(void)
 		return false;
 
 	if(!Audio_LoadStatic("./assets/pew3.wav", &Sounds[SOUND_PEW3]))
+		return false;
+
+	if(!Audio_LoadStatic("./assets/stones.wav", &Sounds[SOUND_STONES]))
 		return false;
 
 	// Load models

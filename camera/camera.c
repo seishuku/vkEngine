@@ -173,79 +173,61 @@ void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32
 }
 
 // Camera<->Rigid body collision detection and response
-void CameraRigidBodyCollision(Camera_t *Camera, RigidBody_t *Body)
+void CameraRigidBodyCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
 {
+	// Camera mass constants, since camera struct doesn't store these
 	const float Camera_Mass=10.0f;
 	const float Camera_invMass=1.0f/Camera_Mass;
 
-	vec3 center;
-	Vec3_Setv(center, Body->Position);
-	Vec3_Subv(center, Camera->Position);
-	float distance_squared=Vec3_Dot(center, center);
+	// Calculate the distance between the camera and the sphere's center
+	vec3 Normal;
+	Vec3_Setv(Normal, Camera->Position);
+	Vec3_Subv(Normal, Body->Position);
 
-	float radius_sum=Camera->Radius+Body->Radius;
-	float radius_sum_squared=radius_sum*radius_sum;
+	float DistanceSq=Vec3_Dot(Normal, Normal);
 
-	if(distance_squared<radius_sum_squared)
+	// Sum of radii
+	float radiusSum=Camera->Radius+Body->Radius;
+
+	// Check if the distance is less than the squared sum of the radii
+	if(DistanceSq<=radiusSum*radiusSum)
 	{
-		float distance=sqrtf(distance_squared);
-		float penetration=radius_sum-distance;
+		// Get the distance between objects
+		float Distance=sqrt(DistanceSq);
 
-		distance=1.0f/distance;
+		// Calculate amount of overlap
+		float Penetration=radiusSum-Distance;
 
-		// calculate the collision normal
-		vec3 normal;
-		Vec3_Setv(normal, Body->Position);
-		Vec3_Subv(normal, Camera->Position);
-		Vec3_Muls(normal, distance);
+		// Normalize the normal
+		Vec3_Muls(Normal, 1.0f/Distance);
 
-		// calculate the relative velocity
-		vec3 rel_velocity;
-		Vec3_Setv(rel_velocity, Body->Velocity);
-		Vec3_Subv(rel_velocity, Camera->Velocity);
+		// Mass calculations
+		float massRatio=Body->Mass/Camera_Mass;
+		float totalMass=Body->Mass+Camera_Mass;
 
-		float vel_along_normal=Vec3_Dot(rel_velocity, normal);
+		// Camera position correction
+		float cameraMovement=Penetration*(Body->Mass/totalMass);
+		Camera->Position[0]+=Normal[0]*cameraMovement;
+		Camera->Position[1]+=Normal[1]*cameraMovement;
+		Camera->Position[2]+=Normal[2]*cameraMovement;
 
-		// ignore the collision if the bodies are moving apart
-		if(vel_along_normal>0.0f)
-			return;
+		// Camera velocity response (reflection)
+		float cameraNdotV=Vec3_Dot(Normal, Camera->Velocity);
+		Camera->Velocity[0]-=2.0f*massRatio*Normal[0]*cameraNdotV;
+		Camera->Velocity[1]-=2.0f*massRatio*Normal[1]*cameraNdotV;
+		Camera->Velocity[2]-=2.0f*massRatio*Normal[2]*cameraNdotV;
 
-		// calculate the restitution coefficient
-		float elasticity=1.0f; // typical values range from 0.1 to 1.0
+		// Rigid body position correction
+		float bodyMovement=Penetration*(Camera_Mass/totalMass);
+		Body->Position[0]-=Normal[0]*bodyMovement;
+		Body->Position[1]-=Normal[1]*bodyMovement;
+		Body->Position[2]-=Normal[2]*bodyMovement;
 
-		// calculate the impulse scalar
-		float j=-(1.0f+elasticity)*vel_along_normal/(Camera_invMass+Body->invMass);
-
-		// apply the impulse
-		vec3 camera_impulse;
-		Vec3_Setv(camera_impulse, normal);
-		Vec3_Muls(camera_impulse, Camera_invMass);
-		Vec3_Muls(camera_impulse, j);
-		Vec3_Subv(Camera->Velocity, camera_impulse);
-
-		vec3 body_impulse;
-		Vec3_Setv(body_impulse, normal);
-		Vec3_Muls(body_impulse, Body->invMass);
-		Vec3_Muls(body_impulse, j);
-		Vec3_Addv(Body->Velocity, body_impulse);
-
-		// correct the position of the bodies to resolve the collision
-		float k=1.0f; // typical values range from 0.01 to 0.1
-		float percent=1.0f; // typical values range from 0.1 to 0.3
-		float correction=penetration/(Camera_invMass+Body->invMass)*percent*k;
-
-		vec3 camera_correction;
-		Vec3_Setv(camera_correction, normal);
-		Vec3_Muls(camera_correction, Camera_invMass);
-		Vec3_Muls(camera_correction, correction);
-		Vec3_Subv(Camera->Position, camera_correction);
-		Vec3_Subv(Camera->View, camera_correction);
-
-		vec3 body_correction;
-		Vec3_Setv(body_correction, normal);
-		Vec3_Muls(body_correction, Body->invMass);
-		Vec3_Muls(body_correction, correction);
-		Vec3_Addv(Body->Position, body_correction);
+		// Rigid body velocity response (reflection)
+		float bodyNdotV=Vec3_Dot(Normal, Body->Velocity);
+		Body->Velocity[0]-=2.0f*(1.0f-massRatio)*Normal[0]*bodyNdotV;
+		Body->Velocity[1]-=2.0f*(1.0f-massRatio)*Normal[1]*bodyNdotV;
+		Body->Velocity[2]-=2.0f*(1.0f-massRatio)*Normal[2]*bodyNdotV;
 	}
 }
 

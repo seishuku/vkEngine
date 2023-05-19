@@ -2,6 +2,7 @@
 #define __AUDIO_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "../math/math.h"
 
 #define SAMPLE_RATE 44100

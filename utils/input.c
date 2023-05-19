@@ -97,7 +97,7 @@ void Event_KeyDown(void *Arg)
 		case KB_RSHIFT:	Camera.shift=true;		break;
 		case KB_Z:		
 						for(int i=0;i<NUM_ASTEROIDS;i++)
-							explode(&Asteroids[i]);
+							PhysicsExplode(&Asteroids[i]);
 						break;
 		default:		break;
 	}

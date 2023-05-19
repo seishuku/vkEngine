@@ -5,7 +5,7 @@
 
 // Define constants
 #define WORLD_SCALE 1000.0f
-#define EXPLOSION_POWER (100.0f*WORLD_SCALE)
+#define EXPLOSION_POWER (50.0f*WORLD_SCALE)
 
 typedef struct
 {
@@ -18,9 +18,8 @@ typedef struct
 	vec3 Size;		// bounding box if it's an AABB
 } RigidBody_t;
 
-void integrate(RigidBody_t *body, float dt);
-void explode(RigidBody_t *bodies);
-void sphere_sphere_collision(RigidBody_t *a, RigidBody_t *b);
-void sphere_aabb_collision(RigidBody_t *sphere, RigidBody_t *aabb);
+void PhysicsIntegrate(RigidBody_t *body, float dt);
+void PhysicsExplode(RigidBody_t *bodies);
+void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b);
 
 #endif

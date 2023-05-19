@@ -74,10 +74,10 @@ int16_t MixSamples(int16_t a, int16_t b, uint8_t volume)
 {
     b=(b*volume)/MAX_VOLUME;
 
-    //if(a<0&&b<0)
-    //    return (a+b)-((a*b)/INT16_MIN);
-    //else if(a>0&&b>0)
-    //    return (a+b)-((a*b)/INT16_MAX);
+    if(a<0&&b<0)
+        return (a+b)-((a*b)/INT16_MIN);
+    else if(a>0&&b>0)
+        return (a+b)-((a*b)/INT16_MAX);
 
     // Why isn't this clipping now, it was before?
     return a+b;
