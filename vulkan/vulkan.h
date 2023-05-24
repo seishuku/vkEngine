@@ -13,6 +13,7 @@
 #include <vulkan/vulkan.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 #define vkCreateDebugUtilsMessengerEXT _vkCreateDebugUtilsMessengerEXT
 extern PFN_vkCreateDebugUtilsMessengerEXT _vkCreateDebugUtilsMessengerEXT;

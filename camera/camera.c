@@ -176,10 +176,9 @@ void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32
 void CameraRigidBodyCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
 {
 	// Camera mass constants, since camera struct doesn't store these
-	const float Camera_Mass=10.0f;
+	const float Camera_Mass=1000.0f;
 	const float Camera_invMass=1.0f/Camera_Mass;
 
-	// Calculate the distance between the camera and the sphere's center
 	vec3 Normal;
 	Vec3_Setv(Normal, Camera->Position);
 	Vec3_Subv(Normal, Body->Position);
@@ -189,45 +188,52 @@ void CameraRigidBodyCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
 	// Sum of radii
 	float radiusSum=Camera->Radius+Body->Radius;
 
-	// Check if the distance is less than the squared sum of the radii
+	// Check if the distance is less than the sum of the radii
 	if(DistanceSq<=radiusSum*radiusSum)
 	{
 		// Get the distance between objects
-		float Distance=sqrt(DistanceSq);
-
-		// Calculate amount of overlap
-		float Penetration=radiusSum-Distance;
+		float Distance=sqrtf(DistanceSq);
 
 		// Normalize the normal
 		Vec3_Muls(Normal, 1.0f/Distance);
+
+		// Calculate relative velocity between objects
+		vec3 relativeVelocity;
+		Vec3_Setv(relativeVelocity, Camera->Velocity);
+		Vec3_Subv(relativeVelocity, Body->Velocity);
+
+		// Calculate reflection of collision normal and relative velocity
+		vec3 Reflect;
+		Vec3_Reflect(Normal, relativeVelocity, Reflect);
+
+		// Calculate amount of overlap
+		float Penetration=radiusSum-Distance;
 
 		// Mass calculations
 		float massRatio=Body->Mass/Camera_Mass;
 		float totalMass=Body->Mass+Camera_Mass;
 
-		// Camera position correction
-		float cameraMovement=Penetration*(Body->Mass/totalMass);
-		Camera->Position[0]+=Normal[0]*cameraMovement;
-		Camera->Position[1]+=Normal[1]*cameraMovement;
-		Camera->Position[2]+=Normal[2]*cameraMovement;
+		// Object A position correction
+		float aMovement=Penetration*(Body->Mass/totalMass);
+		Camera->Position[0]+=Normal[0]*aMovement;
+		Camera->Position[1]+=Normal[1]*aMovement;
+		Camera->Position[2]+=Normal[2]*aMovement;
 
-		// Camera velocity response (reflection)
-		float cameraNdotV=Vec3_Dot(Normal, Camera->Velocity);
-		Camera->Velocity[0]-=2.0f*massRatio*Normal[0]*cameraNdotV;
-		Camera->Velocity[1]-=2.0f*massRatio*Normal[1]*cameraNdotV;
-		Camera->Velocity[2]-=2.0f*massRatio*Normal[2]*cameraNdotV;
+		// Object A velocity response
+		Camera->Velocity[0]+=Reflect[0]*massRatio;
+		Camera->Velocity[1]+=Reflect[1]*massRatio;
+		Camera->Velocity[2]+=Reflect[2]*massRatio;
 
-		// Rigid body position correction
-		float bodyMovement=Penetration*(Camera_Mass/totalMass);
-		Body->Position[0]-=Normal[0]*bodyMovement;
-		Body->Position[1]-=Normal[1]*bodyMovement;
-		Body->Position[2]-=Normal[2]*bodyMovement;
+		// Object B position correction
+		float bMovement=Penetration*(Camera_Mass/totalMass);
+		Body->Position[0]-=Normal[0]*bMovement;
+		Body->Position[1]-=Normal[1]*bMovement;
+		Body->Position[2]-=Normal[2]*bMovement;
 
-		// Rigid body velocity response (reflection)
-		float bodyNdotV=Vec3_Dot(Normal, Body->Velocity);
-		Body->Velocity[0]-=2.0f*(1.0f-massRatio)*Normal[0]*bodyNdotV;
-		Body->Velocity[1]-=2.0f*(1.0f-massRatio)*Normal[1]*bodyNdotV;
-		Body->Velocity[2]-=2.0f*(1.0f-massRatio)*Normal[2]*bodyNdotV;
+		// Object B velocity response
+		Body->Velocity[0]+=Reflect[0]*(1.0f-massRatio);
+		Body->Velocity[1]+=Reflect[1]*(1.0f-massRatio);
+		Body->Velocity[2]+=Reflect[2]*(1.0f-massRatio);
 	}
 }
 

@@ -345,7 +345,8 @@ void GenerateSkyParams(void)
 		MatrixRotate(RandFloat()*PI*2.0f, 1.0f, 0.0f, 0.0f, &Data[16*i]);
 		MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 1.0f, 0.0f, &Data[16*i]);
 		MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 0.0f, 1.0f, &Data[16*i]);
-		MatrixScale(Asteroids[i].Radius/2.0f, Asteroids[i].Radius/2.0f, Asteroids[i].Radius/2.0f, &Data[16*i]);
+		const float radiusScale=1.5f;
+		MatrixScale(Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale, &Data[16*i]);
 
 		Vec3_Sets(Asteroids[i].Velocity, 0.0f);
 //		Vec3_Setv(Asteroids[i].Velocity, RandomVec);
@@ -1274,6 +1275,7 @@ void Destroy(void)
 	Zone_Free(Zone, Sounds[SOUND_PEW1].data);
 	Zone_Free(Zone, Sounds[SOUND_PEW2].data);
 	Zone_Free(Zone, Sounds[SOUND_PEW3].data);
+	Zone_Free(Zone, Sounds[SOUND_STONES].data);
 
 	DestroyOpenVR();
 

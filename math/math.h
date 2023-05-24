@@ -98,6 +98,7 @@ float Vec2_Distance(const vec2 Vector1, const vec2 Vector2);
 float Vec3_Distance(const vec3 Vector1, const vec3 Vector2);
 float Vec4_Distance(const vec4 Vector1, const vec4 Vector2);
 float Vec3_GetAngle(const vec3 Vector1, const vec3 Vector2);
+void Vec3_Reflect(const vec3 N, const vec3 I, vec3 Result);
 float Vec2_Normalize(vec2 v);
 float Vec3_Normalize(vec3 v);
 float Vec4_Normalize(vec4 v);

@@ -6,27 +6,16 @@
 #include "../audio/audio.h"
 #include "../sounds.h"
 
-static void apply_border_constraints(RigidBody_t *Body)
+static void apply_constraints(RigidBody_t *Body)
 {
 	vec3 Center={ 0.0f, 0.0f, 0.0f };
-	float Radius=2000.0f;
+	const float maxRadius=2000.0f;
+	const float maxVelocity=500.0f;
 
-	// Clamp velocity to "a number".
-	//   This reduces the chance of the simulation going unstable.
-	if(Body->Velocity[0]>1000.0f)
-		Body->Velocity[0]=1000.0f;
-	else if(Body->Velocity[0]<-1000.0f)
-		Body->Velocity[0]=-1000.0f;
-
-	if(Body->Velocity[1]>1000.0f)
-		Body->Velocity[1]=1000.0f;
-	else if(Body->Velocity[1]<-1000.0f)
-		Body->Velocity[1]=-1000.0f;
-
-	if(Body->Velocity[2]>1000.0f)
-		Body->Velocity[2]=1000.0f;
-	else if(Body->Velocity[2]<-1000.0f)
-		Body->Velocity[2]=-1000.0f;
+	// Clamp velocity, this reduces the chance of the simulation going unstable
+	Body->Velocity[0]=min(maxVelocity, max(-maxVelocity, Body->Velocity[0]));
+	Body->Velocity[1]=min(maxVelocity, max(-maxVelocity, Body->Velocity[1]));
+	Body->Velocity[2]=min(maxVelocity, max(-maxVelocity, Body->Velocity[2]));
 
 	// Check for collision with outer boundary sphere and reflect velocity if needed
 	vec3 Normal;
@@ -35,17 +24,15 @@ static void apply_border_constraints(RigidBody_t *Body)
 
 	float distanceSq=Vec3_Dot(Normal, Normal);
 
-	if(distanceSq>Radius*Radius)
+	if(distanceSq>maxRadius*maxRadius)
 	{
-		float Distance=sqrt(distanceSq);
+		float Distance=sqrtf(distanceSq);
 
+		// Normalize the normal
 		Vec3_Muls(Normal, 1.0f/Distance);
 
-		float VdotN=Vec3_Dot(Body->Velocity, Normal);
-
-		Body->Velocity[0]-=2.0*VdotN*Normal[0];
-		Body->Velocity[1]-=2.0*VdotN*Normal[1];
-		Body->Velocity[2]-=2.0*VdotN*Normal[2];
+		// Simple velocity reflection to bounce off the "wall"
+		Vec3_Reflect(Normal, Body->Velocity, Body->Velocity);
 	}
 }
 
@@ -82,7 +69,7 @@ void PhysicsIntegrate(RigidBody_t *body, float dt)
 	body->Force[1]=0.0f;
 	body->Force[2]=0.0f;
 
-	apply_border_constraints(body);
+	apply_constraints(body);
 }
 
 void PhysicsExplode(RigidBody_t *body)
@@ -90,7 +77,7 @@ void PhysicsExplode(RigidBody_t *body)
 	vec3 explosion_center={ 0.0f, 0.0f, 0.0f };
 
 	// Random -1.0 to 1.0, normalized to get a random spherical vector
-	Vec3_Set(body->Velocity, (float)rand()/RAND_MAX*2.0f-1.0f, (float)rand()/RAND_MAX*2.0f-1.0f, (float)rand()/RAND_MAX*2.0f-1.0f);
+	Vec3_Set(body->Velocity, ((float)rand()/(float)RAND_MAX)*2.0f-1.0f, ((float)rand()/(float)RAND_MAX)*2.0f-1.0f, ((float)rand()/(float)RAND_MAX)*2.0f-1.0f);
 	Vec3_Normalize(body->Velocity);
 
 	// Calculate distance and direction from explosion center to fragment
@@ -115,6 +102,8 @@ void PhysicsExplode(RigidBody_t *body)
 
 void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 {
+	static uint32_t SoundCooldown=0;
+
 	// Calculate the distance between the camera and the sphere's center
 	vec3 Normal;
 	Vec3_Setv(Normal, a->Position);
@@ -129,10 +118,19 @@ void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 	if(DistanceSq<=radiusSum*radiusSum)
 	{
 		// Get the distance between objects
-		float Distance=sqrt(DistanceSq);
+		float Distance=sqrtf(DistanceSq);
 
 		// Normalize the normal
 		Vec3_Muls(Normal, 1.0f/Distance);
+
+		// Calculate relative velocity between objects
+		vec3 relativeVelocity;
+		Vec3_Setv(relativeVelocity, a->Velocity);
+		Vec3_Subv(relativeVelocity, b->Velocity);
+
+		// Calculate reflection of collision normal and relative velocity
+		vec3 Reflect;
+		Vec3_Reflect(Normal, relativeVelocity, Reflect);
 
 		// Calculate amount of overlap
 		float Penetration=radiusSum-Distance;
@@ -142,29 +140,39 @@ void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 		float totalMass=b->Mass+a->Mass;
 
 		// Object A position correction
-		float aMovement=Penetration*(b->Mass/totalMass)*1.01f;
+		float aMovement=Penetration*(b->Mass/totalMass);
 		a->Position[0]+=Normal[0]*aMovement;
 		a->Position[1]+=Normal[1]*aMovement;
 		a->Position[2]+=Normal[2]*aMovement;
 
-		// Object A velocity response (reflection)
-		float aNdotV=Vec3_Dot(Normal, a->Velocity);
-		a->Velocity[0]-=2.0f*massRatio*Normal[0]*aNdotV;
-		a->Velocity[1]-=2.0f*massRatio*Normal[1]*aNdotV;
-		a->Velocity[2]-=2.0f*massRatio*Normal[2]*aNdotV;
+		// Object A velocity response
+		a->Velocity[0]+=Reflect[0]*massRatio;
+		a->Velocity[1]+=Reflect[1]*massRatio;
+		a->Velocity[2]+=Reflect[2]*massRatio;
 
 		// Object B position correction
-		float bMovement=Penetration*(a->Mass/totalMass)*1.01f;
-		a->Position[0]+=Normal[0]*bMovement;
-		a->Position[1]+=Normal[1]*bMovement;
-		a->Position[2]+=Normal[2]*bMovement;
+		float bMovement=Penetration*(a->Mass/totalMass);
+		b->Position[0]-=Normal[0]*bMovement;
+		b->Position[1]-=Normal[1]*bMovement;
+		b->Position[2]-=Normal[2]*bMovement;
 
-		// Object B velocity response (reflection)
-		float bNdotV=Vec3_Dot(Normal, b->Velocity);
-		b->Velocity[0]-=2.0f*(1.0f-massRatio)*Normal[0]*bNdotV;
-		b->Velocity[1]-=2.0f*(1.0f-massRatio)*Normal[1]*bNdotV;
-		b->Velocity[2]-=2.0f*(1.0f-massRatio)*Normal[2]*bNdotV;
+		// Object B velocity response
+		b->Velocity[0]+=Reflect[0]*(1.0f-massRatio);
+		b->Velocity[1]+=Reflect[1]*(1.0f-massRatio);
+		b->Velocity[2]+=Reflect[2]*(1.0f-massRatio);
 
-		//Audio_PlaySample(&Sounds[SOUND_STONES], false);
+		// Dumb cooldown to quiet up the sound playback
+		if(SoundCooldown==0)
+		{
+			Audio_PlaySample(&Sounds[SOUND_STONES], false);
+			SoundCooldown++;
+		}
+		else
+		{
+			SoundCooldown++;
+
+			if(SoundCooldown>50)
+				SoundCooldown=0;
+		}
 	}
 }

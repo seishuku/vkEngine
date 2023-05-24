@@ -14,7 +14,7 @@
 PaStream *stream=NULL;
 
 #define MAX_VOLUME 255
-#define MAX_CHANNELS 64
+#define MAX_CHANNELS 128
 
 typedef struct
 {

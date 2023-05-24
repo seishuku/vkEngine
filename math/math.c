@@ -172,6 +172,18 @@ float Vec3_GetAngle(const vec3 Vector1, const vec3 Vector2)
 	return acosf(Vec3_Dot(Vector1, Vector2)/(Len1*Len2));
 }
 
+void Vec3_Reflect(const vec3 N, const vec3 I, vec3 Result)
+{
+	if(Result)
+	{
+		float NdotI=Vec3_Dot(N, I);
+
+		Result[0]=I[0]-2.0f*NdotI*N[0];
+		Result[1]=I[1]-2.0f*NdotI*N[1];
+		Result[2]=I[2]-2.0f*NdotI*N[2];
+	}
+}
+
 float Vec2_Normalize(vec2 v)
 {
 	if(v)
