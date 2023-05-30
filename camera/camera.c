@@ -9,7 +9,7 @@
 #include "../camera/camera.h"
 
 // Camera collision stuff
-int32_t ClassifySphere(float Center[3], float Normal[3], float Point[3], float radius, float *distance)
+int32_t ClassifySphere(vec3 Center, vec3 Normal, vec3 Point, float radius, float *distance)
 {
 	*distance=Vec3_Dot(Normal, Center)-Vec3_Dot(Normal, Point);
 
@@ -24,37 +24,34 @@ int32_t ClassifySphere(float Center[3], float Normal[3], float Point[3], float r
 	return 0;
 }
 
-int32_t InsidePolygon(float Intersection[3], float Tri[3][3])
+static bool InsidePolygon(const vec3 Intersection, const vec3 Tri[3])
 {
 	float Angle=0.0f;
-	float A[3], B[3], C[3];
+	vec3 A, B, C;
 
-	A[0]=Tri[0][0]-Intersection[0];
-	A[1]=Tri[0][1]-Intersection[1];
-	A[2]=Tri[0][2]-Intersection[2];
+	Vec3_Setv(&A, Tri[0]);
+	Vec3_Subv(&A, Intersection);
 
-	B[0]=Tri[1][0]-Intersection[0];
-	B[1]=Tri[1][1]-Intersection[1];
-	B[2]=Tri[1][2]-Intersection[2];
+	Vec3_Setv(&B, Tri[1]);
+	Vec3_Subv(&B, Intersection);
 
-	C[0]=Tri[2][0]-Intersection[0];
-	C[1]=Tri[2][1]-Intersection[1];
-	C[2]=Tri[2][2]-Intersection[2];
+	Vec3_Setv(&C, Tri[2]);
+	Vec3_Subv(&C, Intersection);
 
 	Angle+=Vec3_GetAngle(A, B);
 	Angle+=Vec3_GetAngle(B, C);
 	Angle+=Vec3_GetAngle(C, A);
 
 	if(Angle>=6.220353348f)
-		return 1;
+		return true;
 
-	return 0;
+	return false;
 }
 
-void ClosestPointOnLine(vec3 A, vec3 B, vec3 Point, vec3 ClosestPoint)
+static void ClosestPointOnLine(vec3 A, vec3 B, vec3 Point, vec3 *ClosestPoint)
 {
-	vec3 PointDir={ Point[0]-A[0], Point[1]-A[1], Point[2]-A[2] };
-	vec3 Slope={ B[0]-A[0], B[1]-A[1], B[2]-A[2] };
+	vec3 PointDir={ Point.x-A.x, Point.y-A.y, Point.z-A.z };
+	vec3 Slope={ B.x-A.y, B.y-A.y, B.z-A.z };
 	float d=Vec3_Dot(Slope, Slope), recip_d=0.0f;
 
 	if(d)
@@ -62,19 +59,19 @@ void ClosestPointOnLine(vec3 A, vec3 B, vec3 Point, vec3 ClosestPoint)
 
 	float t=fmaxf(0.0f, fminf(1.0f, Vec3_Dot(PointDir, Slope)*recip_d));
 
-	ClosestPoint[0]=A[0]+t*Slope[0];
-	ClosestPoint[1]=A[1]+t*Slope[1];
-	ClosestPoint[2]=A[2]+t*Slope[2];
+	ClosestPoint->x=A.x+t*Slope.x;
+	ClosestPoint->y=A.y+t*Slope.y;
+	ClosestPoint->z=A.z+t*Slope.z;
 }
 
-int32_t EdgeSphereCollision(vec3 Center, float Tri[3][3], float radius)
+int32_t EdgeSphereCollision(vec3 Center, vec3 Tri[3], float radius)
 {
 	int32_t i;
 	vec3 Point;
 
 	for(i=0;i<3;i++)
 	{
-		ClosestPointOnLine(Tri[i], Tri[(i+1)%3], Center, Point);
+		ClosestPointOnLine(Tri[i], Tri[(i+1)%3], Center, &Point);
 
 		float distance=Vec3_Distance(Point, Center);
 
@@ -85,46 +82,59 @@ int32_t EdgeSphereCollision(vec3 Center, float Tri[3][3], float radius)
 	return 0;
 }
 
-void GetCollisionOffset(vec3 Normal, float radius, float distance, vec3 Offset)
+void GetCollisionOffset(vec3 Normal, float radius, float distance, vec3 *Offset)
 {
 	if(distance>0.0f)
 	{
 		float distanceOver=radius-distance;
 
-		Offset[0]=Normal[0]*distanceOver;
-		Offset[1]=Normal[1]*distanceOver;
-		Offset[2]=Normal[2]*distanceOver;
+		Offset->x=Normal.x*distanceOver;
+		Offset->y=Normal.y*distanceOver;
+		Offset->z=Normal.z*distanceOver;
 	}
 	else
 	{
 		float distanceOver=radius+distance;
 
-		Offset[0]=Normal[0]*-distanceOver;
-		Offset[1]=Normal[1]*-distanceOver;
-		Offset[2]=Normal[2]*-distanceOver;
+		Offset->x=Normal.x*-distanceOver;
+		Offset->y=Normal.y*-distanceOver;
+		Offset->z=Normal.z*-distanceOver;
 	}
 }
 
-int32_t SphereBBOXIntersection(const vec3 Center, const float Radius, const vec3 BBMin, const vec3 BBMax)
+bool SphereBBOXIntersection(const vec3 Center, const float Radius, const vec3 BBMin, const vec3 BBMax)
 {
 	float dmin=0.0f;
 	float R2=Radius*Radius;
 
-	for(int32_t i=0;i<3;i++)
+	if(Center.x<BBMin.x)
+		dmin+=(Center.x-BBMin.x)*(Center.x-BBMin.x);
+	else
 	{
-		if(Center[i]<BBMin[i])
-			dmin+=(Center[i]-BBMin[i])*(Center[i]-BBMin[i]);
-		else
-		{
-			if(Center[i]>BBMax[i])
-				dmin+=(Center[i]-BBMax[i])*(Center[i]-BBMax[i]);
-		}
+		if(Center.x>BBMax.x)
+			dmin+=(Center.x-BBMax.x)*(Center.x-BBMax.x);
+	}
+
+	if(Center.y<BBMin.y)
+		dmin+=(Center.y-BBMin.y)*(Center.y-BBMin.y);
+	else
+	{
+		if(Center.y>BBMax.y)
+			dmin+=(Center.y-BBMax.y)*(Center.y-BBMax.y);
+	}
+
+	if(Center.z<BBMin.z)
+		dmin+=(Center.z-BBMin.z)*(Center.z-BBMin.z);
+	else
+	{
+		if(Center.z>BBMax.z)
+			dmin+=(Center.z-BBMax.z)*(Center.z-BBMax.z);
 	}
 
 	if(dmin<=R2)
-		return 1;
+		return true;
 
-	return 0;
+	return false;
 }
 
 // Camera<->triangle mesh collision detection and response
@@ -142,31 +152,27 @@ void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32
 			{ Vertex[3*Face[3*i+2]], Vertex[3*Face[3*i+2]+1], Vertex[3*Face[3*i+2]+2] }
 		};
 
-		vec3 v0={ Tri[1][0]-Tri[0][0], Tri[1][1]-Tri[0][1], Tri[1][2]-Tri[0][2] };
-		vec3 v1={ Tri[2][0]-Tri[0][0], Tri[2][1]-Tri[0][1], Tri[2][2]-Tri[0][2] };
+		vec3 v0={ Tri[1].x-Tri[0].x, Tri[1].y-Tri[0].y, Tri[1].z-Tri[0].z };
+		vec3 v1={ Tri[2].x-Tri[0].x, Tri[2].y-Tri[0].y, Tri[2].z-Tri[0].z };
 
-		Cross(v0, v1, n);
+		Vec3_Cross(v0, v1, &n);
 
-		Vec3_Normalize(n);
+		Vec3_Normalize(&n);
 
 		int32_t classification=ClassifySphere(Camera->Position, n, Tri[0], Camera->Radius, &distance);
 
 		if(classification==1)
 		{
-			vec3 Offset={ n[0]*distance, n[1]*distance, n[2]*distance };
-			vec3 Intersection={ Camera->Position[0]-Offset[0], Camera->Position[1]-Offset[1], Camera->Position[2]-Offset[2] };
+			vec3 Offset={ n.x*distance, n.y*distance, n.z*distance };
+			vec3 Intersection={ Camera->Position.x-Offset.x, Camera->Position.y-Offset.y, Camera->Position.z-Offset.z };
 
 			if(InsidePolygon(Intersection, Tri)||EdgeSphereCollision(Camera->Position, Tri, Camera->Radius*0.5f))
 			{
-				GetCollisionOffset(n, Camera->Radius, distance, Offset);
+				GetCollisionOffset(n, Camera->Radius, distance, &Offset);
 
-				Camera->Position[0]+=Offset[0];
-				Camera->Position[1]+=Offset[1];
-				Camera->Position[2]+=Offset[2];
-
-				Camera->View[0]+=Offset[0];
-				Camera->View[1]+=Offset[1];
-				Camera->View[2]+=Offset[2];
+				Camera->Position.x+=Offset.x;
+				Camera->Position.y+=Offset.y;
+				Camera->Position.z+=Offset.z;
 			}
 		}
 	}
@@ -176,12 +182,14 @@ void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32
 void CameraRigidBodyCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
 {
 	// Camera mass constants, since camera struct doesn't store these
-	const float Camera_Mass=1000.0f;
+	const float Camera_Mass=100.0f;
 	const float Camera_invMass=1.0f/Camera_Mass;
 
+
+	// Calculate the distance between the camera and the sphere's center
 	vec3 Normal;
-	Vec3_Setv(Normal, Camera->Position);
-	Vec3_Subv(Normal, Body->Position);
+	Vec3_Setv(&Normal, Body->Position);
+	Vec3_Subv(&Normal, Camera->Position);
 
 	float DistanceSq=Vec3_Dot(Normal, Normal);
 
@@ -191,69 +199,51 @@ void CameraRigidBodyCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
 	// Check if the distance is less than the sum of the radii
 	if(DistanceSq<=radiusSum*radiusSum)
 	{
-		// Get the distance between objects
-		float Distance=sqrtf(DistanceSq);
+		float distance=sqrtf(DistanceSq);
 
-		// Normalize the normal
-		Vec3_Muls(Normal, 1.0f/Distance);
+		Vec3_Muls(&Normal, 1.0f/distance);
 
-		// Calculate relative velocity between objects
-		vec3 relativeVelocity;
-		Vec3_Setv(relativeVelocity, Camera->Velocity);
-		Vec3_Subv(relativeVelocity, Body->Velocity);
+		const float Penetration=radiusSum-distance;
+		const float totalMass=Camera_invMass+Body->invMass;
 
-		// Calculate reflection of collision normal and relative velocity
-		vec3 Reflect;
-		Vec3_Reflect(Normal, relativeVelocity, Reflect);
+		Camera->Position.x-=Normal.x*Penetration*(Camera_invMass/totalMass);
+		Camera->Position.y-=Normal.y*Penetration*(Camera_invMass/totalMass);
+		Camera->Position.z-=Normal.z*Penetration*(Camera_invMass/totalMass);
 
-		// Calculate amount of overlap
-		float Penetration=radiusSum-Distance;
+		Body->Position.x+=Normal.x*Penetration*(Body->invMass/totalMass);
+		Body->Position.y+=Normal.y*Penetration*(Body->invMass/totalMass);
+		Body->Position.z+=Normal.z*Penetration*(Body->invMass/totalMass);
 
-		// Mass calculations
-		float massRatio=Body->Mass/Camera_Mass;
-		float totalMass=Body->Mass+Camera_Mass;
+		vec3 contactVelocity;
+		Vec3_Setv(&contactVelocity, Body->Velocity);
+		Vec3_Subv(&contactVelocity, Camera->Velocity);
 
-		// Object A position correction
-		float aMovement=Penetration*(Body->Mass/totalMass);
-		Camera->Position[0]+=Normal[0]*aMovement;
-		Camera->Position[1]+=Normal[1]*aMovement;
-		Camera->Position[2]+=Normal[2]*aMovement;
+		const float Restitution=0.66f;
+		float j=(-(1.0f+Restitution)*Vec3_Dot(contactVelocity, Normal))/totalMass;
 
-		// Object A velocity response
-		Camera->Velocity[0]+=Reflect[0]*massRatio;
-		Camera->Velocity[1]+=Reflect[1]*massRatio;
-		Camera->Velocity[2]+=Reflect[2]*massRatio;
+		vec3 Impulse;
+		Vec3_Setv(&Impulse, Normal);
+		Vec3_Muls(&Impulse, j);
 
-		// Object B position correction
-		float bMovement=Penetration*(Camera_Mass/totalMass);
-		Body->Position[0]-=Normal[0]*bMovement;
-		Body->Position[1]-=Normal[1]*bMovement;
-		Body->Position[2]-=Normal[2]*bMovement;
+		Camera->Velocity.x-=Impulse.x*Camera_invMass;
+		Camera->Velocity.y-=Impulse.y*Camera_invMass;
+		Camera->Velocity.z-=Impulse.z*Camera_invMass;
 
-		// Object B velocity response
-		Body->Velocity[0]+=Reflect[0]*(1.0f-massRatio);
-		Body->Velocity[1]+=Reflect[1]*(1.0f-massRatio);
-		Body->Velocity[2]+=Reflect[2]*(1.0f-massRatio);
+		Body->Velocity.x+=Impulse.x*Body->invMass;
+		Body->Velocity.y+=Impulse.y*Body->invMass;
+		Body->Velocity.z+=Impulse.z*Body->invMass;
 	}
 }
 
 // Actual camera stuff
 void CameraInit(Camera_t *Camera, const vec3 Position, const vec3 View, const vec3 Up)
 {
-	Camera->Position[0]=Position[0];
-	Camera->Position[1]=Position[1];
-	Camera->Position[2]=Position[2];
+	Vec3_Setv(&Camera->Position, Position);
+	Vec3_Setv(&Camera->View, View);
+	Vec3_Setv(&Camera->Up, Up);
 
-	Camera->View[0]=View[0];
-	Camera->View[1]=View[1];
-	Camera->View[2]=View[2];
-
-	Camera->Up[0]=Up[0];
-	Camera->Up[1]=Up[1];
-	Camera->Up[2]=Up[2];
-
-	Cross(Camera->View, Camera->Up, Camera->Forward);
-	Cross(Camera->Forward, Camera->Up, Camera->Right);
+	Vec3_Cross(Camera->View, Camera->Up, &Camera->Forward);
+	Vec3_Cross(Camera->Forward, Camera->Up, &Camera->Right);
 
 	Camera->Pitch=0.0f;
 	Camera->Yaw=0.0f;
@@ -261,9 +251,7 @@ void CameraInit(Camera_t *Camera, const vec3 Position, const vec3 View, const ve
 
 	Camera->Radius=10.0f;
 
-	Camera->Velocity[0]=0.0f;
-	Camera->Velocity[1]=0.0f;
-	Camera->Velocity[2]=0.0f;
+	Vec3_Sets(&Camera->Velocity, 0.0f);
 
 	Camera->key_w=0;
 	Camera->key_s=0;
@@ -281,45 +269,40 @@ void CameraPitch(Camera_t *Camera, const float Angle)
 {
 	vec4 quat;
 
-	QuatAnglev(Angle, Camera->Right, quat);
-	QuatRotate(quat, Camera->Forward, Camera->Forward);
-	Vec3_Normalize(Camera->Forward);
+	QuatAnglev(Angle, Camera->Right, &quat);
+	QuatRotate(quat, Camera->Forward, &Camera->Forward);
+	Vec3_Normalize(&Camera->Forward);
 
-	Cross(Camera->Forward, Camera->Right, Camera->Up);
-	Camera->Up[0]*=-1;
-	Camera->Up[1]*=-1;
-	Camera->Up[2]*=-1;
+	Vec3_Cross(Camera->Forward, Camera->Right, &Camera->Up);
+	Vec3_Muls(&Camera->Up, -1.0f);
 }
 
 void CameraYaw(Camera_t *Camera, const float Angle)
 {
 	vec4 quat;
 
-	QuatAnglev(Angle, Camera->Up, quat);
-	QuatRotate(quat, Camera->Forward, Camera->Forward);
-	Vec3_Normalize(Camera->Forward);
+	QuatAnglev(Angle, Camera->Up, &quat);
+	QuatRotate(quat, Camera->Forward, &Camera->Forward);
+	Vec3_Normalize(&Camera->Forward);
 
-	Cross(Camera->Forward, Camera->Up, Camera->Right);
+	Vec3_Cross(Camera->Forward, Camera->Up, &Camera->Right);
 }
 
 void CameraRoll(Camera_t *Camera, const float Angle)
 {
-	float quat[4];
+	vec4 quat;
 
-	QuatAnglev(-Angle, Camera->Forward, quat);
-	QuatRotate(quat, Camera->Right, Camera->Right);
-	Vec3_Normalize(Camera->Right);
+	QuatAnglev(-Angle, Camera->Forward, &quat);
+	QuatRotate(quat, Camera->Right, &Camera->Right);
+	Vec3_Normalize(&Camera->Right);
 
-	Cross(Camera->Forward, Camera->Right, Camera->Up);
-	Camera->Up[0]*=-1;
-	Camera->Up[1]*=-1;
-	Camera->Up[2]*=-1;
+	Vec3_Cross(Camera->Forward, Camera->Right, &Camera->Up);
+	Vec3_Muls(&Camera->Up, -1.0f);
 }
 
-void CameraUpdate(Camera_t *Camera, float Time, matrix out)
+void CameraUpdate(Camera_t *Camera, float dt, matrix out)
 {
 	float speed=2.0f;
-	float m[16];
 
 	if(!out)
 		return;
@@ -328,71 +311,68 @@ void CameraUpdate(Camera_t *Camera, float Time, matrix out)
 		speed*=2.0f;
 
 	if(Camera->key_d)
-		Camera->Velocity[0]+=Time;
+		Camera->Velocity.x+=speed;
 
 	if(Camera->key_a)
-		Camera->Velocity[0]-=Time;
+		Camera->Velocity.x-=speed;
 
 	if(Camera->key_v)
-		Camera->Velocity[1]+=Time;
+		Camera->Velocity.y+=speed;
 
 	if(Camera->key_c)
-		Camera->Velocity[1]-=Time;
+		Camera->Velocity.y-=speed;
 
 	if(Camera->key_w)
-		Camera->Velocity[2]+=Time;
+		Camera->Velocity.z+=speed;
 
 	if(Camera->key_s)
-		Camera->Velocity[2]-=Time;
+		Camera->Velocity.z-=speed;
 
 	if(Camera->key_q)
-		Camera->Roll+=Time*0.125f;
+		Camera->Roll+=0.125f;
 
 	if(Camera->key_e)
-		Camera->Roll-=Time*0.125f;
+		Camera->Roll-=0.125f;
 
 	if(Camera->key_left)
-		Camera->Yaw+=Time*0.125f;
+		Camera->Yaw+=0.125f;
 
 	if(Camera->key_right)
-		Camera->Yaw-=Time*0.125f;
+		Camera->Yaw-=0.125f;
 
 	if(Camera->key_up)
-		Camera->Pitch+=Time*0.125f;
+		Camera->Pitch+=0.125f;
 
 	if(Camera->key_down)
-		Camera->Pitch-=Time*0.125f;
+		Camera->Pitch-=0.125f;
 
-	const float Damp=0.93f;//Time*65.0f;
-	Camera->Velocity[0]*=Damp;
-	Camera->Velocity[1]*=Damp;
-	Camera->Velocity[2]*=Damp;
+	const float Damp=0.92f;
+	Vec3_Muls(&Camera->Velocity, Damp);
 	Camera->Pitch*=Damp;
 	Camera->Yaw*=Damp;
 	Camera->Roll*=Damp;
 
-	CameraPitch(Camera, Camera->Pitch);
-	CameraYaw(Camera, Camera->Yaw);
-	CameraRoll(Camera, Camera->Roll);
+	CameraPitch(Camera, Camera->Pitch*dt);
+	CameraYaw(Camera, Camera->Yaw*dt);
+	CameraRoll(Camera, Camera->Roll*dt);
 
-	Camera->Position[0]+=Camera->Right[0]*speed*Camera->Velocity[0];
-	Camera->Position[1]+=Camera->Right[1]*speed*Camera->Velocity[0];
-	Camera->Position[2]+=Camera->Right[2]*speed*Camera->Velocity[0];
+	Camera->Position.x+=Camera->Right.x*Camera->Velocity.x*dt;
+	Camera->Position.y+=Camera->Right.y*Camera->Velocity.x*dt;
+	Camera->Position.z+=Camera->Right.z*Camera->Velocity.x*dt;
 
-	Camera->Position[0]+=Camera->Up[0]*speed*Camera->Velocity[1];
-	Camera->Position[1]+=Camera->Up[1]*speed*Camera->Velocity[1];
-	Camera->Position[2]+=Camera->Up[2]*speed*Camera->Velocity[1];
+	Camera->Position.x+=Camera->Up.x*Camera->Velocity.y*dt;
+	Camera->Position.y+=Camera->Up.y*Camera->Velocity.y*dt;
+	Camera->Position.z+=Camera->Up.z*Camera->Velocity.y*dt;
 
-	Camera->Position[0]+=Camera->Forward[0]*speed*Camera->Velocity[2];
-	Camera->Position[1]+=Camera->Forward[1]*speed*Camera->Velocity[2];
-	Camera->Position[2]+=Camera->Forward[2]*speed*Camera->Velocity[2];
+	Camera->Position.x+=Camera->Forward.x*Camera->Velocity.z*dt;
+	Camera->Position.y+=Camera->Forward.y*Camera->Velocity.z*dt;
+	Camera->Position.z+=Camera->Forward.z*Camera->Velocity.z*dt;
 
-	Camera->View[0]=Camera->Position[0]+Camera->Forward[0];
-	Camera->View[1]=Camera->Position[1]+Camera->Forward[1];
-	Camera->View[2]=Camera->Position[2]+Camera->Forward[2];
+	Camera->View.x=Camera->Position.x+Camera->Forward.x;
+	Camera->View.y=Camera->Position.y+Camera->Forward.y;
+	Camera->View.z=Camera->Position.z+Camera->Forward.z;
 
-	MatrixLookAt(Camera->Position, Camera->View, Camera->Up, m);
-	MatrixMult(m, out, out);
+	MatrixLookAt(Camera->Position, Camera->View, Camera->Up, out);
 }
 
 // Camera path track stuff
@@ -449,20 +429,20 @@ void CalculateKnots(int32_t *knots, int32_t n, int32_t t)
 	}
 }
 
-void CalculatePoint(int32_t *knots, int32_t n, int32_t t, float v, float *control, float *output)
+void CalculatePoint(int32_t *knots, int32_t n, int32_t t, float v, float *control, vec3 *output)
 {
 	int32_t k;
 	float b;
 
-	output[0]=output[1]=output[2]=0.0f;
+	Vec3_Sets(output, 0.0f);
 
 	for(k=0;k<=n;k++)
 	{
 		b=Blend(k, t, knots, v);
 
-		output[0]+=control[3*k]*b;
-		output[1]+=control[3*k+1]*b;
-		output[2]+=control[3*k+2]*b;
+		output->x+=control[3*k]*b;
+		output->y+=control[3*k+1]*b;
+		output->z+=control[3*k+2]*b;
 	}
 }
 
@@ -546,8 +526,8 @@ void CameraInterpolatePath(CameraPath_t *Path, Camera_t *Camera, float TimeStep,
 	if(Path->Time>Path->EndTime)
 		Path->Time=0.0f;
 
-	CalculatePoint(Path->Knots, Path->NumPoints-1, 3, Path->Time, Path->Position, Camera->Position);
-	CalculatePoint(Path->Knots, Path->NumPoints-1, 3, Path->Time, Path->View, Camera->View);
+	CalculatePoint(Path->Knots, Path->NumPoints-1, 3, Path->Time, Path->Position, &Camera->Position);
+	CalculatePoint(Path->Knots, Path->NumPoints-1, 3, Path->Time, Path->View, &Camera->View);
 
 	MatrixLookAt(Camera->Position, Camera->View, Camera->Up, m);
 	MatrixMult(m, out, out);

@@ -8,11 +8,11 @@
 typedef struct
 {
 	vec3 Position;
+	vec3 Velocity;
 	vec3 Forward;
 	vec3 View;
 	vec3 Up;
 	vec3 Right;
-	vec3 Velocity;
 
 	float Pitch;
 	float Yaw;

@@ -31,7 +31,7 @@ struct
 {
 	uint32_t Advance;
 	uint32_t numPath;
-	vec2 *Path;
+	float *Path;
 } Gylphs[256];
 
 uint32_t GylphSize=0;
@@ -66,12 +66,12 @@ bool LoadFontGylphs(const char *Filename)
 		fread(&Gylphs[i].numPath, sizeof(uint32_t), 1, Stream);
 
 		// Allocate memory and read in the paths
-		Gylphs[i].Path=malloc(sizeof(vec2)*Gylphs[i].numPath);
+		Gylphs[i].Path=malloc(sizeof(float)*2*Gylphs[i].numPath);
 
 		if(!Gylphs[i].Path)
 			return false;
 
-		fread(Gylphs[i].Path, sizeof(vec2), Gylphs[i].numPath, Stream);
+		fread(Gylphs[i].Path, sizeof(float)*2, Gylphs[i].numPath, Stream);
 	}
 
 	fclose(Stream);
@@ -204,7 +204,7 @@ void Font_Print(VkCommandBuffer CommandBuffer, uint32_t Eye, float x, float y, c
 		// Push the current character gylph path with offset and color on to the list
 		for(uint32_t i=0;i<Gylphs[(uint32_t)*ptr].numPath;i++)
 		{
-			float vert[]={ Gylphs[(uint32_t)*ptr].Path[i][0]+x, Gylphs[(uint32_t)*ptr].Path[i][1]+y, -1.0f, 1.0f, r, g, b, 1.0f};
+			float vert[]={ Gylphs[(uint32_t)*ptr].Path[2*i+0]+x, Gylphs[(uint32_t)*ptr].Path[2*i+1]+y, -1.0f, 1.0f, r, g, b, 1.0f};
 			List_Add(&FontVectors, vert);
 		}
 

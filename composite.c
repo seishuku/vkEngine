@@ -89,7 +89,7 @@ bool CreateGaussianPipeline(void)
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
 			.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
-			.offset=0, .size=sizeof(vec2),
+			.offset=0, .size=sizeof(float)*2,
 		},
 	}, 0, &GaussianPipelineLayout);
 
@@ -278,7 +278,7 @@ void CompositeDraw(uint32_t Index, uint32_t Eye)
 
 	vkCmdBindPipeline(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GaussianPipeline.Pipeline);
 
-	vkCmdPushConstants(PerFrame[Index].CommandBuffer, GaussianPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &(vec2){ 1.0f, 0.0 });
+	vkCmdPushConstants(PerFrame[Index].CommandBuffer, GaussianPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*2, &(float[]){ 1.0f, 0.0 });
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&GaussianDescriptorSet, 0, &ColorBlur[Eye]);
 	vkuAllocateUpdateDescriptorSet(&GaussianDescriptorSet, PerFrame[Index].DescriptorPool);
@@ -318,7 +318,7 @@ void CompositeDraw(uint32_t Index, uint32_t Eye)
 
 	vkCmdBindPipeline(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GaussianPipeline.Pipeline);
 
-	vkCmdPushConstants(PerFrame[Index].CommandBuffer, GaussianPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &(vec2){ 0.0f, 1.0 });
+	vkCmdPushConstants(PerFrame[Index].CommandBuffer, GaussianPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*2, &(float[]){ 0.0f, 1.0 });
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&GaussianDescriptorSet, 0, &ColorTemp[Eye]);
 	vkuAllocateUpdateDescriptorSet(&GaussianDescriptorSet, PerFrame[Index].DescriptorPool);

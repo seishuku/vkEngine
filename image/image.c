@@ -66,22 +66,22 @@ static bool _MakeNormalMap(VkuImage_t *Image)
 					const int ox=min(Image->Width-1, x+xx);
 					const float Pixel=(float)Image->Data[Channels*(oy*Image->Width+ox)]*OneOver255;
 
-					n[0]+=KernelX[yy*3+xx]*Pixel;
-					n[1]+=KernelY[yy*3+xx]*Pixel;
+					n.x+=KernelX[yy*3+xx]*Pixel;
+					n.y+=KernelY[yy*3+xx]*Pixel;
 				}
 			}
 
 			// Resulting convolution is the "normal" after normalizing.
-			Vec3_Normalize(n);
+			Vec3_Normalize(&n);
 
 			// Precalculate destination image index
 			const uint32_t Index=4*(y*Image->Width+x);
 
 			// Set destination image RGB to the normal value,
 			//   scaled and biased to fit the 16bit/channel unsigned integer image format
-			Buffer[Index+0]=(uint16_t)(65535.0f*(0.5f*n[0]+0.5f));
-			Buffer[Index+1]=(uint16_t)(65535.0f*(0.5f*n[1]+0.5f));
-			Buffer[Index+2]=(uint16_t)(65535.0f*(0.5f*n[2]+0.5f));
+			Buffer[Index+0]=(uint16_t)(65535.0f*(0.5f*n.x+0.5f));
+			Buffer[Index+1]=(uint16_t)(65535.0f*(0.5f*n.y+0.5f));
+			Buffer[Index+2]=(uint16_t)(65535.0f*(0.5f*n.z+0.5f));
 
 			// If the input image was an RGBA image, copy over the alpha channel from that, otherwise alpha=1.0.
 			if(Channels==4)
@@ -118,20 +118,20 @@ static bool _Normalize(VkuImage_t *Image)
 
 	for(uint32_t i=0;i<Image->Width*Image->Height;i++)
 	{
-		float n[3];
+		vec3 n;
 
 		// scale/bias BGR unorm -> Normal float
-		n[0]=2.0f*((float)Image->Data[Channels*i+2]*OneOver255)-1.0f;
-		n[1]=2.0f*((float)Image->Data[Channels*i+1]*OneOver255)-1.0f;
-		n[2]=2.0f*((float)Image->Data[Channels*i+0]*OneOver255)-1.0f;
+		n.x=2.0f*((float)Image->Data[Channels*i+2]*OneOver255)-1.0f;
+		n.y=2.0f*((float)Image->Data[Channels*i+1]*OneOver255)-1.0f;
+		n.z=2.0f*((float)Image->Data[Channels*i+0]*OneOver255)-1.0f;
 
 		// Normalize it
-		Vec3_Normalize(n);
+		Vec3_Normalize(&n);
 
 		// scale/bias normal back into a 16bit/channel unorm image
-		Buffer[4*i+0]=(uint16_t)(65535.0f*(0.5f*n[0]+0.5f));
-		Buffer[4*i+1]=(uint16_t)(65535.0f*(0.5f*n[1]+0.5f));
-		Buffer[4*i+2]=(uint16_t)(65535.0f*(0.5f*n[2]+0.5f));
+		Buffer[4*i+0]=(uint16_t)(65535.0f*(0.5f*n.x+0.5f));
+		Buffer[4*i+1]=(uint16_t)(65535.0f*(0.5f*n.y+0.5f));
+		Buffer[4*i+2]=(uint16_t)(65535.0f*(0.5f*n.z+0.5f));
 
 		// Pass along alpha channel if original image was RGBA
 		if(Channels==4)
@@ -606,26 +606,27 @@ static void _GetPixelBilinear(VkuImage_t *Image, float x, float y, void *Out)
 
 // _GetUVAngularMap, internal function used by _AngularMapFace.
 // Gets angular map lightprobe UV coorinate from a 3D coordinate.
-static void _GetUVAngularMap(vec3 xyz, vec2 uv)
+static void _GetUVAngularMap(vec3 xyz, vec2 *uv)
 {
-	float phi=-(float)acos(xyz[2]), theta=(float)atan2(xyz[1], xyz[0]);
+	float phi=-(float)acos(xyz.z), theta=(float)atan2(xyz.y, xyz.x);
 
-	Vec2_Set(uv, 0.5f*((phi/PI)*(float)cos(theta))+0.5f,
+	Vec2_Set(uv,
+			 0.5f*((phi/PI)*(float)cos(theta))+0.5f,
 			 0.5f*((phi/PI)*(float)sin(theta))+0.5f);
 }
 
 // _GetXYZFace, internal function used by _AngularMapFace.
 // Gets 3D coordinate from a 2D UV coorinate and face selection.
-static void _GetXYZFace(vec2 uv, vec3 xyz, int face)
+static void _GetXYZFace(vec2 uv, vec3 *xyz, int face)
 {
 	switch(face)
 	{
-		case 0: Vec3_Set(xyz, 1.0f, (uv[1]-0.5f)*2.0f, (0.5f-uv[0])*2.0f);	break; // +X
-		case 1: Vec3_Set(xyz, -1.0f, (uv[1]-0.5f)*2.0f, (uv[0]-0.5f)*2.0f);	break; // -X
-		case 2: Vec3_Set(xyz, (uv[0]-0.5f)*2.0f, -1.0f, (uv[1]-0.5f)*2.0f);	break; // +Y
-		case 3: Vec3_Set(xyz, (uv[0]-0.5f)*2.0f, 1.0f, (0.5f-uv[1])*2.0f);	break; // -Y
-		case 4: Vec3_Set(xyz, (uv[0]-0.5f)*2.0f, (uv[1]-0.5f)*2.0f, 1.0f);	break; // +Z
-		case 5: Vec3_Set(xyz, (0.5f-uv[0])*2.0f, (uv[1]-0.5f)*2.0f, -1.0f);	break; // -Z
+		case 0: Vec3_Set(xyz, 1.0f, (uv.y-0.5f)*2.0f, (0.5f-uv.x)*2.0f);	break; // +X
+		case 1: Vec3_Set(xyz, -1.0f, (uv.y-0.5f)*2.0f, (uv.x-0.5f)*2.0f);	break; // -X
+		case 2: Vec3_Set(xyz, (uv.x-0.5f)*2.0f, -1.0f, (uv.y-0.5f)*2.0f);	break; // +Y
+		case 3: Vec3_Set(xyz, (uv.x-0.5f)*2.0f, 1.0f, (0.5f-uv.y)*2.0f);	break; // -Y
+		case 4: Vec3_Set(xyz, (uv.x-0.5f)*2.0f, (uv.y-0.5f)*2.0f, 1.0f);	break; // +Z
+		case 5: Vec3_Set(xyz, (0.5f-uv.x)*2.0f, (uv.y-0.5f)*2.0f, -1.0f);	break; // -Z
 	}
 
 	Vec3_Normalize(xyz);
@@ -654,15 +655,15 @@ static bool _AngularMapFace(VkuImage_t *In, int Face, VkuImage_t *Out)
 			vec2 uv={ fx, fy };
 
 			// Get a 3D cubemap coordinate for the given UV and selected cube face
-			_GetXYZFace(uv, xyz, Face);
+			_GetXYZFace(uv, &xyz, Face);
 
 			// Use that 3D coordinate and this function to transform it into a UV coord into an angular map lightprobe
 			// TODO: This function can also be substituted for other image formats (lat/lon,  vertical cross, mirror ball),
 			//		   maybe add a flag for different layouts?
-			_GetUVAngularMap(xyz, uv);
+			_GetUVAngularMap(xyz, &uv);
 
 			// Bilinearly sample the pixel from the source image and set it into the output data (destination cubemap face)
-			_GetPixelBilinear(In, uv[0]*In->Width, uv[1]*In->Height, (void *)&Out->Data[(Out->Depth>>3)*(y*Out->Width+x)]);
+			_GetPixelBilinear(In, uv.x*In->Width, uv.y*In->Height, (void *)&Out->Data[(Out->Depth>>3)*(y*Out->Width+x)]);
 		}
 	}
 

@@ -21,7 +21,7 @@ typedef struct
     int16_t *data;
     uint32_t pos, len;
     bool looping;
-    float *xyz;
+    vec3 *xyz;
 } Channel_t;
 
 vec3 Zero={ 0.0f, 0.0f, 0.0f };
@@ -35,8 +35,8 @@ vec3 listener_right={ 1.0f, 0.0f, 0.0f };
 
 void Audio_SetListenerOrigin(vec3 pos, vec3 right)
 {
-    Vec3_Setv(listener_origin, pos);
-    Vec3_Setv(listener_right, right);
+    Vec3_Setv(&listener_origin, pos);
+    Vec3_Setv(&listener_right, right);
 }
 
 void Spatialize(vec3 origin, uint8_t *left_vol, uint8_t *right_vol)
@@ -46,10 +46,10 @@ void Spatialize(vec3 origin, uint8_t *left_vol, uint8_t *right_vol)
     const float dist_mult=1.0f/500.0f;
 
     // Distance from listener to sound source
-    Vec3_Setv(source_vec, origin);
-    Vec3_Subv(source_vec, listener_origin);
+    Vec3_Setv(&source_vec, origin);
+    Vec3_Subv(&source_vec, listener_origin);
 
-    float dist=(Vec3_Normalize(source_vec)-MAX_VOLUME)*dist_mult;
+    float dist=(Vec3_Normalize(&source_vec)-MAX_VOLUME)*dist_mult;
 
     // Clamp to full volume
     if(dist<0.0f)
@@ -117,7 +117,7 @@ int paCallback(const void *inputBuffer, void *outputBuffer, unsigned long frames
             int16_t output_sampleR=*out+1;
             uint8_t left=0, right=0;
 
-            Spatialize(channel->xyz, &left, &right);
+            Spatialize(*channel->xyz, &left, &right);
 
             *out++=MixSamples(output_sampleL, input_sample, left);
             *out++=MixSamples(output_sampleR, input_sample, right);
@@ -141,7 +141,7 @@ int paCallback(const void *inputBuffer, void *outputBuffer, unsigned long frames
                 channel->pos=0;
                 channel->len=0;
                 channel->looping=false;
-                channel->xyz=Zero;
+                channel->xyz=&Zero;
             }
         }
     }
@@ -172,7 +172,7 @@ void Audio_PlaySample(Sample_t *Sample, bool looping)
     channels[index].len=Sample->len;
     channels[index].pos=0;
     channels[index].looping=looping;
-    channels[index].xyz=Sample->xyz;
+    channels[index].xyz=&Sample->xyz;
 }
 
 int Audio_Init(void)
@@ -186,7 +186,7 @@ int Audio_Init(void)
         channels[i].pos=0;
         channels[i].len=0;
         channels[i].looping=false;
-        channels[i].xyz=Zero;
+        channels[i].xyz=&Zero;
     }
 
     // Initialize PortAudio

@@ -45,70 +45,77 @@ static void CalculateTangent(BModel_t *Model)
 				uint32_t i2=Model->Mesh[j].Face[3*i+1];
 				uint32_t i3=Model->Mesh[j].Face[3*i+2];
 
-				v0[0]=Model->Vertex[3*i2+0]-Model->Vertex[3*i1+0];
-				v0[1]=Model->Vertex[3*i2+1]-Model->Vertex[3*i1+1];
-				v0[2]=Model->Vertex[3*i2+2]-Model->Vertex[3*i1+2];
+				v0.x=Model->Vertex[3*i2+0]-Model->Vertex[3*i1+0];
+				v0.y=Model->Vertex[3*i2+1]-Model->Vertex[3*i1+1];
+				v0.z=Model->Vertex[3*i2+2]-Model->Vertex[3*i1+2];
 
-				uv0[0]=Model->UV[2*i2+0]-Model->UV[2*i1+0];
-				uv0[1]=Model->UV[2*i2+1]-Model->UV[2*i1+1];
+				uv0.x=Model->UV[2*i2+0]-Model->UV[2*i1+0];
+				uv0.y=Model->UV[2*i2+1]-Model->UV[2*i1+1];
 
-				v1[0]=Model->Vertex[3*i3+0]-Model->Vertex[3*i1+0];
-				v1[1]=Model->Vertex[3*i3+1]-Model->Vertex[3*i1+1];
-				v1[2]=Model->Vertex[3*i3+2]-Model->Vertex[3*i1+2];
+				v1.x=Model->Vertex[3*i3+0]-Model->Vertex[3*i1+0];
+				v1.y=Model->Vertex[3*i3+1]-Model->Vertex[3*i1+1];
+				v1.z=Model->Vertex[3*i3+2]-Model->Vertex[3*i1+2];
 
-				uv1[0]=Model->UV[2*i3+0]-Model->UV[2*i1+0];
-				uv1[1]=Model->UV[2*i3+1]-Model->UV[2*i1+1];
+				uv1.x=Model->UV[2*i3+0]-Model->UV[2*i1+0];
+				uv1.y=Model->UV[2*i3+1]-Model->UV[2*i1+1];
 
-				r=1.0f/(uv0[0]*uv1[1]-uv1[0]*uv0[1]);
+				r=1.0f/(uv0.x*uv1.y-uv1.x*uv0.y);
 
-				s[0]=(uv1[1]*v0[0]-uv0[1]*v1[0])*r;
-				s[1]=(uv1[1]*v0[1]-uv0[1]*v1[1])*r;
-				s[2]=(uv1[1]*v0[2]-uv0[1]*v1[2])*r;
-				Vec3_Normalize(s);
+				s.x=(uv1.y*v0.x-uv0.y*v1.x)*r;
+				s.y=(uv1.y*v0.y-uv0.y*v1.y)*r;
+				s.z=(uv1.y*v0.z-uv0.y*v1.z)*r;
+				Vec3_Normalize(&s);
 
-				Model->Tangent[3*i1+0]+=s[0];	Model->Tangent[3*i1+1]+=s[1];	Model->Tangent[3*i1+2]+=s[2];
-				Model->Tangent[3*i2+0]+=s[0];	Model->Tangent[3*i2+1]+=s[1];	Model->Tangent[3*i2+2]+=s[2];
-				Model->Tangent[3*i3+0]+=s[0];	Model->Tangent[3*i3+1]+=s[1];	Model->Tangent[3*i3+2]+=s[2];
+				Model->Tangent[3*i1+0]+=s.x;	Model->Tangent[3*i1+1]+=s.y;	Model->Tangent[3*i1+2]+=s.z;
+				Model->Tangent[3*i2+0]+=s.x;	Model->Tangent[3*i2+1]+=s.y;	Model->Tangent[3*i2+2]+=s.z;
+				Model->Tangent[3*i3+0]+=s.x;	Model->Tangent[3*i3+1]+=s.y;	Model->Tangent[3*i3+2]+=s.z;
 
-				t[0]=(uv0[0]*v1[0]-uv1[0]*v0[0])*r;
-				t[1]=(uv0[0]*v1[1]-uv1[0]*v0[1])*r;
-				t[2]=(uv0[0]*v1[2]-uv1[0]*v0[2])*r;
-				Vec3_Normalize(t);
+				t.x=(uv0.x*v1.x-uv1.x*v0.x)*r;
+				t.y=(uv0.x*v1.y-uv1.x*v0.y)*r;
+				t.z=(uv0.x*v1.z-uv1.x*v0.z)*r;
+				Vec3_Normalize(&t);
 
-				Model->Binormal[3*i1+0]+=t[0];	Model->Binormal[3*i1+1]+=t[1];	Model->Binormal[3*i1+2]+=t[2];
-				Model->Binormal[3*i2+0]+=t[0];	Model->Binormal[3*i2+1]+=t[1];	Model->Binormal[3*i2+2]+=t[2];
-				Model->Binormal[3*i3+0]+=t[0];	Model->Binormal[3*i3+1]+=t[1];	Model->Binormal[3*i3+2]+=t[2];
+				Model->Binormal[3*i1+0]+=t.x;	Model->Binormal[3*i1+1]+=t.y;	Model->Binormal[3*i1+2]+=t.z;
+				Model->Binormal[3*i2+0]+=t.x;	Model->Binormal[3*i2+1]+=t.y;	Model->Binormal[3*i2+2]+=t.z;
+				Model->Binormal[3*i3+0]+=t.x;	Model->Binormal[3*i3+1]+=t.y;	Model->Binormal[3*i3+2]+=t.z;
 
-				Cross(v0, v1, n);
-				Vec3_Normalize(n);
+				Vec3_Cross(v0, v1, &n);
+				Vec3_Normalize(&n);
 
-				Model->Normal[3*i1+0]+=n[0];	Model->Normal[3*i1+1]+=n[1];	Model->Normal[3*i1+2]+=n[2];
-				Model->Normal[3*i2+0]+=n[0];	Model->Normal[3*i2+1]+=n[1];	Model->Normal[3*i2+2]+=n[2];
-				Model->Normal[3*i3+0]+=n[0];	Model->Normal[3*i3+1]+=n[1];	Model->Normal[3*i3+2]+=n[2];
+				Model->Normal[3*i1+0]+=n.x;	Model->Normal[3*i1+1]+=n.y;	Model->Normal[3*i1+2]+=n.z;
+				Model->Normal[3*i2+0]+=n.x;	Model->Normal[3*i2+1]+=n.y;	Model->Normal[3*i2+2]+=n.z;
+				Model->Normal[3*i3+0]+=n.x;	Model->Normal[3*i3+1]+=n.y;	Model->Normal[3*i3+2]+=n.z;
 			}
 		}
 
 		for(uint32_t i=0;i<Model->NumVertex;i++)
 		{
-			float *t=&Model->Tangent[3*i];
-			float *b=&Model->Binormal[3*i];
-			float *n=&Model->Normal[3*i];
+			vec3 t, b, n;
+
+			Vec3_Set(&t, Model->Tangent[3*i+0], Model->Tangent[3*i+1], Model->Tangent[3*i+2]);
+			Vec3_Set(&b, Model->Binormal[3*i+0], Model->Binormal[3*i+1], Model->Binormal[3*i+2]);
+			Vec3_Set(&n, Model->Normal[3*i+0], Model->Normal[3*i+1], Model->Normal[3*i+2]);
 
 			float d=Vec3_Dot(n, t);
-			t[0]-=n[0]*d;
-			t[1]-=n[1]*d;
-			t[2]-=n[2]*d;
-			Vec3_Normalize(t);
-			Vec3_Normalize(b);
-			Vec3_Normalize(n);
+			t.x-=n.x*d;
+			t.y-=n.y*d;
+			t.z-=n.z*d;
+
+			Vec3_Normalize(&t);
+			Vec3_Normalize(&b);
+			Vec3_Normalize(&n);
 
 			vec3 NxT;
-			Cross(n, t, NxT);
+			Vec3_Cross(n, t, &NxT);
 
 			if(Vec3_Dot(NxT, b)<0.0f)
-				Vec3_Muls(t, -1.0f);
+				Vec3_Muls(&t, -1.0f);
 
-			Vec3_Setv(b, NxT);
+			Vec3_Setv(&b, NxT);
+
+			memcpy(&Model->Tangent[3*i], &t, sizeof(float)*3);
+			memcpy(&Model->Binormal[3*i], &b, sizeof(float)*3);
+			memcpy(&Model->Normal[3*i], &n, sizeof(float)*3);
 		}
 	}
 }
@@ -164,10 +171,10 @@ bool LoadBModel(BModel_t *Model, const char *Filename)
 			return false;
 
 		ReadString(Model->Material[i].Name, 256, fp);
-		fread(Model->Material[i].Ambient, sizeof(float), 3, fp);
-		fread(Model->Material[i].Diffuse, sizeof(float), 3, fp);
-		fread(Model->Material[i].Specular, sizeof(float), 3, fp);
-		fread(Model->Material[i].Emission, sizeof(float), 3, fp);
+		fread(&Model->Material[i].Ambient, sizeof(float), 3, fp);
+		fread(&Model->Material[i].Diffuse, sizeof(float), 3, fp);
+		fread(&Model->Material[i].Specular, sizeof(float), 3, fp);
+		fread(&Model->Material[i].Emission, sizeof(float), 3, fp);
 		fread(&Model->Material[i].Shininess, sizeof(float), 1, fp);
 		ReadString(Model->Material[i].Texture, 256, fp);
 	}

@@ -195,6 +195,21 @@
     <ClCompile Include="physics\physics.c">
       <Filter>Source Files\physics</Filter>
     </ClCompile>
+    <ClCompile Include="math\vec2.c">
+      <Filter>Source Files\math</Filter>
+    </ClCompile>
+    <ClCompile Include="math\vec3.c">
+      <Filter>Source Files\math</Filter>
+    </ClCompile>
+    <ClCompile Include="math\vec4.c">
+      <Filter>Source Files\math</Filter>
+    </ClCompile>
+    <ClCompile Include="math\quat.c">
+      <Filter>Source Files\math</Filter>
+    </ClCompile>
+    <ClCompile Include="math\matrix.c">
+      <Filter>Source Files\math</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="math\math.h">

@@ -69,7 +69,7 @@
       <TreatWarningAsError>false</TreatWarningAsError>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -116,6 +116,11 @@
     <ClCompile Include="image\qoi.c" />
     <ClCompile Include="image\tga.c" />
     <ClCompile Include="math\math.c" />
+    <ClCompile Include="math\matrix.c" />
+    <ClCompile Include="math\quat.c" />
+    <ClCompile Include="math\vec2.c" />
+    <ClCompile Include="math\vec3.c" />
+    <ClCompile Include="math\vec4.c" />
     <ClCompile Include="model\bmodel.c" />
     <ClCompile Include="particle\particle.c" />
     <ClCompile Include="perframe.c" />

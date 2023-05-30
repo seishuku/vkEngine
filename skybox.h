@@ -8,10 +8,17 @@ typedef struct
 {
 	vec4 uOffset;
 
-	vec3 uNebulaAColor;
-	float uNebulaADensity;
-	vec3 uNebulaBColor;
-	float uNebulaBDensity;
+	// Unions here, to take advantage of the unused float in a vec3 (which is really a vec4, but loaded is loaded from "far end")
+	union
+	{
+		vec3 uNebulaAColor;
+		float uNebulaADensity;
+	};
+	union
+	{
+		vec3 uNebulaBColor;
+		float uNebulaBDensity;
+	};
 
 	float uStarsScale;
 	float uStarDensity;

@@ -177,8 +177,8 @@ void ShadowUpdateMap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 	MatrixIdentity(ModelView);
 
 	vec3 Position;
-	Vec3_Setv(Position, PerFrame[FrameIndex].Skybox_UBO[0]->uSunPosition);
-	Vec3_Muls(Position, 200.0f);
+	Vec3_Setv(&Position, *((vec3 *)&PerFrame[FrameIndex].Skybox_UBO[0]->uSunPosition));
+	Vec3_Muls(&Position, 200.0f);
 
 	MatrixLookAt(Position, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.0f, 1.0f, 0.0f }, ModelView);
 
