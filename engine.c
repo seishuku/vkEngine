@@ -658,24 +658,21 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 
 void Thread_Physics(void *Arg)
 {
-	const int subSteps=4;
-	const float inv_subSteps=1.0f/(float)subSteps;
-
 	// Loop through objects, integrate and check/resolve collisions
 	for(int i=0;i<NUM_ASTEROIDS;i++)
 	{
-		for(int steps=0;steps<subSteps;steps++)
-			PhysicsIntegrate(&Asteroids[i], fTimeStep*inv_subSteps);
+		PhysicsIntegrate(&Asteroids[i], fTimeStep);
 
 		for(int j=i+1;j<NUM_ASTEROIDS;j++)
 			PhysicsSphereToSphereCollisionResponse(&Asteroids[i], &Asteroids[j]);
 
-		CameraRigidBodyCollisionResponse(&Camera, &Asteroids[i]);
+		PhysicsCameraToSphereCollisionResponse(&Camera, &Asteroids[i]);
 	}
 	//////
 
 	// Update camera and modelview matrix
 	CameraUpdate(&Camera, fTimeStep, ModelView);
+	Audio_SetListenerOrigin(Camera.Position, Camera.Right);
 	//////
 
 	// Update instance positions
@@ -1059,7 +1056,16 @@ bool Init(void)
 	if(!Audio_LoadStatic("./assets/pew3.wav", &Sounds[SOUND_PEW3]))
 		return false;
 
-	if(!Audio_LoadStatic("./assets/stones.wav", &Sounds[SOUND_STONES]))
+	if(!Audio_LoadStatic("./assets/stone1.wav", &Sounds[SOUND_STONE1]))
+		return false;
+
+	if(!Audio_LoadStatic("./assets/stone2.wav", &Sounds[SOUND_STONE2]))
+		return false;
+
+	if(!Audio_LoadStatic("./assets/stone3.wav", &Sounds[SOUND_STONE3]))
+		return false;
+
+	if(!Audio_LoadStatic("./assets/crash.wav", &Sounds[SOUND_CRASH]))
 		return false;
 
 	// Load models
@@ -1272,7 +1278,10 @@ void Destroy(void)
 	Zone_Free(Zone, Sounds[SOUND_PEW1].data);
 	Zone_Free(Zone, Sounds[SOUND_PEW2].data);
 	Zone_Free(Zone, Sounds[SOUND_PEW3].data);
-	Zone_Free(Zone, Sounds[SOUND_STONES].data);
+	Zone_Free(Zone, Sounds[SOUND_STONE1].data);
+	Zone_Free(Zone, Sounds[SOUND_STONE2].data);
+	Zone_Free(Zone, Sounds[SOUND_STONE3].data);
+	Zone_Free(Zone, Sounds[SOUND_CRASH].data);
 
 	DestroyOpenVR();
 

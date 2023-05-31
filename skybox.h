@@ -8,26 +8,35 @@ typedef struct
 {
 	vec4 uOffset;
 
-	// Unions here, to take advantage of the unused float in a vec3 (which is really a vec4, but loaded is loaded from "far end")
+	// To take advantage of the unused float in a vec3,
+	//   I'm doing some union/struct shenanigans here because vectors are all 16 byte aligned.
 	union
 	{
 		vec3 uNebulaAColor;
-		float uNebulaADensity;
+		struct
+		{
+			float pad0[3]; // Padded out to locate it correctly.
+			float uNebulaADensity;
+		};
 	};
 	union
 	{
 		vec3 uNebulaBColor;
-		float uNebulaBDensity;
+		struct
+		{
+			float pad1[3]; // Padded out to locate it correctly.
+			float uNebulaBDensity;
+		};
 	};
 
 	float uStarsScale;
 	float uStarDensity;
-	float pad0[2];
+	float pad2[2];
 
 	vec4 uSunPosition;
 	float uSunSize;
 	float uSunFalloff;
-	float pad1[2];
+	float pad3[2];
 	vec4 uSunColor;
 } Skybox_UBO_t;
 

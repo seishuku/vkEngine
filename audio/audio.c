@@ -21,6 +21,7 @@ typedef struct
     int16_t *data;
     uint32_t pos, len;
     bool looping;
+    float vol;
     vec3 *xyz;
 } Channel_t;
 
@@ -119,8 +120,8 @@ int paCallback(const void *inputBuffer, void *outputBuffer, unsigned long frames
 
             Spatialize(*channel->xyz, &left, &right);
 
-            *out++=MixSamples(output_sampleL, input_sample, left);
-            *out++=MixSamples(output_sampleR, input_sample, right);
+            *out++=MixSamples(output_sampleL, input_sample, (uint8_t)((float)left*channel->vol));
+            *out++=MixSamples(output_sampleR, input_sample, (uint8_t)((float)right*channel->vol));
         }
 
         // Advance the sample position by what we've used, next time around will take another chunk.
@@ -150,7 +151,7 @@ int paCallback(const void *inputBuffer, void *outputBuffer, unsigned long frames
 }
 
 // Add a sound to first open channel.
-void Audio_PlaySample(Sample_t *Sample, bool looping)
+void Audio_PlaySample(Sample_t *Sample, bool looping, float vol, vec3 *pos)
 {
     int32_t index;
 
@@ -172,7 +173,14 @@ void Audio_PlaySample(Sample_t *Sample, bool looping)
     channels[index].len=Sample->len;
     channels[index].pos=0;
     channels[index].looping=looping;
-    channels[index].xyz=&Sample->xyz;
+
+    if(pos)
+        channels[index].xyz=pos;
+    else
+        channels[index].xyz=&Sample->xyz;
+
+    vol=min(1.0f, max(0.0f, vol));
+    channels[index].vol=vol;
 }
 
 int Audio_Init(void)

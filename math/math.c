@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include "math.h"
 
 // Some fast approx. trig. functions
@@ -73,6 +74,11 @@ float fact(const int32_t n)
 		j*=i;
 
 	return j;
+}
+
+int32_t RandRange(int32_t min, int32_t max)
+{
+	return (rand()%(max-min+1))+min;
 }
 
 uint32_t IsPower2(uint32_t value)

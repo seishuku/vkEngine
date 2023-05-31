@@ -77,7 +77,7 @@ void Event_KeyDown(void *Arg)
 	switch(*Key)
 	{
 		case KB_SPACE:
-						Audio_PlaySample(&Sounds[rand()%SOUND_PEW3], false);
+						Audio_PlaySample(&Sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &Camera.Position);
 						FireParticleEmitter(Camera.Position, Camera.Forward);
 						break;
 		case KB_P:		GenerateSkyParams();	break;

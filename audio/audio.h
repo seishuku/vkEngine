@@ -18,7 +18,7 @@ typedef struct
 
 bool Audio_LoadStatic(char *Filename, Sample_t *Sample);
 void Audio_SetListenerOrigin(vec3 pos, vec3 right);
-void Audio_PlaySample(Sample_t *Sample, bool looping);
+void Audio_PlaySample(Sample_t *Sample, bool looping, float vol, vec3 *pos);
 int Audio_Init(void);
 void Audio_Destroy(void);
 

@@ -178,63 +178,6 @@ void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32
 	}
 }
 
-// Camera<->Rigid body collision detection and response
-void CameraRigidBodyCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
-{
-	// Camera mass constants, since camera struct doesn't store these
-	const float Camera_Mass=100.0f;
-	const float Camera_invMass=1.0f/Camera_Mass;
-
-
-	// Calculate the distance between the camera and the sphere's center
-	vec3 Normal;
-	Vec3_Setv(&Normal, Body->Position);
-	Vec3_Subv(&Normal, Camera->Position);
-
-	float DistanceSq=Vec3_Dot(Normal, Normal);
-
-	// Sum of radii
-	float radiusSum=Camera->Radius+Body->Radius;
-
-	// Check if the distance is less than the sum of the radii
-	if(DistanceSq<=radiusSum*radiusSum)
-	{
-		float distance=sqrtf(DistanceSq);
-
-		Vec3_Muls(&Normal, 1.0f/distance);
-
-		const float Penetration=radiusSum-distance;
-		const float totalMass=Camera_invMass+Body->invMass;
-
-		Camera->Position.x-=Normal.x*Penetration*(Camera_invMass/totalMass);
-		Camera->Position.y-=Normal.y*Penetration*(Camera_invMass/totalMass);
-		Camera->Position.z-=Normal.z*Penetration*(Camera_invMass/totalMass);
-
-		Body->Position.x+=Normal.x*Penetration*(Body->invMass/totalMass);
-		Body->Position.y+=Normal.y*Penetration*(Body->invMass/totalMass);
-		Body->Position.z+=Normal.z*Penetration*(Body->invMass/totalMass);
-
-		vec3 contactVelocity;
-		Vec3_Setv(&contactVelocity, Body->Velocity);
-		Vec3_Subv(&contactVelocity, Camera->Velocity);
-
-		const float Restitution=0.66f;
-		float j=(-(1.0f+Restitution)*Vec3_Dot(contactVelocity, Normal))/totalMass;
-
-		vec3 Impulse;
-		Vec3_Setv(&Impulse, Normal);
-		Vec3_Muls(&Impulse, j);
-
-		Camera->Velocity.x-=Impulse.x*Camera_invMass;
-		Camera->Velocity.y-=Impulse.y*Camera_invMass;
-		Camera->Velocity.z-=Impulse.z*Camera_invMass;
-
-		Body->Velocity.x+=Impulse.x*Body->invMass;
-		Body->Velocity.y+=Impulse.y*Body->invMass;
-		Body->Velocity.z+=Impulse.z*Body->invMass;
-	}
-}
-
 // Actual camera stuff
 void CameraInit(Camera_t *Camera, const vec3 Position, const vec3 View, const vec3 Up)
 {

@@ -76,11 +76,7 @@ void PhysicsExplode(RigidBody_t *body)
 {
 	vec3 explosion_center={ 0.0f, 0.0f, 0.0f };
 
-	// Random -1.0 to 1.0, normalized to get a random spherical vector
-	Vec3_Set(&body->Velocity, ((float)rand()/(float)RAND_MAX)*2.0f-1.0f, ((float)rand()/(float)RAND_MAX)*2.0f-1.0f, ((float)rand()/(float)RAND_MAX)*2.0f-1.0f);
-	Vec3_Normalize(&body->Velocity);
-
-	// Calculate distance and direction from explosion center to fragment
+	// Calculate direction from explosion center to fragment
 	vec3 direction;
 	Vec3_Setv(&direction, body->Position);
 	Vec3_Subv(&direction, explosion_center);
@@ -135,7 +131,8 @@ void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 
 		const float totalMass=a->invMass+b->invMass;
 		const float Restitution=0.66f;
-		float j=(-(1.0f+Restitution)*Vec3_Dot(contactVelocity, Normal))/totalMass;
+		const float VdotN=Vec3_Dot(contactVelocity, Normal);
+		float j=(-(1.0f+Restitution)*VdotN)/totalMass;
 
 		vec3 aVelocityImpulse;
 		Vec3_Setv(&aVelocityImpulse, Normal);
@@ -147,18 +144,68 @@ void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 		Vec3_Muls(&bVelocityImpulse, j*b->invMass);
 		Vec3_Addv(&b->Velocity, bVelocityImpulse);
 
-		//// Dumb cooldown to quiet up the sound playback
-		//if(SoundCooldown==0)
-		//{
-		//	Audio_PlaySample(&Sounds[SOUND_STONES], false);
-		//	SoundCooldown++;
-		//}
-		//else
-		//{
-		//	SoundCooldown++;
+		const float relVelMag=sqrtf(fabsf(VdotN));
 
-		//	if(SoundCooldown>10)
-		//		SoundCooldown=0;
-		//}
+		if(relVelMag>1.0f)
+			Audio_PlaySample(&Sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, relVelMag/200.0f, &a->Position);
+		}
+}
+
+// Camera<->Rigid body collision detection and response
+void PhysicsCameraToSphereCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
+{
+	// Camera mass constants, since camera struct doesn't store these
+	const float Camera_Mass=100.0f;
+	const float Camera_invMass=1.0f/Camera_Mass;
+
+
+	// Calculate the distance between the camera and the sphere's center
+	vec3 Normal;
+	Vec3_Setv(&Normal, Body->Position);
+	Vec3_Subv(&Normal, Camera->Position);
+
+	float DistanceSq=Vec3_Dot(Normal, Normal);
+
+	// Sum of radii
+	float radiusSum=Camera->Radius+Body->Radius;
+
+	// Check if the distance is less than the sum of the radii
+	if(DistanceSq<=radiusSum*radiusSum)
+	{
+		float distance=sqrtf(DistanceSq);
+
+		Vec3_Muls(&Normal, 1.0f/distance);
+
+		const float Penetration=radiusSum-distance;
+		vec3 positionImpulse;
+		Vec3_Setv(&positionImpulse, Normal);
+		Vec3_Muls(&positionImpulse, Penetration*0.5f);
+
+		Vec3_Subv(&Camera->Position, positionImpulse);
+		Vec3_Addv(&Body->Position, positionImpulse);
+
+		vec3 contactVelocity;
+		Vec3_Setv(&contactVelocity, Body->Velocity);
+		Vec3_Subv(&contactVelocity, Camera->Velocity);
+
+		const float totalMass=Camera_invMass+Body->invMass;
+		const float Restitution=0.66f;
+		const float VdotN=Vec3_Dot(contactVelocity, Normal);
+		float j=(-(1.0f+Restitution)*VdotN)/totalMass;
+
+		vec3 aVelocityImpulse;
+		Vec3_Setv(&aVelocityImpulse, Normal);
+		Vec3_Muls(&aVelocityImpulse, j*Camera_invMass);
+		Vec3_Subv(&Camera->Velocity, aVelocityImpulse);
+
+		vec3 bVelocityImpulse;
+		Vec3_Setv(&bVelocityImpulse, Normal);
+		Vec3_Muls(&bVelocityImpulse, j*Body->invMass);
+		Vec3_Addv(&Body->Velocity, bVelocityImpulse);
+
+		const float relVelMag=sqrtf(fabsf(VdotN));
+
+		if(relVelMag>1.0f)
+			Audio_PlaySample(&Sounds[SOUND_CRASH], false, relVelMag/200.0f, &Camera->Position);
 	}
 }

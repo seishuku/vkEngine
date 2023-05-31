@@ -3,7 +3,11 @@
 
 #include <stdint.h>
 #include <math.h>
-#include <pmmintrin.h>
+#ifdef _MSC_VER
+#include <intrin.h>
+#else
+#include <x86intrin.h>
+#endif
 
 #ifndef PI
 #define PI 3.1415926f
@@ -25,8 +29,8 @@
 #define RAD2DEG 0.01745329222222f
 #endif
 
-typedef union { struct { float x, y; };			__m128 value; } vec2;
-typedef union { struct { float x, y, z; };		__m128 value; } vec3;
+typedef union { struct { float x, y, pad[2]; };	__m128 value; } vec2;
+typedef union { struct { float x, y, z, pad; };	__m128 value; } vec3;
 typedef union { struct { float x, y, z, w; };	__m128 value; } vec4;
 
 typedef float matrix[16];
@@ -106,6 +110,7 @@ inline float rad2deg(const float x)
 
 float fact(const int32_t n);
 
+int32_t RandRange(int32_t min, int32_t max);
 uint32_t IsPower2(uint32_t value);
 uint32_t NextPower2(uint32_t value);
 int32_t ComputeLog(uint32_t value);
