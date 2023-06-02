@@ -18,9 +18,7 @@ static void apply_constraints(RigidBody_t *Body)
 	Body->Velocity.z=min(maxVelocity, max(-maxVelocity, Body->Velocity.z));
 
 	// Check for collision with outer boundary sphere and reflect velocity if needed
-	vec3 Normal;
-	Vec3_Setv(&Normal, Body->Position);
-	Vec3_Subv(&Normal, Center);
+	vec3 Normal=Vec3_Subv(Body->Position, Center);
 
 	float distanceSq=Vec3_Dot(Normal, Normal);
 
@@ -28,10 +26,10 @@ static void apply_constraints(RigidBody_t *Body)
 	{
 		float Distance=rsqrtf(distanceSq);
 		// Normalize the normal
-		Vec3_Muls(&Normal, Distance);
+		Normal=Vec3_Muls(Normal, Distance);
 
 		// Simple velocity reflection to bounce off the "wall"
-		Vec3_Reflect(Normal, Body->Velocity, &Body->Velocity);
+		Body->Velocity=Vec3_Reflect(Normal, Body->Velocity);
 	}
 }
 
@@ -46,28 +44,18 @@ void PhysicsIntegrate(RigidBody_t *body, float dt)
 
 	// Apply damping force
 	// Force+=Velocity*-damping
-	vec3 damping_force;
-	Vec3_Setv(&damping_force, body->Velocity);
-	Vec3_Muls(&damping_force, -damping);
-	Vec3_Addv(&body->Force, damping_force);
+	body->Force=Vec3_Addv(body->Force, Vec3_Muls(body->Velocity, -damping));
 
 	// Euler integration of position and velocity
 	// Position+=Velocity*dt+0.5f*Force/Mass*dt*dt
 	// Velocity+=Force/Mass*dt
-	vec3 forceMass, velocityScaled;
 	float massDeltaTimeSq=0.5f*body->invMass*dt*dt;
-	Vec3_Setv(&forceMass, body->Force);
-	Vec3_Muls(&forceMass, massDeltaTimeSq);
-	Vec3_Setv(&velocityScaled, body->Velocity);
-	Vec3_Muls(&velocityScaled, dt);
-	Vec3_Addv(&velocityScaled, forceMass);
-	Vec3_Addv(&body->Position, velocityScaled);
 
-	Vec3_Setv(&forceMass, body->Force);
-	Vec3_Muls(&forceMass, body->invMass*dt);
-	Vec3_Addv(&body->Velocity, forceMass);
+	body->Position=Vec3_Addv(body->Position, Vec3_Addv(Vec3_Muls(body->Velocity, dt), Vec3_Muls(body->Force, massDeltaTimeSq)));
 
-	Vec3_Sets(&body->Force, 0.0f);
+	body->Velocity=Vec3_Addv(body->Velocity, Vec3_Muls(body->Force, body->invMass*dt));
+
+	body->Force=Vec3_Sets(0.0f);
 
 	apply_constraints(body);
 }
@@ -77,33 +65,23 @@ void PhysicsExplode(RigidBody_t *body)
 	vec3 explosion_center={ 0.0f, 0.0f, 0.0f };
 
 	// Calculate direction from explosion center to fragment
-	vec3 direction;
-	Vec3_Setv(&direction, body->Position);
-	Vec3_Subv(&direction, explosion_center);
+	vec3 direction=Vec3_Subv(body->Position, explosion_center);
 	Vec3_Normalize(&direction);
 
 	// Calculate acceleration and impulse force
-	vec3 acceleration;
-	Vec3_Setv(&acceleration, direction);
-	Vec3_Muls(&acceleration, EXPLOSION_POWER);
+	vec3 acceleration=Vec3_Muls(direction, EXPLOSION_POWER);
 
 	// F=M*A bla bla...
-	vec3 force;
-	Vec3_Setv(&force, acceleration);
-	Vec3_Muls(&force, body->Mass);
+	vec3 force=Vec3_Muls(acceleration, body->Mass);
 
 	// Add it into object's velocity
-	Vec3_Addv(&body->Velocity, force);
+	body->Velocity=Vec3_Addv(body->Velocity, force);
 }
 
 void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 {
-	static uint32_t SoundCooldown=0;
-
 	// Calculate the distance between the camera and the sphere's center
-	vec3 Normal;
-	Vec3_Setv(&Normal, b->Position);
-	Vec3_Subv(&Normal, a->Position);
+	vec3 Normal=Vec3_Subv(b->Position, a->Position);
 
 	const float DistanceSq=Vec3_Dot(Normal, Normal);
 
@@ -115,34 +93,23 @@ void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 	{
 		float distance=sqrtf(DistanceSq);
 
-		Vec3_Muls(&Normal, 1.0f/distance);
+		Normal=Vec3_Muls(Normal, 1.0f/distance);
 
 		const float Penetration=radiusSum-distance;
-		vec3 positionImpulse;
-		Vec3_Setv(&positionImpulse, Normal);
-		Vec3_Muls(&positionImpulse, Penetration*0.5f);
+		vec3 positionImpulse=Vec3_Muls(Normal, Penetration*0.5f);
 
-		Vec3_Subv(&a->Position, positionImpulse);
-		Vec3_Addv(&b->Position, positionImpulse);
+		a->Position=Vec3_Subv(a->Position, positionImpulse);
+		b->Position=Vec3_Addv(b->Position, positionImpulse);
 
-		vec3 contactVelocity;
-		Vec3_Setv(&contactVelocity, b->Velocity);
-		Vec3_Subv(&contactVelocity, a->Velocity);
+		vec3 contactVelocity=Vec3_Subv(b->Velocity, a->Velocity);
 
 		const float totalMass=a->invMass+b->invMass;
 		const float Restitution=0.66f;
 		const float VdotN=Vec3_Dot(contactVelocity, Normal);
 		float j=(-(1.0f+Restitution)*VdotN)/totalMass;
 
-		vec3 aVelocityImpulse;
-		Vec3_Setv(&aVelocityImpulse, Normal);
-		Vec3_Muls(&aVelocityImpulse, j*a->invMass);
-		Vec3_Subv(&a->Velocity, aVelocityImpulse);
-
-		vec3 bVelocityImpulse;
-		Vec3_Setv(&bVelocityImpulse, Normal);
-		Vec3_Muls(&bVelocityImpulse, j*b->invMass);
-		Vec3_Addv(&b->Velocity, bVelocityImpulse);
+		a->Velocity=Vec3_Subv(a->Velocity, Vec3_Muls(Normal, j*a->invMass));
+		b->Velocity=Vec3_Addv(b->Velocity, Vec3_Muls(Normal, j*b->invMass));
 
 		const float relVelMag=sqrtf(fabsf(VdotN));
 
@@ -158,11 +125,8 @@ void PhysicsCameraToSphereCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
 	const float Camera_Mass=100.0f;
 	const float Camera_invMass=1.0f/Camera_Mass;
 
-
 	// Calculate the distance between the camera and the sphere's center
-	vec3 Normal;
-	Vec3_Setv(&Normal, Body->Position);
-	Vec3_Subv(&Normal, Camera->Position);
+	vec3 Normal=Vec3_Subv(Body->Position, Camera->Position);
 
 	float DistanceSq=Vec3_Dot(Normal, Normal);
 
@@ -174,34 +138,23 @@ void PhysicsCameraToSphereCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
 	{
 		float distance=sqrtf(DistanceSq);
 
-		Vec3_Muls(&Normal, 1.0f/distance);
+		Normal=Vec3_Muls(Normal, 1.0f/distance);
 
 		const float Penetration=radiusSum-distance;
-		vec3 positionImpulse;
-		Vec3_Setv(&positionImpulse, Normal);
-		Vec3_Muls(&positionImpulse, Penetration*0.5f);
+		vec3 positionImpulse=Vec3_Muls(Normal, Penetration*0.5f);
 
-		Vec3_Subv(&Camera->Position, positionImpulse);
-		Vec3_Addv(&Body->Position, positionImpulse);
+		Camera->Position=Vec3_Subv(Camera->Position, positionImpulse);
+		Body->Position=Vec3_Addv(Body->Position, positionImpulse);
 
-		vec3 contactVelocity;
-		Vec3_Setv(&contactVelocity, Body->Velocity);
-		Vec3_Subv(&contactVelocity, Camera->Velocity);
+		vec3 contactVelocity=Vec3_Subv(Body->Velocity, Camera->Velocity);
 
 		const float totalMass=Camera_invMass+Body->invMass;
 		const float Restitution=0.66f;
 		const float VdotN=Vec3_Dot(contactVelocity, Normal);
 		float j=(-(1.0f+Restitution)*VdotN)/totalMass;
 
-		vec3 aVelocityImpulse;
-		Vec3_Setv(&aVelocityImpulse, Normal);
-		Vec3_Muls(&aVelocityImpulse, j*Camera_invMass);
-		Vec3_Subv(&Camera->Velocity, aVelocityImpulse);
-
-		vec3 bVelocityImpulse;
-		Vec3_Setv(&bVelocityImpulse, Normal);
-		Vec3_Muls(&bVelocityImpulse, j*Body->invMass);
-		Vec3_Addv(&Body->Velocity, bVelocityImpulse);
+		Camera->Velocity=Vec3_Subv(Camera->Velocity, Vec3_Muls(Normal, j*Camera_invMass));
+		Body->Velocity=Vec3_Addv(Body->Velocity, Vec3_Muls(Normal, j*Body->invMass));
 
 		const float relVelMag=sqrtf(fabsf(VdotN));
 

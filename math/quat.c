@@ -89,7 +89,7 @@ void QuatRotate(const vec4 q, const vec3 v, vec3 *out)
 			u.z*2.0f*Vec3_Dot(u, v)+v.z*s*s-Vec3_Dot(u, u)
 		};
 
-		Vec3_Cross(u, v, &v2);
+		v2=Vec3_Cross(u, v);
 
 		out->x=v2.x*2.0f*s+v1.x;
 		out->y=v2.y*2.0f*s+v1.y;

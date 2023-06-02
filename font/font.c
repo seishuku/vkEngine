@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include "../system/system.h"
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
 #include "../utils/list.h"
@@ -66,7 +67,7 @@ bool LoadFontGylphs(const char *Filename)
 		fread(&Gylphs[i].numPath, sizeof(uint32_t), 1, Stream);
 
 		// Allocate memory and read in the paths
-		Gylphs[i].Path=malloc(sizeof(float)*2*Gylphs[i].numPath);
+		Gylphs[i].Path=Zone_Malloc(Zone, sizeof(float)*2*Gylphs[i].numPath);
 
 		if(!Gylphs[i].Path)
 			return false;
@@ -240,7 +241,7 @@ void Font_Destroy(void)
 {
 	// Loop through gylphs to free memory
 	for(uint32_t i=0;i<255;i++)
-		free(Gylphs[i].Path);
+		Zone_Free(Zone, Gylphs[i].Path);
 
 	// Destroy the control point list
 	List_Destroy(&FontVectors);

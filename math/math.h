@@ -2,12 +2,8 @@
 #define __MATH_H__
 
 #include <stdint.h>
+#include <string.h>
 #include <math.h>
-#ifdef _MSC_VER
-#include <intrin.h>
-#else
-#include <x86intrin.h>
-#endif
 
 #ifndef PI
 #define PI 3.1415926f
@@ -21,77 +17,81 @@
 #define max(a, b) ((a)>(b)?(a):(b))
 #endif
 
-#ifndef DEG2RAD
-#define DEG2RAD 57.29578049044297f
-#endif
+typedef struct
+{
+	float x, y;
+} vec2;
 
-#ifndef RAD2DEG
-#define RAD2DEG 0.01745329222222f
-#endif
+typedef struct
+{
+	float x, y, z;
+} vec3;
 
-typedef union { struct { float x, y, pad[2]; };	__m128 value; } vec2;
-typedef union { struct { float x, y, z, pad; };	__m128 value; } vec3;
-typedef union { struct { float x, y, z, w; };	__m128 value; } vec4;
+typedef struct
+{
+	float x, y, z, w;
+} vec4;
 
 typedef float matrix[16];
 
-void Vec2_Set(vec2 *a, const float x, const float y);
-void Vec2_Setv(vec2 *a, const vec2 b);
-void Vec2_Sets(vec2 *a, const float b);
-void Vec2_Add(vec2 *a, const float x, const float y);
-void Vec2_Addv(vec2 *a, const vec2 b);
-void Vec2_Adds(vec2 *a, const float b);
-void Vec2_Sub(vec2 *a, const float x, const float y);
-void Vec2_Subv(vec2 *a, const vec2 b);
-void Vec2_Subs(vec2 *a, const float b);
-void Vec2_Mul(vec2 *a, const float x, const float y);
-void Vec2_Mulv(vec2 *a, const vec2 b);
-void Vec2_Muls(vec2 *a, const float b);
+vec2 Vec2_Set(const float x, const float y);
+vec2 Vec2_Setv(const vec2 b);
+vec2 Vec2_Sets(const float b);
+vec2 Vec2_Add(const vec2 a, const float x, const float y);
+vec2 Vec2_Addv(const vec2 a, const vec2 b);
+vec2 Vec2_Adds(const vec2 a, const float b);
+vec2 Vec2_Sub(const vec2 a, const float x, const float y);
+vec2 Vec2_Subv(const vec2 a, const vec2 b);
+vec2 Vec2_Subs(const vec2 a, const float b);
+vec2 Vec2_Mul(const vec2 a, const float x, const float y);
+vec2 Vec2_Mulv(const vec2 a, const vec2 b);
+vec2 Vec2_Muls(const vec2 a, const float b);
 float Vec2_Dot(const vec2 a, const vec2 b);
 float Vec2_Length(const vec2 Vector);
 float Vec2_Distance(const vec2 Vector1, const vec2 Vector2);
-void Vec2_Reflect(const vec2 N, const vec2 I, vec2 *Result);
+vec2 Vec2_Reflect(const vec2 N, const vec2 I);
 float Vec2_Normalize(vec2 *v);
-void Vec2_Lerp(const vec2 a, const vec2 b, const float t, vec2 *out);
+vec2 Vec2_Lerp(const vec2 a, const vec2 b, const float t);
 
-void Vec3_Set(vec3 *a, const float x, const float y, const float z);
-void Vec3_Setv(vec3 *a, const vec3 b);
-void Vec3_Sets(vec3 *a, const float b);
-void Vec3_Add(vec3 *a, const float x, const float y, const float z);
-void Vec3_Addv(vec3 *a, const vec3 b);
-void Vec3_Adds(vec3 *a, const float b);
-void Vec3_Sub(vec3 *a, const float x, const float y, const float z);
-void Vec3_Subv(vec3 *a, const vec3 b);
-void Vec3_Subs(vec3 *a, const float b);
-void Vec3_Mul(vec3 *a, const float x, const float y, const float z);
-void Vec3_Mulv(vec3 *a, const vec3 b);
-void Vec3_Muls(vec3 *a, const float b);
+vec3 Vec3_Set(const float x, const float y, const float z);
+vec3 Vec3_Setv(const vec3 b);
+vec3 Vec3_Sets(const float b);
+vec3 Vec3_Add(const vec3 a, const float x, const float y, const float z);
+vec3 Vec3_Addv(const vec3 a, const vec3 b);
+vec3 Vec3_Adds(const vec3 a, const float b);
+vec3 Vec3_Sub(const vec3 a, const float x, const float y, const float z);
+vec3 Vec3_Subv(const vec3 a, const vec3 b);
+vec3 Vec3_Subs(const vec3 a, const float b);
+vec3 Vec3_Mul(const vec3 a, const float x, const float y, const float z);
+vec3 Vec3_Mulv(const vec3 a, const vec3 b);
+vec3 Vec3_Muls(const vec3 a, const float b);
 float Vec3_Dot(const vec3 a, const vec3 b);
 float Vec3_Length(const vec3 Vector);
 float Vec3_Distance(const vec3 Vector1, const vec3 Vector2);
 float Vec3_GetAngle(const vec3 Vector1, const vec3 Vector2);
-void Vec3_Reflect(const vec3 N, const vec3 I, vec3 *Result);
+vec3 Vec3_Reflect(const vec3 N, const vec3 I);
 float Vec3_Normalize(vec3 *v);
-void Vec3_Cross(const vec3 v0, const vec3 v1, vec3 *n);
-void Vec3_Lerp(const vec3 a, const vec3 b, const float t, vec3 *out);
+vec3 Vec3_Cross(const vec3 v0, const vec3 v1);
+vec3 Vec3_Lerp(const vec3 a, const vec3 b, const float t);
 
-void Vec4_Set(vec4 *a, const float x, const float y, const float z, const float w);
-void Vec4_Setv(vec4 *a, const vec4 b);
-void Vec4_Sets(vec4 *a, const float b);
-void Vec4_Add(vec4 *a, const float x, const float y, const float z, const float w);
-void Vec4_Addv(vec4 *a, const vec4 b);
-void Vec4_Adds(vec4 *a, const float b);
-void Vec4_Sub(vec4 *a, const float x, const float y, const float z, const float w);
-void Vec4_Subv(vec4 *a, const vec4 b);
-void Vec4_Subs(vec4 *a, const float b);
-void Vec4_Mul(vec4 *a, const float x, const float y, const float z, const float w);
-void Vec4_Mulv(vec4 *a, const vec4 b);
-void Vec4_Muls(vec4 *a, const float b);
+vec4 Vec4_Set(const float x, const float y, const float z, const float w);
+vec4 Vec4_Setv(const vec4 b);
+vec4 Vec4_Sets(const float b);
+vec4 Vec4_Add(const vec4 a, const float x, const float y, const float z, const float w);
+vec4 Vec4_Addv(const vec4 a, const vec4 b);
+vec4 Vec4_Adds(const vec4 a, const float b);
+vec4 Vec4_Sub(const vec4 a, const float x, const float y, const float z, const float w);
+vec4 Vec4_Subv(const vec4 a, const vec4 b);
+vec4 Vec4_Subs(const vec4 a, const float b);
+vec4 Vec4_Mul(const vec4 a, const float x, const float y, const float z, const float w);
+vec4 Vec4_Mulv(const vec4 a, const vec4 b);
+vec4 Vec4_Muls(const vec4 a, const float b);
 float Vec4_Dot(const vec4 a, const vec4 b);
 float Vec4_Length(const vec4 Vector);
 float Vec4_Distance(const vec4 Vector1, const vec4 Vector2);
+vec4 Vec4_Reflect(const vec4 N, const vec4 I);
 float Vec4_Normalize(vec4 *v);
-void Vec4_Lerp(const vec4 a, const vec4 b, const float t, vec4 *out);
+vec4 Vec4_Lerp(const vec4 a, const vec4 b, const float t);
 
 float fsinf(const float v);
 float fcosf(const float v);
@@ -110,6 +110,7 @@ inline float rad2deg(const float x)
 
 float fact(const int32_t n);
 
+float RandFloat(void);
 int32_t RandRange(int32_t min, int32_t max);
 uint32_t IsPower2(uint32_t value);
 uint32_t NextPower2(uint32_t value);

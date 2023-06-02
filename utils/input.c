@@ -17,7 +17,6 @@
 void GenerateSkyParams(void);
 extern Camera_t Camera;
 extern ParticleSystem_t ParticleSystem;
-float RandFloat(void);
 
 #define NUM_ASTEROIDS 1000
 extern RigidBody_t Asteroids[NUM_ASTEROIDS];
@@ -27,27 +26,27 @@ extern RigidBody_t Asteroids[NUM_ASTEROIDS];
 // Emitter callback for the launched emitter's particles
 void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle)
 {
-	Vec3_Sets(&Particle->pos, 0.0f);
+	Particle->pos=Vec3_Sets(0.0f);
 
 	// Simple -1.0 to 1.0 random spherical pattern, scaled by 100, fairly short lifespan.
-	Vec3_Set(&Particle->vel, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
-	Vec3_Normalize(&Particle->vel);
-	Vec3_Muls(&Particle->vel, 10.0f);
+	vec3 vel=Vec3_Set(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
+	Vec3_Normalize(&vel);
+	Particle->vel=Vec3_Muls(vel, 10.0f);
 
 	Particle->life=((float)rand()/(float)RAND_MAX)*2.5f+0.01f;
 }
 
 // Launch a "missle"
 // This is basically the same as an emitter callback, but done manually by working on the particle array directly.
-void FireParticleEmitter(vec3 Position, vec3 Direction)
+static void FireParticleEmitter(vec3 Position, vec3 Direction)
 {
 	// Get pointer to the emitter that's being used to drive the other emitters
 	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
 
 	// Create a new particle emitter
-	vec3 RandVec={ RandFloat(), RandFloat(), RandFloat() };
+	vec3 RandVec=Vec3_Set(RandFloat(), RandFloat(), RandFloat());
 	Vec3_Normalize(&RandVec);
-	uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.2f, 0.2f, 0.2f }, RandVec, 1.0f, 500, false, EmitterCallback);
+	uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, Vec3_Set(0.0f, 0.0f, 0.0f), Vec3_Set(0.2f, 0.2f, 0.2f), RandVec, 1.0f, 500, false, EmitterCallback);
 
 	// Search list for first dead particle
 	for(uint32_t i=0;i<Emitter->NumParticles;i++)
@@ -56,12 +55,9 @@ void FireParticleEmitter(vec3 Position, vec3 Direction)
 		if(Emitter->Particles[i].life<0.0f)
 		{
 			Emitter->Particles[i].ID=ID;
-
-			Vec3_Setv(&Emitter->Particles[i].pos, Position);
-
-			Vec3_Setv(&Emitter->Particles[i].vel, Direction);
-			Vec3_Normalize(&Emitter->Particles[i].vel);
-			Vec3_Muls(&Emitter->Particles[i].vel, 100.0f);
+			Emitter->Particles[i].pos=Vec3_Setv(Position);
+			Vec3_Normalize(&Direction);
+			Emitter->Particles[i].vel=Vec3_Muls(Direction, 100.0f);
 
 			Emitter->Particles[i].life=10.0f;
 

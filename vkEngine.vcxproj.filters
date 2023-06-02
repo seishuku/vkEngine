@@ -13,94 +13,171 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Shaders">
-      <UniqueIdentifier>{da33e577-6214-473f-bd17-eed0af3e439f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\vulkan">
-      <UniqueIdentifier>{bcc64417-1d0d-4093-acfe-a77377bb25eb}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\system">
-      <UniqueIdentifier>{755907bf-c236-4784-99c9-ad6bdface157}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\math">
-      <UniqueIdentifier>{07a907dd-9612-41f4-8ee8-b655c0ebbba3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\font">
-      <UniqueIdentifier>{052fa67a-ae43-4223-8ebd-cd545e07444a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\model">
-      <UniqueIdentifier>{9cc29cbc-fe13-45ca-b216-69be8a4987f2}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\image">
-      <UniqueIdentifier>{f3965da7-eacc-40a7-adb9-895adeb1fa69}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\math">
-      <UniqueIdentifier>{fc6862ee-6f13-40e7-a511-6cc001ac7ec4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\font">
-      <UniqueIdentifier>{eccf5011-2987-45ec-bdc9-cf78f26e5ee8}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\model">
-      <UniqueIdentifier>{b914293e-84d0-4207-9fcc-5ecc8da94c2a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\image">
-      <UniqueIdentifier>{93381c07-7d53-448e-81a6-2e96f1bb9b25}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\system">
-      <UniqueIdentifier>{88c22324-f6bf-421a-b00c-3fb655cf3cbc}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\vulkan">
-      <UniqueIdentifier>{e9489a5f-472f-49ab-9d20-08a3bd05daa2}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\utils">
-      <UniqueIdentifier>{6f0deacc-98ba-4606-8c1a-46fdbb859a12}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\utils">
-      <UniqueIdentifier>{5dae7961-ad06-42ae-b7bb-61b2a0a167bd}</UniqueIdentifier>
+    <Filter Include="Header Files\audio">
+      <UniqueIdentifier>{7041fae1-edee-4d28-9981-7cd910f345bc}</UniqueIdentifier>
     </Filter>
     <Filter Include="Header Files\camera">
-      <UniqueIdentifier>{fd66522e-6afb-4e25-8589-38fa9a318e95}</UniqueIdentifier>
+      <UniqueIdentifier>{f7116477-b95a-4501-8b2d-7e50d944417f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\particle">
-      <UniqueIdentifier>{237e06da-cd03-467a-8255-1071fa686f32}</UniqueIdentifier>
+    <Filter Include="Header Files\font">
+      <UniqueIdentifier>{8ad9b191-9db3-442a-ae85-67054bab2b89}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\image">
+      <UniqueIdentifier>{bbf5221b-ed08-437e-92ea-411e393b9634}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\math">
+      <UniqueIdentifier>{8f2c0569-8359-4245-9294-30cab325e8f5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\model">
+      <UniqueIdentifier>{21e189e1-6acc-4190-880e-707251c78eaa}</UniqueIdentifier>
     </Filter>
     <Filter Include="Header Files\particle">
-      <UniqueIdentifier>{9255b643-7629-435f-9497-137b09de4498}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\threads">
-      <UniqueIdentifier>{cf844439-4749-436e-aa67-76d423f65abe}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\threads">
-      <UniqueIdentifier>{1ecbd12b-40da-4da3-91bd-a788e95b21b6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\vr">
-      <UniqueIdentifier>{59309212-1e7c-4c97-9b20-c652ece3b96a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\vr">
-      <UniqueIdentifier>{ac23c9dc-2db0-4ba0-a607-52d96c97ff57}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\camera">
-      <UniqueIdentifier>{3c6294bb-196d-4d97-a5e5-63e2e9019398}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\audio">
-      <UniqueIdentifier>{10dca050-ae3d-49b8-9a58-90b1ba00a1b9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\audio">
-      <UniqueIdentifier>{9721b6a2-fc81-437e-9309-e0fce1b14420}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\physics">
-      <UniqueIdentifier>{02654779-bbb6-4ce1-8500-673199a2ce85}</UniqueIdentifier>
+      <UniqueIdentifier>{bc7f609a-43cc-4072-8a20-56714ff91678}</UniqueIdentifier>
     </Filter>
     <Filter Include="Header Files\physics">
-      <UniqueIdentifier>{65506bdd-4233-4db9-ba7a-2939d0db18db}</UniqueIdentifier>
+      <UniqueIdentifier>{203e32ec-603d-4e48-a28e-a54be1e37eb7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\system">
+      <UniqueIdentifier>{56432f3b-cbc2-44dd-865a-6993494c23f1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\threads">
+      <UniqueIdentifier>{4640276d-e317-44a9-974b-cbf71be48121}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\utils">
+      <UniqueIdentifier>{fc5a2534-3d5e-40fd-9f40-f0a54fd4122c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\vr">
+      <UniqueIdentifier>{4a023467-fd02-4976-88a4-3b8143b234ed}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\vulkan">
+      <UniqueIdentifier>{463d74d1-6039-46b2-ab5c-fd3d91c7ffd4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\audio">
+      <UniqueIdentifier>{29c3d9c7-bd21-4743-8864-200e37b26243}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\camera">
+      <UniqueIdentifier>{3c01f9d7-9736-4d80-919c-806b3cd2d04c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\font">
+      <UniqueIdentifier>{ecced096-95b5-474d-a7b1-cf38b63e72c5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\image">
+      <UniqueIdentifier>{ea00ea3e-e7d6-4ec7-a165-47fb476dc902}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\math">
+      <UniqueIdentifier>{6e6159cd-7350-45eb-b1d0-16fceb8b2ec1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\model">
+      <UniqueIdentifier>{f67c8ecf-725a-475c-9597-588925881184}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\particle">
+      <UniqueIdentifier>{a0643e23-de73-4525-bf9e-678de83262a8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\physics">
+      <UniqueIdentifier>{e0960890-8709-4548-b2de-44ae9d6e2bb5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\system">
+      <UniqueIdentifier>{00acf21c-db77-44df-b066-4955cb25bbd8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\threads">
+      <UniqueIdentifier>{321ff1b4-b913-431b-8dc4-2ab316981e99}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\utils">
+      <UniqueIdentifier>{d60bc400-b729-43fd-90fe-8afdba12c4a6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\vr">
+      <UniqueIdentifier>{f79a9cbb-417e-41e8-93d2-e2daf2f5f434}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\vulkan">
+      <UniqueIdentifier>{837e13fe-6433-4c24-b79c-79fd3b8c8773}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{eef3467f-4d2b-4c5b-9256-274c7ce27ad9}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="engine.c">
-      <Filter>Source Files</Filter>
+    <ClInclude Include="audio\audio.h">
+      <Filter>Header Files\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="camera\camera.h">
+      <Filter>Header Files\camera</Filter>
+    </ClInclude>
+    <ClInclude Include="font\font.h">
+      <Filter>Header Files\font</Filter>
+    </ClInclude>
+    <ClInclude Include="image\image.h">
+      <Filter>Header Files\image</Filter>
+    </ClInclude>
+    <ClInclude Include="math\math.h">
+      <Filter>Header Files\math</Filter>
+    </ClInclude>
+    <ClInclude Include="model\bmodel.h">
+      <Filter>Header Files\model</Filter>
+    </ClInclude>
+    <ClInclude Include="vulkan\vulkan.h">
+      <Filter>Header Files\vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="vr\vr.h">
+      <Filter>Header Files\vr</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\event.h">
+      <Filter>Header Files\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\genid.h">
+      <Filter>Header Files\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\input.h">
+      <Filter>Header Files\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\list.h">
+      <Filter>Header Files\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\memzone.h">
+      <Filter>Header Files\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="threads\threads.h">
+      <Filter>Header Files\threads</Filter>
+    </ClInclude>
+    <ClInclude Include="system\system.h">
+      <Filter>Header Files\system</Filter>
+    </ClInclude>
+    <ClInclude Include="physics\physics.h">
+      <Filter>Header Files\physics</Filter>
+    </ClInclude>
+    <ClInclude Include="particle\particle.h">
+      <Filter>Header Files\particle</Filter>
+    </ClInclude>
+    <ClInclude Include="composite.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="models.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="perframe.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shadow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="skybox.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sounds.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="textures.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="audio\audio.c">
+      <Filter>Source Files\audio</Filter>
     </ClCompile>
-    <ClCompile Include="math\math.c">
-      <Filter>Source Files\math</Filter>
+    <ClCompile Include="audio\wave.c">
+      <Filter>Source Files\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="camera\camera.c">
+      <Filter>Source Files\camera</Filter>
     </ClCompile>
     <ClCompile Include="font\font.c">
       <Filter>Source Files\font</Filter>
@@ -114,86 +191,14 @@
     <ClCompile Include="image\tga.c">
       <Filter>Source Files\image</Filter>
     </ClCompile>
-    <ClCompile Include="vulkan\vulkan_buffer.c">
-      <Filter>Source Files\vulkan</Filter>
+    <ClCompile Include="math\math.c">
+      <Filter>Source Files\math</Filter>
     </ClCompile>
-    <ClCompile Include="utils\genid.c">
-      <Filter>Source Files\utils</Filter>
+    <ClCompile Include="math\matrix.c">
+      <Filter>Source Files\math</Filter>
     </ClCompile>
-    <ClCompile Include="utils\list.c">
-      <Filter>Source Files\utils</Filter>
-    </ClCompile>
-    <ClCompile Include="system\win32.c">
-      <Filter>Source Files\system</Filter>
-    </ClCompile>
-    <ClCompile Include="camera\camera.c">
-      <Filter>Source Files\camera</Filter>
-    </ClCompile>
-    <ClCompile Include="utils\memzone.c">
-      <Filter>Source Files\utils</Filter>
-    </ClCompile>
-    <ClCompile Include="vulkan\vulkan_mem.c">
-      <Filter>Source Files\vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="vulkan\vulkan_context.c">
-      <Filter>Source Files\vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="vulkan\vulkan_instance.c">
-      <Filter>Source Files\vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="vulkan\vulkan_descriptorset.c">
-      <Filter>Source Files\vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="vulkan\vulkan_pipeline.c">
-      <Filter>Source Files\vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="model\bmodel.c">
-      <Filter>Source Files\model</Filter>
-    </ClCompile>
-    <ClCompile Include="utils\event.c">
-      <Filter>Source Files\utils</Filter>
-    </ClCompile>
-    <ClCompile Include="particle\particle.c">
-      <Filter>Source Files\particle</Filter>
-    </ClCompile>
-    <ClCompile Include="utils\input.c">
-      <Filter>Source Files\utils</Filter>
-    </ClCompile>
-    <ClCompile Include="shadow.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="skybox.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="vulkan\vulkan_swapchain.c">
-      <Filter>Source Files\vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="threads\threads.c">
-      <Filter>Source Files\threads</Filter>
-    </ClCompile>
-    <ClCompile Include="vr\vr.c">
-      <Filter>Source Files\vr</Filter>
-    </ClCompile>
-    <ClCompile Include="perframe.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="composite.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="audio\audio.c">
-      <Filter>Source Files\audio</Filter>
-    </ClCompile>
-    <ClCompile Include="audio\wave.c">
-      <Filter>Source Files\audio</Filter>
-    </ClCompile>
-    <ClCompile Include="vulkan\vulkan_framebuffer.c">
-      <Filter>Source Files\vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="vulkan\vulkan_renderpass.c">
-      <Filter>Source Files\vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="physics\physics.c">
-      <Filter>Source Files\physics</Filter>
+    <ClCompile Include="math\quat.c">
+      <Filter>Source Files\math</Filter>
     </ClCompile>
     <ClCompile Include="math\vec2.c">
       <Filter>Source Files\math</Filter>
@@ -204,125 +209,84 @@
     <ClCompile Include="math\vec4.c">
       <Filter>Source Files\math</Filter>
     </ClCompile>
-    <ClCompile Include="math\quat.c">
-      <Filter>Source Files\math</Filter>
+    <ClCompile Include="model\bmodel.c">
+      <Filter>Source Files\model</Filter>
     </ClCompile>
-    <ClCompile Include="math\matrix.c">
-      <Filter>Source Files\math</Filter>
+    <ClCompile Include="vulkan\vulkan_buffer.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="vulkan\vulkan_context.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="vulkan\vulkan_descriptorset.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="vulkan\vulkan_framebuffer.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="vulkan\vulkan_instance.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="vulkan\vulkan_mem.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="vulkan\vulkan_pipeline.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="vulkan\vulkan_renderpass.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="vulkan\vulkan_swapchain.c">
+      <Filter>Source Files\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="vr\vr.c">
+      <Filter>Source Files\vr</Filter>
+    </ClCompile>
+    <ClCompile Include="utils\event.c">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="utils\genid.c">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="utils\input.c">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="utils\list.c">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="utils\memzone.c">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="threads\threads.c">
+      <Filter>Source Files\threads</Filter>
+    </ClCompile>
+    <ClCompile Include="system\win32.c">
+      <Filter>Source Files\system</Filter>
+    </ClCompile>
+    <ClCompile Include="physics\physics.c">
+      <Filter>Source Files\physics</Filter>
+    </ClCompile>
+    <ClCompile Include="particle\particle.c">
+      <Filter>Source Files\particle</Filter>
+    </ClCompile>
+    <ClCompile Include="composite.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="engine.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="perframe.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="shadow.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="skybox.c">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="math\math.h">
-      <Filter>Header Files\math</Filter>
-    </ClInclude>
-    <ClInclude Include="image\image.h">
-      <Filter>Header Files\image</Filter>
-    </ClInclude>
-    <ClInclude Include="system\system.h">
-      <Filter>Header Files\system</Filter>
-    </ClInclude>
-    <ClInclude Include="vulkan\vulkan.h">
-      <Filter>Header Files\vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="utils\genid.h">
-      <Filter>Header Files\utils</Filter>
-    </ClInclude>
-    <ClInclude Include="utils\list.h">
-      <Filter>Header Files\utils</Filter>
-    </ClInclude>
-    <ClInclude Include="camera\camera.h">
-      <Filter>Header Files\camera</Filter>
-    </ClInclude>
-    <ClInclude Include="utils\memzone.h">
-      <Filter>Header Files\utils</Filter>
-    </ClInclude>
-    <ClInclude Include="model\bmodel.h">
-      <Filter>Header Files\model</Filter>
-    </ClInclude>
-    <ClInclude Include="utils\event.h">
-      <Filter>Header Files\utils</Filter>
-    </ClInclude>
-    <ClInclude Include="particle\particle.h">
-      <Filter>Header Files\particle</Filter>
-    </ClInclude>
-    <ClInclude Include="utils\input.h">
-      <Filter>Header Files\utils</Filter>
-    </ClInclude>
-    <ClInclude Include="shadow.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="skybox.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="models.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="textures.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="threads\threads.h">
-      <Filter>Header Files\threads</Filter>
-    </ClInclude>
-    <ClInclude Include="vr\vr.h">
-      <Filter>Header Files\vr</Filter>
-    </ClInclude>
-    <ClInclude Include="perframe.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="composite.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="font\font.h">
-      <Filter>Header Files\font</Filter>
-    </ClInclude>
-    <ClInclude Include="audio\audio.h">
-      <Filter>Header Files\audio</Filter>
-    </ClInclude>
-    <ClInclude Include="sounds.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="physics\physics.h">
-      <Filter>Header Files\physics</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <GLSL Include="shaders\font.frag">
-      <Filter>Shaders</Filter>
-    </GLSL>
-    <GLSL Include="shaders\lighting.frag">
-      <Filter>Shaders</Filter>
-    </GLSL>
-    <GLSL Include="shaders\font.vert">
-      <Filter>Shaders</Filter>
-    </GLSL>
-    <GLSL Include="shaders\lighting.vert">
-      <Filter>Shaders</Filter>
-    </GLSL>
-    <GLSL Include="shaders\skybox.frag">
-      <Filter>Shaders</Filter>
-    </GLSL>
-    <GLSL Include="shaders\skybox.vert">
-      <Filter>Shaders</Filter>
-    </GLSL>
-    <GLSL Include="shaders\particle.frag">
-      <Filter>Shaders</Filter>
-    </GLSL>
-    <GLSL Include="shaders\particle.geom">
-      <Filter>Shaders</Filter>
-    </GLSL>
-    <GLSL Include="shaders\particle.vert">
-      <Filter>Shaders</Filter>
-    </GLSL>
-    <GLSL Include="shaders\shadow.vert">
-      <Filter>Shaders</Filter>
-    </GLSL>
     <GLSL Include="shaders\bezier.frag">
-      <Filter>Shaders</Filter>
-    </GLSL>
-    <GLSL Include="shaders\bezier.geom">
-      <Filter>Shaders</Filter>
-    </GLSL>
-    <GLSL Include="shaders\bezier.vert">
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\composite.frag">
@@ -331,16 +295,52 @@
     <GLSL Include="shaders\compositeVR.frag">
       <Filter>Shaders</Filter>
     </GLSL>
-    <GLSL Include="shaders\threshold.frag">
+    <GLSL Include="shaders\font.frag">
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\gaussian.frag">
       <Filter>Shaders</Filter>
     </GLSL>
-    <GLSL Include="shaders\fullscreen.vert">
+    <GLSL Include="shaders\lighting.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\particle.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\skybox.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\threshold.frag">
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\volume.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\bezier.geom">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\particle.geom">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\bezier.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\font.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\fullscreen.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\lighting.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\particle.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\shadow.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\skybox.vert">
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\volume.vert">

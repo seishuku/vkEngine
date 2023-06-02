@@ -606,30 +606,34 @@ static void _GetPixelBilinear(VkuImage_t *Image, float x, float y, void *Out)
 
 // _GetUVAngularMap, internal function used by _AngularMapFace.
 // Gets angular map lightprobe UV coorinate from a 3D coordinate.
-static void _GetUVAngularMap(vec3 xyz, vec2 *uv)
+static vec2 _GetUVAngularMap(vec3 xyz)
 {
 	float phi=-(float)acos(xyz.z), theta=(float)atan2(xyz.y, xyz.x);
 
-	Vec2_Set(uv,
-			 0.5f*((phi/PI)*(float)cos(theta))+0.5f,
-			 0.5f*((phi/PI)*(float)sin(theta))+0.5f);
+	return Vec2_Set(
+		0.5f*((phi/PI)*(float)cos(theta))+0.5f,
+		0.5f*((phi/PI)*(float)sin(theta))+0.5f);
 }
 
 // _GetXYZFace, internal function used by _AngularMapFace.
 // Gets 3D coordinate from a 2D UV coorinate and face selection.
-static void _GetXYZFace(vec2 uv, vec3 *xyz, int face)
+static vec3 _GetXYZFace(vec2 uv, int face)
 {
+	vec3 xyz;
+
 	switch(face)
 	{
-		case 0: Vec3_Set(xyz, 1.0f, (uv.y-0.5f)*2.0f, (0.5f-uv.x)*2.0f);	break; // +X
-		case 1: Vec3_Set(xyz, -1.0f, (uv.y-0.5f)*2.0f, (uv.x-0.5f)*2.0f);	break; // -X
-		case 2: Vec3_Set(xyz, (uv.x-0.5f)*2.0f, -1.0f, (uv.y-0.5f)*2.0f);	break; // +Y
-		case 3: Vec3_Set(xyz, (uv.x-0.5f)*2.0f, 1.0f, (0.5f-uv.y)*2.0f);	break; // -Y
-		case 4: Vec3_Set(xyz, (uv.x-0.5f)*2.0f, (uv.y-0.5f)*2.0f, 1.0f);	break; // +Z
-		case 5: Vec3_Set(xyz, (0.5f-uv.x)*2.0f, (uv.y-0.5f)*2.0f, -1.0f);	break; // -Z
+		case 0: xyz=Vec3_Set(1.0f, (uv.y-0.5f)*2.0f, (0.5f-uv.x)*2.0f);	break; // +X
+		case 1: xyz=Vec3_Set(-1.0f, (uv.y-0.5f)*2.0f, (uv.x-0.5f)*2.0f);	break; // -X
+		case 2: xyz=Vec3_Set((uv.x-0.5f)*2.0f, -1.0f, (uv.y-0.5f)*2.0f);	break; // +Y
+		case 3: xyz=Vec3_Set((uv.x-0.5f)*2.0f, 1.0f, (0.5f-uv.y)*2.0f);	break; // -Y
+		case 4: xyz=Vec3_Set((uv.x-0.5f)*2.0f, (uv.y-0.5f)*2.0f, 1.0f);	break; // +Z
+		case 5: xyz=Vec3_Set((0.5f-uv.x)*2.0f, (uv.y-0.5f)*2.0f, -1.0f);	break; // -Z
 	}
 
-	Vec3_Normalize(xyz);
+	Vec3_Normalize(&xyz);
+
+	return xyz;
 }
 
 // _AngularMapFace, internal function used by Image_Upload.
@@ -655,12 +659,12 @@ static bool _AngularMapFace(VkuImage_t *In, int Face, VkuImage_t *Out)
 			vec2 uv={ fx, fy };
 
 			// Get a 3D cubemap coordinate for the given UV and selected cube face
-			_GetXYZFace(uv, &xyz, Face);
+			xyz=_GetXYZFace(uv, Face);
 
 			// Use that 3D coordinate and this function to transform it into a UV coord into an angular map lightprobe
 			// TODO: This function can also be substituted for other image formats (lat/lon,  vertical cross, mirror ball),
 			//		   maybe add a flag for different layouts?
-			_GetUVAngularMap(xyz, &uv);
+			uv=_GetUVAngularMap(xyz);
 
 			// Bilinearly sample the pixel from the source image and set it into the output data (destination cubemap face)
 			_GetPixelBilinear(In, uv.x*In->Width, uv.y*In->Height, (void *)&Out->Data[(Out->Depth>>3)*(y*Out->Width+x)]);

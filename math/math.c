@@ -76,6 +76,11 @@ float fact(const int32_t n)
 	return j;
 }
 
+float RandFloat(void)
+{
+	return (float)rand()/(float)RAND_MAX;
+}
+
 int32_t RandRange(int32_t min, int32_t max)
 {
 	return (rand()%(max-min+1))+min;

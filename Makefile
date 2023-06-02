@@ -79,7 +79,7 @@ LDFLAGS=-Wold-style-definition -L/usr/X11/lib -lvulkan -lX11 -lm -lpthread -lope
 
 all: $(TARGET) $(SHADERS)
 
-debug: CFLAGS+= -DDEBUG -D_DEBUG -g -ggdb -O1
+debug: CFLAGS=-Wall -Wno-missing-braces -Wextra -msse3 -DDEBUG -D_DEBUG -g -ggdb -O1 -std=gnu17 -I/usr/X11/include
 debug: $(TARGET) $(SHADERS)
 
 $(TARGET): $(OBJS)

@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <malloc.h>
 #include "../vulkan/vulkan.h"
 #include "../system/system.h"
 #include "../math/math.h"
@@ -29,14 +28,9 @@ static bool InsidePolygon(const vec3 Intersection, const vec3 Tri[3])
 	float Angle=0.0f;
 	vec3 A, B, C;
 
-	Vec3_Setv(&A, Tri[0]);
-	Vec3_Subv(&A, Intersection);
-
-	Vec3_Setv(&B, Tri[1]);
-	Vec3_Subv(&B, Intersection);
-
-	Vec3_Setv(&C, Tri[2]);
-	Vec3_Subv(&C, Intersection);
+	A=Vec3_Subv(Tri[0], Intersection);
+	B=Vec3_Subv(Tri[1], Intersection);
+	C=Vec3_Subv(Tri[2], Intersection);
 
 	Angle+=Vec3_GetAngle(A, B);
 	Angle+=Vec3_GetAngle(B, C);
@@ -82,24 +76,12 @@ int32_t EdgeSphereCollision(vec3 Center, vec3 Tri[3], float radius)
 	return 0;
 }
 
-void GetCollisionOffset(vec3 Normal, float radius, float distance, vec3 *Offset)
+vec3 GetCollisionOffset(vec3 Normal, float radius, float distance)
 {
 	if(distance>0.0f)
-	{
-		float distanceOver=radius-distance;
-
-		Offset->x=Normal.x*distanceOver;
-		Offset->y=Normal.y*distanceOver;
-		Offset->z=Normal.z*distanceOver;
-	}
+		return Vec3_Muls(Normal, radius-distance);
 	else
-	{
-		float distanceOver=radius+distance;
-
-		Offset->x=Normal.x*-distanceOver;
-		Offset->y=Normal.y*-distanceOver;
-		Offset->z=Normal.z*-distanceOver;
-	}
+		return Vec3_Muls(Normal, -(radius+distance));
 }
 
 bool SphereBBOXIntersection(const vec3 Center, const float Radius, const vec3 BBMin, const vec3 BBMax)
@@ -155,7 +137,7 @@ void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32
 		vec3 v0={ Tri[1].x-Tri[0].x, Tri[1].y-Tri[0].y, Tri[1].z-Tri[0].z };
 		vec3 v1={ Tri[2].x-Tri[0].x, Tri[2].y-Tri[0].y, Tri[2].z-Tri[0].z };
 
-		Vec3_Cross(v0, v1, &n);
+		n=Vec3_Cross(v0, v1);
 
 		Vec3_Normalize(&n);
 
@@ -163,17 +145,10 @@ void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32
 
 		if(classification==1)
 		{
-			vec3 Offset={ n.x*distance, n.y*distance, n.z*distance };
-			vec3 Intersection={ Camera->Position.x-Offset.x, Camera->Position.y-Offset.y, Camera->Position.z-Offset.z };
+			vec3 Intersection=Vec3_Subv(Camera->Position, Vec3_Muls(n, distance));
 
 			if(InsidePolygon(Intersection, Tri)||EdgeSphereCollision(Camera->Position, Tri, Camera->Radius*0.5f))
-			{
-				GetCollisionOffset(n, Camera->Radius, distance, &Offset);
-
-				Camera->Position.x+=Offset.x;
-				Camera->Position.y+=Offset.y;
-				Camera->Position.z+=Offset.z;
-			}
+				Camera->Position=Vec3_Addv(Camera->Position, GetCollisionOffset(n, Camera->Radius, distance));
 		}
 	}
 }
@@ -181,12 +156,12 @@ void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32
 // Actual camera stuff
 void CameraInit(Camera_t *Camera, const vec3 Position, const vec3 View, const vec3 Up)
 {
-	Vec3_Setv(&Camera->Position, Position);
-	Vec3_Setv(&Camera->View, View);
-	Vec3_Setv(&Camera->Up, Up);
+	Camera->Position=Vec3_Setv(Position);
+	Camera->View=Vec3_Setv(View);
+	Camera->Up=Vec3_Setv(Up);
 
-	Vec3_Cross(Camera->View, Camera->Up, &Camera->Forward);
-	Vec3_Cross(Camera->Forward, Camera->Up, &Camera->Right);
+	Camera->Forward=Vec3_Cross(Camera->View, Camera->Up);
+	Camera->Right=Vec3_Cross(Camera->Forward, Camera->Up);
 
 	Camera->Pitch=0.0f;
 	Camera->Yaw=0.0f;
@@ -194,7 +169,7 @@ void CameraInit(Camera_t *Camera, const vec3 Position, const vec3 View, const ve
 
 	Camera->Radius=10.0f;
 
-	Vec3_Sets(&Camera->Velocity, 0.0f);
+	Camera->Velocity=Vec3_Sets(0.0f);
 
 	Camera->key_w=0;
 	Camera->key_s=0;
@@ -216,8 +191,8 @@ void CameraPitch(Camera_t *Camera, const float Angle)
 	QuatRotate(quat, Camera->Forward, &Camera->Forward);
 	Vec3_Normalize(&Camera->Forward);
 
-	Vec3_Cross(Camera->Forward, Camera->Right, &Camera->Up);
-	Vec3_Muls(&Camera->Up, -1.0f);
+	Camera->Up=Vec3_Cross(Camera->Forward, Camera->Right);
+	Camera->Up=Vec3_Muls(Camera->Up, -1.0f);
 }
 
 void CameraYaw(Camera_t *Camera, const float Angle)
@@ -228,7 +203,7 @@ void CameraYaw(Camera_t *Camera, const float Angle)
 	QuatRotate(quat, Camera->Forward, &Camera->Forward);
 	Vec3_Normalize(&Camera->Forward);
 
-	Vec3_Cross(Camera->Forward, Camera->Up, &Camera->Right);
+	Camera->Right=Vec3_Cross(Camera->Forward, Camera->Up);
 }
 
 void CameraRoll(Camera_t *Camera, const float Angle)
@@ -239,8 +214,8 @@ void CameraRoll(Camera_t *Camera, const float Angle)
 	QuatRotate(quat, Camera->Right, &Camera->Right);
 	Vec3_Normalize(&Camera->Right);
 
-	Vec3_Cross(Camera->Forward, Camera->Right, &Camera->Up);
-	Vec3_Muls(&Camera->Up, -1.0f);
+	Camera->Up=Vec3_Cross(Camera->Forward, Camera->Right);
+	Camera->Up=Vec3_Muls(Camera->Up, -1.0f);
 }
 
 void CameraUpdate(Camera_t *Camera, float dt, matrix out)
@@ -290,7 +265,7 @@ void CameraUpdate(Camera_t *Camera, float dt, matrix out)
 		Camera->Pitch-=0.125f;
 
 	const float Damp=0.92f;
-	Vec3_Muls(&Camera->Velocity, Damp);
+	Camera->Velocity=Vec3_Muls(Camera->Velocity, Damp);
 	Camera->Pitch*=Damp;
 	Camera->Yaw*=Damp;
 	Camera->Roll*=Damp;
@@ -377,7 +352,7 @@ void CalculatePoint(int32_t *knots, int32_t n, int32_t t, float v, float *contro
 	int32_t k;
 	float b;
 
-	Vec3_Sets(output, 0.0f);
+	*output=Vec3_Sets(0.0f);
 
 	for(k=0;k<=n;k++)
 	{

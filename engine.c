@@ -248,35 +248,25 @@ bool CreateVolumePipeline(void)
 	return true;
 }
 
-float RandFloat(void)
-{
-	return (float)rand()/(float)RAND_MAX;
-}
-
-bool SphereSphereIntersect(vec3 PositionA, float RadiusA, vec3 PositionB, float RadiusB)
-{
-	return Vec3_Distance(PositionA, PositionB)<RadiusA+RadiusB;
-}
-
 void GenerateSkyParams(void)
 {
 	// Build a skybox param struct with random values
 	Skybox_UBO_t Skybox_UBO;
 
-	Vec4_Set(&Skybox_UBO.uOffset, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
+	Skybox_UBO.uOffset=Vec4_Set(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
 	Vec4_Normalize(&Skybox_UBO.uOffset);
 
-	Vec3_Set(&Skybox_UBO.uNebulaAColor, RandFloat(), RandFloat(), RandFloat());
+	Skybox_UBO.uNebulaAColor=Vec3_Set(RandFloat(), RandFloat(), RandFloat());
 	Skybox_UBO.uNebulaADensity=RandFloat()*2.0f;
 
-	Vec3_Set(&Skybox_UBO.uNebulaBColor, RandFloat(), RandFloat(), RandFloat());
+	Skybox_UBO.uNebulaBColor=Vec3_Set(RandFloat(), RandFloat(), RandFloat());
 	Skybox_UBO.uNebulaBDensity=RandFloat()*2.0f;
 
-	Vec4_Set(&Skybox_UBO.uSunPosition, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
+	Skybox_UBO.uSunPosition=Vec4_Set(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
 	Vec4_Normalize(&Skybox_UBO.uSunPosition);
 
 	const float MaxSun=5.0f;
-	Vec4_Set(&Skybox_UBO.uSunColor, min(MaxSun, RandFloat()*MaxSun+0.5f), min(MaxSun, RandFloat()*MaxSun+0.5f), min(MaxSun, RandFloat()*MaxSun+0.5f), 0.0f);
+	Skybox_UBO.uSunColor=Vec4_Set(min(MaxSun, RandFloat()*MaxSun+0.5f), min(MaxSun, RandFloat()*MaxSun+0.5f), min(MaxSun, RandFloat()*MaxSun+0.5f), 0.0f);
 	Skybox_UBO.uSunSize=1.0f/(RandFloat()*1000.0f+100.0f);
 	Skybox_UBO.uSunFalloff=RandFloat()*16.0f+8.0f;
 
@@ -303,19 +293,18 @@ void GenerateSkyParams(void)
 
 	while(i<NUM_ASTEROIDS)
 	{
-		vec3 RandomVec;
-		Vec3_Set(&RandomVec, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
+		vec3 RandomVec=Vec3_Set(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
 		Vec3_Normalize(&RandomVec);
 
 		RigidBody_t Asteroid;
-		Vec3_Set(&Asteroid.Position, RandomVec.x*(RandFloat()*1000.0f+50.0f), RandomVec.y*(RandFloat()*1000.0f+50.0f), RandomVec.z*(RandFloat()*1000.0f+50.0f));
+		Asteroid.Position=Vec3_Set(RandomVec.x*(RandFloat()*1000.0f+50.0f), RandomVec.y*(RandFloat()*1000.0f+50.0f), RandomVec.z*(RandFloat()*1000.0f+50.0f));
 		Asteroid.Radius=(RandFloat()*20.0f+0.01f)*2.0f;
 
 		bool overlapping=false;
 
 		for(uint32_t j=0;j<i;j++)
 		{
-			if(SphereSphereIntersect(Asteroid.Position, Asteroid.Radius, Asteroids[j].Position, Asteroids[j].Radius))
+			if(Vec3_Distance(Asteroid.Position, Asteroids[j].Position)<Asteroid.Radius+Asteroids[j].Radius)
 				overlapping=true;
 		}
 
@@ -330,8 +319,7 @@ void GenerateSkyParams(void)
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
 	{
-		vec3 RandomVec;
-		Vec3_Set(&RandomVec, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
+		vec3 RandomVec=Vec3_Set(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
 		Vec3_Normalize(&RandomVec);
 
 		MatrixIdentity(&Data[16*i]);
@@ -342,11 +330,11 @@ void GenerateSkyParams(void)
 		const float radiusScale=1.5f;
 		MatrixScale(Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale, &Data[16*i]);
 
-		Vec3_Sets(&Asteroids[i].Velocity, 0.0f);
+		Asteroids[i].Velocity=Vec3_Sets(0.0f);
 //		Vec3_Setv(Asteroids[i].Velocity, RandomVec);
 //		Vec3_Muls(Asteroids[i].Velocity, 10.0f);
 
-		Vec3_Sets(&Asteroids[i].Force, 0.0f);
+		Asteroids[i].Force=Vec3_Sets(0.0f);
 
 		Asteroids[i].Mass=(1.0f/3000.0f)*(1.33333333f*PI*Asteroids[i].Radius);
 		Asteroids[i].invMass=1.0f/Asteroids[i].Mass;
@@ -593,8 +581,8 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 
 	memcpy(PerFrame[Index].Main_UBO[Eye]->HMD, Pose, sizeof(matrix));
 
-	Vec4_Setv(&PerFrame[Index].Main_UBO[Eye]->light_color, PerFrame[Index].Skybox_UBO[Eye]->uSunColor);
-	Vec4_Setv(&PerFrame[Index].Main_UBO[Eye]->light_direction, PerFrame[Index].Skybox_UBO[Eye]->uSunPosition);
+	PerFrame[Index].Main_UBO[Eye]->light_color=Vec4_Setv(PerFrame[Index].Skybox_UBO[Eye]->uSunColor);
+	PerFrame[Index].Main_UBO[Eye]->light_direction=Vec4_Setv(PerFrame[Index].Skybox_UBO[Eye]->uSunPosition);
 	PerFrame[Index].Main_UBO[Eye]->light_direction.w=PerFrame[Index].Skybox_UBO[Eye]->uSunSize;
 
 	memcpy(PerFrame[Index].Main_UBO[Eye]->light_mvp, Shadow_UBO.mvp, sizeof(matrix));
@@ -957,8 +945,7 @@ VkBool32 LoadVolume(VkuContext_t *Context, VkuImage_t *Image)
 			((float)z-(Image->Depth>>1))/Image->Depth,
 		};
 
-		Vec3_Muls(&v, Scale);
-		float p=nebula(v);
+		float p=nebula(Vec3_Muls(v, Scale));
 
 		((uint8_t *)Data)[i]=(uint8_t)(p*255.0f);
 	}
@@ -1135,7 +1122,7 @@ bool Init(void)
 
 	ParticleSystem_SetGravity(&ParticleSystem, 0.0f, 0.0f, 0.0f);
 
-	vec3 Zero={ 0.0f, 0.0f, 0.0f };
+	vec3 Zero=Vec3_Set(123.0f, 0.0f, 0.0f);
 	ParticleSystem_AddEmitter(&ParticleSystem, Zero, Zero, Zero, 0.0f, 100, true, NULL);
 
 	// Create primary frame buffers, depth image

@@ -1,72 +1,69 @@
 #include "math.h"
 
-void Vec3_Set(vec3 *a, const float x, const float y, const float z)
+vec3 Vec3_Set(const float x, const float y, const float z)
 {
-	a->value=_mm_set_ps(0, z, y, x);
+	return (vec3) { x, y, z };
 }
 
-void Vec3_Setv(vec3 *a, const vec3 b)
+vec3 Vec3_Setv(const vec3 b)
 {
-	a->value=b.value;
+	return b;
 }
 
-void Vec3_Sets(vec3 *a, const float b)
+vec3 Vec3_Sets(const float b)
 {
-	a->value=_mm_set_ps(0, b, b, b);
+	return (vec3) { b, b, b };
 }
 
-void Vec3_Add(vec3 *a, const float x, const float y, const float z)
+vec3 Vec3_Add(const vec3 a, const float x, const float y, const float z)
 {
-	a->value=_mm_add_ps(a->value, _mm_set_ps(0, z, y, x));
+	return (vec3) { a.x+x, a.y+y, a.z+z };
 }
 
-void Vec3_Addv(vec3 *a, const vec3 b)
+vec3 Vec3_Addv(const vec3 a, const vec3 b)
 {
-	a->value=_mm_add_ps(a->value, b.value);
+	return (vec3) { a.x+b.x, a.y+b.y, a.z+b.z };
 }
 
-void Vec3_Adds(vec3 *a, const float b)
+vec3 Vec3_Adds(const vec3 a, const float b)
 {
-	a->value=_mm_add_ps(a->value, _mm_set_ps(0, b, b, b));
+	return (vec3) { a.x+b, a.y+b, a.z+b };
 }
 
-void Vec3_Sub(vec3 *a, const float x, const float y, const float z)
+vec3 Vec3_Sub(const vec3 a, const float x, const float y, const float z)
 {
-	a->value=_mm_sub_ps(a->value, _mm_set_ps(0, z, y, x));
+	return (vec3) { a.x+x, a.y+y, a.z+z };
 }
 
-void Vec3_Subv(vec3 *a, const vec3 b)
+vec3 Vec3_Subv(const vec3 a, const vec3 b)
 {
-	a->value=_mm_sub_ps(a->value, b.value);
+	return (vec3) { a.x-b.x, a.y-b.y, a.z-b.z };
 }
 
-void Vec3_Subs(vec3 *a, const float b)
+vec3 Vec3_Subs(const vec3 a, const float b)
 {
-	a->value=_mm_sub_ps(a->value, _mm_set_ps(0, b, b, b));
+	return (vec3) { a.x-b, a.y-b, a.z-b };
 }
 
-void Vec3_Mul(vec3 *a, const float x, const float y, const float z)
+vec3 Vec3_Mul(const vec3 a, const float x, const float y, const float z)
 {
-	a->value=_mm_mul_ps(a->value, _mm_set_ps(0, z, y, x));
+	return (vec3) { a.x*x, a.y*y, a.z*z };
 }
 
-void Vec3_Mulv(vec3 *a, const vec3 b)
+vec3 Vec3_Mulv(const vec3 a, const vec3 b)
 {
-	a->value=_mm_mul_ps(a->value, b.value);
+	return (vec3) { a.x*b.x, a.y*b.y, a.z*b.z };
 }
 
-void Vec3_Muls(vec3 *a, const float b)
+vec3 Vec3_Muls(const vec3 a, const float b)
 {
-	a->value=_mm_mul_ps(a->value, _mm_set_ps(0, b, b, b));
+	return (vec3) { a.x*b, a.y*b, a.z*b };
 }
 
 float Vec3_Dot(const vec3 a, const vec3 b)
 {
-	__m128 x0=_mm_mul_ps(a.value, b.value);
-	__m128 x1=_mm_hadd_ps(x0, x0);
-
-	return _mm_cvtss_f32(_mm_hadd_ps(x1, x1));
-//	return a.x*b.x+a.y*b.y+a.z*b.z;
+	vec3 mult=Vec3_Mulv(a, b);
+	return mult.x+mult.y+mult.z;
 }
 
 float Vec3_Length(const vec3 Vector)
@@ -76,11 +73,7 @@ float Vec3_Length(const vec3 Vector)
 
 float Vec3_Distance(const vec3 Vector1, const vec3 Vector2)
 {
-	vec3 Vector;
-	Vec3_Setv(&Vector, Vector2);
-	Vec3_Subv(&Vector, Vector1);
-
-	return Vec3_Length(Vector);
+	return Vec3_Length(Vec3_Subv(Vector2, Vector1));
 }
 
 float Vec3_GetAngle(const vec3 Vector1, const vec3 Vector2)
@@ -88,16 +81,9 @@ float Vec3_GetAngle(const vec3 Vector1, const vec3 Vector2)
 	return acosf(Vec3_Dot(Vector1, Vector2)/(Vec3_Length(Vector1)*Vec3_Length(Vector2)));
 }
 
-void Vec3_Reflect(const vec3 N, const vec3 I, vec3 *Result)
+vec3 Vec3_Reflect(const vec3 N, const vec3 I)
 {
-	if(Result)
-	{
-		float NdotI=2.0f*Vec3_Dot(N, I);
-
-		Result->x=I.x-NdotI*N.x;
-		Result->y=I.y-NdotI*N.y;
-		Result->z=I.z-NdotI*N.z;
-	}
+	return Vec3_Subv(I, Vec3_Muls(N, 2.0f*Vec3_Dot(N, I)));
 }
 
 float Vec3_Normalize(vec3 *v)
@@ -110,39 +96,26 @@ float Vec3_Normalize(vec3 *v)
 		{
 			float r=1.0f/length;
 
-			Vec3_Muls(v, r);
+			*v=Vec3_Muls(*v, r);
 		}
+
+		return length;
 	}
 
 	return 0.0f;
 }
 
-void Vec3_Cross(const vec3 v0, const vec3 v1, vec3 *n)
+vec3 Vec3_Cross(const vec3 v0, const vec3 v1)
 {
-	if(!n)
-		return;
-
-	__m128 tmp0, tmp1, tmp2;
-
-	tmp0=_mm_shuffle_ps(v1.value, v1.value, _MM_SHUFFLE(3, 0, 2, 1));
-	tmp1=_mm_shuffle_ps(v0.value, v0.value, _MM_SHUFFLE(3, 0, 2, 1));
-
-	tmp0=_mm_mul_ps(tmp0, v0.value);
-	tmp1=_mm_mul_ps(tmp1, v1.value);
-	tmp2=_mm_sub_ps(tmp0, tmp1);
-
-	n->value=_mm_shuffle_ps(tmp2, tmp2, _MM_SHUFFLE(3, 0, 2, 1));
-	//n->x=v0.y*v1.z-v0.z*v1.y;
-	//n->y=v0.z*v1.x-v0.x*v1.z;
-	//n->z=v0.x*v1.y-v0.y*v1.x;
+	return (vec3)
+	{
+		v0.y*v1.z-v0.z*v1.y,
+		v0.z*v1.x-v0.x*v1.z,
+		v0.x*v1.y-v0.y*v1.x
+	};
 }
 
-void Vec3_Lerp(const vec3 a, const vec3 b, const float t, vec3 *out)
+vec3 Vec3_Lerp(const vec3 a, const vec3 b, const float t)
 {
-	if(out)
-	{
-		out->x=t*(b.x-a.x)+a.x;
-		out->y=t*(b.y-a.y)+a.y;
-		out->z=t*(b.z-a.z)+a.z;
-	}
+	return Vec3_Addv(Vec3_Muls(Vec3_Subv(b, a), t), a);
 }

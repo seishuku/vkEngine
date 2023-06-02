@@ -79,7 +79,7 @@ static void CalculateTangent(BModel_t *Model)
 				Model->Binormal[3*i2+0]+=t.x;	Model->Binormal[3*i2+1]+=t.y;	Model->Binormal[3*i2+2]+=t.z;
 				Model->Binormal[3*i3+0]+=t.x;	Model->Binormal[3*i3+1]+=t.y;	Model->Binormal[3*i3+2]+=t.z;
 
-				Vec3_Cross(v0, v1, &n);
+				n=Vec3_Cross(v0, v1);
 				Vec3_Normalize(&n);
 
 				Model->Normal[3*i1+0]+=n.x;	Model->Normal[3*i1+1]+=n.y;	Model->Normal[3*i1+2]+=n.z;
@@ -92,26 +92,22 @@ static void CalculateTangent(BModel_t *Model)
 		{
 			vec3 t, b, n;
 
-			Vec3_Set(&t, Model->Tangent[3*i+0], Model->Tangent[3*i+1], Model->Tangent[3*i+2]);
-			Vec3_Set(&b, Model->Binormal[3*i+0], Model->Binormal[3*i+1], Model->Binormal[3*i+2]);
-			Vec3_Set(&n, Model->Normal[3*i+0], Model->Normal[3*i+1], Model->Normal[3*i+2]);
+			t=Vec3_Set(Model->Tangent[3*i+0], Model->Tangent[3*i+1], Model->Tangent[3*i+2]);
+			b=Vec3_Set(Model->Binormal[3*i+0], Model->Binormal[3*i+1], Model->Binormal[3*i+2]);
+			n=Vec3_Set(Model->Normal[3*i+0], Model->Normal[3*i+1], Model->Normal[3*i+2]);
 
-			float d=Vec3_Dot(n, t);
-			t.x-=n.x*d;
-			t.y-=n.y*d;
-			t.z-=n.z*d;
+			t=Vec3_Subv(t, Vec3_Muls(n, Vec3_Dot(n, t)));
 
 			Vec3_Normalize(&t);
 			Vec3_Normalize(&b);
 			Vec3_Normalize(&n);
 
-			vec3 NxT;
-			Vec3_Cross(n, t, &NxT);
+			vec3 NxT=Vec3_Cross(n, t);
 
 			if(Vec3_Dot(NxT, b)<0.0f)
-				Vec3_Muls(&t, -1.0f);
+				t=Vec3_Muls(t, -1.0f);
 
-			Vec3_Setv(&b, NxT);
+			b=Vec3_Setv(NxT);
 
 			memcpy(&Model->Tangent[3*i], &t, sizeof(float)*3);
 			memcpy(&Model->Binormal[3*i], &b, sizeof(float)*3);

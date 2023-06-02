@@ -36,19 +36,16 @@ vec3 listener_right={ 1.0f, 0.0f, 0.0f };
 
 void Audio_SetListenerOrigin(vec3 pos, vec3 right)
 {
-    Vec3_Setv(&listener_origin, pos);
-    Vec3_Setv(&listener_right, right);
+    listener_origin=Vec3_Setv(pos);
+    listener_right=Vec3_Setv(right);
 }
 
 void Spatialize(vec3 origin, uint8_t *left_vol, uint8_t *right_vol)
 {
-    vec3 source_vec;
-
     const float dist_mult=1.0f/500.0f;
 
     // Distance from listener to sound source
-    Vec3_Setv(&source_vec, origin);
-    Vec3_Subv(&source_vec, listener_origin);
+    vec3 source_vec=Vec3_Subv(origin, listener_origin);
 
     float dist=(Vec3_Normalize(&source_vec)-MAX_VOLUME)*dist_mult;
 

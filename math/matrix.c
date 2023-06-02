@@ -174,16 +174,14 @@ void MatrixAlignPoints(const vec3 start, const vec3 end, const vec3 up, matrix o
 {
 	if(out)
 	{
-		vec3 axis;
-
 		// Find the direction of the start point and end point, then normalize it.
-		vec3 direction={ end.x-start.x, end.y-start.y, end.z-start.z };
+		vec3 direction=Vec3_Subv(end, start);
 		Vec3_Normalize(&direction);
 
 		// Get the cross product between the direction
 		// and the object's current orientation, and normalize that.
 		// That vector is the axis of rotation
-		Vec3_Cross(direction, up, &axis);
+		vec3 axis=Vec3_Cross(direction, up);
 		Vec3_Normalize(&axis);
 
 		// direction.orientation=cos(angle), so arccos to get angle between
@@ -259,14 +257,14 @@ void MatrixLookAt(const vec3 position, const vec3 forward, const vec3 up, matrix
 {
 	if(out)
 	{
-		vec3 f={ forward.x-position.x, forward.y-position.y, forward.z-position.z };
+		vec3 f=Vec3_Subv(forward, position);
 		vec3 u=up, s;
 
 		Vec3_Normalize(&u);
 		Vec3_Normalize(&f);
-		Vec3_Cross(f, u, &s);
+		s=Vec3_Cross(f, u);
 		Vec3_Normalize(&s);
-		Vec3_Cross(s, f, &u);
+		u=Vec3_Cross(s, f);
 
 		out[0]=s.x;
 		out[1]=u.x;

@@ -143,7 +143,7 @@ void *Zone_Malloc(MemZone_t *Zone, size_t Size)
 	Zone->Current=Base->Next;
 
 #ifdef _DEBUG
-	DBGPRINTF(DEBUG_WARNING, "Zone allocate block - Location: 0x%p Size: %0.3fKB\n", Base, (float)Size/1000.0f);
+	DBGPRINTF(DEBUG_WARNING, "Zone allocate block - Location: 0x%p Size: %0.3fKB\n", (void *)((uint8_t *)Base+HEADER_SIZE), (float)Size/1000.0f);
 #endif
 	return (void *)((uint8_t *)Base+HEADER_SIZE);
 }
