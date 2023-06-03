@@ -33,7 +33,7 @@ void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle
 	Vec3_Normalize(&vel);
 	Particle->vel=Vec3_Muls(vel, 10.0f);
 
-	Particle->life=((float)rand()/(float)RAND_MAX)*2.5f+0.01f;
+	Particle->life=RandFloat()*0.25f+0.01f;
 }
 
 // Launch a "missle"
@@ -46,7 +46,8 @@ static void FireParticleEmitter(vec3 Position, vec3 Direction)
 	// Create a new particle emitter
 	vec3 RandVec=Vec3_Set(RandFloat(), RandFloat(), RandFloat());
 	Vec3_Normalize(&RandVec);
-	uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, Vec3_Set(0.0f, 0.0f, 0.0f), Vec3_Set(0.2f, 0.2f, 0.2f), RandVec, 1.0f, 500, false, EmitterCallback);
+	RandVec=Vec3_Muls(RandVec, 100.0f);
+	uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, Vec3_Set(0.0f, 0.0f, 0.0f), Vec3_Set(0.0f, 0.0f, 0.0f), RandVec, 5.0f, 500, false, EmitterCallback);
 
 	// Search list for first dead particle
 	for(uint32_t i=0;i<Emitter->NumParticles;i++)
@@ -73,9 +74,9 @@ void Event_KeyDown(void *Arg)
 	switch(*Key)
 	{
 		case KB_SPACE:
-						Audio_PlaySample(&Sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &Camera.Position);
-						FireParticleEmitter(Camera.Position, Camera.Forward);
-						break;
+			Audio_PlaySample(&Sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &Camera.Position);
+			FireParticleEmitter(Camera.Position, Camera.Forward);
+			break;
 		case KB_P:		GenerateSkyParams();	break;
 		case KB_W:		Camera.key_w=true;		break;
 		case KB_S:		Camera.key_s=true;		break;
@@ -91,10 +92,10 @@ void Event_KeyDown(void *Arg)
 		case KB_RIGHT:	Camera.key_right=true;	break;
 		case KB_LSHIFT:
 		case KB_RSHIFT:	Camera.shift=true;		break;
-		case KB_Z:		
-						for(int i=0;i<NUM_ASTEROIDS;i++)
-							PhysicsExplode(&Asteroids[i]);
-						break;
+		case KB_Z:
+			for(int i=0;i<NUM_ASTEROIDS;i++)
+				PhysicsExplode(&Asteroids[i]);
+			break;
 		default:		break;
 	}
 }

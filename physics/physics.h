@@ -3,6 +3,7 @@
 
 #include "../math/math.h"
 #include "../camera/camera.h"
+#include "../particle/particle.h"
 
 // Define constants
 #define WORLD_SCALE 1000.0f
@@ -23,5 +24,6 @@ void PhysicsIntegrate(RigidBody_t *body, float dt);
 void PhysicsExplode(RigidBody_t *bodies);
 void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b);
 void PhysicsCameraToSphereCollisionResponse(Camera_t *Camera, RigidBody_t *Body);
+void PhysicsParticleToSphereCollisionResponse(Particle_t *Particle, RigidBody_t *Body);
 
 #endif

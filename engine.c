@@ -94,7 +94,7 @@ typedef struct
 	} PerFrame[VKU_MAX_FRAME_COUNT];
 } ThreadData_t;
 
-#define NUM_THREADS 4
+#define NUM_THREADS 3
 ThreadWorker_t Thread[NUM_THREADS];
 ThreadData_t ThreadData[NUM_THREADS];
 pthread_barrier_t ThreadBarrier;
@@ -649,30 +649,25 @@ void Thread_Physics(void *Arg)
 	// Loop through objects, integrate and check/resolve collisions
 	for(int i=0;i<NUM_ASTEROIDS;i++)
 	{
+		// Run physics integration on the asteriods
 		PhysicsIntegrate(&Asteroids[i], fTimeStep);
 
+		// Check asteroids against other asteroids
 		for(int j=i+1;j<NUM_ASTEROIDS;j++)
 			PhysicsSphereToSphereCollisionResponse(&Asteroids[i], &Asteroids[j]);
 
+		// Check asteriods against the camera
 		PhysicsCameraToSphereCollisionResponse(&Camera, &Asteroids[i]);
-		
+	
+		// Check asteriods against "missle" particles
+		// Emitter '0' on the particle system contains particles that drive the projectile physics
 		ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
-
+		// Loop through all the possible particles
 		for(uint32_t j=0;j<Emitter->NumParticles;j++)
 		{
+			// If the particle ID matches with the projectile ID, then check collision and respond
 			if(Emitter->Particles[j].ID!=Emitter->ID)
-			{
-				RigidBody_t Missle;
-
-				Missle.Position=Vec3_Setv(Emitter->Particles[j].pos);
-				Missle.Velocity=Vec3_Setv(Emitter->Particles[j].vel);
-				Missle.Radius=2.0f;
-				Missle.Mass=10000000.0f;
-				Missle.invMass=1.0f/Missle.Mass;
-				Missle.Force=Vec3_Sets(0.0f);
-
-				PhysicsSphereToSphereCollisionResponse(&Missle, &Asteroids[i]);
-			}
+				PhysicsParticleToSphereCollisionResponse(&Emitter->Particles[j], &Asteroids[i]);
 		}
 	}
 	//////
@@ -696,7 +691,7 @@ void Thread_Physics(void *Arg)
 	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
 	//////
 
-	pthread_barrier_wait(&ThreadBarrier);
+//	pthread_barrier_wait(&ThreadBarrier);
 }
 	
 void Render(void)
@@ -704,14 +699,6 @@ void Render(void)
 	static uint32_t Index=0;
 	uint32_t imageIndex;
 	matrix Pose;
-
-	Thread_AddJob(&Thread[3], Thread_Physics, NULL);
-
-	if(!IsVR)
-	{
-		MatrixIdentity(EyeProjection[0]);
-		MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, EyeProjection[0]);
-	}
 
 	// Get a pointer to the emitter that's providing the positions
 	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
@@ -730,6 +717,15 @@ void Render(void)
 	}
 
 	ParticleSystem_Step(&ParticleSystem, fTimeStep);
+
+//	Thread_AddJob(&Thread[3], Thread_Physics, NULL);
+	Thread_Physics(NULL);
+
+	if(!IsVR)
+	{
+		MatrixIdentity(EyeProjection[0]);
+		MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, EyeProjection[0]);
+	}
 
 	MatrixIdentity(Pose);
 
@@ -1074,6 +1070,15 @@ bool Init(void)
 	if(!Audio_LoadStatic("./assets/crash.wav", &Sounds[SOUND_CRASH]))
 		return false;
 
+	if(!Audio_LoadStatic("./assets/explode1.wav", &Sounds[SOUND_EXPLODE1]))
+		return false;
+
+	if(!Audio_LoadStatic("./assets/explode2.wav", &Sounds[SOUND_EXPLODE2]))
+		return false;
+
+	if(!Audio_LoadStatic("./assets/explode3.wav", &Sounds[SOUND_EXPLODE3]))
+		return false;
+
 	// Load models
 	if(LoadBModel(&Models[MODEL_ASTEROID1], "./assets/asteroid1.bmodel"))
 		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID1]);
@@ -1141,7 +1146,7 @@ bool Init(void)
 
 	ParticleSystem_SetGravity(&ParticleSystem, 0.0f, 0.0f, 0.0f);
 
-	vec3 Zero=Vec3_Set(123.0f, 0.0f, 0.0f);
+	vec3 Zero=Vec3_Set(0.0f, 0.0f, 0.0f);
 	ParticleSystem_AddEmitter(&ParticleSystem, Zero, Zero, Zero, 0.0f, 100, true, NULL);
 
 	// Create primary frame buffers, depth image
@@ -1288,6 +1293,9 @@ void Destroy(void)
 	Zone_Free(Zone, Sounds[SOUND_STONE2].data);
 	Zone_Free(Zone, Sounds[SOUND_STONE3].data);
 	Zone_Free(Zone, Sounds[SOUND_CRASH].data);
+	Zone_Free(Zone, Sounds[SOUND_EXPLODE1].data);
+	Zone_Free(Zone, Sounds[SOUND_EXPLODE2].data);
+	Zone_Free(Zone, Sounds[SOUND_EXPLODE3].data);
 
 	DestroyOpenVR();
 

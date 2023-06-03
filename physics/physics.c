@@ -6,6 +6,9 @@
 #include "../audio/audio.h"
 #include "../sounds.h"
 
+// Particle system
+extern ParticleSystem_t ParticleSystem;
+
 static void apply_constraints(RigidBody_t *Body)
 {
 	vec3 Center={ 0.0f, 0.0f, 0.0f };
@@ -114,7 +117,7 @@ void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 		const float relVelMag=sqrtf(fabsf(VdotN));
 
 		if(relVelMag>1.0f)
-			Audio_PlaySample(&Sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, relVelMag/200.0f, &a->Position);
+			Audio_PlaySample(&Sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, relVelMag/50.0f, &a->Position);
 		}
 }
 
@@ -159,6 +162,72 @@ void PhysicsCameraToSphereCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
 		const float relVelMag=sqrtf(fabsf(VdotN));
 
 		if(relVelMag>1.0f)
-			Audio_PlaySample(&Sounds[SOUND_CRASH], false, relVelMag/200.0f, &Camera->Position);
+			Audio_PlaySample(&Sounds[SOUND_CRASH], false, relVelMag/50.0f, &Camera->Position);
+	}
+}
+
+void ExplodeEmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle)
+{
+	Particle->pos=Vec3_Sets(0.0f);
+
+	// Simple -1.0 to 1.0 random spherical pattern, scaled by 100, fairly short lifespan.
+	Particle->vel=Vec3_Set(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
+	Vec3_Normalize(&Particle->vel);
+	Particle->vel=Vec3_Muls(Particle->vel, 50.0f);
+
+	Particle->life=((float)rand()/RAND_MAX)*0.5f+0.01f;
+}
+
+// Particle<->Rigid body collision detection and response
+void PhysicsParticleToSphereCollisionResponse(Particle_t *Particle, RigidBody_t *Body)
+{
+	// Particle constants, since particle struct doesn't store these
+	const float Particle_Radius=2.0f;
+	const float Particle_Mass=1.0f;
+	const float Particle_invMass=1.0f/Particle_Mass;
+
+	// Calculate the distance between the camera and the sphere's center
+	vec3 Normal=Vec3_Subv(Body->Position, Particle->pos);
+
+	float DistanceSq=Vec3_Dot(Normal, Normal);
+
+	// Sum of radii
+	float radiusSum=Particle_Radius+Body->Radius;
+
+	// Check if the distance is less than the sum of the radii
+	if(DistanceSq<=radiusSum*radiusSum)
+	{
+		float distance=sqrtf(DistanceSq);
+
+		Normal=Vec3_Muls(Normal, 1.0f/distance);
+
+		const float Penetration=radiusSum-distance;
+		vec3 positionImpulse=Vec3_Muls(Normal, Penetration*0.5f);
+
+		Particle->pos=Vec3_Subv(Particle->pos, positionImpulse);
+		Body->Position=Vec3_Addv(Body->Position, positionImpulse);
+
+		vec3 contactVelocity=Vec3_Subv(Body->Velocity, Particle->vel);
+
+		const float totalMass=Particle_invMass+Body->invMass;
+		const float Restitution=0.66f;
+		const float VdotN=Vec3_Dot(contactVelocity, Normal);
+		float j=(-(1.0f+Restitution)*VdotN)/totalMass;
+
+		Particle->vel=Vec3_Subv(Particle->vel, Vec3_Muls(Normal, j*Particle_invMass));
+		Body->Velocity=Vec3_Addv(Body->Velocity, Vec3_Muls(Normal, j*Body->invMass));
+
+		Particle->life=-1.0f;
+
+		const float relVelMag=sqrtf(fabsf(VdotN));
+
+		if(relVelMag>1.0f)
+		{
+			Audio_PlaySample(&Sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, relVelMag/50.0f, &Particle->pos);
+
+			// FIXME: This is probably causing derelict emitters that never go away
+			uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, Particle->pos, Vec3_Set(100.0f, 12.0f, 5.0f), Vec3_Set(0.0f, 0.0f, 0.0f), 5.0f, 1000, true, ExplodeEmitterCallback);
+			ParticleSystem_ResetEmitter(&ParticleSystem, ID);
+		}
 	}
 }
