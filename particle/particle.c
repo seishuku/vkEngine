@@ -94,7 +94,7 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *System, vec3 Position, vec3
 	if(Emitter.Particles==NULL)
 		return UINT32_MAX;
 
-//	memset(Emitter.Particles, 0, NumParticles*sizeof(Particle_t));
+	memset(Emitter.Particles, 0, NumParticles*sizeof(Particle_t));
 
 	// Set emitter position (used when resetting/recycling particles when they die)
 	Emitter.Position=Vec3_Setv(Position);
@@ -103,7 +103,7 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *System, vec3 Position, vec3
 	for(uint32_t i=0;i<Emitter.NumParticles;i++)
 	{
 		Emitter.Particles[i].ID=ID;
-		//Emitter.Particles[i].pos=Position;
+		Emitter.Particles[i].pos=Vec3_Setv(Position);
 		Emitter.Particles[i].life=-1.0f;
 	}
 

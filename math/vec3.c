@@ -90,16 +90,13 @@ float Vec3_Normalize(vec3 *v)
 {
 	if(v)
 	{
-		float length=Vec3_Length(*v);
+		float length=rsqrtf(Vec3_Dot(*v, *v));
 
 		if(length)
 		{
-			float r=1.0f/length;
-
-			*v=Vec3_Muls(*v, r);
+			*v=Vec3_Muls(*v, length);
+			return 1.0f/length;
 		}
-
-		return length;
 	}
 
 	return 0.0f;

@@ -655,6 +655,25 @@ void Thread_Physics(void *Arg)
 			PhysicsSphereToSphereCollisionResponse(&Asteroids[i], &Asteroids[j]);
 
 		PhysicsCameraToSphereCollisionResponse(&Camera, &Asteroids[i]);
+		
+		ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
+
+		for(uint32_t j=0;j<Emitter->NumParticles;j++)
+		{
+			if(Emitter->Particles[j].ID!=Emitter->ID)
+			{
+				RigidBody_t Missle;
+
+				Missle.Position=Vec3_Setv(Emitter->Particles[j].pos);
+				Missle.Velocity=Vec3_Setv(Emitter->Particles[j].vel);
+				Missle.Radius=2.0f;
+				Missle.Mass=10000000.0f;
+				Missle.invMass=1.0f/Missle.Mass;
+				Missle.Force=Vec3_Sets(0.0f);
+
+				PhysicsSphereToSphereCollisionResponse(&Missle, &Asteroids[i]);
+			}
+		}
 	}
 	//////
 

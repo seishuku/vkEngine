@@ -17,21 +17,9 @@
 #define max(a, b) ((a)>(b)?(a):(b))
 #endif
 
-typedef struct
-{
-	float x, y;
-} vec2;
-
-typedef struct
-{
-	float x, y, z;
-} vec3;
-
-typedef struct
-{
-	float x, y, z, w;
-} vec4;
-
+typedef struct { float x, y; } vec2;
+typedef struct { float x, y, z; } vec3;
+typedef struct { float x, y, z, w; } vec4;
 typedef float matrix[16];
 
 vec2 Vec2_Set(const float x, const float y);

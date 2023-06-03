@@ -73,8 +73,8 @@ SHADERS+=shaders/skybox.vert.spv
 SHADERS+=shaders/gaussian.frag.spv
 SHADERS+=shaders/threshold.frag.spv
 
-CC=clang
-CFLAGS=-Wall -Wno-missing-braces -Wextra -msse3 -O3 -std=gnu17 -I/usr/X11/include
+CC=gcc
+CFLAGS=-Wall -Wno-missing-braces -Wextra -O3 -std=gnu17 -I/usr/X11/include
 LDFLAGS=-Wold-style-definition -L/usr/X11/lib -lvulkan -lX11 -lm -lpthread -lopenvr_api -lportaudio
 
 all: $(TARGET) $(SHADERS)
