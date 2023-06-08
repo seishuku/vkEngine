@@ -169,27 +169,22 @@ void ShadowUpdateMap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 	vkCmdSetViewport(CommandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)ShadowSize, (float)ShadowSize, 0.0f, 1.0f });
 	vkCmdSetScissor(CommandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { ShadowSize, ShadowSize } });
 
-	matrix Projection;
-	MatrixIdentity(Projection);
-	MatrixOrtho(-1200.0f, 1200.0f, -1200.0f, 1200.0f, 0.1f, 3000.0f, Projection);
-
-	matrix ModelView;
-	MatrixIdentity(ModelView);
+	matrix Projection=MatrixOrtho(-1200.0f, 1200.0f, -1200.0f, 1200.0f, 0.1f, 3000.0f);
 
 	vec3 Position=Vec3_Muls(*((vec3 *)&PerFrame[FrameIndex].Skybox_UBO[0]->uSunPosition), 200.0f);
 
-	MatrixLookAt(Position, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.0f, 1.0f, 0.0f }, ModelView);
+	matrix ModelView=MatrixLookAt(Position, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.0f, 1.0f, 0.0f });
 
-	MatrixMult(ModelView, Projection, Shadow_UBO.mvp);
+	Shadow_UBO.mvp=MatrixMult(ModelView, Projection);
 
 	vkCmdBindVertexBuffers(CommandBuffer, 1, 1, &Asteroid_Instance.Buffer, &(VkDeviceSize) { 0 });
 
 	// Draw the models
 	for(uint32_t j=0;j<NUM_MODELS;j++)
 	{
-		MatrixIdentity(Shadow_UBO.local);
-		MatrixRotate(fTime, 1.0f, 0.0f, 0.0f, Shadow_UBO.local);
-		MatrixRotate(fTime, 0.0f, 1.0f, 0.0f, Shadow_UBO.local);
+		Shadow_UBO.local=MatrixIdentity();
+		Shadow_UBO.local=MatrixMult(Shadow_UBO.local, MatrixRotate(fTime, 1.0f, 0.0f, 0.0f));
+		Shadow_UBO.local=MatrixMult(Shadow_UBO.local, MatrixRotate(fTime, 0.0f, 1.0f, 0.0f));
 
 		vkCmdPushConstants(CommandBuffer, ShadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Shadow_UBO_t), &Shadow_UBO);
 

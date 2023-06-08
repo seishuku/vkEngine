@@ -8,7 +8,7 @@
 #include "../camera/camera.h"
 
 // Camera collision stuff
-int32_t ClassifySphere(vec3 Center, vec3 Normal, vec3 Point, float radius, float *distance)
+static int32_t ClassifySphere(vec3 Center, vec3 Normal, vec3 Point, float radius, float *distance)
 {
 	*distance=Vec3_Dot(Normal, Center)-Vec3_Dot(Normal, Point);
 
@@ -42,7 +42,7 @@ static bool InsidePolygon(const vec3 Intersection, const vec3 Tri[3])
 	return false;
 }
 
-static void ClosestPointOnLine(vec3 A, vec3 B, vec3 Point, vec3 *ClosestPoint)
+static vec3 ClosestPointOnLine(vec3 A, vec3 B, vec3 Point)
 {
 	vec3 PointDir={ Point.x-A.x, Point.y-A.y, Point.z-A.z };
 	vec3 Slope={ B.x-A.y, B.y-A.y, B.z-A.z };
@@ -53,23 +53,14 @@ static void ClosestPointOnLine(vec3 A, vec3 B, vec3 Point, vec3 *ClosestPoint)
 
 	float t=fmaxf(0.0f, fminf(1.0f, Vec3_Dot(PointDir, Slope)*recip_d));
 
-	ClosestPoint->x=A.x+t*Slope.x;
-	ClosestPoint->y=A.y+t*Slope.y;
-	ClosestPoint->z=A.z+t*Slope.z;
+	return Vec3_Addv(A, Vec3_Muls(Slope, t));
 }
 
 int32_t EdgeSphereCollision(vec3 Center, vec3 Tri[3], float radius)
 {
-	int32_t i;
-	vec3 Point;
-
-	for(i=0;i<3;i++)
+	for(uint32_t i=0;i<3;i++)
 	{
-		ClosestPointOnLine(Tri[i], Tri[(i+1)%3], Center, &Point);
-
-		float distance=Vec3_Distance(Point, Center);
-
-		if(distance<radius)
+		if(Vec3_Distance(ClosestPointOnLine(Tri[i], Tri[(i+1)%3], Center), Center)<radius)
 			return 1;
 	}
 
@@ -82,6 +73,36 @@ vec3 GetCollisionOffset(vec3 Normal, float radius, float distance)
 		return Vec3_Muls(Normal, radius-distance);
 	else
 		return Vec3_Muls(Normal, -(radius+distance));
+}
+
+// Camera<->triangle mesh collision detection and response
+void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32_t NumFace)
+{
+	float distance=0.0f;
+
+	for(int32_t i=0;i<NumFace;i++)
+	{
+		vec3 Tri[3]=
+		{
+			{ Vertex[3*Face[3*i+0]], Vertex[3*Face[3*i+0]+1], Vertex[3*Face[3*i+0]+2] },
+			{ Vertex[3*Face[3*i+1]], Vertex[3*Face[3*i+1]+1], Vertex[3*Face[3*i+1]+2] },
+			{ Vertex[3*Face[3*i+2]], Vertex[3*Face[3*i+2]+1], Vertex[3*Face[3*i+2]+2] }
+		};
+
+		vec3 v0=Vec3_Subv(Tri[1], Tri[0]);
+		vec3 v1=Vec3_Subv(Tri[2], Tri[0]);
+
+		vec3 n=Vec3_Cross(v0, v1);
+		Vec3_Normalize(&n);
+
+		if(ClassifySphere(Camera->Position, n, Tri[0], Camera->Radius, &distance)==1)
+		{
+			vec3 Intersection=Vec3_Subv(Camera->Position, Vec3_Muls(n, distance));
+
+			if(InsidePolygon(Intersection, Tri)||EdgeSphereCollision(Camera->Position, Tri, Camera->Radius*0.5f))
+				Camera->Position=Vec3_Addv(Camera->Position, GetCollisionOffset(n, Camera->Radius, distance));
+		}
+	}
 }
 
 bool SphereBBOXIntersection(const vec3 Center, const float Radius, const vec3 BBMin, const vec3 BBMax)
@@ -119,40 +140,6 @@ bool SphereBBOXIntersection(const vec3 Center, const float Radius, const vec3 BB
 	return false;
 }
 
-// Camera<->triangle mesh collision detection and response
-void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32_t NumFace)
-{
-	float distance=0.0f;
-	vec3 n;
-
-	for(int32_t i=0;i<NumFace;i++)
-	{
-		vec3 Tri[3]=
-		{
-			{ Vertex[3*Face[3*i+0]], Vertex[3*Face[3*i+0]+1], Vertex[3*Face[3*i+0]+2] },
-			{ Vertex[3*Face[3*i+1]], Vertex[3*Face[3*i+1]+1], Vertex[3*Face[3*i+1]+2] },
-			{ Vertex[3*Face[3*i+2]], Vertex[3*Face[3*i+2]+1], Vertex[3*Face[3*i+2]+2] }
-		};
-
-		vec3 v0={ Tri[1].x-Tri[0].x, Tri[1].y-Tri[0].y, Tri[1].z-Tri[0].z };
-		vec3 v1={ Tri[2].x-Tri[0].x, Tri[2].y-Tri[0].y, Tri[2].z-Tri[0].z };
-
-		n=Vec3_Cross(v0, v1);
-
-		Vec3_Normalize(&n);
-
-		int32_t classification=ClassifySphere(Camera->Position, n, Tri[0], Camera->Radius, &distance);
-
-		if(classification==1)
-		{
-			vec3 Intersection=Vec3_Subv(Camera->Position, Vec3_Muls(n, distance));
-
-			if(InsidePolygon(Intersection, Tri)||EdgeSphereCollision(Camera->Position, Tri, Camera->Radius*0.5f))
-				Camera->Position=Vec3_Addv(Camera->Position, GetCollisionOffset(n, Camera->Radius, distance));
-		}
-	}
-}
-
 // Actual camera stuff
 void CameraInit(Camera_t *Camera, const vec3 Position, const vec3 View, const vec3 Up)
 {
@@ -185,22 +172,15 @@ void CameraInit(Camera_t *Camera, const vec3 Position, const vec3 View, const ve
 
 void CameraPitch(Camera_t *Camera, const float Angle)
 {
-	vec4 quat;
-
-	QuatAnglev(Angle, Camera->Right, &quat);
-	QuatRotate(quat, Camera->Forward, &Camera->Forward);
+	Camera->Forward=QuatRotate(QuatAnglev(Angle, Camera->Right), Camera->Forward);
 	Vec3_Normalize(&Camera->Forward);
 
-	Camera->Up=Vec3_Cross(Camera->Forward, Camera->Right);
-	Camera->Up=Vec3_Muls(Camera->Up, -1.0f);
+	Camera->Up=Vec3_Muls(Vec3_Cross(Camera->Forward, Camera->Right), -1.0f);
 }
 
 void CameraYaw(Camera_t *Camera, const float Angle)
 {
-	vec4 quat;
-
-	QuatAnglev(Angle, Camera->Up, &quat);
-	QuatRotate(quat, Camera->Forward, &Camera->Forward);
+	Camera->Forward=QuatRotate(QuatAnglev(Angle, Camera->Up), Camera->Forward);
 	Vec3_Normalize(&Camera->Forward);
 
 	Camera->Right=Vec3_Cross(Camera->Forward, Camera->Up);
@@ -208,22 +188,15 @@ void CameraYaw(Camera_t *Camera, const float Angle)
 
 void CameraRoll(Camera_t *Camera, const float Angle)
 {
-	vec4 quat;
-
-	QuatAnglev(-Angle, Camera->Forward, &quat);
-	QuatRotate(quat, Camera->Right, &Camera->Right);
+	Camera->Right=QuatRotate(QuatAnglev(-Angle, Camera->Forward), Camera->Right);
 	Vec3_Normalize(&Camera->Right);
 
-	Camera->Up=Vec3_Cross(Camera->Forward, Camera->Right);
-	Camera->Up=Vec3_Muls(Camera->Up, -1.0f);
+	Camera->Up=Vec3_Muls(Vec3_Cross(Camera->Forward, Camera->Right), -1.0f);
 }
 
-void CameraUpdate(Camera_t *Camera, float dt, matrix out)
+matrix CameraUpdate(Camera_t *Camera, float dt)
 {
 	float speed=2.0f;
-
-	if(!out)
-		return;
 
 	if(Camera->shift)
 		speed*=2.0f;
@@ -264,7 +237,7 @@ void CameraUpdate(Camera_t *Camera, float dt, matrix out)
 	if(Camera->key_down)
 		Camera->Pitch-=0.125f;
 
-	const float Damp=0.92f;
+	const float Damp=powf(0.001f, dt);
 	Camera->Velocity=Vec3_Muls(Camera->Velocity, Damp);
 	Camera->Pitch*=Damp;
 	Camera->Yaw*=Damp;
@@ -274,23 +247,13 @@ void CameraUpdate(Camera_t *Camera, float dt, matrix out)
 	CameraYaw(Camera, Camera->Yaw*dt);
 	CameraRoll(Camera, Camera->Roll*dt);
 
-	Camera->Position.x+=Camera->Right.x*Camera->Velocity.x*dt;
-	Camera->Position.y+=Camera->Right.y*Camera->Velocity.x*dt;
-	Camera->Position.z+=Camera->Right.z*Camera->Velocity.x*dt;
+	Camera->Position=Vec3_Addv(Camera->Position, Vec3_Muls(Camera->Right, Camera->Velocity.x*dt));
+	Camera->Position=Vec3_Addv(Camera->Position, Vec3_Muls(Camera->Up, Camera->Velocity.y*dt));
+	Camera->Position=Vec3_Addv(Camera->Position, Vec3_Muls(Camera->Forward, Camera->Velocity.z*dt));
 
-	Camera->Position.x+=Camera->Up.x*Camera->Velocity.y*dt;
-	Camera->Position.y+=Camera->Up.y*Camera->Velocity.y*dt;
-	Camera->Position.z+=Camera->Up.z*Camera->Velocity.y*dt;
+	Camera->View=Vec3_Addv(Camera->Position, Camera->Forward);
 
-	Camera->Position.x+=Camera->Forward.x*Camera->Velocity.z*dt;
-	Camera->Position.y+=Camera->Forward.y*Camera->Velocity.z*dt;
-	Camera->Position.z+=Camera->Forward.z*Camera->Velocity.z*dt;
-
-	Camera->View.x=Camera->Position.x+Camera->Forward.x;
-	Camera->View.y=Camera->Position.y+Camera->Forward.y;
-	Camera->View.z=Camera->Position.z+Camera->Forward.z;
-
-	MatrixLookAt(Camera->Position, Camera->View, Camera->Up, out);
+	return MatrixLookAt(Camera->Position, Camera->View, Camera->Up);
 }
 
 // Camera path track stuff
@@ -432,13 +395,8 @@ int32_t CameraLoadPath(char *filename, CameraPath_t *Path)
 	return 1;
 }
 
-void CameraInterpolatePath(CameraPath_t *Path, Camera_t *Camera, float TimeStep, matrix out)
+matrix CameraInterpolatePath(CameraPath_t *Path, Camera_t *Camera, float TimeStep)
 {
-	matrix m;
-
-	if(!out)
-		return;
-
 	Path->Time+=TimeStep;
 
 	if(Path->Time>Path->EndTime)
@@ -447,8 +405,7 @@ void CameraInterpolatePath(CameraPath_t *Path, Camera_t *Camera, float TimeStep,
 	CalculatePoint(Path->Knots, Path->NumPoints-1, 3, Path->Time, Path->Position, &Camera->Position);
 	CalculatePoint(Path->Knots, Path->NumPoints-1, 3, Path->Time, Path->View, &Camera->View);
 
-	MatrixLookAt(Camera->Position, Camera->View, Camera->Up, m);
-	MatrixMult(m, out, out);
+	return MatrixLookAt(Camera->Position, Camera->View, Camera->Up);
 }
 
 void CameraDeletePath(CameraPath_t *Path)

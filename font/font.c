@@ -223,9 +223,7 @@ void Font_Print(VkCommandBuffer CommandBuffer, uint32_t Eye, float x, float y, c
 		vkUnmapMemory(Context.Device, FontBuffer.DeviceMemory);
 	}
 
-	matrix Projection;
-	MatrixIdentity(Projection);
-	MatrixOrtho(0.0f, ((float)Width/Height)*scale, 0.0f, 1.0f*scale, 0.001f, 100.0f, Projection);
+	matrix Projection=MatrixOrtho(0.0f, ((float)Width/Height)*scale, 0.0f, 1.0f*scale, 0.001f, 100.0f);
 
 	// Draw characters!
 	vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, FontPipeline.Pipeline);

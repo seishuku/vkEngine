@@ -393,9 +393,9 @@ void ParticleSystem_Draw(ParticleSystem_t *System, VkCommandBuffer CommandBuffer
 		}
 	}
 
-	MatrixMult(Modelview, Projection, ParticlePC.mvp);
-	ParticlePC.Right=Vec4_Set(Modelview[0], Modelview[4], Modelview[8], Modelview[12]);
-	ParticlePC.Up=Vec4_Set(Modelview[1], Modelview[5], Modelview[9], Modelview[13]);
+	ParticlePC.mvp=MatrixMult(Modelview, Projection);
+	ParticlePC.Right=Vec4_Set(Modelview.x.x, Modelview.y.x, Modelview.z.x, Modelview.w.x);
+	ParticlePC.Up=Vec4_Set(Modelview.x.y, Modelview.y.y, Modelview.z.y, Modelview.w.y);
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&ParticleDescriptorSet, 0, &ParticleTexture);
 	vkuAllocateUpdateDescriptorSet(&ParticleDescriptorSet, DescriptorPool);

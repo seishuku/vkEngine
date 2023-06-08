@@ -23,72 +23,59 @@ uint32_t rtHeight;
 matrix EyeProjection[2];
 
 // Convert from OpenVR's 3x4 matrix to 4x4 matrix format
-void HmdMatrix34toMatrix44(HmdMatrix34_t in, matrix out)
+matrix HmdMatrix34toMatrix44(HmdMatrix34_t in)
 {
-	out[0]=in.m[0][0];
-	out[1]=in.m[1][0];
-	out[2]=in.m[2][0];
-	out[3]=0.0f;
-	out[4]=in.m[0][1];
-	out[5]=in.m[1][1];
-	out[6]=in.m[2][1];
-	out[7]=0.0f;
-	out[8]=in.m[0][2];
-	out[9]=in.m[1][2];
-	out[10]=in.m[2][2];
-	out[11]=0.0f;
-	out[12]=in.m[0][3];
-	out[13]=in.m[1][3];
-	out[14]=in.m[2][3];
-	out[15]=1.0f;
+	return (matrix)
+	{
+		{ in.m[0][0], in.m[1][0], in.m[2][0], 0.0f },
+		{ in.m[0][1], in.m[1][1], in.m[2][1], 0.0f },
+		{ in.m[0][2], in.m[1][2], in.m[2][2], 0.0f },
+		{ in.m[0][3], in.m[1][3], in.m[2][3], 1.0f }
+	};
 }
 
 // Get the current projection and transform for selected eye and output a projection matrix for vulkan
-void GetEyeProjection(EVREye Eye, matrix Projection)
+matrix GetEyeProjection(EVREye Eye)
 {
 	if(!VRSystem)
-		return;
+		return MatrixIdentity();
 
-	matrix Transform;
-	HmdMatrix44_t HmdProj;
+	matrix Projection;
 	float zNear=0.01f;
 
 	// Get projection matrix and copy into my matrix format
-	HmdProj=VRSystem->GetProjectionMatrix(Eye, zNear, 1.0f);
-	memcpy(Projection, &HmdProj, sizeof(matrix));
+	HmdMatrix44_t HmdProj=VRSystem->GetProjectionMatrix(Eye, zNear, 1.0f);
+	memcpy(&Projection, &HmdProj, sizeof(matrix));
 
 	// Row/Col major convert
-	MatrixTranspose(Projection, Projection);
+	Projection=MatrixTranspose(Projection);
 
 	// Y-Flip for vulkan
-	Projection[5]*=-1.0f;
+	Projection.y.y*=-1.0f;
 
 	// mod for infinite far plane
-	Projection[10]=0.0f;
-	Projection[11]=-1.0f;
-	Projection[14]=zNear;
+	Projection.z.z=0.0f;
+	Projection.z.w=-1.0f;
+	Projection.w.z=zNear;
 
 	// Inverse eye transform and multiply into projection matrix
-	HmdMatrix34toMatrix44(VRSystem->GetEyeToHeadTransform(Eye), Transform);
-	MatrixInverse(Transform, Transform);
-	MatrixMult(Projection, Transform, Projection);
+	return MatrixMult(Projection, MatrixInverse(HmdMatrix34toMatrix44(VRSystem->GetEyeToHeadTransform(Eye))));
 }
 
 // Get current inverse head pose matrix
-void GetHeadPose(matrix Pose)
+matrix GetHeadPose(void)
 {
 	if(!VRCompositor)
-		return;
+		return MatrixIdentity();
 
 	TrackedDevicePose_t trackedDevicePose[64];
 
 	VRCompositor->WaitGetPoses(trackedDevicePose, k_unMaxTrackedDeviceCount, NULL, 0);
 
 	if(trackedDevicePose[k_unTrackedDeviceIndex_Hmd].bDeviceIsConnected&&trackedDevicePose[k_unTrackedDeviceIndex_Hmd].bPoseIsValid)
-	{
-		HmdMatrix34toMatrix44(trackedDevicePose[k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking, Pose);
-		MatrixInverse(Pose, Pose);
-	}
+		return MatrixInverse(HmdMatrix34toMatrix44(trackedDevicePose[k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking));
+
+	return MatrixIdentity();
 }
 
 bool InitOpenVR(void)
@@ -150,8 +137,8 @@ bool InitOpenVR(void)
 
 	DBGPRINTF(DEBUG_INFO, "HMD suggested render target size: %d x %d @ %0.1fHz\n", rtWidth, rtHeight, Freq);
 
-	GetEyeProjection(EVREye_Eye_Left, EyeProjection[0]);
-	GetEyeProjection(EVREye_Eye_Right, EyeProjection[1]);
+	EyeProjection[0]=GetEyeProjection(EVREye_Eye_Left);
+	EyeProjection[1]=GetEyeProjection(EVREye_Eye_Right);
 
 	return true;
 }

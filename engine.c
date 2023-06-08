@@ -28,49 +28,59 @@
 #include "perframe.h"
 #include "sounds.h"
 
+// Initial window size
 uint32_t Width=1920, Height=1080;
 
+// extern switch from vr.c for if we have VR available
 extern bool IsVR;
 
+// Vulkan instance handle and context structs
 VkInstance Instance;
 VkuContext_t Context;
 
+// Vulkan memory allocator zone
 VkuMemZone_t *VkZone;
 
+// Camera data
 Camera_t Camera;
 matrix ModelView;
 
+// extern timing data from system main
 extern float fps, fTimeStep, fTime;
 
+// Main particle system struct
 ParticleSystem_t ParticleSystem;
 
+// 3D Model data
 BModel_t Models[NUM_MODELS];
 
+// Texture images
 VkuImage_t Textures[NUM_TEXTURES];
 
+// Sound sample data
 Sample_t Sounds[NUM_SOUNDS];
 
-// Swapchain
+// Vulkan swapchain helper struct
 VkuSwapchain_t Swapchain;
 
 // Multisample anti-alias sample count
 VkSampleCountFlags MSAA=VK_SAMPLE_COUNT_4_BIT;
 
-// Colorbuffer image
+// Colorbuffer image and format
 VkFormat ColorFormat=VK_FORMAT_R16G16B16A16_SFLOAT;
 VkuImage_t ColorImage[2];		// left and right eye color buffer
 
-// Depth buffer image
+// Depth buffer image and format
 VkFormat DepthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
 VkuImage_t DepthImage[2];		// left and right eye depth buffers
 
-// Primary rendering pipeline stuff
+// Primary rendering vulkan stuff
 VkuDescriptorSet_t DescriptorSet;
 VkPipelineLayout PipelineLayout;
 VkuPipeline_t Pipeline;
 //////
 
-// Volume rendering
+// Volume rendering vulkan stuff
 VkuDescriptorSet_t VolumeDescriptorSet;
 VkPipelineLayout VolumePipelineLayout;
 VkuPipeline_t VolumePipeline;
@@ -83,6 +93,7 @@ VkuBuffer_t Asteroid_Instance;
 RigidBody_t Asteroids[NUM_ASTEROIDS];
 //////
 
+// Thread stuff
 typedef struct
 {
 	uint32_t Index, Eye;
@@ -95,12 +106,14 @@ typedef struct
 } ThreadData_t;
 
 #define NUM_THREADS 3
-ThreadWorker_t Thread[NUM_THREADS];
 ThreadData_t ThreadData[NUM_THREADS];
-pthread_barrier_t ThreadBarrier;
+ThreadWorker_t Thread[NUM_THREADS], ThreadPhysics;
+pthread_barrier_t ThreadBarrier, ThreadBarrier_Physics;
+//////
 
 void RecreateSwapchain(void);
 
+// Create functions for creating render data for asteroids
 bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeight)
 {
 	vkuCreateTexture2D(&Context, &ColorImage[Eye], targetWidth, targetHeight, ColorFormat, MSAA);
@@ -192,7 +205,9 @@ bool CreatePipeline(void)
 
 	return true;
 }
+//////
 
+// Create functions for volume rendering
 bool CreateVolumePipeline(void)
 {
 	vkuInitDescriptorSet(&VolumeDescriptorSet, &Context);
@@ -247,7 +262,9 @@ bool CreateVolumePipeline(void)
 
 	return true;
 }
+//////
 
+// Build up random data for skybox and asteroid field
 void GenerateSkyParams(void)
 {
 	// Build a skybox param struct with random values
@@ -280,13 +297,7 @@ void GenerateSkyParams(void)
 		memcpy(PerFrame[i].Skybox_UBO[1], &Skybox_UBO, sizeof(Skybox_UBO_t));
 	}
 
-	float *Data=NULL;
-
-	if(!Asteroid_Instance.Buffer)
-		vkuCreateHostBuffer(&Context, &Asteroid_Instance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-	vkMapMemory(Context.Device, Asteroid_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Data);
-
+	// Set up rigid body reps for asteroids
 	uint32_t i=0, tries=0;
 
 	memset(Asteroids, 0, sizeof(RigidBody_t)*NUM_ASTEROIDS);
@@ -316,24 +327,32 @@ void GenerateSkyParams(void)
 		if(tries>NUM_ASTEROIDS*NUM_ASTEROIDS)
 			break;
 	}
+	//////
+
+	// Set up instance data for asteroid rendering
+	float *Data=NULL;
+
+	if(!Asteroid_Instance.Buffer)
+		vkuCreateHostBuffer(&Context, &Asteroid_Instance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+	vkMapMemory(Context.Device, Asteroid_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Data);
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
 	{
 		vec3 RandomVec=Vec3_Set(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
 		Vec3_Normalize(&RandomVec);
 
-		MatrixIdentity(&Data[16*i]);
-		MatrixTranslatev(Asteroids[i].Position, &Data[16*i]);
-		MatrixRotate(RandFloat()*PI*2.0f, 1.0f, 0.0f, 0.0f, &Data[16*i]);
-		MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 1.0f, 0.0f, &Data[16*i]);
-		MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 0.0f, 1.0f, &Data[16*i]);
+		matrix Orientation=MatrixIdentity();
+		Orientation=MatrixMult(Orientation, MatrixTranslatev(Asteroids[i].Position));
+		Orientation=MatrixMult(Orientation, MatrixRotate(RandFloat()*PI*2.0f, 1.0f, 0.0f, 0.0f));
+		Orientation=MatrixMult(Orientation, MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 1.0f, 0.0f));
+		Orientation=MatrixMult(Orientation, MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 0.0f, 1.0f));
 		const float radiusScale=1.5f;
-		MatrixScale(Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale, &Data[16*i]);
+		Orientation=MatrixMult(Orientation, MatrixScale(Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale));
+
+		memcpy(&Data[16*i], &Orientation, sizeof(matrix));
 
 		Asteroids[i].Velocity=Vec3_Sets(0.0f);
-//		Vec3_Setv(Asteroids[i].Velocity, RandomVec);
-//		Vec3_Muls(Asteroids[i].Velocity, 10.0f);
-
 		Asteroids[i].Force=Vec3_Sets(0.0f);
 
 		Asteroids[i].Mass=(1.0f/3000.0f)*(1.33333333f*PI*Asteroids[i].Radius);
@@ -341,8 +360,11 @@ void GenerateSkyParams(void)
 	}
 
 	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
+	//////
 }
+//////
 
+// General thread contructor for threads using Vulkan
 void Thread_Constructor(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
@@ -396,6 +418,7 @@ void Thread_Constructor(void *Arg)
 	}
 }
 
+// General thread destructor for vulkan threads
 void Thread_Destructor(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
@@ -410,6 +433,7 @@ void Thread_Destructor(void *Arg)
 	}
 }
 
+// Asteroids render pass thread
 void Thread_Main(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
@@ -455,10 +479,9 @@ void Thread_Main(void *Arg)
 
 		vkCmdBindDescriptorSets(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
-		matrix local;
-		MatrixIdentity(local);
-		MatrixRotate(fTime, 1.0f, 0.0f, 0.0f, local);
-		MatrixRotate(fTime, 0.0f, 1.0f, 0.0f, local);
+		matrix local=MatrixIdentity();
+		local=MatrixMult(local, MatrixRotate(fTime, 1.0f, 0.0f, 0.0f));
+		local=MatrixMult(local, MatrixRotate(fTime, 0.0f, 1.0f, 0.0f));
 
 		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(matrix), &local);
 
@@ -477,6 +500,7 @@ void Thread_Main(void *Arg)
 	pthread_barrier_wait(&ThreadBarrier);
 }
 
+// Skybox render pass thread
 void Thread_Skybox(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
@@ -520,11 +544,11 @@ void Thread_Skybox(void *Arg)
 	pthread_barrier_wait(&ThreadBarrier);
 }
 
-uint32_t uFrame=0;
-
+// Particles render pass thread, also has volumetric rendering
 void Thread_Particles(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
+	static uint32_t uFrame=0;
 
 	vkResetDescriptorPool(Context.Device, Data->PerFrame[Data->Index].DescriptorPool[Data->Eye], 0);
 	vkResetCommandPool(Context.Device, Data->PerFrame[Data->Index].CommandPool[Data->Eye], 0);
@@ -550,8 +574,7 @@ void Thread_Particles(void *Arg)
 	vkCmdSetViewport(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)rtWidth, (float)rtHeight, 0.0f, 1.0f });
 	vkCmdSetScissor(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { rtWidth, rtHeight } });
 
-	matrix Modelview;
-	MatrixMult(PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->HMD, Modelview);
+	matrix Modelview=MatrixMult(PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->HMD);
 	ParticleSystem_Draw(&ParticleSystem, Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Data->PerFrame[Data->Index].DescriptorPool[Data->Eye], Modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
 
 	vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, VolumePipeline.Pipeline);
@@ -571,21 +594,22 @@ void Thread_Particles(void *Arg)
 	pthread_barrier_wait(&ThreadBarrier);
 }
 
+// Render everything together, per-eye, per-frame index
 void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matrix Pose)
 {
 	// Generate the projection matrix
-	memcpy(PerFrame[Index].Main_UBO[Eye]->projection, &EyeProjection[Eye], sizeof(matrix));
+	PerFrame[Index].Main_UBO[Eye]->projection=EyeProjection[Eye];
 
 	// Set up the modelview matrix
-	memcpy(PerFrame[Index].Main_UBO[Eye]->modelview, ModelView, sizeof(matrix));
+	PerFrame[Index].Main_UBO[Eye]->modelview=ModelView;
 
-	memcpy(PerFrame[Index].Main_UBO[Eye]->HMD, Pose, sizeof(matrix));
+	PerFrame[Index].Main_UBO[Eye]->HMD=Pose;
 
 	PerFrame[Index].Main_UBO[Eye]->light_color=Vec4_Setv(PerFrame[Index].Skybox_UBO[Eye]->uSunColor);
 	PerFrame[Index].Main_UBO[Eye]->light_direction=Vec4_Setv(PerFrame[Index].Skybox_UBO[Eye]->uSunPosition);
 	PerFrame[Index].Main_UBO[Eye]->light_direction.w=PerFrame[Index].Skybox_UBO[Eye]->uSunSize;
 
-	memcpy(PerFrame[Index].Main_UBO[Eye]->light_mvp, Shadow_UBO.mvp, sizeof(matrix));
+	PerFrame[Index].Main_UBO[Eye]->light_mvp=Shadow_UBO.mvp;
 
 	// Start a render pass and clear the frame/depth buffer
 	vkCmdBeginRendering(CommandBuffer, &(VkRenderingInfo)
@@ -644,12 +668,34 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	vkCmdEndRendering(CommandBuffer);
 }
 
+// Runs anything physics related
 void Thread_Physics(void *Arg)
 {
+	// Get a pointer to the emitter that's providing the positions
+	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
+
+	for(uint32_t i=0;i<Emitter->NumParticles;i++)
+	{
+		if(Emitter->Particles[i].ID!=Emitter->ID)
+		{
+			// Get those positions and set the other emitter's positions to those
+			ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitter->Particles[i].ID, Emitter->Particles[i].pos);
+
+			// If this particle is dead, delete that emitter and reset it's ID 
+			if(Emitter->Particles[i].life<0.0f)
+			{
+				ParticleSystem_DeleteEmitter(&ParticleSystem, Emitter->Particles[i].ID);
+				Emitter->Particles[i].ID=0;
+			}
+		}
+	}
+
+	ParticleSystem_Step(&ParticleSystem, fTimeStep);
+
 	// Loop through objects, integrate and check/resolve collisions
 	for(int i=0;i<NUM_ASTEROIDS;i++)
 	{
-		// Run physics integration on the asteriods
+		// Run physics integration on the asteroids
 		PhysicsIntegrate(&Asteroids[i], fTimeStep);
 
 		// Check asteroids against other asteroids
@@ -673,7 +719,7 @@ void Thread_Physics(void *Arg)
 	//////
 
 	// Update camera and modelview matrix
-	CameraUpdate(&Camera, fTimeStep, ModelView);
+	ModelView=CameraUpdate(&Camera, fTimeStep);
 	Audio_SetListenerOrigin(Camera.Position, Camera.Right);
 	//////
 
@@ -691,46 +737,23 @@ void Thread_Physics(void *Arg)
 	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
 	//////
 
-//	pthread_barrier_wait(&ThreadBarrier);
+	// Barrier now that we're done here
+	pthread_barrier_wait(&ThreadBarrier_Physics);
 }
-	
+
+// Render call from system main event loop
 void Render(void)
 {
 	static uint32_t Index=0;
 	uint32_t imageIndex;
 	matrix Pose;
 
-	// Get a pointer to the emitter that's providing the positions
-	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
-
-	for(uint32_t i=0;i<Emitter->NumParticles;i++)
-	{
-		if(Emitter->Particles[i].ID!=Emitter->ID)
-		{
-			// Get those positions and set the other emitter's positions to those
-			ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitter->Particles[i].ID, Emitter->Particles[i].pos);
-
-			// If this particle is dead, delete that emitter's ID
-			if(Emitter->Particles[i].life<0.0f)
-				ParticleSystem_DeleteEmitter(&ParticleSystem, Emitter->Particles[i].ID);
-		}
-	}
-
-	ParticleSystem_Step(&ParticleSystem, fTimeStep);
-
-//	Thread_AddJob(&Thread[3], Thread_Physics, NULL);
-	Thread_Physics(NULL);
+	Thread_AddJob(&ThreadPhysics, Thread_Physics, NULL);
 
 	if(!IsVR)
-	{
-		MatrixIdentity(EyeProjection[0]);
-		MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f, EyeProjection[0]);
-	}
+		EyeProjection[0]=MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f);
 
-	MatrixIdentity(Pose);
-
-	if(IsVR)
-		GetHeadPose(Pose);
+	Pose=GetHeadPose();
 
 	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain.Swapchain, UINT64_MAX, PerFrame[Index].PresentCompleteSemaphore, VK_NULL_HANDLE, &imageIndex);
 
@@ -759,6 +782,9 @@ void Render(void)
 	ShadowUpdateMap(PerFrame[Index].CommandBuffer, Index);
 
 	vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+	// Wait for physics to finish before rendering, particle drawing needs data done first.
+	pthread_barrier_wait(&ThreadBarrier_Physics);
 
 	EyeRender(PerFrame[Index].CommandBuffer, Index, 0, Pose);
 
@@ -849,6 +875,7 @@ void Render(void)
 	Index=(Index+1)%Swapchain.NumImages;
 }
 
+// Nebula volume texture generation, need to move this to it's own source
 int p[512]=
 {
 	151, 160, 137, 91,  90,  15,  131, 13,  201, 95,  96,  53,  194, 233, 7,   225,
@@ -1030,7 +1057,9 @@ VkBool32 LoadVolume(VkuContext_t *Context, VkuImage_t *Image)
 
 	return VK_TRUE;
 }
+//////
 
+// Initalization call from system main
 bool Init(void)
 {
 	srand(123);
@@ -1230,9 +1259,15 @@ bool Init(void)
 	// Synchronization barrier, count is number of threads+main thread
 	pthread_barrier_init(&ThreadBarrier, NULL, NUM_THREADS+1);
 
+	// Thread for physics, and sync barrier
+	Thread_Init(&ThreadPhysics);
+	Thread_Start(&ThreadPhysics);
+	pthread_barrier_init(&ThreadBarrier_Physics, NULL, 2);
+
 	return true;
 }
 
+// Rebuild vulkan swapchain and related data
 void RecreateSwapchain(void)
 {
 	if(Context.Device!=VK_NULL_HANDLE) // Windows quirk, WM_SIZE is signaled on window creation, *before* Vulkan get initalized
@@ -1280,6 +1315,7 @@ void RecreateSwapchain(void)
 	}
 }
 
+// Destroy call from system main
 void Destroy(void)
 {
 	vkDeviceWaitIdle(Context.Device);
@@ -1301,6 +1337,8 @@ void Destroy(void)
 
 	for(uint32_t i=0;i<NUM_THREADS;i++)
 		Thread_Destroy(&Thread[i]);
+
+	Thread_Destroy(&ThreadPhysics);
 
 	if(Context.PipelineCache)
 	{

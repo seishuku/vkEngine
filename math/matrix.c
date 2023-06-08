@@ -1,338 +1,256 @@
 #include "math.h"
 
-void MatrixIdentity(matrix out)
+// I'm not a huge fan of this layout, so here's a...
+// Matrix cheat sheet
+// .x.x=[ 0] .x.y=[ 1] .x.z=[ 2] .x.w=[ 3]
+// .y.x=[ 4] .y.y=[ 5] .y.z=[ 6] .y.w=[ 7]
+// .z.x=[ 8] .z.y=[ 9] .z.z=[10] .z.w=[11]
+// .w.x=[12] .w.y=[13] .w.z=[14] .w.w=[15]
+
+matrix MatrixIdentity(void)
 {
-	if(out)
+	return (matrix)
 	{
-		out[0]=1.0f;	out[1]=0.0f;	out[2]=0.0f;	out[3]=0.0f;
-		out[4]=0.0f;	out[5]=1.0f;	out[6]=0.0f;	out[7]=0.0f;
-		out[8]=0.0f;	out[9]=0.0f;	out[10]=1.0f;	out[11]=0.0f;
-		out[12]=0.0f;	out[13]=0.0f;	out[14]=0.0f;	out[15]=1.0f;
-	}
+		{ 1.0f, 0.0f, 0.0f, 0.0f },
+		{ 0.0f, 1.0f, 0.0f, 0.0f },
+		{ 0.0f, 0.0f, 1.0f, 0.0f },
+		{ 0.0f, 0.0f, 0.0f, 1.0f }
+	};
 }
 
-void MatrixMult(const matrix a, const matrix b, matrix out)
+matrix MatrixMult(const matrix a, const matrix b)
 {
-	matrix res;
-
-	if(!out)
-		return;
-
-	res[ 0]=a[ 0]*b[ 0]+a[ 1]*b[ 4]+a[ 2]*b[ 8]+a[ 3]*b[12];
-	res[ 1]=a[ 0]*b[ 1]+a[ 1]*b[ 5]+a[ 2]*b[ 9]+a[ 3]*b[13];
-	res[ 2]=a[ 0]*b[ 2]+a[ 1]*b[ 6]+a[ 2]*b[10]+a[ 3]*b[14];
-	res[ 3]=a[ 0]*b[ 3]+a[ 1]*b[ 7]+a[ 2]*b[11]+a[ 3]*b[15];
-	res[ 4]=a[ 4]*b[ 0]+a[ 5]*b[ 4]+a[ 6]*b[ 8]+a[ 7]*b[12];
-	res[ 5]=a[ 4]*b[ 1]+a[ 5]*b[ 5]+a[ 6]*b[ 9]+a[ 7]*b[13];
-	res[ 6]=a[ 4]*b[ 2]+a[ 5]*b[ 6]+a[ 6]*b[10]+a[ 7]*b[14];
-	res[ 7]=a[ 4]*b[ 3]+a[ 5]*b[ 7]+a[ 6]*b[11]+a[ 7]*b[15];
-	res[ 8]=a[ 8]*b[ 0]+a[ 9]*b[ 4]+a[10]*b[ 8]+a[11]*b[12];
-	res[ 9]=a[ 8]*b[ 1]+a[ 9]*b[ 5]+a[10]*b[ 9]+a[11]*b[13];
-	res[10]=a[ 8]*b[ 2]+a[ 9]*b[ 6]+a[10]*b[10]+a[11]*b[14];
-	res[11]=a[ 8]*b[ 3]+a[ 9]*b[ 7]+a[10]*b[11]+a[11]*b[15];
-	res[12]=a[12]*b[ 0]+a[13]*b[ 4]+a[14]*b[ 8]+a[15]*b[12];
-	res[13]=a[12]*b[ 1]+a[13]*b[ 5]+a[14]*b[ 9]+a[15]*b[13];
-	res[14]=a[12]*b[ 2]+a[13]*b[ 6]+a[14]*b[10]+a[15]*b[14];
-	res[15]=a[12]*b[ 3]+a[13]*b[ 7]+a[14]*b[11]+a[15]*b[15];
-
-	memcpy(out, res, sizeof(matrix));
-}
-
-void MatrixInverse(const matrix in, matrix out)
-{
-	matrix res;
-
-	if(!out)
-		return;
-
-	res[ 0]=in[ 0];
-	res[ 1]=in[ 4];
-	res[ 2]=in[ 8];
-	res[ 3]=0.0f;
-	res[ 4]=in[ 1];
-	res[ 5]=in[ 5];
-	res[ 6]=in[ 9];
-	res[ 7]=0.0f;
-	res[ 8]=in[ 2];
-	res[ 9]=in[ 6];
-	res[10]=in[10];
-	res[11]=0.0f;
-	res[12]=-(in[12]*in[ 0])-(in[13]*in[ 1])-(in[14]*in[ 2]);
-	res[13]=-(in[12]*in[ 4])-(in[13]*in[ 5])-(in[14]*in[ 6]);
-	res[14]=-(in[12]*in[ 8])-(in[13]*in[ 9])-(in[14]*in[10]);
-	res[15]=1.0f;
-
-	memcpy(out, res, sizeof(matrix));
-}
-
-void MatrixTranspose(const matrix in, matrix out)
-{
-	matrix res;
-
-	if(!out)
-		return;
-
-	res[ 0]=in[ 0];
-	res[ 1]=in[ 4];
-	res[ 2]=in[ 8];
-	res[ 3]=in[12];
-	res[ 4]=in[ 1];
-	res[ 5]=in[ 5];
-	res[ 6]=in[ 9];
-	res[ 7]=in[13];
-	res[ 8]=in[ 2];
-	res[ 9]=in[ 6];
-	res[10]=in[10];
-	res[11]=in[14];
-	res[12]=in[ 3];
-	res[13]=in[ 7];
-	res[14]=in[11];
-	res[15]=in[15];
-
-	memcpy(out, res, sizeof(matrix));
-}
-
-void MatrixRotate(const float angle, const float x, const float y, const float z, matrix out)
-{
-	if(out)
+	return (matrix)
 	{
-		matrix m;
-		float c=cosf(angle);
-		float s=sinf(angle);
-
-		float temp[3]={ (1.0f-c)*x, (1.0f-c)*y, (1.0f-c)*z };
-
-		m[0]=c+temp[0]*x;
-		m[1]=temp[0]*y+s*z;
-		m[2]=temp[0]*z-s*y;
-		m[3]=0.0f;
-		m[4]=temp[1]*x-s*z;
-		m[5]=c+temp[1]*y;
-		m[6]=temp[1]*z+s*x;
-		m[7]=0.0f;
-		m[8]=temp[2]*x+s*y;
-		m[9]=temp[2]*y-s*x;
-		m[10]=c+temp[2]*z;
-		m[11]=0.0f;
-		m[12]=0.0f;
-		m[13]=0.0f;
-		m[14]=0.0f;
-		m[15]=1.0f;
-
-		MatrixMult(m, out, out);
-	}
-}
-
-void MatrixRotatev(const float angle, const vec3 v, matrix out)
-{
-	MatrixRotate(angle, v.x, v.y, v.z, out);
-}
-
-void MatrixTranslate(const float x, const float y, const float z, matrix out)
-{
-	if(out)
-	{
-		matrix m=
 		{
-			1.0f, 0.0f, 0.0f, 0.0f,
-			0.0f, 1.0f, 0.0f, 0.0f,
-			0.0f, 0.0f, 1.0f, 0.0f,
-			   x,    y,    z, 1.0f
-		};
-
-		MatrixMult(m, out, out);
-	}
-}
-
-void MatrixTranslatev(const vec3 v, matrix out)
-{
-	MatrixTranslate(v.x, v.y, v.z, out);
-}
-
-void MatrixScale(const float x, const float y, const float z, matrix out)
-{
-	if(out)
-	{
-		matrix m=
+			a.x.x *b.x.x+a.x.y*b.y.x+a.x.z*b.z.x+a.x.w*b.w.x,
+			a.x.x *b.x.y+a.x.y*b.y.y+a.x.z*b.z.y+a.x.w*b.w.y,
+			a.x.x *b.x.z+a.x.y*b.y.z+a.x.z*b.z.z+a.x.w*b.w.z,
+			a.x.x *b.x.w+a.x.y*b.y.w+a.x.z*b.z.w+a.x.w*b.w.w
+		},
 		{
-			   x, 0.0f, 0.0f, 0.0f,
-			0.0f,    y, 0.0f, 0.0f,
-			0.0f, 0.0f,    z, 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f
-		};
-
-		MatrixMult(m, out, out);
-	}
-}
-
-void MatrixScalev(const vec3 v, matrix out)
-{
-	MatrixScale(v.x, v.y, v.z, out);
-}
-
-void MatrixAlignPoints(const vec3 start, const vec3 end, const vec3 up, matrix out)
-{
-	if(out)
-	{
-		// Find the direction of the start point and end point, then normalize it.
-		vec3 direction=Vec3_Subv(end, start);
-		Vec3_Normalize(&direction);
-
-		// Get the cross product between the direction
-		// and the object's current orientation, and normalize that.
-		// That vector is the axis of rotation
-		vec3 axis=Vec3_Cross(direction, up);
-		Vec3_Normalize(&axis);
-
-		// direction.orientation=cos(angle), so arccos to get angle between
-		// the new direction and the static orientation.
-		float angle=acosf(Vec3_Dot(direction, up));
-
-		// Use that angle to build a rotation and translation matrix to reorient it.
-		float s=sinf(angle);
-		float c=cosf(angle);
-		float c1=1.0f-c;
-
-		matrix m=
+			a.y.x*b.x.x+a.y.y*b.y.x+a.y.z*b.z.x+a.y.w*b.w.x,
+			a.y.x*b.x.y+a.y.y*b.y.y+a.y.z*b.z.y+a.y.w*b.w.y,
+			a.y.x*b.x.z+a.y.y*b.y.z+a.y.z*b.z.z+a.y.w*b.w.z,
+			a.y.x*b.x.w+a.y.y*b.y.w+a.y.z*b.z.w+a.y.w*b.w.w
+		},
 		{
-			c+axis.x*axis.x*c1,			axis.y*axis.x*c1+axis.z*s,	axis.z*axis.x*c1-axis.y*s,	0.0f,
-			axis.x*axis.y*c1-axis.z*s,	c+axis.y*axis.y*c1,			axis.z*axis.y *c1+axis.x*s,	0.0f,
-			axis.x*axis.z*c1+axis.y*s,	axis.y*axis.z*c1-axis.x*s,	c+axis.z*axis.z*c1,			0.0f,
-			start.x,					start.y,					start.z,					1.0f
-		};
-
-		// Multiply that with the current set matrix
-		MatrixMult(m, out, out);
-	}
+			a.z.x*b.x.x+a.z.y*b.y.x+a.z.z*b.z.x+a.z.w*b.w.x,
+			a.z.x*b.x.y+a.z.y*b.y.y+a.z.z*b.z.y+a.z.w*b.w.y,
+			a.z.x*b.x.z+a.z.y*b.y.z+a.z.z*b.z.z+a.z.w*b.w.z,
+			a.z.x*b.x.w+a.z.y*b.y.w+a.z.z*b.z.w+a.z.w*b.w.w
+		},
+		{
+			a.w.x*b.x.x+a.w.y*b.y.x+a.w.z*b.z.x+a.w.w*b.w.x,
+			a.w.x*b.x.y+a.w.y*b.y.y+a.w.z*b.z.y+a.w.w*b.w.y,
+			a.w.x*b.x.z+a.w.y*b.y.z+a.w.z*b.z.z+a.w.w*b.w.z,
+			a.w.x*b.x.w+a.w.y*b.y.w+a.w.z*b.z.w+a.w.w*b.w.w
+		}
+	};
 }
 
-void Matrix4x4MultVec4(const vec4 in, const matrix m, vec4 *out)
+matrix MatrixInverse(const matrix in)
 {
-	if(out)
+	return (matrix)
 	{
-		vec4 res=
+		{ in.x.x, in.y.x, in.z.x, 0.0f },
+		{ in.x.y, in.y.y, in.z.y, 0.0f },
+		{ in.x.z, in.y.z, in.z.z, 0.0f },
 		{
-			in.x*m[ 0]+in.y*m[ 4]+in.z*m[ 8]+in.w*m[12],
-			in.x*m[ 1]+in.y*m[ 5]+in.z*m[ 9]+in.w*m[13],
-			in.x*m[ 2]+in.y*m[ 6]+in.z*m[10]+in.w*m[14],
-			in.x*m[ 3]+in.y*m[ 7]+in.z*m[11]+in.w*m[15]
-		};
-
-		memcpy(out, &res, sizeof(vec4));
-	}
+			-(in.w.x*in.x.x)-(in.w.y*in.x.y)-(in.w.z*in.x.z),
+			-(in.w.x*in.y.x)-(in.w.y*in.y.y)-(in.w.z*in.y.z),
+			-(in.w.x*in.z.x)-(in.w.y*in.z.y)-(in.w.z*in.z.z),
+			1.0f
+		}
+	};
 }
 
-void Matrix4x4MultVec3(const vec3 in, const matrix m, vec3 *out)
+matrix MatrixTranspose(const matrix in)
 {
-	if(out)
+	return (matrix)
 	{
-		vec3 res=
-		{
-			in.x*m[ 0]+in.y*m[ 4]+in.z*m[ 8]+m[12],
-			in.x*m[ 1]+in.y*m[ 5]+in.z*m[ 9]+m[13],
-			in.x*m[ 2]+in.y*m[ 6]+in.z*m[10]+m[14]
-		};
-
-		memcpy(out, &res, sizeof(vec3));
-	}
+		{ in.x.x, in.y.x, in.z.x, in.w.x },
+		{ in.x.y, in.y.y, in.z.y, in.w.y },
+		{ in.x.z, in.y.z, in.z.z, in.w.z },
+		{ in.x.w, in.y.w, in.z.w, in.w.w }
+	};
 }
 
-void Matrix3x3MultVec3(const vec3 in, const matrix m, vec3 *out)
+matrix MatrixRotate(const float angle, const float x, const float y, const float z)
 {
-	if(out)
-	{
-		vec3 res=
-		{
-			in.x*m[ 0]+in.y*m[ 4]+in.z*m[ 8],
-			in.x*m[ 1]+in.y*m[ 5]+in.z*m[ 9],
-			in.x*m[ 2]+in.y*m[ 6]+in.z*m[10]
-		};
+	float c=cosf(angle);
+	float s=sinf(angle);
 
-		memcpy(out, &res, sizeof(vec3));
-	}
+	float temp[3]={ (1.0f-c)*x, (1.0f-c)*y, (1.0f-c)*z };
+
+	return (matrix)
+	{
+		{ c+temp[0]*x, temp[0]*y+s*z, temp[0]*z-s*y, 0.0f },
+		{ temp[1]*x-s*z, c+temp[1]*y, temp[1]*z+s*x, 0.0f },
+		{ temp[2]*x+s*y, temp[2]*y-s*x, c+temp[2]*z, 0.0f },
+		{ 0.0f, 0.0f, 0.0f, 1.0f }
+	};
+}
+
+matrix MatrixRotatev(const float angle, const vec3 v)
+{
+	return MatrixRotate(angle, v.x, v.y, v.z);
+}
+
+matrix MatrixTranslate(const float x, const float y, const float z)
+{
+	return (matrix)
+	{
+		{ 1.0f, 0.0f, 0.0f, 0.0f },
+		{ 0.0f, 1.0f, 0.0f, 0.0f },
+		{ 0.0f, 0.0f, 1.0f, 0.0f },
+		{    x,    y,    z, 1.0f }
+	};
+}
+
+matrix MatrixTranslatev(const vec3 v)
+{
+	return MatrixTranslate(v.x, v.y, v.z);
+}
+
+matrix MatrixScale(const float x, const float y, const float z)
+{
+	return (matrix)
+	{
+		{    x, 0.0f, 0.0f, 0.0f },
+		{ 0.0f,    y, 0.0f, 0.0f },
+		{ 0.0f, 0.0f,    z, 0.0f },
+		{ 0.0f, 0.0f, 0.0f, 1.0f }
+	};
+}
+
+matrix MatrixScalev(const vec3 v)
+{
+	return MatrixScale(v.x, v.y, v.z);
+}
+
+matrix MatrixAlignPoints(const vec3 start, const vec3 end, const vec3 up)
+{
+	// Find the direction of the start point and end point, then normalize it.
+	vec3 direction=Vec3_Subv(end, start);
+	Vec3_Normalize(&direction);
+
+	// Get the cross product between the direction
+	// and the object's current orientation, and normalize that.
+	// That vector is the axis of rotation
+	vec3 axis=Vec3_Cross(direction, up);
+	Vec3_Normalize(&axis);
+
+	// direction.orientation=cos(angle), so arccos to get angle between
+	// the new direction and the static orientation.
+	float angle=acosf(Vec3_Dot(direction, up));
+
+	// Use that angle to build a rotation and translation matrix to reorient it.
+	float s=sinf(angle);
+	float c=cosf(angle);
+	float c1=1.0f-c;
+
+	return (matrix)
+	{
+		{ c+axis.x*axis.x*c1,			axis.y*axis.x*c1+axis.z*s,	axis.z*axis.x*c1-axis.y*s,	0.0f },
+		{ axis.x*axis.y*c1-axis.z*s,	c+axis.y*axis.y*c1,			axis.z*axis.y *c1+axis.x*s,	0.0f },
+		{ axis.x*axis.z*c1+axis.y*s,	axis.y*axis.z*c1-axis.x*s,	c+axis.z*axis.z*c1,			0.0f },
+		{ start.x,						start.y,					start.z,					1.0f }
+	};
+}
+
+vec4 Matrix4x4MultVec4(const vec4 in, const matrix m)
+{
+	return (vec4)
+	{
+		in.x*m.x.x+in.y*m.y.x+in.z*m.z.x+in.w*m.w.x,
+		in.x*m.x.y+in.y*m.y.y+in.z*m.z.y+in.w*m.w.y,
+		in.x*m.x.z+in.y*m.y.z+in.z*m.z.z+in.w*m.w.z,
+		in.x*m.x.w+in.y*m.y.w+in.z*m.z.w+in.w*m.w.w
+	};
+}
+
+vec3 Matrix4x4MultVec3(const vec3 in, const matrix m)
+{
+	return (vec3)
+	{
+		in.x*m.x.x+in.y*m.y.x+in.z*m.z.x+m.w.x,
+		in.x*m.x.y+in.y*m.y.y+in.z*m.z.y+m.w.y,
+		in.x*m.x.z+in.y*m.y.z+in.z*m.z.z+m.w.z
+	};
+}
+
+vec3 Matrix3x3MultVec3(const vec3 in, const matrix m)
+{
+	return (vec3)
+	{
+		in.x*m.x.x+in.y*m.y.x+in.z*m.z.x,
+		in.x*m.x.y+in.y*m.y.y+in.z*m.z.y,
+		in.x*m.x.z+in.y*m.y.z+in.z*m.z.z
+	};
 }
 
 // TODO?: Should this multiply with the supplied matrix like the other functions?
-void MatrixLookAt(const vec3 position, const vec3 forward, const vec3 up, matrix out)
+matrix MatrixLookAt(const vec3 position, const vec3 forward, const vec3 up)
 {
-	if(out)
+	vec3 f=Vec3_Subv(forward, position);
+	vec3 u=up, s;
+
+	Vec3_Normalize(&u);
+	Vec3_Normalize(&f);
+	s=Vec3_Cross(f, u);
+	Vec3_Normalize(&s);
+	u=Vec3_Cross(s, f);
+
+	return (matrix)
 	{
-		vec3 f=Vec3_Subv(forward, position);
-		vec3 u=up, s;
-
-		Vec3_Normalize(&u);
-		Vec3_Normalize(&f);
-		s=Vec3_Cross(f, u);
-		Vec3_Normalize(&s);
-		u=Vec3_Cross(s, f);
-
-		out[0]=s.x;
-		out[1]=u.x;
-		out[2]=-f.x;
-		out[3]=0.0f;
-		out[4]=s.y;
-		out[5]=u.y;
-		out[6]=-f.y;
-		out[7]=0.0f;
-		out[8]=s.z;
-		out[9]=u.z;
-		out[10]=-f.z;
-		out[11]=0.0f;
-		out[12]=-Vec3_Dot(s, position);
-		out[13]=-Vec3_Dot(u, position);
-		out[14]=Vec3_Dot(f, position);
-		out[15]=1.0f;
-	}
+		{ s.x, u.x, -f.x, 0.0f },
+		{ s.y, u.y, -f.y, 0.0f },
+		{ s.z, u.z, -f.z, 0.0f },
+		{
+			-Vec3_Dot(s, position),
+			-Vec3_Dot(u, position),
+			Vec3_Dot(f, position),
+			1.0f
+		}
+	};
 }
 
 // Projection matrix functions, these are set up for "z reverse" (depth cleared to 0.0, and greater than or equal depth test)
-void MatrixInfPerspective(const float fovy, const float aspect, const float zNear, matrix out)
+matrix MatrixInfPerspective(const float fovy, const float aspect, const float zNear)
 {
-	if(out)
-	{
-		const float focal=tanf((fovy*PI/180.0f)*0.5f);
-		matrix m=
-		{
-			1.0f/(aspect*focal),  0.0f,        0.0f,  0.0f,
-			0.0f,                 -1.0f/focal, 0.0f,  0.0f,
-			0.0f,                 0.0f,        0.0f,  -1.0f,
-			0.0f,                 0.0f,        zNear, 0.0f
-		};
+	const float focal=tanf((fovy*PI/180.0f)*0.5f);
 
-		MatrixMult(m, out, out);
-	}
+	return (matrix)
+	{
+		{ 1.0f/(aspect*focal),  0.0f,        0.0f,  0.0f },
+		{ 0.0f,                 -1.0f/focal, 0.0f,  0.0f },
+		{ 0.0f,                 0.0f,        0.0f,  -1.0f },
+		{ 0.0f,                 0.0f,        zNear, 0.0f }
+	};
 }
 
-void MatrixPerspective(const float fovy, const float aspect, const float zNear, const float zFar, matrix out)
+matrix MatrixPerspective(const float fovy, const float aspect, const float zNear, const float zFar)
 {
-	if(out)
-	{
-		const float focal=tanf((fovy*PI/180.0f)*0.5f);
-		matrix m=
-		{
-			1.0f/(aspect*focal),  0.0f,        0.0f,                       0.0f,
-			0.0f,                 -1.0f/focal, 0.0f,                       0.0f,
-			0.0f,                 0.0f,        -2.0f/(zFar-zNear),         -1.0f,
-			0.0f,                 0.0f,        -(zFar+zNear)/(zFar-zNear), 0.0f,
-		};
+	const float focal=tanf((fovy*PI/180.0f)*0.5f);
 
-		MatrixMult(m, out, out);
-	}
+	return (matrix)
+	{
+		{ 1.0f/(aspect*focal),  0.0f,        0.0f,                       0.0f },
+		{ 0.0f,                 -1.0f/focal, 0.0f,                       0.0f },
+		{ 0.0f,                 0.0f,        -2.0f/(zFar-zNear),         -1.0f },
+		{ 0.0f,                 0.0f,        -(zFar+zNear)/(zFar-zNear), 0.0f },
+	};
 }
 
 // This is *not* set up for "z reverse"
-void MatrixOrtho(const float left, const float right, const float bottom, const float top, const float zNear, const float zFar, matrix out)
+matrix MatrixOrtho(const float left, const float right, const float bottom, const float top, const float zNear, const float zFar)
 {
-	if(out)
+	return (matrix)
 	{
-		matrix m=
-		{
-			2.0f/(right-left),          0.0f,                       0.0f,               0.0f,
-			0.0f,                       2.0f/(bottom-top),          0.0f,               0.0f,
-			0.0f,                       0.0f,                       1.0f/(zNear-zFar),  0.0f,
-			-(right+left)/(right-left), -(bottom+top)/(bottom-top), zNear/(zNear-zFar), 1.0f
-		};
-
-		MatrixMult(m, out, out);
-	}
+		{ 2.0f/(right-left),          0.0f,                       0.0f,               0.0f },
+		{ 0.0f,                       2.0f/(bottom-top),          0.0f,               0.0f },
+		{ 0.0f,                       0.0f,                       1.0f/(zNear-zFar),  0.0f },
+		{ -(right+left)/(right-left), -(bottom+top)/(bottom-top), zNear/(zNear-zFar), 1.0f }
+	};
 }

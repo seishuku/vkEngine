@@ -63,22 +63,22 @@ void PhysicsIntegrate(RigidBody_t *body, float dt)
 	apply_constraints(body);
 }
 
-void PhysicsExplode(RigidBody_t *body)
+void PhysicsExplode(RigidBody_t *Body)
 {
 	vec3 explosion_center={ 0.0f, 0.0f, 0.0f };
 
 	// Calculate direction from explosion center to fragment
-	vec3 direction=Vec3_Subv(body->Position, explosion_center);
+	vec3 direction=Vec3_Subv(Body->Position, explosion_center);
 	Vec3_Normalize(&direction);
 
 	// Calculate acceleration and impulse force
 	vec3 acceleration=Vec3_Muls(direction, EXPLOSION_POWER);
 
 	// F=M*A bla bla...
-	vec3 force=Vec3_Muls(acceleration, body->Mass);
+	vec3 force=Vec3_Muls(acceleration, Body->Mass);
 
 	// Add it into object's velocity
-	body->Velocity=Vec3_Addv(body->Velocity, force);
+	Body->Velocity=Vec3_Addv(Body->Velocity, force);
 }
 
 void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
@@ -170,10 +170,9 @@ void ExplodeEmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *P
 {
 	Particle->pos=Vec3_Sets(0.0f);
 
-	// Simple -1.0 to 1.0 random spherical pattern, scaled by 100, fairly short lifespan.
 	Particle->vel=Vec3_Set(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
 	Vec3_Normalize(&Particle->vel);
-	Particle->vel=Vec3_Muls(Particle->vel, 50.0f);
+	Particle->vel=Vec3_Muls(Particle->vel, RandFloat()*50.0f);
 
 	Particle->life=((float)rand()/RAND_MAX)*0.5f+0.01f;
 }
@@ -225,9 +224,24 @@ void PhysicsParticleToSphereCollisionResponse(Particle_t *Particle, RigidBody_t 
 		{
 			Audio_PlaySample(&Sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, relVelMag/50.0f, &Particle->pos);
 
-			// FIXME: This is probably causing derelict emitters that never go away
-			uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, Particle->pos, Vec3_Set(100.0f, 12.0f, 5.0f), Vec3_Set(0.0f, 0.0f, 0.0f), 5.0f, 1000, true, ExplodeEmitterCallback);
-			ParticleSystem_ResetEmitter(&ParticleSystem, ID);
+			// FIXME: Is this causing derelict emitters that never go away?
+			//			I don't think it is, but need to check.
+			ParticleSystem_ResetEmitter(
+				&ParticleSystem,
+				ParticleSystem_AddEmitter(
+					&ParticleSystem,
+					Particle->pos,					// Position
+					Vec3_Set(100.0f, 12.0f, 5.0f),	// Start color
+					Vec3_Set(0.0f, 0.0f, 0.0f),		// End color
+					5.0f,							// Radius of particles
+					1000,							// Number of particles in system
+					true,							// Is burst?
+					ExplodeEmitterCallback			// Callback for particle generation
+				)
+			);
+
+			// Silly radius reduction on hit
+			//Body->Radius=fmaxf(Body->Radius-10.0f, 0.0f);
 		}
 	}
 }

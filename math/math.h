@@ -20,7 +20,7 @@
 typedef struct { float x, y; } vec2;
 typedef struct { float x, y, z; } vec3;
 typedef struct { float x, y, z, w; } vec4;
-typedef float matrix[16];
+typedef struct { vec4 x, y, z, w; } matrix;
 
 vec2 Vec2_Set(const float x, const float y);
 vec2 Vec2_Setv(const vec2 b);
@@ -105,32 +105,32 @@ uint32_t NextPower2(uint32_t value);
 int32_t ComputeLog(uint32_t value);
 float Lerp(const float a, const float b, const float t);
 
-void QuatAngle(const float angle, const float x, const float y, const float z, vec4 *out);
-void QuatAnglev(const float angle, const vec3 v, vec4 *out);
-void QuatEuler(const float roll, const float pitch, const float yaw, vec4 *out);
-void QuatMultiply(const vec4 a, const vec4 b, vec4 *out);
-void QuatInverse(vec4 *q);
-void QuatRotate(const vec4 q, const vec3 v, vec3 *out);
-void QuatSlerp(const vec4 qa, const vec4 qb, const float t, vec4 *out);
-void QuatMatrix(const vec4 in, matrix out);
+vec4 QuatAngle(const float angle, const float x, const float y, const float z);
+vec4 QuatAnglev(const float angle, const vec3 v);
+vec4 QuatEuler(const float roll, const float pitch, const float yaw);
+vec4 QuatMultiply(const vec4 a, const vec4 b);
+vec4 QuatInverse(const vec4 q);
+vec3 QuatRotate(const vec4 q, const vec3 v);
+vec4 QuatSlerp(const vec4 qa, const vec4 qb, const float t);
+matrix QuatMatrix(const vec4 in);
 
-void MatrixIdentity(matrix out);
-void MatrixMult(const matrix a, const matrix b, matrix out);
-void MatrixInverse(const matrix in, matrix out);
-void MatrixRotate(const float angle, const float x, const float y, const float z, matrix out);
-void MatrixRotatev(const float angle, const vec3 v, matrix out);
-void MatrixTranspose(const matrix in, matrix out);
-void MatrixTranslate(const float x, const float y, const float z, matrix out);
-void MatrixTranslatev(const vec3 v, matrix out);
-void MatrixScale(const float x, const float y, const float z, matrix out);
-void MatrixScalev(const vec3 v, matrix out);
-void MatrixAlignPoints(const vec3 start, const vec3 end, const vec3 up, matrix out);
-void Matrix4x4MultVec4(const vec4 in, const matrix m, vec4 *out);
-void Matrix4x4MultVec3(const vec3 in, const matrix m, vec3 *out);
-void Matrix3x3MultVec3(const vec3 in, const matrix m, vec3 *out);
-void MatrixLookAt(const vec3 position, const vec3 forward, const vec3 up, matrix out);
-void MatrixInfPerspective(float fovy, float aspect, float zNear, matrix out);
-void MatrixPerspective(float fovy, float aspect, float zNear, float zFar, matrix out);
-void MatrixOrtho(float left, float right, float bottom, float top, float zNear, float zFar, matrix out);
+matrix MatrixIdentity(void);
+matrix MatrixMult(const matrix a, const matrix b);
+matrix MatrixInverse(const matrix in);
+matrix MatrixRotate(const float angle, const float x, const float y, const float z);
+matrix MatrixRotatev(const float angle, const vec3 v);
+matrix MatrixTranspose(const matrix in);
+matrix MatrixTranslate(const float x, const float y, const float z);
+matrix MatrixTranslatev(const vec3 v);
+matrix MatrixScale(const float x, const float y, const float z);
+matrix MatrixScalev(const vec3 v);
+matrix MatrixAlignPoints(const vec3 start, const vec3 end, const vec3 up);
+vec4 Matrix4x4MultVec4(const vec4 in, const matrix m);
+vec3 Matrix4x4MultVec3(const vec3 in, const matrix m);
+vec3 Matrix3x3MultVec3(const vec3 in, const matrix m);
+matrix MatrixLookAt(const vec3 position, const vec3 forward, const vec3 up);
+matrix MatrixInfPerspective(float fovy, float aspect, float zNear);
+matrix MatrixPerspective(float fovy, float aspect, float zNear, float zFar);
+matrix MatrixOrtho(float left, float right, float bottom, float top, float zNear, float zFar);
 
 #endif

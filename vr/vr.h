@@ -11,8 +11,8 @@ extern uint32_t rtHeight;
 
 extern matrix EyeProjection[2];
 
-void GetEyeProjection(EVREye Eye, matrix Projection);
-void GetHeadPose(matrix Pose);
+matrix GetEyeProjection(EVREye Eye);
+matrix GetHeadPose(void);
 bool InitOpenVR(void);
 void DestroyOpenVR(void);
 
