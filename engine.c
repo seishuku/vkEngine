@@ -24,6 +24,7 @@
 #include "textures.h"
 #include "skybox.h"
 #include "shadow.h"
+#include "nebula.h"
 #include "composite.h"
 #include "perframe.h"
 #include "sounds.h"
@@ -78,12 +79,6 @@ VkuImage_t DepthImage[2];		// left and right eye depth buffers
 VkuDescriptorSet_t DescriptorSet;
 VkPipelineLayout PipelineLayout;
 VkuPipeline_t Pipeline;
-//////
-
-// Volume rendering vulkan stuff
-VkuDescriptorSet_t VolumeDescriptorSet;
-VkPipelineLayout VolumePipelineLayout;
-VkuPipeline_t VolumePipeline;
 //////
 
 // Asteroid data
@@ -207,83 +202,26 @@ bool CreatePipeline(void)
 }
 //////
 
-// Create functions for volume rendering
-bool CreateVolumePipeline(void)
-{
-	vkuInitDescriptorSet(&VolumeDescriptorSet, &Context);
-	vkuDescriptorSet_AddBinding(&VolumeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&VolumeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuAssembleDescriptorSetLayout(&VolumeDescriptorSet);
-
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=1,
-		.pSetLayouts=&VolumeDescriptorSet.DescriptorSetLayout,
-		.pushConstantRangeCount=1,
-		.pPushConstantRanges=&(VkPushConstantRange)
-		{
-			.offset=0,
-			.size=sizeof(uint32_t),
-			.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
-		},
-	}, 0, &VolumePipelineLayout);
-
-	vkuInitPipeline(&VolumePipeline, &Context);
-
-	vkuPipeline_SetPipelineLayout(&VolumePipeline, VolumePipelineLayout);
-
-	VolumePipeline.DepthTest=VK_TRUE;
-	VolumePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
-	VolumePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
-	VolumePipeline.RasterizationSamples=MSAA;
-
-	VolumePipeline.Blend=VK_TRUE;
-	VolumePipeline.SrcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	VolumePipeline.DstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	VolumePipeline.ColorBlendOp=VK_BLEND_OP_ADD;
-
-	if(!vkuPipeline_AddStage(&VolumePipeline, "./shaders/volume.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
-		return false;
-
-	if(!vkuPipeline_AddStage(&VolumePipeline, "./shaders/volume.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-		return false;
-
-	VkPipelineRenderingCreateInfo PipelineRenderingCreateInfo=
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-		.colorAttachmentCount=1,
-		.pColorAttachmentFormats=&ColorFormat,
-		.depthAttachmentFormat=DepthFormat,
-	};
-
-	if(!vkuAssemblePipeline(&VolumePipeline, &PipelineRenderingCreateInfo))
-		return false;
-
-	return true;
-}
-//////
-
 // Build up random data for skybox and asteroid field
 void GenerateSkyParams(void)
 {
 	// Build a skybox param struct with random values
 	Skybox_UBO_t Skybox_UBO;
 
-	Skybox_UBO.uOffset=Vec4_Set(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
+	Skybox_UBO.uOffset=Vec4(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
 	Vec4_Normalize(&Skybox_UBO.uOffset);
 
-	Skybox_UBO.uNebulaAColor=Vec3_Set(RandFloat(), RandFloat(), RandFloat());
+	Skybox_UBO.uNebulaAColor=Vec3(RandFloat(), RandFloat(), RandFloat());
 	Skybox_UBO.uNebulaADensity=RandFloat()*2.0f;
 
-	Skybox_UBO.uNebulaBColor=Vec3_Set(RandFloat(), RandFloat(), RandFloat());
+	Skybox_UBO.uNebulaBColor=Vec3(RandFloat(), RandFloat(), RandFloat());
 	Skybox_UBO.uNebulaBDensity=RandFloat()*2.0f;
 
-	Skybox_UBO.uSunPosition=Vec4_Set(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
+	Skybox_UBO.uSunPosition=Vec4(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
 	Vec4_Normalize(&Skybox_UBO.uSunPosition);
 
 	const float MaxSun=5.0f;
-	Skybox_UBO.uSunColor=Vec4_Set(min(MaxSun, RandFloat()*MaxSun+0.5f), min(MaxSun, RandFloat()*MaxSun+0.5f), min(MaxSun, RandFloat()*MaxSun+0.5f), 0.0f);
+	Skybox_UBO.uSunColor=Vec4(min(MaxSun, RandFloat()*MaxSun+0.5f), min(MaxSun, RandFloat()*MaxSun+0.5f), min(MaxSun, RandFloat()*MaxSun+0.5f), 0.0f);
 	Skybox_UBO.uSunSize=1.0f/(RandFloat()*1000.0f+100.0f);
 	Skybox_UBO.uSunFalloff=RandFloat()*16.0f+8.0f;
 
@@ -304,11 +242,11 @@ void GenerateSkyParams(void)
 
 	while(i<NUM_ASTEROIDS)
 	{
-		vec3 RandomVec=Vec3_Set(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
+		vec3 RandomVec=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
 		Vec3_Normalize(&RandomVec);
 
 		RigidBody_t Asteroid;
-		Asteroid.Position=Vec3_Set(RandomVec.x*(RandFloat()*1000.0f+50.0f), RandomVec.y*(RandFloat()*1000.0f+50.0f), RandomVec.z*(RandFloat()*1000.0f+50.0f));
+		Asteroid.Position=Vec3(RandomVec.x*(RandFloat()*1000.0f+50.0f), RandomVec.y*(RandFloat()*1000.0f+50.0f), RandomVec.z*(RandFloat()*1000.0f+50.0f));
 		Asteroid.Radius=(RandFloat()*20.0f+0.01f)*2.0f;
 
 		bool overlapping=false;
@@ -330,7 +268,7 @@ void GenerateSkyParams(void)
 	//////
 
 	// Set up instance data for asteroid rendering
-	float *Data=NULL;
+	matrix *Data=NULL;
 
 	if(!Asteroid_Instance.Buffer)
 		vkuCreateHostBuffer(&Context, &Asteroid_Instance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
@@ -339,21 +277,19 @@ void GenerateSkyParams(void)
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
 	{
-		vec3 RandomVec=Vec3_Set(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
+		vec3 RandomVec=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
 		Vec3_Normalize(&RandomVec);
 
-		matrix Orientation=MatrixIdentity();
-		Orientation=MatrixMult(Orientation, MatrixTranslatev(Asteroids[i].Position));
-		Orientation=MatrixMult(Orientation, MatrixRotate(RandFloat()*PI*2.0f, 1.0f, 0.0f, 0.0f));
-		Orientation=MatrixMult(Orientation, MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 1.0f, 0.0f));
-		Orientation=MatrixMult(Orientation, MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 0.0f, 1.0f));
+		Data[i]=MatrixIdentity();
+		Data[i]=MatrixMult(Data[i], MatrixTranslatev(Asteroids[i].Position));
+		Data[i]=MatrixMult(Data[i], MatrixRotate(RandFloat()*PI*2.0f, 1.0f, 0.0f, 0.0f));
+		Data[i]=MatrixMult(Data[i], MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 1.0f, 0.0f));
+		Data[i]=MatrixMult(Data[i], MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 0.0f, 1.0f));
 		const float radiusScale=1.5f;
-		Orientation=MatrixMult(Orientation, MatrixScale(Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale));
+		Data[i]=MatrixMult(Data[i], MatrixScale(Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale));
 
-		memcpy(&Data[16*i], &Orientation, sizeof(matrix));
-
-		Asteroids[i].Velocity=Vec3_Sets(0.0f);
-		Asteroids[i].Force=Vec3_Sets(0.0f);
+		Asteroids[i].Velocity=Vec3b(0.0f);
+		Asteroids[i].Force=Vec3b(0.0f);
 
 		Asteroids[i].Mass=(1.0f/3000.0f)*(1.33333333f*PI*Asteroids[i].Radius);
 		Asteroids[i].invMass=1.0f/Asteroids[i].Mass;
@@ -605,8 +541,8 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 
 	PerFrame[Index].Main_UBO[Eye]->HMD=Pose;
 
-	PerFrame[Index].Main_UBO[Eye]->light_color=Vec4_Setv(PerFrame[Index].Skybox_UBO[Eye]->uSunColor);
-	PerFrame[Index].Main_UBO[Eye]->light_direction=Vec4_Setv(PerFrame[Index].Skybox_UBO[Eye]->uSunPosition);
+	PerFrame[Index].Main_UBO[Eye]->light_color=PerFrame[Index].Skybox_UBO[Eye]->uSunColor;
+	PerFrame[Index].Main_UBO[Eye]->light_direction=PerFrame[Index].Skybox_UBO[Eye]->uSunPosition;
 	PerFrame[Index].Main_UBO[Eye]->light_direction.w=PerFrame[Index].Skybox_UBO[Eye]->uSunSize;
 
 	PerFrame[Index].Main_UBO[Eye]->light_mvp=Shadow_UBO.mvp;
@@ -723,16 +659,12 @@ void Thread_Physics(void *Arg)
 	Audio_SetListenerOrigin(Camera.Position, Camera.Right);
 	//////
 
-	// Update instance positions
-	float *Data=NULL;
+	// Update instance matrix translation positions
+	matrix *Data=NULL;
 	vkMapMemory(Context.Device, Asteroid_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Data);
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
-	{
-		Data[16*i+12]=Asteroids[i].Position.x;
-		Data[16*i+13]=Asteroids[i].Position.y;
-		Data[16*i+14]=Asteroids[i].Position.z;
-	}
+		Data[i].w=Vec4(Asteroids[i].Position.x, Asteroids[i].Position.y, Asteroids[i].Position.z, 1.0f);
 
 	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
 	//////
@@ -813,7 +745,7 @@ void Render(void)
 
 	vkEndCommandBuffer(PerFrame[Index].CommandBuffer);
 
-	// Sumit command queue
+	// Submit command queue
 	vkQueueSubmit(Context.Queue, 1, &(VkSubmitInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -875,190 +807,6 @@ void Render(void)
 	Index=(Index+1)%Swapchain.NumImages;
 }
 
-// Nebula volume texture generation, need to move this to it's own source
-int p[512]=
-{
-	151, 160, 137, 91,  90,  15,  131, 13,  201, 95,  96,  53,  194, 233, 7,   225,
-	140, 36,  103, 30,  69,  142, 8,   99,  37,  240, 21,  10,  23,  190, 6,   148,
-	247, 120, 234, 75,  0,   26,  197, 62,  94,  252, 219, 203, 117, 35,  11,  32,
-	57,  177, 33,  88,  237, 149, 56,  87,  174, 20,  125, 136, 171, 168, 68,  175,
-	74,  165, 71,  134, 139, 48,  27,  166, 77,  146, 158, 231, 83,  111, 229, 122,
-	60,  211, 133, 230, 220, 105, 92,  41,  55,  46,  245, 40,  244, 102, 143, 54,
-	65,  25,  63,  161, 1,   216, 80,  73,  209, 76,  132, 187, 208, 89,  18,  169,
-	200, 196, 135, 130, 116, 188, 159, 86,  164, 100, 109, 198, 173, 186, 3,   64,
-	52,  217, 226, 250, 124, 123, 5,   202, 38,  147, 118, 126, 255, 82,  85,  212,
-	207, 206, 59,  227, 47,  16,  58,  17,  182, 189, 28,  42,  223, 183, 170, 213,
-	119, 248, 152, 2,   44,  154, 163, 70,  221, 153, 101, 155, 167, 43,  172, 9,
-	129, 22,  39,  253, 19,  98,  108, 110, 79,  113, 224, 232, 178, 185, 112, 104,
-	218, 246, 97,  228, 251, 34,  242, 193, 238, 210, 144, 12,  191, 179, 162, 241,
-	81,  51,  145, 235, 249, 14,  239, 107, 49,  192, 214, 31,  181, 199, 106, 157,
-	184, 84,  204, 176, 115, 121, 50,  45,  127, 4,   150, 254, 138, 236, 205, 93,
-	222, 114, 67,  29,  24,  72,  243, 141, 128, 195, 78,  66,  215, 61,  156, 180
-};
-
-float fade(float t)
-{
-	return t*t*t*(t*(t*6-15)+10);
-}
-
-float lerp(float t, float a, float b)
-{
-	return a+t*(b-a);
-}
-
-float grad(int hash, float x, float y, float z)
-{
-	int h=hash&15;
-	float u=h<8?x:y, v=h<4?y:h==12||h==14?x:z;
-
-	return ((h&1)==0?u:-u)+((h&2)==0?v:-v);
-}
-
-float noise(float x, float y, float z)
-{
-	static bool init=true;
-
-	if(init)
-	{
-		for(int i=0; i<256; i++)
-			p[256+i]=p[i];
-
-		init=false;
-	}
-
-	int X=(int)floor(x)&255, Y=(int)floor(y)&255, Z=(int)floor(z)&255;
-
-	x-=floorf(x);
-	y-=floorf(y);
-	z-=floorf(z);
-
-	float u=fade(x), v=fade(y), w=fade(z);
-
-	int A=p[X]+Y, AA=p[A]+Z, AB=p[A+1]+Z, B=p[X+1]+Y, BA=p[B]+Z, BB=p[B+1]+Z;
-
-	return lerp(w, lerp(v, lerp(u, grad(p[AA], x, y, z), grad(p[BA], x-1, y, z)), lerp(u, grad(p[AB], x, y-1, z), grad(p[BB], x-1, y-1, z))), lerp(v, lerp(u, grad(p[AA+1], x, y, z-1), grad(p[BA+1], x-1, y, z-1)), lerp(u, grad(p[AB+1], x, y-1, z-1), grad(p[BB+1], x-1, y-1, z-1))));
-}
-
-float nebula(vec3 p)
-{
-	const int iterations=6;
-	float turb=0.0f, scale=1.0f;
-
-	for(int i=0;i<iterations;i++)
-	{
-		scale*=0.5f;
-		turb+=scale*noise(p.x/scale, p.y/scale, p.z/scale);
-	}
-
-	return min(1.0f, max(0.0f, turb));
-}
-
-VkBool32 LoadVolume(VkuContext_t *Context, VkuImage_t *Image)
-{
-	VkCommandBuffer CommandBuffer;
-	VkuBuffer_t StagingBuffer;
-	void *Data=NULL;
-
-	Image->Width=64;
-	Image->Height=64;
-	Image->Depth=64; // Slight abuse of image struct, depth is supposed to be color depth, not image depth.
-
-	// Byte size of image data
-	uint32_t Size=Image->Width*Image->Height*Image->Depth;
-
-	// Create staging buffer
-	vkuCreateHostBuffer(Context, &StagingBuffer, Size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-
-	// Map image memory and copy data
-	vkMapMemory(Context->Device, StagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
-
-	const float Scale=2.0f;
-
-	for(uint32_t i=0;i<Size;i++)
-	{
-		uint32_t x=i%Image->Width;
-		uint32_t y=(i%(Image->Width*Image->Height))/Image->Width;
-		uint32_t z=i/(Image->Width*Image->Height);
-
-		vec3 v=
-		{
-			((float)x-(Image->Width>>1))/Image->Width,
-			((float)y-(Image->Height>>1))/Image->Height,
-			((float)z-(Image->Depth>>1))/Image->Depth,
-		};
-
-		float p=nebula(Vec3_Muls(v, Scale));
-
-		((uint8_t *)Data)[i]=(uint8_t)(p*255.0f);
-	}
-
-	vkUnmapMemory(Context->Device, StagingBuffer.DeviceMemory);
-
-	if(!vkuCreateImageBuffer(Context, Image,
-		VK_IMAGE_TYPE_3D, VK_FORMAT_R8_UNORM, 1, 1, Image->Width, Image->Height, Image->Depth,
-		VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
-		return VK_FALSE;
-
-	// Start a one shot command buffer
-	CommandBuffer=vkuOneShotCommandBufferBegin(Context);
-
-	// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
-	vkuTransitionLayout(CommandBuffer, Image->Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-	// Copy from staging buffer to the texture buffer.
-	vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer.Buffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, (VkBufferImageCopy[1])
-	{
-		{
-			0, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }, { 0, 0, 0 }, { Image->Width, Image->Height, Image->Depth }
-		}
-	});
-
-	// Final change to image layout from destination optimal to be optimal reading only by shader.
-	// This is also done by generating mipmaps, if requested.
-	vkuTransitionLayout(CommandBuffer, Image->Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-	// End one shot command buffer and submit
-	vkuOneShotCommandBufferEnd(Context, CommandBuffer);
-
-	// Delete staging buffers
-	vkuDestroyBuffer(Context, &StagingBuffer);
-
-	// Create texture sampler object
-	vkCreateSampler(Context->Device, &(VkSamplerCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-		.magFilter=VK_FILTER_LINEAR,
-		.minFilter=VK_FILTER_LINEAR,
-		.mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST,
-		.addressModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.mipLodBias=0.0f,
-		.compareOp=VK_COMPARE_OP_NEVER,
-		.minLod=0.0f,
-		.maxLod=VK_LOD_CLAMP_NONE,
-		.maxAnisotropy=1.0f,
-		.anisotropyEnable=VK_FALSE,
-		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-	}, VK_NULL_HANDLE, &Image->Sampler);
-
-	// Create texture image view object
-	vkCreateImageView(Context->Device, &(VkImageViewCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.image=Image->Image,
-		.viewType=VK_IMAGE_VIEW_TYPE_3D,
-		.format=VK_FORMAT_R8_UNORM,
-		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
-		.subresourceRange={ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
-	}, VK_NULL_HANDLE, &Image->View);
-
-	return VK_TRUE;
-}
-//////
-
 // Initalization call from system main
 bool Init(void)
 {
@@ -1073,7 +821,7 @@ bool Init(void)
 	if(VkZone==NULL)
 		return false;
 
-	CameraInit(&Camera, (vec3) { 0.0f, 0.0f, 2.0f }, (vec3) { -1.0f, 0.0f, 0.0f }, (vec3) { 0.0f, 1.0f, 0.0f });
+	CameraInit(&Camera, Vec3(0.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 
 	if(!Audio_Init())
 		return false;
@@ -1151,7 +899,7 @@ bool Init(void)
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4], "./assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4_NORMAL], "./assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 
-	LoadVolume(&Context, &Textures[TEXTURE_VOLUME]);
+	GenNebulaVolume(&Context, &Textures[TEXTURE_VOLUME]);
 
 	// Create primary pipeline
 	CreatePipeline();
@@ -1170,12 +918,13 @@ bool Init(void)
 	// Create compositing pipeline
 	CreateCompositePipeline();
 
+	// Set up particle system
 	if(!ParticleSystem_Init(&ParticleSystem))
 		return false;
 
 	ParticleSystem_SetGravity(&ParticleSystem, 0.0f, 0.0f, 0.0f);
 
-	vec3 Zero=Vec3_Set(0.0f, 0.0f, 0.0f);
+	vec3 Zero=Vec3(0.0f, 0.0f, 0.0f);
 	ParticleSystem_AddEmitter(&ParticleSystem, Zero, Zero, Zero, 0.0f, 100, true, NULL);
 
 	// Create primary frame buffers, depth image

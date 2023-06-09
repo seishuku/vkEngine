@@ -7,7 +7,7 @@ vec4 QuatAngle(const float angle, const float x, const float y, const float z)
 
 	Vec3_Normalize(&v);
 
-	return Vec4_Set(s*v.x, s*v.y, s*v.z, cosf(angle*0.5f));
+	return Vec4(s*v.x, s*v.y, s*v.z, cosf(angle*0.5f));
 }
 
 vec4 QuatAnglev(const float angle, const vec3 v)
@@ -26,7 +26,7 @@ vec4 QuatEuler(const float roll, const float pitch, const float yaw)
 	float sy=sinf(yaw*0.5f);
 	float cy=cosf(yaw*0.5f);
 
-	return Vec4_Set(
+	return Vec4(
 		cy*sr*cp-sy*cr*sp,
 		cy*cr*sp+sy*sr*cp,
 		sy*cr*cp-cy*sr*sp,
@@ -36,7 +36,7 @@ vec4 QuatEuler(const float roll, const float pitch, const float yaw)
 
 vec4 QuatMultiply(const vec4 a, const vec4 b)
 {
-	return Vec4_Set(
+	return Vec4(
 		a.w*b.x+a.x*b.w+a.y*b.z-a.z*b.y,
 		a.w*b.y-a.x*b.z+a.y*b.w+a.z*b.x,
 		a.w*b.z+a.x*b.y-a.y*b.x+a.z*b.w,
@@ -48,7 +48,7 @@ vec4 QuatInverse(const vec4 q)
 {
 	float invNorm=1.0f/Vec4_Dot(q, q);
 
-	return Vec4_Set(
+	return Vec4(
 		q.x*-invNorm,
 		q.y*-invNorm,
 		q.z*-invNorm,
@@ -58,10 +58,10 @@ vec4 QuatInverse(const vec4 q)
 
 vec3 QuatRotate(const vec4 q, const vec3 v)
 {
-	vec4 p=Vec4_Setv(q);
+	vec4 p=q;
 	Vec4_Normalize(&p);
 
-	vec3 u=Vec3_Set(p.x, p.y, p.z);
+	vec3 u=Vec3(p.x, p.y, p.z);
 
 	return Vec3_Addv(
 		Vec3_Muls(Vec3_Cross(u, v), 2.0f*p.w),

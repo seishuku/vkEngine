@@ -9,10 +9,10 @@ typedef struct
 {
 	vec3 Position;
 	vec3 Velocity;
-	vec3 Forward;
-	vec3 View;
-	vec3 Up;
+
 	vec3 Right;
+	vec3 Up;
+	vec3 Forward;
 
 	float Pitch;
 	float Yaw;
@@ -39,11 +39,11 @@ typedef struct
 	int32_t *Knots;
 } CameraPath_t;
 
-void CameraInit(Camera_t *Camera, const vec3 Position, const vec3 View, const vec3 Up);
+void CameraInit(Camera_t *Camera, const vec3 Position, const vec3 Right, const vec3 Up, const vec3 Forward);
 matrix CameraUpdate(Camera_t *Camera, float Time);
 void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32_t NumFace);
 int32_t CameraLoadPath(char *filename, CameraPath_t *Path);
-matrix CameraInterpolatePath(CameraPath_t *Path, Camera_t *Camera, float TimeStep);
+matrix CameraInterpolatePath(CameraPath_t *Path, float TimeStep);
 void CameraDeletePath(CameraPath_t *Path);
 
 #endif

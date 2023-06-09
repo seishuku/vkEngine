@@ -1,16 +1,11 @@
 #include "math.h"
 
-vec2 Vec2_Set(const float x, const float y)
+vec2 Vec2(const float x, const float y)
 {
 	return (vec2) { x, y };
 }
 
-vec2 Vec2_Setv(const vec2 b)
-{
-	return b;
-}
-
-vec2 Vec2_Sets(const float b)
+vec2 Vec2b(const float b)
 {
 	return (vec2) { b, b };
 }

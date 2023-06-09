@@ -157,7 +157,7 @@ bool Audio_LoadStatic(char *Filename, Sample_t *Sample)
     Sample->len=outputSize;
     Sample->pos=0;
     Sample->channels=(uint8_t)channels;
-    Sample->xyz=Vec3_Sets(0.0f);
+    Sample->xyz=Vec3b(0.0f);
 
     return 1;
 }

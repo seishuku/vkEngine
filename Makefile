@@ -51,6 +51,7 @@ OBJS+=utils/memzone.o
 OBJS+=perframe.o
 OBJS+=shadow.o
 OBJS+=skybox.o
+OBJS+=nebula.o
 OBJS+=composite.o
 OBJS+=engine.o
 

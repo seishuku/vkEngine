@@ -83,8 +83,8 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *System, vec3 Position, vec3
 	// Set various flags/parameters
 	Emitter.Burst=Burst;
 	Emitter.ID=ID;
-	Emitter.StartColor=Vec3_Setv(StartColor);
-	Emitter.EndColor=Vec3_Setv(EndColor);
+	Emitter.StartColor=StartColor;
+	Emitter.EndColor=EndColor;
 	Emitter.ParticleSize=ParticleSize;
 
 	// Set number of particles and allocate memory
@@ -97,13 +97,13 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *System, vec3 Position, vec3
 	memset(Emitter.Particles, 0, NumParticles*sizeof(Particle_t));
 
 	// Set emitter position (used when resetting/recycling particles when they die)
-	Emitter.Position=Vec3_Setv(Position);
+	Emitter.Position=Position;
 
 	// Set initial particle position and life to -1.0 (dead)
 	for(uint32_t i=0;i<Emitter.NumParticles;i++)
 	{
 		Emitter.Particles[i].ID=ID;
-		Emitter.Particles[i].pos=Vec3_Setv(Position);
+		Emitter.Particles[i].pos=Position;
 		Emitter.Particles[i].life=-1.0f;
 	}
 
@@ -170,11 +170,8 @@ void ParticleSystem_ResetEmitter(ParticleSystem_t *System, uint32_t ID)
 						float r=RandFloat()*SeedRadius;
 
 						// Set particle start position to emitter position
-						Emitter->Particles[j].pos=Vec3_Setv(Emitter->Position);
-
-						Emitter->Particles[j].vel.x=r*sinf(theta);
-						Emitter->Particles[j].vel.y=RandFloat()*100.0f;
-						Emitter->Particles[j].vel.z=r*cosf(theta);
+						Emitter->Particles[j].pos=Emitter->Position;
+						Emitter->Particles[j].vel=Vec3(r*sinf(theta), RandFloat()*100.0f, r*cosf(theta));
 
 						Emitter->Particles[j].life=RandFloat()*0.999f+0.001f;
 					}
@@ -197,7 +194,7 @@ void ParticleSystem_SetEmitterPosition(ParticleSystem_t *System, uint32_t ID, ve
 
 		if(Emitter->ID==ID)
 		{
-			Emitter->Position=Vec3_Setv(Position);
+			Emitter->Position=Position;
 			return;
 		}
 	}
@@ -208,7 +205,7 @@ bool ParticleSystem_SetGravity(ParticleSystem_t *System, float x, float y, float
 	if(System==NULL)
 		return false;
 
-	System->Gravity=Vec3_Set(x, y, z);
+	System->Gravity=Vec3(x, y, z);
 
 	return true;
 }
@@ -218,7 +215,7 @@ bool ParticleSystem_SetGravityv(ParticleSystem_t *System, vec3 v)
 	if(System==NULL)
 		return false;
 
-	System->Gravity=Vec3_Setv(v);
+	System->Gravity=v;
 
 	return true;
 }
@@ -233,7 +230,7 @@ bool ParticleSystem_Init(ParticleSystem_t *System)
 	System->ParticleArray=NULL;
 
 	// Default generic gravity
-	System->Gravity=Vec3_Set(0.0f, -9.81f, 0.0f);
+	System->Gravity=Vec3(0.0f, -9.81f, 0.0f);
 
 	if(!Image_Upload(&Context, &ParticleTexture, "./assets/particle.tga", IMAGE_BILINEAR|IMAGE_MIPMAP))
 		return false;
@@ -334,11 +331,8 @@ void ParticleSystem_Step(ParticleSystem_t *System, float dt)
 					float r=RandFloat()*SeedRadius;
 
 					// Set particle start position to emitter position
-					Emitter->Particles[j].pos=Vec3_Setv(Emitter->Position);
-
-					Emitter->Particles[j].vel.x=r*sinf(theta);
-					Emitter->Particles[j].vel.y=RandFloat()*100.0f;
-					Emitter->Particles[j].vel.z=r*cosf(theta);
+					Emitter->Particles[j].pos=Emitter->Position;
+					Emitter->Particles[j].vel=Vec3(r*sinf(theta), RandFloat()*100.0f, r*cosf(theta));
 
 					Emitter->Particles[j].life=RandFloat()*0.999f+0.001f;
 				}
@@ -376,13 +370,11 @@ void ParticleSystem_Draw(ParticleSystem_t *System, VkCommandBuffer CommandBuffer
 			// Only draw ones that are alive still
 			if(Emitter->Particles[j].life>0.0f)
 			{
-				vec3 Color;
-
 				*Array++=Emitter->Particles[j].pos.x;
 				*Array++=Emitter->Particles[j].pos.y;
 				*Array++=Emitter->Particles[j].pos.z;
 				*Array++=Emitter->ParticleSize;
-				Color=Vec3_Lerp(Emitter->StartColor, Emitter->EndColor, Emitter->Particles[j].life);
+				vec3 Color=Vec3_Lerp(Emitter->StartColor, Emitter->EndColor, Emitter->Particles[j].life);
 				*Array++=Color.x;
 				*Array++=Color.y;
 				*Array++=Color.z;
@@ -394,8 +386,8 @@ void ParticleSystem_Draw(ParticleSystem_t *System, VkCommandBuffer CommandBuffer
 	}
 
 	ParticlePC.mvp=MatrixMult(Modelview, Projection);
-	ParticlePC.Right=Vec4_Set(Modelview.x.x, Modelview.y.x, Modelview.z.x, Modelview.w.x);
-	ParticlePC.Up=Vec4_Set(Modelview.x.y, Modelview.y.y, Modelview.z.y, Modelview.w.y);
+	ParticlePC.Right=Vec4(Modelview.x.x, Modelview.y.x, Modelview.z.x, Modelview.w.x);
+	ParticlePC.Up=Vec4(Modelview.x.y, Modelview.y.y, Modelview.z.y, Modelview.w.y);
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&ParticleDescriptorSet, 0, &ParticleTexture);
 	vkuAllocateUpdateDescriptorSet(&ParticleDescriptorSet, DescriptorPool);

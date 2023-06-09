@@ -92,9 +92,9 @@ static void CalculateTangent(BModel_t *Model)
 		{
 			vec3 t, b, n;
 
-			t=Vec3_Set(Model->Tangent[3*i+0], Model->Tangent[3*i+1], Model->Tangent[3*i+2]);
-			b=Vec3_Set(Model->Binormal[3*i+0], Model->Binormal[3*i+1], Model->Binormal[3*i+2]);
-			n=Vec3_Set(Model->Normal[3*i+0], Model->Normal[3*i+1], Model->Normal[3*i+2]);
+			t=Vec3(Model->Tangent[3*i+0], Model->Tangent[3*i+1], Model->Tangent[3*i+2]);
+			b=Vec3(Model->Binormal[3*i+0], Model->Binormal[3*i+1], Model->Binormal[3*i+2]);
+			n=Vec3(Model->Normal[3*i+0], Model->Normal[3*i+1], Model->Normal[3*i+2]);
 
 			t=Vec3_Subv(t, Vec3_Muls(n, Vec3_Dot(n, t)));
 
@@ -107,7 +107,7 @@ static void CalculateTangent(BModel_t *Model)
 			if(Vec3_Dot(NxT, b)<0.0f)
 				t=Vec3_Muls(t, -1.0f);
 
-			b=Vec3_Setv(NxT);
+			b=NxT;
 
 			memcpy(&Model->Tangent[3*i], &t, sizeof(float)*3);
 			memcpy(&Model->Binormal[3*i], &b, sizeof(float)*3);

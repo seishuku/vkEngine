@@ -22,9 +22,14 @@ typedef struct { float x, y, z; } vec3;
 typedef struct { float x, y, z, w; } vec4;
 typedef struct { vec4 x, y, z, w; } matrix;
 
-vec2 Vec2_Set(const float x, const float y);
-vec2 Vec2_Setv(const vec2 b);
-vec2 Vec2_Sets(const float b);
+// VecX - Component wise type initalizer (set vector to x, y, z, w)
+// Vec*b - Broadcast wise type initalizer (set vector to b)
+// VecX_X - Component wise type op (x, y, z, w math op on vector)
+// VecX_Xv - Vector wise type op (vector math op on vector)
+// VecX_Xs - Broadcast wise type op (b math op on vector)
+
+vec2 Vec2(const float x, const float y);
+vec2 Vec2b(const float b);
 vec2 Vec2_Add(const vec2 a, const float x, const float y);
 vec2 Vec2_Addv(const vec2 a, const vec2 b);
 vec2 Vec2_Adds(const vec2 a, const float b);
@@ -41,9 +46,8 @@ vec2 Vec2_Reflect(const vec2 N, const vec2 I);
 float Vec2_Normalize(vec2 *v);
 vec2 Vec2_Lerp(const vec2 a, const vec2 b, const float t);
 
-vec3 Vec3_Set(const float x, const float y, const float z);
-vec3 Vec3_Setv(const vec3 b);
-vec3 Vec3_Sets(const float b);
+vec3 Vec3(const float x, const float y, const float z);
+vec3 Vec3b(const float b);
 vec3 Vec3_Add(const vec3 a, const float x, const float y, const float z);
 vec3 Vec3_Addv(const vec3 a, const vec3 b);
 vec3 Vec3_Adds(const vec3 a, const float b);
@@ -62,9 +66,8 @@ float Vec3_Normalize(vec3 *v);
 vec3 Vec3_Cross(const vec3 v0, const vec3 v1);
 vec3 Vec3_Lerp(const vec3 a, const vec3 b, const float t);
 
-vec4 Vec4_Set(const float x, const float y, const float z, const float w);
-vec4 Vec4_Setv(const vec4 b);
-vec4 Vec4_Sets(const float b);
+vec4 Vec4(const float x, const float y, const float z, const float w);
+vec4 Vec4b(const float b);
 vec4 Vec4_Add(const vec4 a, const float x, const float y, const float z, const float w);
 vec4 Vec4_Addv(const vec4 a, const vec4 b);
 vec4 Vec4_Adds(const vec4 a, const float b);

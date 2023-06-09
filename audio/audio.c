@@ -36,8 +36,8 @@ vec3 listener_right={ 1.0f, 0.0f, 0.0f };
 
 void Audio_SetListenerOrigin(vec3 pos, vec3 right)
 {
-    listener_origin=Vec3_Setv(pos);
-    listener_right=Vec3_Setv(right);
+    listener_origin=pos;
+    listener_right=right;
 }
 
 void Spatialize(vec3 origin, uint8_t *left_vol, uint8_t *right_vol)

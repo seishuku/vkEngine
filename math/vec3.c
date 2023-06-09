@@ -1,16 +1,11 @@
 #include "math.h"
 
-vec3 Vec3_Set(const float x, const float y, const float z)
+vec3 Vec3(const float x, const float y, const float z)
 {
 	return (vec3) { x, y, z };
 }
 
-vec3 Vec3_Setv(const vec3 b)
-{
-	return b;
-}
-
-vec3 Vec3_Sets(const float b)
+vec3 Vec3b(const float b)
 {
 	return (vec3) { b, b, b };
 }

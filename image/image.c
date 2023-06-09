@@ -610,7 +610,7 @@ static vec2 _GetUVAngularMap(vec3 xyz)
 {
 	float phi=-(float)acos(xyz.z), theta=(float)atan2(xyz.y, xyz.x);
 
-	return Vec2_Set(
+	return Vec2(
 		0.5f*((phi/PI)*(float)cos(theta))+0.5f,
 		0.5f*((phi/PI)*(float)sin(theta))+0.5f);
 }
@@ -623,12 +623,12 @@ static vec3 _GetXYZFace(vec2 uv, int face)
 
 	switch(face)
 	{
-		case 0: xyz=Vec3_Set(1.0f, (uv.y-0.5f)*2.0f, (0.5f-uv.x)*2.0f);	break; // +X
-		case 1: xyz=Vec3_Set(-1.0f, (uv.y-0.5f)*2.0f, (uv.x-0.5f)*2.0f);	break; // -X
-		case 2: xyz=Vec3_Set((uv.x-0.5f)*2.0f, -1.0f, (uv.y-0.5f)*2.0f);	break; // +Y
-		case 3: xyz=Vec3_Set((uv.x-0.5f)*2.0f, 1.0f, (0.5f-uv.y)*2.0f);	break; // -Y
-		case 4: xyz=Vec3_Set((uv.x-0.5f)*2.0f, (uv.y-0.5f)*2.0f, 1.0f);	break; // +Z
-		case 5: xyz=Vec3_Set((0.5f-uv.x)*2.0f, (uv.y-0.5f)*2.0f, -1.0f);	break; // -Z
+		case 0: xyz=Vec3(1.0f, (uv.y-0.5f)*2.0f, (0.5f-uv.x)*2.0f);		break; // +X
+		case 1: xyz=Vec3(-1.0f, (uv.y-0.5f)*2.0f, (uv.x-0.5f)*2.0f);	break; // -X
+		case 2: xyz=Vec3((uv.x-0.5f)*2.0f, -1.0f, (uv.y-0.5f)*2.0f);	break; // +Y
+		case 3: xyz=Vec3((uv.x-0.5f)*2.0f, 1.0f, (0.5f-uv.y)*2.0f);		break; // -Y
+		case 4: xyz=Vec3((uv.x-0.5f)*2.0f, (uv.y-0.5f)*2.0f, 1.0f);		break; // +Z
+		case 5: xyz=Vec3((0.5f-uv.x)*2.0f, (uv.y-0.5f)*2.0f, -1.0f);	break; // -Z
 	}
 
 	Vec3_Normalize(&xyz);

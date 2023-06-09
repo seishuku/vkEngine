@@ -26,10 +26,10 @@ extern RigidBody_t Asteroids[NUM_ASTEROIDS];
 // Emitter callback for the launched emitter's particles
 void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle)
 {
-	Particle->pos=Vec3_Sets(0.0f);
+	Particle->pos=Vec3b(0.0f);
 
 	// Simple -1.0 to 1.0 random spherical pattern, scaled by 100, fairly short lifespan.
-	vec3 vel=Vec3_Set(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
+	vec3 vel=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
 	Vec3_Normalize(&vel);
 	Particle->vel=Vec3_Muls(vel, 10.0f);
 
@@ -44,10 +44,10 @@ static void FireParticleEmitter(vec3 Position, vec3 Direction)
 	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
 
 	// Create a new particle emitter
-	vec3 RandVec=Vec3_Set(RandFloat(), RandFloat(), RandFloat());
+	vec3 RandVec=Vec3(RandFloat(), RandFloat(), RandFloat());
 	Vec3_Normalize(&RandVec);
 	RandVec=Vec3_Muls(RandVec, 100.0f);
-	uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, Vec3_Set(0.0f, 0.0f, 0.0f), Vec3_Set(0.0f, 0.0f, 0.0f), RandVec, 5.0f, 500, false, EmitterCallback);
+	uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 0.0f, 0.0f), RandVec, 5.0f, 500, false, EmitterCallback);
 
 	// Search list for first dead particle
 	for(uint32_t i=0;i<Emitter->NumParticles;i++)
@@ -56,7 +56,7 @@ static void FireParticleEmitter(vec3 Position, vec3 Direction)
 		if(Emitter->Particles[i].life<0.0f)
 		{
 			Emitter->Particles[i].ID=ID;
-			Emitter->Particles[i].pos=Vec3_Setv(Position);
+			Emitter->Particles[i].pos=Position;
 			Vec3_Normalize(&Direction);
 			Emitter->Particles[i].vel=Vec3_Muls(Direction, 100.0f);
 
@@ -131,7 +131,7 @@ void Event_Mouse(void *Arg)
 
 	if(MouseEvent->button&MOUSE_BUTTON_LEFT)
 	{
-		Camera.Yaw-=(float)MouseEvent->dx/15.0f;
-		Camera.Pitch-=(float)MouseEvent->dy/15.0f;
+		Camera.Yaw-=(float)MouseEvent->dx/8000.0f;
+		Camera.Pitch-=(float)MouseEvent->dy/8000.0f;
 	}
 }

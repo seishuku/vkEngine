@@ -168,6 +168,9 @@
     <ClInclude Include="textures.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="nebula.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="audio\audio.c">
@@ -282,6 +285,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="skybox.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="nebula.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

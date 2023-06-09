@@ -1,16 +1,11 @@
 #include "math.h"
 
-vec4 Vec4_Set(const float x, const float y, const float z, const float w)
+vec4 Vec4(const float x, const float y, const float z, const float w)
 {
 	return (vec4) { x, y, z, w };
 }
 
-vec4 Vec4_Setv(const vec4 b)
-{
-	return b;
-}
-
-vec4 Vec4_Sets(const float b)
+vec4 Vec4b(const float b)
 {
 	return (vec4) { b, b, b, b };
 }

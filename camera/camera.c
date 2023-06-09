@@ -26,13 +26,12 @@ static int32_t ClassifySphere(vec3 Center, vec3 Normal, vec3 Point, float radius
 static bool InsidePolygon(const vec3 Intersection, const vec3 Tri[3])
 {
 	float Angle=0.0f;
-	vec3 A, B, C;
 
-	A=Vec3_Subv(Tri[0], Intersection);
-	B=Vec3_Subv(Tri[1], Intersection);
-	C=Vec3_Subv(Tri[2], Intersection);
+	vec3 A=Vec3_Subv(Tri[0], Intersection);
+	vec3 B=Vec3_Subv(Tri[1], Intersection);
+	vec3 C=Vec3_Subv(Tri[2], Intersection);
 
-	Angle+=Vec3_GetAngle(A, B);
+	Angle =Vec3_GetAngle(A, B);
 	Angle+=Vec3_GetAngle(B, C);
 	Angle+=Vec3_GetAngle(C, A);
 
@@ -141,14 +140,12 @@ bool SphereBBOXIntersection(const vec3 Center, const float Radius, const vec3 BB
 }
 
 // Actual camera stuff
-void CameraInit(Camera_t *Camera, const vec3 Position, const vec3 View, const vec3 Up)
+void CameraInit(Camera_t *Camera, const vec3 Position, const vec3 Right, const vec3 Up, const vec3 Forward)
 {
-	Camera->Position=Vec3_Setv(Position);
-	Camera->View=Vec3_Setv(View);
-	Camera->Up=Vec3_Setv(Up);
-
-	Camera->Forward=Vec3_Cross(Camera->View, Camera->Up);
-	Camera->Right=Vec3_Cross(Camera->Forward, Camera->Up);
+	Camera->Position=Position;
+	Camera->Right=Right;
+	Camera->Up=Up;
+	Camera->Forward=Forward;
 
 	Camera->Pitch=0.0f;
 	Camera->Yaw=0.0f;
@@ -156,108 +153,110 @@ void CameraInit(Camera_t *Camera, const vec3 Position, const vec3 View, const ve
 
 	Camera->Radius=10.0f;
 
-	Camera->Velocity=Vec3_Sets(0.0f);
+	Camera->Velocity=Vec3b(0.0f);
 
-	Camera->key_w=0;
-	Camera->key_s=0;
-	Camera->key_a=0;
-	Camera->key_d=0;
-	Camera->key_v=0;
-	Camera->key_c=0;
-	Camera->key_left=0;
-	Camera->key_right=0;
-	Camera->key_up=0;
-	Camera->key_down=0;
+	Camera->key_w=false;
+	Camera->key_s=false;
+	Camera->key_a=false;
+	Camera->key_d=false;
+	Camera->key_v=false;
+	Camera->key_c=false;
+	Camera->key_left=false;
+	Camera->key_right=false;
+	Camera->key_up=false;
+	Camera->key_down=false;
 }
 
-void CameraPitch(Camera_t *Camera, const float Angle)
+static void CameraRotate(Camera_t *Camera)
 {
-	Camera->Forward=QuatRotate(QuatAnglev(Angle, Camera->Right), Camera->Forward);
+	vec4 PitchYaw=QuatMultiply(QuatAnglev(-Camera->Pitch, Camera->Right), QuatAnglev(Camera->Yaw, Camera->Up));
+	Camera->Forward=QuatRotate(PitchYaw, Camera->Forward);
 	Vec3_Normalize(&Camera->Forward);
 
-	Camera->Up=Vec3_Muls(Vec3_Cross(Camera->Forward, Camera->Right), -1.0f);
-}
+	Camera->Right=Vec3_Cross(Camera->Up, Camera->Forward);
 
-void CameraYaw(Camera_t *Camera, const float Angle)
-{
-	Camera->Forward=QuatRotate(QuatAnglev(Angle, Camera->Up), Camera->Forward);
-	Vec3_Normalize(&Camera->Forward);
-
-	Camera->Right=Vec3_Cross(Camera->Forward, Camera->Up);
-}
-
-void CameraRoll(Camera_t *Camera, const float Angle)
-{
-	Camera->Right=QuatRotate(QuatAnglev(-Angle, Camera->Forward), Camera->Right);
+	Camera->Right=QuatRotate(QuatAnglev(-Camera->Roll, Camera->Forward), Camera->Right);
 	Vec3_Normalize(&Camera->Right);
 
-	Camera->Up=Vec3_Muls(Vec3_Cross(Camera->Forward, Camera->Right), -1.0f);
+	Camera->Up=Vec3_Cross(Camera->Forward, Camera->Right);
 }
 
 matrix CameraUpdate(Camera_t *Camera, float dt)
 {
-	float speed=2.0f;
+	float speed=240.0f;
+	float rotation=0.0625f;
 
 	if(Camera->shift)
 		speed*=2.0f;
 
-	if(Camera->key_d)
-		Camera->Velocity.x+=speed;
-
 	if(Camera->key_a)
-		Camera->Velocity.x-=speed;
+		Camera->Velocity.x+=speed*dt;
+
+	if(Camera->key_d)
+		Camera->Velocity.x-=speed*dt;
 
 	if(Camera->key_v)
-		Camera->Velocity.y+=speed;
+		Camera->Velocity.y+=speed*dt;
 
 	if(Camera->key_c)
-		Camera->Velocity.y-=speed;
+		Camera->Velocity.y-=speed*dt;
 
 	if(Camera->key_w)
-		Camera->Velocity.z+=speed;
+		Camera->Velocity.z+=speed*dt;
 
 	if(Camera->key_s)
-		Camera->Velocity.z-=speed;
+		Camera->Velocity.z-=speed*dt;
 
 	if(Camera->key_q)
-		Camera->Roll+=0.125f;
+		Camera->Roll+=rotation*dt;
 
 	if(Camera->key_e)
-		Camera->Roll-=0.125f;
+		Camera->Roll-=rotation*dt;
 
 	if(Camera->key_left)
-		Camera->Yaw+=0.125f;
+		Camera->Yaw+=rotation*dt;
 
 	if(Camera->key_right)
-		Camera->Yaw-=0.125f;
+		Camera->Yaw-=rotation*dt;
 
 	if(Camera->key_up)
-		Camera->Pitch+=0.125f;
+		Camera->Pitch+=rotation*dt;
 
 	if(Camera->key_down)
-		Camera->Pitch-=0.125f;
+		Camera->Pitch-=rotation*dt;
 
-	const float Damp=powf(0.001f, dt);
+	const float maxVelocity=100.0f;
+	float magnitude=Vec3_Length(Camera->Velocity);
+
+	// If velocity magnitude is higher than our max, normalize the velocity vector and scale by maximum speed
+	if(magnitude>maxVelocity)
+		Camera->Velocity=Vec3_Muls(Camera->Velocity, (1.0f/magnitude)*maxVelocity);
+
+	// Dampen velocity
+	float Damp=powf(0.9f, dt*60.0f);
+
 	Camera->Velocity=Vec3_Muls(Camera->Velocity, Damp);
 	Camera->Pitch*=Damp;
 	Camera->Yaw*=Damp;
 	Camera->Roll*=Damp;
 
-	CameraPitch(Camera, Camera->Pitch*dt);
-	CameraYaw(Camera, Camera->Yaw*dt);
-	CameraRoll(Camera, Camera->Roll*dt);
+	// Apply pitch/yaw/roll rotations
+	CameraRotate(Camera);
 
-	Camera->Position=Vec3_Addv(Camera->Position, Vec3_Muls(Camera->Right, Camera->Velocity.x*dt));
-	Camera->Position=Vec3_Addv(Camera->Position, Vec3_Muls(Camera->Up, Camera->Velocity.y*dt));
-	Camera->Position=Vec3_Addv(Camera->Position, Vec3_Muls(Camera->Forward, Camera->Velocity.z*dt));
+	// Combine the velocity with the 3 directional vectors to give overall directional velocity
+	volatile vec3 velocity=Vec3b(0.0f);
+	velocity=Vec3_Addv(velocity, Vec3_Muls(Camera->Right, Camera->Velocity.x));
+	velocity=Vec3_Addv(velocity, Vec3_Muls(Camera->Up, Camera->Velocity.y));
+	velocity=Vec3_Addv(velocity, Vec3_Muls(Camera->Forward, Camera->Velocity.z));
 
-	Camera->View=Vec3_Addv(Camera->Position, Camera->Forward);
+	// Integrate the velocity over time to give positional change
+	Camera->Position=Vec3_Addv(Camera->Position, Vec3_Muls(velocity, dt));
 
-	return MatrixLookAt(Camera->Position, Camera->View, Camera->Up);
+	return MatrixLookAt(Camera->Position, Vec3_Addv(Camera->Position, Camera->Forward), Camera->Up);
 }
 
 // Camera path track stuff
-float Blend(int32_t k, int32_t t, int32_t *knots, float v)
+static float Blend(int32_t k, int32_t t, int32_t *knots, float v)
 {
 	float b;
 
@@ -289,7 +288,7 @@ float Blend(int32_t k, int32_t t, int32_t *knots, float v)
 	return b;
 }
 
-void CalculateKnots(int32_t *knots, int32_t n, int32_t t)
+static void CalculateKnots(int32_t *knots, int32_t n, int32_t t)
 {
 	int32_t i;
 
@@ -310,21 +309,23 @@ void CalculateKnots(int32_t *knots, int32_t n, int32_t t)
 	}
 }
 
-void CalculatePoint(int32_t *knots, int32_t n, int32_t t, float v, float *control, vec3 *output)
+static vec3 CalculatePoint(int32_t *knots, int32_t n, int32_t t, float v, float *control)
 {
 	int32_t k;
 	float b;
 
-	*output=Vec3_Sets(0.0f);
+	vec3 output=Vec3b(0.0f);
 
 	for(k=0;k<=n;k++)
 	{
 		b=Blend(k, t, knots, v);
 
-		output->x+=control[3*k]*b;
-		output->y+=control[3*k+1]*b;
-		output->z+=control[3*k+2]*b;
+		output.x+=control[3*k]*b;
+		output.y+=control[3*k+1]*b;
+		output.z+=control[3*k+2]*b;
 	}
+
+	return output;
 }
 
 int32_t CameraLoadPath(char *filename, CameraPath_t *Path)
@@ -348,7 +349,6 @@ int32_t CameraLoadPath(char *filename, CameraPath_t *Path)
 	if(Path->Position==NULL)
 	{
 		fclose(stream);
-
 		return 0;
 	}
 
@@ -395,17 +395,17 @@ int32_t CameraLoadPath(char *filename, CameraPath_t *Path)
 	return 1;
 }
 
-matrix CameraInterpolatePath(CameraPath_t *Path, Camera_t *Camera, float TimeStep)
+matrix CameraInterpolatePath(CameraPath_t *Path, float TimeStep)
 {
 	Path->Time+=TimeStep;
 
 	if(Path->Time>Path->EndTime)
 		Path->Time=0.0f;
 
-	CalculatePoint(Path->Knots, Path->NumPoints-1, 3, Path->Time, Path->Position, &Camera->Position);
-	CalculatePoint(Path->Knots, Path->NumPoints-1, 3, Path->Time, Path->View, &Camera->View);
+	vec3 Position=CalculatePoint(Path->Knots, Path->NumPoints-1, 3, Path->Time, Path->Position);
+	vec3 View=CalculatePoint(Path->Knots, Path->NumPoints-1, 3, Path->Time, Path->View);
 
-	return MatrixLookAt(Camera->Position, Camera->View, Camera->Up);
+	return MatrixLookAt(Position, View, Vec3(0.0f, 1.0f, 0.0f));
 }
 
 void CameraDeletePath(CameraPath_t *Path)

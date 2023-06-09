@@ -171,9 +171,10 @@ void ShadowUpdateMap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 
 	matrix Projection=MatrixOrtho(-1200.0f, 1200.0f, -1200.0f, 1200.0f, 0.1f, 3000.0f);
 
+	// Janky cast, mate.
 	vec3 Position=Vec3_Muls(*((vec3 *)&PerFrame[FrameIndex].Skybox_UBO[0]->uSunPosition), 200.0f);
 
-	matrix ModelView=MatrixLookAt(Position, (vec3) { 0.0f, 0.0f, 0.0f }, (vec3) { 0.0f, 1.0f, 0.0f });
+	matrix ModelView=MatrixLookAt(Position, Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f));
 
 	Shadow_UBO.mvp=MatrixMult(ModelView, Projection);
 

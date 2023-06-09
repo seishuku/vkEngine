@@ -58,7 +58,7 @@ void PhysicsIntegrate(RigidBody_t *body, float dt)
 
 	body->Velocity=Vec3_Addv(body->Velocity, Vec3_Muls(body->Force, body->invMass*dt));
 
-	body->Force=Vec3_Sets(0.0f);
+	body->Force=Vec3b(0.0f);
 
 	apply_constraints(body);
 }
@@ -168,9 +168,9 @@ void PhysicsCameraToSphereCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
 
 void ExplodeEmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle)
 {
-	Particle->pos=Vec3_Sets(0.0f);
+	Particle->pos=Vec3b(0.0f);
 
-	Particle->vel=Vec3_Set(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
+	Particle->vel=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
 	Vec3_Normalize(&Particle->vel);
 	Particle->vel=Vec3_Muls(Particle->vel, RandFloat()*50.0f);
 
@@ -230,13 +230,13 @@ void PhysicsParticleToSphereCollisionResponse(Particle_t *Particle, RigidBody_t 
 				&ParticleSystem,
 				ParticleSystem_AddEmitter(
 					&ParticleSystem,
-					Particle->pos,					// Position
-					Vec3_Set(100.0f, 12.0f, 5.0f),	// Start color
-					Vec3_Set(0.0f, 0.0f, 0.0f),		// End color
-					5.0f,							// Radius of particles
-					1000,							// Number of particles in system
-					true,							// Is burst?
-					ExplodeEmitterCallback			// Callback for particle generation
+					Particle->pos,				// Position
+					Vec3(100.0f, 12.0f, 5.0f),	// Start color
+					Vec3(0.0f, 0.0f, 0.0f),		// End color
+					5.0f,						// Radius of particles
+					1000,						// Number of particles in system
+					true,						// Is burst?
+					ExplodeEmitterCallback		// Callback for particle generation
 				)
 			);
 
