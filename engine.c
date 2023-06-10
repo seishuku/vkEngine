@@ -236,18 +236,28 @@ void GenerateSkyParams(void)
 	}
 
 	// Set up rigid body reps for asteroids
+	const float AsteroidFieldMinRadius=50.0f;
+	const float AsteroidFieldMaxRadius=4000.0f;
+	const float AsteroidMinRadius=0.05f;
+	const float AsteroidMaxRadius=40.0f;
+
 	uint32_t i=0, tries=0;
 
 	memset(Asteroids, 0, sizeof(RigidBody_t)*NUM_ASTEROIDS);
 
 	while(i<NUM_ASTEROIDS)
 	{
-		vec3 RandomVec=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
-		Vec3_Normalize(&RandomVec);
+		vec3 RandomDirection=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
+		Vec3_Normalize(&RandomDirection);
 
 		RigidBody_t Asteroid;
-		Asteroid.Position=Vec3(RandomVec.x*(RandFloat()*1000.0f+50.0f), RandomVec.y*(RandFloat()*1000.0f+50.0f), RandomVec.z*(RandFloat()*1000.0f+50.0f));
-		Asteroid.Radius=(RandFloat()*20.0f+0.01f)*2.0f;
+
+		Asteroid.Position=Vec3(
+			RandomDirection.x*(RandFloat()*(AsteroidFieldMaxRadius-AsteroidFieldMinRadius))+AsteroidFieldMinRadius,
+			RandomDirection.y*(RandFloat()*(AsteroidFieldMaxRadius-AsteroidFieldMinRadius))+AsteroidFieldMinRadius,
+			RandomDirection.z*(RandFloat()*(AsteroidFieldMaxRadius-AsteroidFieldMinRadius))+AsteroidFieldMinRadius
+		);
+		Asteroid.Radius=(RandFloat()*(AsteroidMaxRadius-AsteroidMinRadius))+AsteroidMinRadius;
 
 		bool overlapping=false;
 
@@ -277,15 +287,13 @@ void GenerateSkyParams(void)
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
 	{
-		vec3 RandomVec=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
-		Vec3_Normalize(&RandomVec);
+		const float radiusScale=1.5f;
 
 		Data[i]=MatrixIdentity();
 		Data[i]=MatrixMult(Data[i], MatrixTranslatev(Asteroids[i].Position));
 		Data[i]=MatrixMult(Data[i], MatrixRotate(RandFloat()*PI*2.0f, 1.0f, 0.0f, 0.0f));
 		Data[i]=MatrixMult(Data[i], MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 1.0f, 0.0f));
 		Data[i]=MatrixMult(Data[i], MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 0.0f, 1.0f));
-		const float radiusScale=1.5f;
 		Data[i]=MatrixMult(Data[i], MatrixScale(Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale));
 
 		Asteroids[i].Velocity=Vec3b(0.0f);
@@ -473,6 +481,7 @@ void Thread_Skybox(void *Arg)
 
 	vkCmdBindDescriptorSets(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipelineLayout, 0, 1, &SkyboxDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
+	// No vertex data, it's baked into the vertex shader
 	vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 60, 1, 0, 0);
 
 	vkEndCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye]);
@@ -523,6 +532,7 @@ void Thread_Particles(void *Arg)
 	vkuAllocateUpdateDescriptorSet(&VolumeDescriptorSet, Data->PerFrame[Data->Index].DescriptorPool[Data->Eye]);
 	vkCmdBindDescriptorSets(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, VolumePipelineLayout, 0, 1, &VolumeDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
+	// No vertex data, it's baked into the vertex shader
 	vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 36, 1, 0, 0);
 
 	vkEndCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye]);
@@ -638,10 +648,10 @@ void Thread_Physics(void *Arg)
 		for(int j=i+1;j<NUM_ASTEROIDS;j++)
 			PhysicsSphereToSphereCollisionResponse(&Asteroids[i], &Asteroids[j]);
 
-		// Check asteriods against the camera
+		// Check asteroids against the camera
 		PhysicsCameraToSphereCollisionResponse(&Camera, &Asteroids[i]);
 	
-		// Check asteriods against "missle" particles
+		// Check asteroids against projectile particles
 		// Emitter '0' on the particle system contains particles that drive the projectile physics
 		ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
 		// Loop through all the possible particles
@@ -807,7 +817,7 @@ void Render(void)
 	Index=(Index+1)%Swapchain.NumImages;
 }
 
-// Initalization call from system main
+// Initialization call from system main
 bool Init(void)
 {
 	srand(123);
@@ -996,7 +1006,7 @@ bool Init(void)
 		}, &PerFrame[i].CommandBuffer);
 	}
 
-	// Set up and initalize threads
+	// Set up and initialize threads
 	for(uint32_t i=0;i<NUM_THREADS;i++)
 	{
 		Thread_Init(&Thread[i]);

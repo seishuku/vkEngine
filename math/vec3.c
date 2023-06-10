@@ -111,3 +111,13 @@ vec3 Vec3_Lerp(const vec3 a, const vec3 b, const float t)
 {
 	return Vec3_Addv(Vec3_Muls(Vec3_Subv(b, a), t), a);
 }
+
+vec3 Vec3_Clamp(const vec3 v, const float min, const float max)
+{
+	return (vec3)
+	{
+		min(max(v.x, min), max),
+		min(max(v.y, min), max),
+		min(max(v.z, min), max)
+	};
+}

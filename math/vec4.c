@@ -96,3 +96,14 @@ vec4 Vec4_Lerp(const vec4 a, const vec4 b, const float t)
 {
 	return Vec4_Addv(Vec4_Muls(Vec4_Subv(b, a), t), a);
 }
+
+vec4 Vec4_Clamp(const vec4 v, const float min, const float max)
+{
+	return (vec4)
+	{
+		min(max(v.x, min), max),
+		min(max(v.y, min), max),
+		min(max(v.z, min), max),
+		min(max(v.w, min), max)
+	};
+}

@@ -45,6 +45,7 @@ float Vec2_Distance(const vec2 Vector1, const vec2 Vector2);
 vec2 Vec2_Reflect(const vec2 N, const vec2 I);
 float Vec2_Normalize(vec2 *v);
 vec2 Vec2_Lerp(const vec2 a, const vec2 b, const float t);
+vec2 Vec2_Clamp(const vec2 v, const float min, const float max);
 
 vec3 Vec3(const float x, const float y, const float z);
 vec3 Vec3b(const float b);
@@ -65,6 +66,7 @@ vec3 Vec3_Reflect(const vec3 N, const vec3 I);
 float Vec3_Normalize(vec3 *v);
 vec3 Vec3_Cross(const vec3 v0, const vec3 v1);
 vec3 Vec3_Lerp(const vec3 a, const vec3 b, const float t);
+vec3 Vec3_Clamp(const vec3 v, const float min, const float max);
 
 vec4 Vec4(const float x, const float y, const float z, const float w);
 vec4 Vec4b(const float b);
@@ -83,6 +85,7 @@ float Vec4_Distance(const vec4 Vector1, const vec4 Vector2);
 vec4 Vec4_Reflect(const vec4 N, const vec4 I);
 float Vec4_Normalize(vec4 *v);
 vec4 Vec4_Lerp(const vec4 a, const vec4 b, const float t);
+vec4 Vec4_Clamp(const vec4 v, const float min, const float max);
 
 float fsinf(const float v);
 float fcosf(const float v);

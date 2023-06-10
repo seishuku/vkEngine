@@ -96,3 +96,12 @@ vec2 Vec2_Lerp(const vec2 a, const vec2 b, const float t)
 {
 	return Vec2_Addv(Vec2_Muls(Vec2_Subv(b, a), t), a);
 }
+
+vec2 Vec2_Clamp(const vec2 v, const float min, const float max)
+{
+	return (vec2)
+	{
+		min(max(v.x, min), max),
+		min(max(v.y, min), max)
+	};
+}

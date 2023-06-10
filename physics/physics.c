@@ -16,9 +16,7 @@ static void apply_constraints(RigidBody_t *Body)
 	const float maxVelocity=500.0f;
 
 	// Clamp velocity, this reduces the chance of the simulation going unstable
-	Body->Velocity.x=min(maxVelocity, max(-maxVelocity, Body->Velocity.x));
-	Body->Velocity.y=min(maxVelocity, max(-maxVelocity, Body->Velocity.y));
-	Body->Velocity.z=min(maxVelocity, max(-maxVelocity, Body->Velocity.z));
+	Body->Velocity=Vec3_Clamp(Body->Velocity, -maxVelocity, maxVelocity);
 
 	// Check for collision with outer boundary sphere and reflect velocity if needed
 	vec3 Normal=Vec3_Subv(Body->Position, Center);
@@ -92,7 +90,7 @@ void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 	const float radiusSum=a->Radius+b->Radius;
 
 	// Check if the distance is less than the sum of the radii
-	if(DistanceSq<radiusSum*radiusSum)
+	if(DistanceSq<radiusSum*radiusSum&&DistanceSq)
 	{
 		float distance=sqrtf(DistanceSq);
 
@@ -121,6 +119,52 @@ void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 		}
 }
 
+void PhysicsSphereToAABBCollisionResponse(RigidBody_t *sphere, RigidBody_t *aabb)
+{
+	// Calculate the half extents of the AABB
+	vec3 half=Vec3_Muls(aabb->Size, 0.5f);
+
+	// Calculate the AABB's min and max points
+	vec3 aabbMin=Vec3_Subv(aabb->Position, half);
+	vec3 aabbMax=Vec3_Addv(aabb->Position, half);
+
+	// Find the closest point on the AABB to the sphere
+	vec3 closest=Vec3(
+		fmaxf(aabbMin.x, fminf(sphere->Position.x, aabbMax.x)),
+		fmaxf(aabbMin.y, fminf(sphere->Position.y, aabbMax.y)),
+		fmaxf(aabbMin.z, fminf(sphere->Position.z, aabbMax.z))
+	);
+
+	// Calculate the distance between the closest point and the sphere's center
+	vec3 Normal=Vec3_Subv(closest, sphere->Position);
+
+	float DistanceSq=Vec3_Dot(Normal, Normal);
+
+	// Check if the distance is less than the sphere's radius
+	if(DistanceSq<=sphere->Radius*sphere->Radius&&DistanceSq)
+	{
+		float distance=sqrtf(DistanceSq);
+
+		Normal=Vec3_Muls(Normal, 1.0f/distance);
+
+		const float Penetration=sphere->Radius-distance;
+		vec3 positionImpulse=Vec3_Muls(Normal, Penetration*0.5f);
+
+		sphere->Position=Vec3_Subv(sphere->Position, positionImpulse);
+		aabb->Position=Vec3_Addv(aabb->Position, positionImpulse);
+
+		vec3 contactVelocity=Vec3_Subv(aabb->Velocity, sphere->Velocity);
+
+		const float totalMass=sphere->invMass+aabb->invMass;
+		const float Restitution=0.6f;
+		const float VdotN=Vec3_Dot(contactVelocity, Normal);
+		float j=(-(1.0f+Restitution)*VdotN)/totalMass;
+
+		sphere->Velocity=Vec3_Subv(sphere->Velocity, Vec3_Muls(Normal, j*sphere->invMass));
+		aabb->Velocity=Vec3_Addv(aabb->Velocity, Vec3_Muls(Normal, j*aabb->invMass));
+	}
+}
+
 // Camera<->Rigid body collision detection and response
 void PhysicsCameraToSphereCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
 {
@@ -137,7 +181,7 @@ void PhysicsCameraToSphereCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
 	float radiusSum=Camera->Radius+Body->Radius;
 
 	// Check if the distance is less than the sum of the radii
-	if(DistanceSq<=radiusSum*radiusSum)
+	if(DistanceSq<=radiusSum*radiusSum&&DistanceSq)
 	{
 		float distance=sqrtf(DistanceSq);
 
@@ -162,7 +206,7 @@ void PhysicsCameraToSphereCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
 		const float relVelMag=sqrtf(fabsf(VdotN));
 
 		if(relVelMag>1.0f)
-			Audio_PlaySample(&Sounds[SOUND_CRASH], false, relVelMag/50.0f, &Camera->Position);
+			Audio_PlaySample(&Sounds[SOUND_CRASH], false, relVelMag/50.0f, &Body->Position);
 	}
 }
 
@@ -194,7 +238,7 @@ void PhysicsParticleToSphereCollisionResponse(Particle_t *Particle, RigidBody_t 
 	float radiusSum=Particle_Radius+Body->Radius;
 
 	// Check if the distance is less than the sum of the radii
-	if(DistanceSq<=radiusSum*radiusSum)
+	if(DistanceSq<=radiusSum*radiusSum&&DistanceSq)
 	{
 		float distance=sqrtf(DistanceSq);
 

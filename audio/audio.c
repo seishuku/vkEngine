@@ -45,7 +45,7 @@ void Spatialize(vec3 origin, uint8_t *left_vol, uint8_t *right_vol)
     const float dist_mult=1.0f/500.0f;
 
     // Distance from listener to sound source
-    vec3 source_vec=Vec3_Subv(origin, listener_origin);
+    vec3 source_vec=Vec3_Subv(listener_origin, origin);
 
     float dist=(Vec3_Normalize(&source_vec)-MAX_VOLUME)*dist_mult;
 
