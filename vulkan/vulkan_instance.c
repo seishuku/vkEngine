@@ -115,16 +115,16 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 		.pApplicationInfo=&AppInfo,
 		.enabledExtensionCount=sizeof(Extensions)/sizeof(void *),
 		.ppEnabledExtensionNames=Extensions,
-//#ifdef _DEBUG
-//		.pNext=&(VkValidationFeaturesEXT)
-//		{
-//			.sType=VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
-//			.pEnabledValidationFeatures=enabledValidationFeatures,
-//			.enabledValidationFeatureCount=sizeof(enabledValidationFeatures)/sizeof(VkValidationFeatureEnableEXT),
-//		},
-//		.enabledLayerCount=1,
-//		.ppEnabledLayerNames=(const char *[]) { "VK_LAYER_KHRONOS_validation" },
-//#endif
+#ifdef _DEBUG
+		//.pNext=&(VkValidationFeaturesEXT)
+		//{
+		//	.sType=VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
+		//	.pEnabledValidationFeatures=enabledValidationFeatures,
+		//	.enabledValidationFeatureCount=sizeof(enabledValidationFeatures)/sizeof(VkValidationFeatureEnableEXT),
+		//},
+		.enabledLayerCount=1,
+		.ppEnabledLayerNames=(const char *[]) { "VK_LAYER_KHRONOS_validation" },
+#endif
 	};
 
 	if(vkCreateInstance(&InstanceInfo, 0, Instance)!=VK_SUCCESS)

@@ -5,6 +5,7 @@
 #include "vulkan/vulkan.h"
 #include "math/math.h"
 #include "font/font.h"
+#include "camera/camera.h"
 #include "perframe.h"
 
 extern VkuContext_t Context;
@@ -16,12 +17,18 @@ extern uint32_t Width, Height;
 extern bool IsVR;
 
 extern float fps, fTimeStep;
+extern double physicsTime;
 
 extern VkFormat ColorFormat;
+
+extern uint32_t connectedClients;
+extern Camera_t NetCameras[];
 
 VkuImage_t ColorResolve[2];		// left and right eye MSAA resolve color buffer
 VkuImage_t ColorBlur[2];		// left and right eye blur color buffer
 VkuImage_t ColorTemp[2];		// left and right eye blur color buffer
+
+extern VkuImage_t ShadowDepth;
 
 VkuDescriptorSet_t CompositeDescriptorSet;
 VkPipelineLayout CompositePipelineLayout;
@@ -364,6 +371,7 @@ void CompositeDraw(uint32_t Index, uint32_t Eye)
 		vkCmdBindPipeline(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CompositePipeline.Pipeline);
 
 		vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet, 0, &ColorResolve[0]);
+//		vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet, 0, &ShadowDepth);
 		vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet, 1, &ColorBlur[0]);
 
 		if(IsVR)
@@ -378,7 +386,7 @@ void CompositeDraw(uint32_t Index, uint32_t Eye)
 		vkCmdDraw(PerFrame[Index].CommandBuffer, 3, 1, 0, 0);
 
 		// Draw text in the compositing renderpass
-		Font_Print(PerFrame[Index].CommandBuffer, 0, 0.0f, 16.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep);
+		Font_Print(PerFrame[Index].CommandBuffer, 0, 0.0f, 32.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms\nPhysics time: %0.5fms", fps, fTimeStep, physicsTime);
 
 		vkCmdEndRendering(PerFrame[Index].CommandBuffer);
 	}

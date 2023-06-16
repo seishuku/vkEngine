@@ -9,6 +9,14 @@
 #define PI 3.1415926f
 #endif
 
+#ifdef min
+#undef min
+#endif
+
+#ifdef max
+#undef max
+#endif
+
 #ifndef min
 #define min(a, b) ((a)<(b)?(a):(b))
 #endif

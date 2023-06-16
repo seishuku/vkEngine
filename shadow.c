@@ -4,6 +4,7 @@
 #include "system/system.h"
 #include "vulkan/vulkan.h"
 #include "math/math.h"
+#include "camera/camera.h"
 #include "model/bmodel.h"
 #include "models.h"
 #include "skybox.h"
@@ -15,6 +16,7 @@
 extern VkuContext_t Context;
 extern VkuBuffer_t Asteroid_Instance;
 extern float fTime;
+extern Camera_t Camera;
 
 Shadow_UBO_t Shadow_UBO;
 
@@ -169,13 +171,21 @@ void ShadowUpdateMap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 	vkCmdSetViewport(CommandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)ShadowSize, (float)ShadowSize, 0.0f, 1.0f });
 	vkCmdSetScissor(CommandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { ShadowSize, ShadowSize } });
 
-	matrix Projection=MatrixOrtho(-1200.0f, 1200.0f, -1200.0f, 1200.0f, 0.1f, 3000.0f);
+	matrix Projection=MatrixOrtho(-1200.0f, 1200.0f, -1200.0f, 1200.0f, 0.1f, 4000.0f);
 
-	// Janky cast, mate.
-	vec3 Position=Vec3_Muls(*((vec3 *)&PerFrame[FrameIndex].Skybox_UBO[0]->uSunPosition), 200.0f);
+	// Looking at the asteriod field from the sun's position "a number" away
+	// This should technically be an infinite distance away, but that's not possible, so "a number" is whatever best compromise.
+	// (uSubPosition is a vec4, so need to recreate that in a vec3)
+	vec3 Position=Vec3_Muls(Vec3(
+		PerFrame[FrameIndex].Skybox_UBO[0]->uSunPosition.x,
+		PerFrame[FrameIndex].Skybox_UBO[0]->uSunPosition.y,
+		PerFrame[FrameIndex].Skybox_UBO[0]->uSunPosition.z
+	), 3000.0f);
 
-	matrix ModelView=MatrixLookAt(Position, Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f));
+	// Following the camera's position, so we don't have to composite multiple shadow maps or have super large maps.
+	matrix ModelView=MatrixLookAt(Vec3_Addv(Position, Camera.Position), Camera.Position, Vec3(0.0f, 1.0f, 0.0f));
 
+	// Multiply matrices together, so we can just send one matrix as a push constant.
 	Shadow_UBO.mvp=MatrixMult(ModelView, Projection);
 
 	vkCmdBindVertexBuffers(CommandBuffer, 1, 1, &Asteroid_Instance.Buffer, &(VkDeviceSize) { 0 });

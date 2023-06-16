@@ -23,6 +23,9 @@ OBJS+=physics/physics.o
 # camera
 OBJS+=camera/camera.o
 
+# network
+OBJS+=network/network.o
+
 # Vulkan
 OBJS+=vulkan/vulkan_buffer.o
 OBJS+=vulkan/vulkan_context.o

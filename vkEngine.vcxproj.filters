@@ -94,6 +94,12 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{eef3467f-4d2b-4c5b-9256-274c7ce27ad9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\network">
+      <UniqueIdentifier>{269fa318-8911-4d73-958d-6cf560965320}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\network">
+      <UniqueIdentifier>{7cb6b49a-d263-44d7-b222-ebbb89970fdc}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="audio\audio.h">
@@ -170,6 +176,9 @@
     </ClInclude>
     <ClInclude Include="nebula.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="network\network.h">
+      <Filter>Header Files\network</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -290,6 +299,9 @@
     <ClCompile Include="nebula.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="network\network.c">
+      <Filter>Source Files\network</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <GLSL Include="shaders\bezier.frag">
@@ -350,6 +362,18 @@
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\volume.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\sphere.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\sphere.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\line.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\line.vert">
       <Filter>Shaders</Filter>
     </GLSL>
   </ItemGroup>

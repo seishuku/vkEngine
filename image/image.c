@@ -13,8 +13,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include "../system/system.h"
-#include "../math/math.h"
 #include "../vulkan/vulkan.h"
+#include "../math/math.h"
 #include "image.h"
 
 // _MakeNormalMap, internal function used by Image_Upload.

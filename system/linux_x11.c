@@ -1,6 +1,7 @@
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <sys/time.h>
+#include <time.h>
 #include <strings.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,50 +33,21 @@ extern VkuSwapchain_t Swapchain;
 extern uint32_t Width, Height;
 extern Camera_t Camera;
 
-uint64_t Frequency, StartTime, EndTime;
-float avgfps=0.0f, fps=0.0f, fTimeStep, fTime=0.0f;
+float fps=0.0f, fTimeStep, fTime=0.0f;
 
 void Render(void);
 bool Init(void);
 void RecreateSwapchain(void);
 void Destroy(void);
 
-uint64_t rdtsc(void)
+double GetClock(void)
 {
-	uint32_t l, h;
+	struct timespec ts;
 
-	__asm__ __volatile__ ("rdtsc" : "=a" (l), "=d" (h));
+	if(!clock_gettime(CLOCK_MONOTONIC, &ts))
+		return ts.tv_sec+(double)ts.tv_nsec/1000000000.0;
 
-	return (uint64_t)l|((uint64_t)h<<32);
-}
-
-uint64_t GetFrequency(void)
-{
-	uint64_t StartTicks, StopTicks;
-	struct timeval TimeStart, TimeStop;
-	volatile uint32_t i;
-
-	gettimeofday(&TimeStart, NULL);
-	StartTicks=rdtsc();
-
-	for(i=0;i<1000000;i++);
-
-	StopTicks=rdtsc();
-	gettimeofday(&TimeStop, NULL);
-
-	return (StopTicks-StartTicks)*1000000/(TimeStop.tv_usec-TimeStart.tv_usec);
-}
-
-void DelayUS(uint64_t us)
-{
-	struct timeval TimeStart, TimeCurrent;
-
-	gettimeofday(&TimeStart, NULL);
-
-	do
-	{
-		gettimeofday(&TimeCurrent, NULL);
-	} while((TimeCurrent.tv_usec-TimeStart.tv_usec)<us);
+	return 0.0;
 }
 
 void EventLoop(void)
@@ -301,16 +273,13 @@ void EventLoop(void)
 			}
 		}
 
-		StartTime=rdtsc();
+		static float avgfps=0.0f;
+
+		double StartTime=GetClock();
 		Render();
-		EndTime=rdtsc();
 
-		// Total screen time in seconds
-		fTimeStep=(float)(EndTime-StartTime)/Frequency;
-		// Running time
+		fTimeStep=(float)(GetClock()-StartTime);
 		fTime+=fTimeStep;
-
-		// Accumulate frames per second
 		avgfps+=1.0f/fTimeStep;
 
 		// Average over 100 frames
@@ -397,9 +366,6 @@ int main(int argc, char **argv)
 	}
 
 	XMapWindow(Context.Dpy, Context.Win);
-
-	Frequency=GetFrequency();
-	DBGPRINTF(DEBUG_INFO, "\nCPU freqency: %0.2fGHz\n", (float)Frequency/1000000000);
 
 	DBGPRINTF(DEBUG_WARNING, "\nCurrent system zone memory allocations:\n");
 	Zone_Print(Zone);

@@ -5,6 +5,7 @@
 #include <stdalign.h>
 #include <string.h>
 #include "system/system.h"
+#include "network/network.h"
 #include "vulkan/vulkan.h"
 #include "math/math.h"
 #include "camera/camera.h"
@@ -81,6 +82,14 @@ VkPipelineLayout PipelineLayout;
 VkuPipeline_t Pipeline;
 //////
 
+// Debug rendering vulkan stuff
+VkPipelineLayout SpherePipelineLayout;
+VkuPipeline_t SpherePipeline;
+
+VkPipelineLayout LinePipelineLayout;
+VkuPipeline_t LinePipeline;
+//////
+
 // Asteroid data
 VkuBuffer_t Asteroid_Instance;
 
@@ -104,6 +113,56 @@ typedef struct
 ThreadData_t ThreadData[NUM_THREADS];
 ThreadWorker_t Thread[NUM_THREADS], ThreadPhysics;
 pthread_barrier_t ThreadBarrier, ThreadBarrier_Physics;
+//////
+
+// Network stuff
+#define CONNECT_PACKETMAGIC		('C'|('O'<<8)|('N'<<16)|('N'<<24))
+#define DISCONNECT_PACKETMAGIC	('D'|('I'<<8)|('S'<<16)|('C'<<24))
+#define STATUS_PACKETMAGIC		('S'|('t'<<8)|('A'<<16)|('t'<<24))
+#define MAX_CLIENTS 16
+
+// PacketMagic determines packet type
+// Connect: Client sends packet with CONNECT magic, slot/seed 0, address/port is server's address and port, server sends back address/port, current random seed and slot
+// Disconnect: Client sends packet with DISCONNECT magic, server just closes socket and client shuts down
+// Status: Client sends packet with STATUS magic, server sends back all other client statuses?
+
+// Camera data for sending over the network
+typedef struct
+{
+	vec3 Position;
+	vec3 Velocity;
+	vec3 Forward, Up;
+} NetCamera_t;
+
+// Connect data when connecting to server
+typedef struct
+{
+	uint32_t Seed;
+	uint16_t Port;
+} NetConnect_t;
+
+// Overall data network packet
+typedef struct
+{
+	uint32_t PacketMagic;
+	uint32_t ClientID;
+	union
+	{
+		NetConnect_t Connect;
+		NetCamera_t Camera;
+	};
+} NetworkPacket_t;
+
+uint32_t ServerAddress=NETWORK_ADDRESS(192, 168, 1, 10);
+uint16_t ServerPort=4545;
+
+uint16_t ClientPort=0;
+uint32_t ClientID=0;
+
+Socket_t ClientSocket=-1;
+
+uint32_t connectedClients=0;
+Camera_t NetCameras[MAX_CLIENTS];
 //////
 
 void RecreateSwapchain(void);
@@ -220,10 +279,21 @@ void GenerateSkyParams(void)
 	Skybox_UBO.uSunPosition=Vec4(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
 	Vec4_Normalize(&Skybox_UBO.uSunPosition);
 
-	const float MaxSun=5.0f;
-	Skybox_UBO.uSunColor=Vec4(min(MaxSun, RandFloat()*MaxSun+0.5f), min(MaxSun, RandFloat()*MaxSun+0.5f), min(MaxSun, RandFloat()*MaxSun+0.5f), 0.0f);
-	Skybox_UBO.uSunSize=1.0f/(RandFloat()*1000.0f+100.0f);
-	Skybox_UBO.uSunFalloff=RandFloat()*16.0f+8.0f;
+	const float MinSunBrightness=0.5f;
+	const float MaxSunBrightness=5.0f;
+	const float MinSunSize=100.0f;
+	const float MaxSunSize=1000.0f;
+	const float MinSunFalloff=8.0f;
+	const float MaxSunFalloff=16.0f;
+
+	Skybox_UBO.uSunColor=Vec4(
+		RandFloat()*(MaxSunBrightness-MinSunBrightness)+MinSunBrightness,
+		RandFloat()*(MaxSunBrightness-MinSunBrightness)+MinSunBrightness,
+		RandFloat()*(MaxSunBrightness-MinSunBrightness)+MinSunBrightness,
+		0.0f
+	);
+	Skybox_UBO.uSunSize=1.0f/(RandFloat()*(MaxSunSize-MinSunSize)+MinSunSize);
+	Skybox_UBO.uSunFalloff=RandFloat()*(MaxSunFalloff-MinSunFalloff)+MinSunFalloff;
 
 	Skybox_UBO.uStarsScale=200.0f;
 	Skybox_UBO.uStarDensity=8.0f;
@@ -237,7 +307,7 @@ void GenerateSkyParams(void)
 
 	// Set up rigid body reps for asteroids
 	const float AsteroidFieldMinRadius=50.0f;
-	const float AsteroidFieldMaxRadius=4000.0f;
+	const float AsteroidFieldMaxRadius=1000.0f;
 	const float AsteroidMinRadius=0.05f;
 	const float AsteroidMaxRadius=40.0f;
 
@@ -305,6 +375,98 @@ void GenerateSkyParams(void)
 
 	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
 	//////
+}
+//////
+
+// Debug sphere pipeline
+bool CreateSpherePipeline(void)
+{
+	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+			.pushConstantRangeCount=1,
+			.pPushConstantRanges=&(VkPushConstantRange)
+		{
+			.offset=0,
+				.size=sizeof(matrix)+sizeof(vec4),
+				.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
+	}, 0, &SpherePipelineLayout);
+
+	vkuInitPipeline(&SpherePipeline, &Context);
+
+	vkuPipeline_SetPipelineLayout(&SpherePipeline, SpherePipelineLayout);
+
+	SpherePipeline.DepthTest=VK_TRUE;
+	SpherePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+	SpherePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
+	SpherePipeline.RasterizationSamples=MSAA;
+	SpherePipeline.PolygonMode=VK_POLYGON_MODE_LINE;
+
+	if(!vkuPipeline_AddStage(&SpherePipeline, "./shaders/sphere.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+		return false;
+
+	if(!vkuPipeline_AddStage(&SpherePipeline, "./shaders/sphere.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+		return false;
+
+	VkPipelineRenderingCreateInfo PipelineRenderingCreateInfo=
+	{
+		.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+		.colorAttachmentCount=1,
+		.pColorAttachmentFormats=&ColorFormat,
+		.depthAttachmentFormat=DepthFormat,
+	};
+
+	if(!vkuAssemblePipeline(&SpherePipeline, &PipelineRenderingCreateInfo))
+		return false;
+
+	return true;
+}
+//////
+
+// Debug line pipeline
+bool CreateLinePipeline(void)
+{
+	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+			.pushConstantRangeCount=1,
+			.pPushConstantRanges=&(VkPushConstantRange)
+		{
+			.offset=0,
+				.size=sizeof(matrix)+(sizeof(vec4)*2),
+				.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
+	}, 0, &LinePipelineLayout);
+
+	vkuInitPipeline(&LinePipeline, &Context);
+
+	vkuPipeline_SetPipelineLayout(&LinePipeline, LinePipelineLayout);
+
+	LinePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+	LinePipeline.DepthTest=VK_TRUE;
+	LinePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+	LinePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
+	LinePipeline.RasterizationSamples=MSAA;
+
+	if(!vkuPipeline_AddStage(&LinePipeline, "./shaders/line.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+		return false;
+
+	if(!vkuPipeline_AddStage(&LinePipeline, "./shaders/line.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+		return false;
+
+	VkPipelineRenderingCreateInfo PipelineRenderingCreateInfo=
+	{
+		.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+		.colorAttachmentCount=1,
+		.pColorAttachmentFormats=&ColorFormat,
+		.depthAttachmentFormat=DepthFormat,
+	};
+	
+	if(!vkuAssemblePipeline(&LinePipeline, &PipelineRenderingCreateInfo))
+		return false;
+
+	return true;
 }
 //////
 
@@ -437,6 +599,49 @@ void Thread_Main(void *Arg)
 			vkCmdBindIndexBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Models[i].Mesh[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Models[i].Mesh[j].NumFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*i);
 		}
+	}
+
+	for(uint32_t i=0;i<MAX_CLIENTS;i++)
+	{
+		if(i==ClientID)
+			continue;
+
+		struct
+		{
+			matrix mvp;
+			vec4 start, end;
+		} line_ubo;
+
+		line_ubo.mvp=MatrixMult(PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
+
+		vec4 position=Vec4(NetCameras[i].Position.x, NetCameras[i].Position.y, NetCameras[i].Position.z, 1.0f);
+		vec4 forward=Vec4(NetCameras[i].Forward.x, NetCameras[i].Forward.y, NetCameras[i].Forward.z, 1.0f);
+
+		line_ubo.start=position;
+		line_ubo.end=Vec4_Addv(position, Vec4_Muls(forward, 30.0f));
+
+		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, LinePipeline.Pipeline);
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
+		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
+
+		struct
+		{
+			matrix mvp;
+			vec4 color;
+		} sphere_ubo;
+
+		matrix local=MatrixIdentity();
+		local=MatrixMult(local, MatrixScale(10.0f, 10.0f, 10.0f));
+		local=MatrixMult(local, MatrixAlignPoints(NetCameras[i].Position, Vec3_Addv(NetCameras[i].Position, NetCameras[i].Forward), NetCameras[i].Up));
+
+		local=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview);
+		sphere_ubo.mvp=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
+
+		sphere_ubo.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, SpherePipeline.Pipeline);
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], SpherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(sphere_ubo), &sphere_ubo);
+		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 60, 1, 0, 0);
 	}
 
 	vkEndCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye]);
@@ -614,9 +819,13 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	vkCmdEndRendering(CommandBuffer);
 }
 
+double physicsTime=0.0;
+
 // Runs anything physics related
 void Thread_Physics(void *Arg)
 {
+	double startTime=GetClock();
+
 	// Get a pointer to the emitter that's providing the positions
 	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
 
@@ -679,8 +888,64 @@ void Thread_Physics(void *Arg)
 	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
 	//////
 
+	// Network status packet
+	if(ClientSocket!=-1)
+	{
+		NetworkPacket_t StatusPacket;
+
+		memset(&StatusPacket, 0, sizeof(NetworkPacket_t));
+
+		StatusPacket.PacketMagic=STATUS_PACKETMAGIC;
+		StatusPacket.ClientID=ClientID;
+
+		StatusPacket.Camera.Position=Camera.Position;
+		StatusPacket.Camera.Velocity=Camera.Velocity;
+		StatusPacket.Camera.Forward=Camera.Forward;
+		StatusPacket.Camera.Up=Camera.Up;
+
+		Network_SocketSend(ClientSocket, (uint8_t *)&StatusPacket, sizeof(NetworkPacket_t), ServerAddress, ServerPort);
+	}
+	//////
+
+	physicsTime=GetClock()-startTime;
+
 	// Barrier now that we're done here
 	pthread_barrier_wait(&ThreadBarrier_Physics);
+}
+
+pthread_t UpdateThread;
+bool NetUpdate_Run=true;
+
+void *NetUpdate(void *Arg)
+{
+	memset(NetCameras, 0, sizeof(Camera_t)*MAX_CLIENTS);
+
+	while(NetUpdate_Run)
+	{
+		uint8_t Buffer[1024], *pBuffer=Buffer;
+		uint32_t Magic=0;
+		uint32_t Address=0;
+		uint16_t Port=0;
+
+		Network_SocketReceive(ClientSocket, Buffer, sizeof(Buffer), &Address, &Port);
+
+		memcpy(&Magic, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
+
+		if(Magic==STATUS_PACKETMAGIC)
+		{
+			uint32_t clientID=0;
+			memcpy(&clientID, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
+
+			memcpy(&NetCameras[clientID].Position, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
+			memcpy(&NetCameras[clientID].Velocity, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
+			memcpy(&NetCameras[clientID].Forward, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
+			memcpy(&NetCameras[clientID].Up, pBuffer, sizeof(float)*3);			pBuffer+=sizeof(float)*3;
+
+			DBGPRINTF(DEBUG_INFO, "\033[%d;0H\033[KID %d Pos: %0.1f %0.1f %0.1f", clientID+1, clientID, NetCameras[clientID].Position.x, NetCameras[clientID].Position.y, NetCameras[clientID].Position.z);
+		}
+	}
+
+	return NULL;
 }
 
 // Render call from system main event loop
@@ -918,6 +1183,9 @@ bool Init(void)
 	CreateSkyboxPipeline();
 	GenerateSkyParams();
 
+	CreateSpherePipeline();
+	CreateLinePipeline();
+
 	// Create volumetric rendering pipeline
 	CreateVolumePipeline();
 
@@ -1023,6 +1291,63 @@ bool Init(void)
 	Thread_Start(&ThreadPhysics);
 	pthread_barrier_init(&ThreadBarrier_Physics, NULL, 2);
 
+
+#if 1
+	// Initalize the network API (mainly for winsock)
+	Network_Init();
+
+	// Create a new socket
+	ClientSocket=Network_CreateSocket();
+
+	if(ClientSocket==-1)
+		return false;
+
+	// Send connect magic to initiate connection
+	uint32_t Magic=CONNECT_PACKETMAGIC;
+	if(!Network_SocketSend(ClientSocket, (uint8_t *)&Magic, sizeof(uint32_t), ServerAddress, ServerPort))
+		return false;
+
+	uint32_t Timeout=UINT16_MAX*4;
+	bool Response=false;
+
+	while(!Response)
+	{
+		uint32_t Address=0;
+		uint16_t Port=0;
+		NetworkPacket_t ResponsePacket;
+
+		memset(&ResponsePacket, 0, sizeof(NetworkPacket_t));
+
+		if(Network_SocketReceive(ClientSocket, (uint8_t *)&ResponsePacket, sizeof(NetworkPacket_t), &Address, &Port)>0)
+		{
+			if(ResponsePacket.PacketMagic==CONNECT_PACKETMAGIC)
+			{
+				DBGPRINTF(DEBUG_INFO, "Magic: 0x%X ID: %d Seed: %d Port: %d Address: 0x%X Port: %d\n",
+						  ResponsePacket.PacketMagic,
+						  ResponsePacket.ClientID,
+						  ResponsePacket.Connect.Seed,
+						  ResponsePacket.Connect.Port,
+						  Address,
+						  Port);
+
+				srand(ResponsePacket.Connect.Seed);
+				ClientPort=ResponsePacket.Connect.Port;
+				ClientID=ResponsePacket.ClientID;
+				Response=true;
+			}
+		}
+
+		//Timeout--;
+		//if(Timeout==0)
+		//{
+		//	DBGPRINTF("Connection timed out...\n");
+		//	break;
+		//}
+	}
+#endif
+
+	pthread_create(&UpdateThread, NULL, NetUpdate, NULL);
+
 	return true;
 }
 
@@ -1078,6 +1403,14 @@ void RecreateSwapchain(void)
 void Destroy(void)
 {
 	vkDeviceWaitIdle(Context.Device);
+
+	NetUpdate_Run=false;
+	pthread_join(UpdateThread, NULL);
+
+	// Send disconnect message to server and close/destroy network stuff
+	Network_SocketSend(ClientSocket, (uint8_t *)&(NetworkPacket_t) { .ClientID=ClientID, .PacketMagic=DISCONNECT_PACKETMAGIC }, sizeof(NetworkPacket_t), ServerAddress, ServerPort);
+	Network_SocketClose(ClientSocket);
+	Network_Destroy();
 
 	Audio_Destroy();
 

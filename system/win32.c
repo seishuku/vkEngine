@@ -33,50 +33,24 @@ extern uint32_t Width, Height;
 
 extern Camera_t Camera;
 
-uint64_t Frequency, StartTime, EndTime;
-float avgfps=0.0f, fps=0.0f, fTimeStep, fTime=0.0f;
-uint32_t Frames=0;
+float fps=0.0f, fTimeStep, fTime=0.0f;
 
-void GenerateSkyParams(void);
 void Render(void);
 bool Init(void);
 void RecreateSwapchain(void);
 void Destroy(void);
 
-uint64_t rdtsc(void)
+double GetClock(void)
 {
-	return __rdtsc();
-}
+	static uint64_t Frequency=0;
+	uint64_t Count;
 
-uint64_t GetFrequency(void)
-{
-	uint64_t TimeStart, TimeStop, TimeFreq;
+	if(!Frequency)
+		QueryPerformanceFrequency((LARGE_INTEGER *)&Frequency);
 
-	QueryPerformanceFrequency((LARGE_INTEGER *)&TimeFreq);
+	QueryPerformanceCounter((LARGE_INTEGER *)&Count);
 
-	QueryPerformanceCounter((LARGE_INTEGER *)&TimeStart);
-	uint64_t StartTicks=rdtsc();
-
-	for(volatile uint64_t i=0;i<1000000;i++);
-
-	uint64_t StopTicks=rdtsc();
-	QueryPerformanceCounter((LARGE_INTEGER *)&TimeStop);
-
-	return (StopTicks-StartTicks)*TimeFreq/(TimeStop-TimeStart);
-}
-
-void DelayUS(uint64_t us)
-{
-	uint64_t TimeStart=0, TimeCurrent=0, TimeFreq=0;
-
-	QueryPerformanceFrequency((LARGE_INTEGER *)&TimeFreq);
-	QueryPerformanceCounter((LARGE_INTEGER *)&TimeStart);
-	TimeFreq=(uint64_t)(((double)us/1000000)*TimeFreq);
-
-	do
-	{
-		QueryPerformanceCounter((LARGE_INTEGER *)&TimeCurrent);
-	} while((TimeCurrent-TimeStart)<TimeFreq);
+	return (double)Count/Frequency;
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -448,9 +422,6 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	Frequency=GetFrequency();
-	DBGPRINTF(DEBUG_INFO, "\nCPU freqency: %0.2fGHz\n", (float)Frequency/1000000000);
-
 	DBGPRINTF(DEBUG_INFO, "\nCurrent system zone memory allocations:\n");
 	Zone_Print(Zone);
 
@@ -474,14 +445,17 @@ int main(int argc, char **argv)
 		}
 		else
 		{
-			StartTime=rdtsc();
-			Render();
-			EndTime=rdtsc();
+			static float avgfps=0.0f;
 
-			fTimeStep=(float)(EndTime-StartTime)/Frequency;
+			double StartTime=GetClock();
+			Render();
+
+			fTimeStep=(float)(GetClock()-StartTime);
 			fTime+=fTimeStep;
+
 			avgfps+=1.0f/fTimeStep;
 
+			static uint32_t Frames=0;
 			if(Frames++>100)
 			{
 				fps=avgfps/Frames;

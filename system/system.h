@@ -1,6 +1,10 @@
 #ifndef __SYSTEM_H__
 #define __SYSTEM_H__
 
+#include <stdint.h>
+#include <stdio.h>
+#include "../utils/memzone.h"
+
 #ifndef DEBUG_ERROR
 #define DEBUG_ERROR "\x1B[91m"
 #endif
@@ -25,12 +29,8 @@
 #define BUFFER_OFFSET(x) ((char *)NULL+(x))
 #endif
 
-#include <stdint.h>
-#include "../utils/memzone.h"
-
 extern MemZone_t *Zone;
 
-uint64_t GetFrequency(void);
-void DelayUS(uint64_t us);
+double GetClock(void);
 
 #endif

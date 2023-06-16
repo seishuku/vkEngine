@@ -385,7 +385,6 @@ int32_t CameraLoadPath(char *filename, CameraPath_t *Path)
 	{
 		Zone_Free(Zone, Path->Position);
 		Zone_Free(Zone, Path->View);
-		fclose(stream);
 
 		return 0;
 	}
