@@ -153,7 +153,7 @@ typedef struct
 	};
 } NetworkPacket_t;
 
-uint32_t ServerAddress=NETWORK_ADDRESS(192, 168, 1, 10);
+uint32_t ServerAddress=NETWORK_ADDRESS(172, 26, 218, 132);
 uint16_t ServerPort=4545;
 
 uint16_t ClientPort=0;
@@ -601,10 +601,14 @@ void Thread_Main(void *Arg)
 		}
 	}
 
-	for(uint32_t i=0;i<MAX_CLIENTS;i++)
+	// Draw some simple geometry to represent other client cameras
+	for(uint32_t i=0;i<connectedClients;i++)
 	{
+		// Only draw others, not ourself
 		if(i==ClientID)
 			continue;
+
+		// Note: These draw calls don't have any external geometry attached, it's in the vertex shader.
 
 		struct
 		{
@@ -643,6 +647,7 @@ void Thread_Main(void *Arg)
 		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], SpherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(sphere_ubo), &sphere_ubo);
 		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 60, 1, 0, 0);
 	}
+	//////
 
 	vkEndCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye]);
 
@@ -859,7 +864,13 @@ void Thread_Physics(void *Arg)
 
 		// Check asteroids against the camera
 		PhysicsCameraToSphereCollisionResponse(&Camera, &Asteroids[i]);
-	
+
+		for(uint32_t j=0;j<connectedClients;j++)
+		{
+			if(j!=ClientID)
+				PhysicsCameraToSphereCollisionResponse(&NetCameras[j], &Asteroids[i]);
+		}
+
 		// Check asteroids against projectile particles
 		// Emitter '0' on the particle system contains particles that drive the projectile physics
 		ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
@@ -870,6 +881,12 @@ void Thread_Physics(void *Arg)
 			if(Emitter->Particles[j].ID!=Emitter->ID)
 				PhysicsParticleToSphereCollisionResponse(&Emitter->Particles[j], &Asteroids[i]);
 		}
+	}
+
+	for(uint32_t i=0;i<connectedClients;i++)
+	{
+		if(i!=ClientID)
+			PhysicsCameraToCameraCollisionResponse(&Camera, &NetCameras[i]);
 	}
 	//////
 
@@ -930,18 +947,23 @@ void *NetUpdate(void *Arg)
 		Network_SocketReceive(ClientSocket, Buffer, sizeof(Buffer), &Address, &Port);
 
 		memcpy(&Magic, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
+		memcpy(&connectedClients, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
 
 		if(Magic==STATUS_PACKETMAGIC)
 		{
-			uint32_t clientID=0;
-			memcpy(&clientID, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
+			for(uint32_t i=0;i<connectedClients;i++)
+			{
+				uint32_t clientID=0;
 
-			memcpy(&NetCameras[clientID].Position, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-			memcpy(&NetCameras[clientID].Velocity, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-			memcpy(&NetCameras[clientID].Forward, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-			memcpy(&NetCameras[clientID].Up, pBuffer, sizeof(float)*3);			pBuffer+=sizeof(float)*3;
+				memcpy(&clientID, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
 
-			DBGPRINTF(DEBUG_INFO, "\033[%d;0H\033[KID %d Pos: %0.1f %0.1f %0.1f", clientID+1, clientID, NetCameras[clientID].Position.x, NetCameras[clientID].Position.y, NetCameras[clientID].Position.z);
+				memcpy(&NetCameras[clientID].Position, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
+				memcpy(&NetCameras[clientID].Velocity, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
+				memcpy(&NetCameras[clientID].Forward, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
+				memcpy(&NetCameras[clientID].Up, pBuffer, sizeof(float)*3);			pBuffer+=sizeof(float)*3;
+
+				//DBGPRINTF(DEBUG_INFO, "\033[%d;0H\033[KID %d Pos: %0.1f %0.1f %0.1f", clientID+1, clientID, NetCameras[clientID].Position.x, NetCameras[clientID].Position.y, NetCameras[clientID].Position.z);
+			}
 		}
 	}
 

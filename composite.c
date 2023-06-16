@@ -21,9 +21,6 @@ extern double physicsTime;
 
 extern VkFormat ColorFormat;
 
-extern uint32_t connectedClients;
-extern Camera_t NetCameras[];
-
 VkuImage_t ColorResolve[2];		// left and right eye MSAA resolve color buffer
 VkuImage_t ColorBlur[2];		// left and right eye blur color buffer
 VkuImage_t ColorTemp[2];		// left and right eye blur color buffer

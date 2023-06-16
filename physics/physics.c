@@ -210,6 +210,50 @@ void PhysicsCameraToSphereCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
 	}
 }
 
+void PhysicsCameraToCameraCollisionResponse(Camera_t *CameraA, Camera_t *CameraB)
+{
+	// Camera mass constants, since camera struct doesn't store these
+	const float Camera_Mass=100.0f;
+	const float Camera_invMass=1.0f/Camera_Mass;
+
+	// Calculate the distance between the camera and the sphere's center
+	vec3 Normal=Vec3_Subv(CameraB->Position, CameraA->Position);
+
+	float DistanceSq=Vec3_Dot(Normal, Normal);
+
+	// Sum of radii
+	float radiusSum=CameraA->Radius+CameraB->Radius;
+
+	// Check if the distance is less than the sum of the radii
+	if(DistanceSq<=radiusSum*radiusSum&&DistanceSq)
+	{
+		float distance=sqrtf(DistanceSq);
+
+		Normal=Vec3_Muls(Normal, 1.0f/distance);
+
+		const float Penetration=radiusSum-distance;
+		vec3 positionImpulse=Vec3_Muls(Normal, Penetration*0.5f);
+
+		CameraA->Position=Vec3_Subv(CameraA->Position, positionImpulse);
+		CameraB->Position=Vec3_Addv(CameraB->Position, positionImpulse);
+
+		vec3 contactVelocity=Vec3_Subv(CameraB->Velocity, CameraA->Velocity);
+
+		const float totalMass=Camera_invMass+Camera_invMass;
+		const float Restitution=0.66f;
+		const float VdotN=Vec3_Dot(contactVelocity, Normal);
+		float j=(-(1.0f+Restitution)*VdotN)/totalMass;
+
+		CameraA->Velocity=Vec3_Subv(CameraA->Velocity, Vec3_Muls(Normal, j*Camera_invMass));
+		CameraB->Velocity=Vec3_Addv(CameraB->Velocity, Vec3_Muls(Normal, j*Camera_invMass));
+
+		const float relVelMag=sqrtf(fabsf(VdotN));
+
+		if(relVelMag>1.0f)
+			Audio_PlaySample(&Sounds[SOUND_CRASH], false, relVelMag/50.0f, &CameraB->Position);
+	}
+}
+
 void ExplodeEmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle)
 {
 	Particle->pos=Vec3b(0.0f);

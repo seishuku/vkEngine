@@ -24,6 +24,7 @@ void PhysicsIntegrate(RigidBody_t *body, float dt);
 void PhysicsExplode(RigidBody_t *bodies);
 void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b);
 void PhysicsCameraToSphereCollisionResponse(Camera_t *Camera, RigidBody_t *Body);
+void PhysicsCameraToCameraCollisionResponse(Camera_t *CameraA, Camera_t *CameraB);
 void PhysicsParticleToSphereCollisionResponse(Particle_t *Particle, RigidBody_t *Body);
 
 #endif
