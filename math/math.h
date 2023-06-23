@@ -112,6 +112,8 @@ inline float rad2deg(const float x)
 
 float fact(const int32_t n);
 
+void RandomSeed(uint32_t Seed);
+uint32_t Random(void);
 float RandFloat(void);
 int32_t RandRange(int32_t min, int32_t max);
 uint32_t IsPower2(uint32_t value);

@@ -3,6 +3,7 @@
 layout (push_constant) uniform ubo
 {
 	mat4 mvp;
+	vec4 Color;
 	vec4 Verts[2];
 };
 

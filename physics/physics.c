@@ -262,7 +262,7 @@ void ExplodeEmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *P
 	Vec3_Normalize(&Particle->vel);
 	Particle->vel=Vec3_Muls(Particle->vel, RandFloat()*50.0f);
 
-	Particle->life=((float)rand()/RAND_MAX)*0.5f+0.01f;
+	Particle->life=RandFloat()*0.5f+0.01f;
 }
 
 // Particle<->Rigid body collision detection and response

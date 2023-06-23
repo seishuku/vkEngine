@@ -12,5 +12,5 @@ layout(location=0) out vec4 Output;
 
 void main()
 {
-    Output=color;
+    Output=Color;
 }

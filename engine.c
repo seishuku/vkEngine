@@ -111,26 +111,33 @@ typedef struct
 
 #define NUM_THREADS 3
 ThreadData_t ThreadData[NUM_THREADS];
-ThreadWorker_t Thread[NUM_THREADS], ThreadPhysics;
+ThreadWorker_t Thread[NUM_THREADS], ThreadPhysics, ThreadNetUpdate;
 pthread_barrier_t ThreadBarrier, ThreadBarrier_Physics;
 //////
 
 // Network stuff
-#define CONNECT_PACKETMAGIC		('C'|('O'<<8)|('N'<<16)|('N'<<24))
-#define DISCONNECT_PACKETMAGIC	('D'|('I'<<8)|('S'<<16)|('C'<<24))
-#define STATUS_PACKETMAGIC		('S'|('t'<<8)|('A'<<16)|('t'<<24))
+#define CONNECT_PACKETMAGIC		('C'|('o'<<8)|('n'<<16)|('n'<<24)) // "Conn"
+#define DISCONNECT_PACKETMAGIC	('D'|('i'<<8)|('s'<<16)|('C'<<24)) // "DisC"
+#define STATUS_PACKETMAGIC		('S'|('t'<<8)|('a'<<16)|('t'<<24)) // "Stat"
+#define FIELD_PACKETMAGIC		('F'|('e'<<8)|('l'<<16)|('d'<<24)) // "Feld"
 #define MAX_CLIENTS 16
 
-// PacketMagic determines packet type
-// Connect: Client sends packet with CONNECT magic, slot/seed 0, address/port is server's address and port, server sends back address/port, current random seed and slot
-// Disconnect: Client sends packet with DISCONNECT magic, server just closes socket and client shuts down
-// Status: Client sends packet with STATUS magic, server sends back all other client statuses?
+// PacketMagic determines packet type:
+//
+// Connect:
+//		Client sends connect magic, server responds back with current random seed and slot.
+// Disconnect:
+//		Client sends disconnect magic, server closes socket and removes client from list.
+// Status:
+//		Client to server: Sends current camera data
+//		Server to client: Sends all current connected client cameras.
+// Field:
+//		Server sends current play field (as it sees it) to all connected clients at a regular interval.
 
 // Camera data for sending over the network
 typedef struct
 {
-	vec3 Position;
-	vec3 Velocity;
+	vec3 Position, Velocity;
 	vec3 Forward, Up;
 } NetCamera_t;
 
@@ -153,7 +160,7 @@ typedef struct
 	};
 } NetworkPacket_t;
 
-uint32_t ServerAddress=NETWORK_ADDRESS(172, 26, 218, 132);
+uint32_t ServerAddress=NETWORK_ADDRESS(192, 168, 1, 10);
 uint16_t ServerPort=4545;
 
 uint16_t ClientPort=0;
@@ -401,7 +408,7 @@ bool CreateSpherePipeline(void)
 	SpherePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
 	SpherePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
 	SpherePipeline.RasterizationSamples=MSAA;
-	SpherePipeline.PolygonMode=VK_POLYGON_MODE_LINE;
+//	SpherePipeline.PolygonMode=VK_POLYGON_MODE_LINE;
 
 	if(!vkuPipeline_AddStage(&SpherePipeline, "./shaders/sphere.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
@@ -430,12 +437,12 @@ bool CreateLinePipeline(void)
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-			.pushConstantRangeCount=1,
-			.pPushConstantRanges=&(VkPushConstantRange)
+		.pushConstantRangeCount=1,
+		.pPushConstantRanges=&(VkPushConstantRange)
 		{
 			.offset=0,
-				.size=sizeof(matrix)+(sizeof(vec4)*2),
-				.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+			.size=sizeof(matrix)+(sizeof(vec4)*3),
+			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 	}, 0, &LinePipelineLayout);
 
@@ -604,7 +611,7 @@ void Thread_Main(void *Arg)
 	// Draw some simple geometry to represent other client cameras
 	for(uint32_t i=0;i<connectedClients;i++)
 	{
-		// Only draw others, not ourself
+		// Only draw others, not ourselves
 		if(i==ClientID)
 			continue;
 
@@ -613,18 +620,32 @@ void Thread_Main(void *Arg)
 		struct
 		{
 			matrix mvp;
-			vec4 start, end;
+			vec4 color, start, end;
 		} line_ubo;
-
-		line_ubo.mvp=MatrixMult(PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
 
 		vec4 position=Vec4(NetCameras[i].Position.x, NetCameras[i].Position.y, NetCameras[i].Position.z, 1.0f);
 		vec4 forward=Vec4(NetCameras[i].Forward.x, NetCameras[i].Forward.y, NetCameras[i].Forward.z, 1.0f);
+		vec4 up=Vec4(NetCameras[i].Up.x, NetCameras[i].Up.y, NetCameras[i].Up.z, 1.0f);
+		NetCameras[i].Right=Vec3_Cross(NetCameras[i].Forward, NetCameras[i].Up);
+		vec4 right=Vec4(NetCameras[i].Right.x, NetCameras[i].Right.y, NetCameras[i].Right.z, 1.0f);
 
+		line_ubo.mvp=MatrixMult(PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
 		line_ubo.start=position;
-		line_ubo.end=Vec4_Addv(position, Vec4_Muls(forward, 30.0f));
 
 		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, LinePipeline.Pipeline);
+
+		line_ubo.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
+		line_ubo.end=Vec4_Addv(position, Vec4_Muls(forward, 15.0f));
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
+		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
+
+		line_ubo.color=Vec4(0.0f, 1.0f, 0.0f, 1.0f);
+		line_ubo.end=Vec4_Addv(position, Vec4_Muls(up, 15.0f));
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
+		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
+
+		line_ubo.color=Vec4(0.0f, 0.0f, 1.0f, 1.0f);
+		line_ubo.end=Vec4_Addv(position, Vec4_Muls(right, 15.0f));
 		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
 		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
 
@@ -636,7 +657,7 @@ void Thread_Main(void *Arg)
 
 		matrix local=MatrixIdentity();
 		local=MatrixMult(local, MatrixScale(10.0f, 10.0f, 10.0f));
-		local=MatrixMult(local, MatrixAlignPoints(NetCameras[i].Position, Vec3_Addv(NetCameras[i].Position, NetCameras[i].Forward), NetCameras[i].Up));
+		local=MatrixMult(local, MatrixInverse(MatrixLookAt(NetCameras[i].Position, Vec3_Addv(NetCameras[i].Position, NetCameras[i].Forward), NetCameras[i].Up)));
 
 		local=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview);
 		sphere_ubo.mvp=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
@@ -829,117 +850,134 @@ double physicsTime=0.0;
 // Runs anything physics related
 void Thread_Physics(void *Arg)
 {
-	double startTime=GetClock();
+	const double Sixty=1.0/60.0;
+	const float dt=(float)Sixty;//fTimeStep;
 
-	// Get a pointer to the emitter that's providing the positions
-	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
+	// Get the current time
+	double currentTime=GetClock();
 
-	for(uint32_t i=0;i<Emitter->NumParticles;i++)
+	// If current time has elapsed last set time, then run code
+	if(currentTime>physicsTime)
 	{
-		if(Emitter->Particles[i].ID!=Emitter->ID)
-		{
-			// Get those positions and set the other emitter's positions to those
-			ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitter->Particles[i].ID, Emitter->Particles[i].pos);
+		// reset time to current time + time until next run
+		physicsTime=currentTime+Sixty;
 
-			// If this particle is dead, delete that emitter and reset it's ID 
-			if(Emitter->Particles[i].life<0.0f)
+		// Get a pointer to the emitter that's providing the positions
+		ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
+
+		for(uint32_t i=0;i<Emitter->NumParticles;i++)
+		{
+			if(Emitter->Particles[i].ID!=Emitter->ID)
 			{
-				ParticleSystem_DeleteEmitter(&ParticleSystem, Emitter->Particles[i].ID);
-				Emitter->Particles[i].ID=0;
+				// Get those positions and set the other emitter's positions to those
+				ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitter->Particles[i].ID, Emitter->Particles[i].pos);
+
+				// If this particle is dead, delete that emitter and reset it's ID 
+				if(Emitter->Particles[i].life<0.0f)
+				{
+					ParticleSystem_DeleteEmitter(&ParticleSystem, Emitter->Particles[i].ID);
+					Emitter->Particles[i].ID=0;
+				}
 			}
 		}
-	}
 
-	ParticleSystem_Step(&ParticleSystem, fTimeStep);
+		ParticleSystem_Step(&ParticleSystem, dt);
 
-	// Loop through objects, integrate and check/resolve collisions
-	for(int i=0;i<NUM_ASTEROIDS;i++)
-	{
-		// Run physics integration on the asteroids
-		PhysicsIntegrate(&Asteroids[i], fTimeStep);
-
-		// Check asteroids against other asteroids
-		for(int j=i+1;j<NUM_ASTEROIDS;j++)
-			PhysicsSphereToSphereCollisionResponse(&Asteroids[i], &Asteroids[j]);
-
-		// Check asteroids against the camera
-		PhysicsCameraToSphereCollisionResponse(&Camera, &Asteroids[i]);
-
-		for(uint32_t j=0;j<connectedClients;j++)
+		// Loop through objects, integrate and check/resolve collisions
+		for(int i=0;i<NUM_ASTEROIDS;i++)
 		{
-			if(j!=ClientID)
-				PhysicsCameraToSphereCollisionResponse(&NetCameras[j], &Asteroids[i]);
+			// Run physics integration on the asteroids
+			PhysicsIntegrate(&Asteroids[i], dt);
+
+			// Check asteroids against other asteroids
+			for(int j=i+1;j<NUM_ASTEROIDS;j++)
+				PhysicsSphereToSphereCollisionResponse(&Asteroids[i], &Asteroids[j]);
+
+			// Check asteroids against the camera
+			PhysicsCameraToSphereCollisionResponse(&Camera, &Asteroids[i]);
+
+			for(uint32_t j=0;j<connectedClients;j++)
+			{
+				// Don't check for collision with our own net camera
+				if(j!=ClientID)
+					PhysicsCameraToSphereCollisionResponse(&NetCameras[j], &Asteroids[i]);
+			}
+
+			// Check asteroids against projectile particles
+			// Emitter '0' on the particle system contains particles that drive the projectile physics
+			ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
+			// Loop through all the possible particles
+			for(uint32_t j=0;j<Emitter->NumParticles;j++)
+			{
+				// If the particle ID matches with the projectile ID, then check collision and respond
+				if(Emitter->Particles[j].ID!=Emitter->ID)
+					PhysicsParticleToSphereCollisionResponse(&Emitter->Particles[j], &Asteroids[i]);
+			}
 		}
 
-		// Check asteroids against projectile particles
-		// Emitter '0' on the particle system contains particles that drive the projectile physics
-		ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
-		// Loop through all the possible particles
-		for(uint32_t j=0;j<Emitter->NumParticles;j++)
+		for(uint32_t i=0;i<connectedClients;i++)
 		{
-			// If the particle ID matches with the projectile ID, then check collision and respond
-			if(Emitter->Particles[j].ID!=Emitter->ID)
-				PhysicsParticleToSphereCollisionResponse(&Emitter->Particles[j], &Asteroids[i]);
+			// Don't check for collision with our own net camera
+			if(i!=ClientID)
+				PhysicsCameraToCameraCollisionResponse(&Camera, &NetCameras[i]);
 		}
+		//////
+
+		// Update camera and modelview matrix
+		ModelView=CameraUpdate(&Camera, dt);
+		Audio_SetListenerOrigin(Camera.Position, Camera.Right);
+		//////
+
+		// Update instance matrix translation positions
+		matrix *Data=NULL;
+		vkMapMemory(Context.Device, Asteroid_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Data);
+
+		for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
+			Data[i].w=Vec4(Asteroids[i].Position.x, Asteroids[i].Position.y, Asteroids[i].Position.z, 1.0f);
+
+		vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
+		//////
+
+		// Network status packet
+		if(ClientSocket!=-1)
+		{
+			NetworkPacket_t StatusPacket;
+
+			memset(&StatusPacket, 0, sizeof(NetworkPacket_t));
+
+			StatusPacket.PacketMagic=STATUS_PACKETMAGIC;
+			StatusPacket.ClientID=ClientID;
+
+			StatusPacket.Camera.Position=Camera.Position;
+			StatusPacket.Camera.Velocity=Camera.Velocity;
+			StatusPacket.Camera.Forward=Camera.Forward;
+			StatusPacket.Camera.Up=Camera.Up;
+
+			Network_SocketSend(ClientSocket, (uint8_t *)&StatusPacket, sizeof(NetworkPacket_t), ServerAddress, ServerPort);
+		}
+		//////
 	}
-
-	for(uint32_t i=0;i<connectedClients;i++)
-	{
-		if(i!=ClientID)
-			PhysicsCameraToCameraCollisionResponse(&Camera, &NetCameras[i]);
-	}
-	//////
-
-	// Update camera and modelview matrix
-	ModelView=CameraUpdate(&Camera, fTimeStep);
-	Audio_SetListenerOrigin(Camera.Position, Camera.Right);
-	//////
-
-	// Update instance matrix translation positions
-	matrix *Data=NULL;
-	vkMapMemory(Context.Device, Asteroid_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Data);
-
-	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
-		Data[i].w=Vec4(Asteroids[i].Position.x, Asteroids[i].Position.y, Asteroids[i].Position.z, 1.0f);
-
-	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
-	//////
-
-	// Network status packet
-	if(ClientSocket!=-1)
-	{
-		NetworkPacket_t StatusPacket;
-
-		memset(&StatusPacket, 0, sizeof(NetworkPacket_t));
-
-		StatusPacket.PacketMagic=STATUS_PACKETMAGIC;
-		StatusPacket.ClientID=ClientID;
-
-		StatusPacket.Camera.Position=Camera.Position;
-		StatusPacket.Camera.Velocity=Camera.Velocity;
-		StatusPacket.Camera.Forward=Camera.Forward;
-		StatusPacket.Camera.Up=Camera.Up;
-
-		Network_SocketSend(ClientSocket, (uint8_t *)&StatusPacket, sizeof(NetworkPacket_t), ServerAddress, ServerPort);
-	}
-	//////
-
-	physicsTime=GetClock()-startTime;
 
 	// Barrier now that we're done here
-	pthread_barrier_wait(&ThreadBarrier_Physics);
+//	pthread_barrier_wait(&ThreadBarrier_Physics);
 }
 
 pthread_t UpdateThread;
 bool NetUpdate_Run=true;
 
-void *NetUpdate(void *Arg)
+void NetUpdate(void *Arg)
 {
 	memset(NetCameras, 0, sizeof(Camera_t)*MAX_CLIENTS);
 
+	if(ClientSocket==-1)
+	{
+		NetUpdate_Run=false;
+		return;
+	}
+
 	while(NetUpdate_Run)
 	{
-		uint8_t Buffer[1024], *pBuffer=Buffer;
+		uint8_t Buffer[32767], *pBuffer=Buffer;
 		uint32_t Magic=0;
 		uint32_t Address=0;
 		uint16_t Port=0;
@@ -947,10 +985,11 @@ void *NetUpdate(void *Arg)
 		Network_SocketReceive(ClientSocket, Buffer, sizeof(Buffer), &Address, &Port);
 
 		memcpy(&Magic, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
-		memcpy(&connectedClients, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
 
 		if(Magic==STATUS_PACKETMAGIC)
 		{
+			memcpy(&connectedClients, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
+
 			for(uint32_t i=0;i<connectedClients;i++)
 			{
 				uint32_t clientID=0;
@@ -965,9 +1004,19 @@ void *NetUpdate(void *Arg)
 				//DBGPRINTF(DEBUG_INFO, "\033[%d;0H\033[KID %d Pos: %0.1f %0.1f %0.1f", clientID+1, clientID, NetCameras[clientID].Position.x, NetCameras[clientID].Position.y, NetCameras[clientID].Position.z);
 			}
 		}
-	}
+		else if(Magic==FIELD_PACKETMAGIC)
+		{
+			uint32_t asteroidCount=NUM_ASTEROIDS;
 
-	return NULL;
+			memcpy(&asteroidCount, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
+
+			for(uint32_t i=0;i<asteroidCount;i++)
+			{
+				memcpy(&Asteroids[i].Position, pBuffer, sizeof(vec3));	pBuffer+=sizeof(vec3);
+				memcpy(&Asteroids[i].Velocity, pBuffer, sizeof(vec3));	pBuffer+=sizeof(vec3);
+			}
+		}
+	}
 }
 
 // Render call from system main event loop
@@ -978,6 +1027,7 @@ void Render(void)
 	matrix Pose;
 
 	Thread_AddJob(&ThreadPhysics, Thread_Physics, NULL);
+//	Thread_Physics(NULL);
 
 	if(!IsVR)
 		EyeProjection[0]=MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f);
@@ -1013,7 +1063,7 @@ void Render(void)
 	vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 	// Wait for physics to finish before rendering, particle drawing needs data done first.
-	pthread_barrier_wait(&ThreadBarrier_Physics);
+//	pthread_barrier_wait(&ThreadBarrier_Physics);
 
 	EyeRender(PerFrame[Index].CommandBuffer, Index, 0, Pose);
 
@@ -1107,7 +1157,7 @@ void Render(void)
 // Initialization call from system main
 bool Init(void)
 {
-	srand(123);
+	RandomSeed(123);
 
 	Event_Add(EVENT_KEYDOWN, Event_KeyDown);
 	Event_Add(EVENT_KEYUP, Event_KeyUp);
@@ -1329,7 +1379,7 @@ bool Init(void)
 	if(!Network_SocketSend(ClientSocket, (uint8_t *)&Magic, sizeof(uint32_t), ServerAddress, ServerPort))
 		return false;
 
-	uint32_t Timeout=UINT16_MAX*4;
+	double Timeout=GetClock()+5.0; // Current time +5 seconds
 	bool Response=false;
 
 	while(!Response)
@@ -1344,31 +1394,32 @@ bool Init(void)
 		{
 			if(ResponsePacket.PacketMagic==CONNECT_PACKETMAGIC)
 			{
-				DBGPRINTF(DEBUG_INFO, "Magic: 0x%X ID: %d Seed: %d Port: %d Address: 0x%X Port: %d\n",
-						  ResponsePacket.PacketMagic,
+				DBGPRINTF(DEBUG_INFO, "Response from server - ID: %d Seed: %d Port: %d Address: 0x%X Port: %d\n",
 						  ResponsePacket.ClientID,
 						  ResponsePacket.Connect.Seed,
 						  ResponsePacket.Connect.Port,
 						  Address,
 						  Port);
 
-				srand(ResponsePacket.Connect.Seed);
-				ClientPort=ResponsePacket.Connect.Port;
+				RandomSeed(ResponsePacket.Connect.Seed);
 				ClientID=ResponsePacket.ClientID;
 				Response=true;
 			}
 		}
 
-		//Timeout--;
-		//if(Timeout==0)
-		//{
-		//	DBGPRINTF("Connection timed out...\n");
-		//	break;
-		//}
+		if(GetClock()>Timeout)
+		{
+			DBGPRINTF("Connection timed out...\n");
+			Network_SocketClose(ClientSocket);
+			ClientSocket=-1;
+			break;
+		}
 	}
 #endif
 
-	pthread_create(&UpdateThread, NULL, NetUpdate, NULL);
+	Thread_Init(&ThreadNetUpdate);
+	Thread_Start(&ThreadNetUpdate);
+	Thread_AddJob(&ThreadNetUpdate, NetUpdate, NULL);
 
 	return true;
 }
@@ -1427,11 +1478,15 @@ void Destroy(void)
 	vkDeviceWaitIdle(Context.Device);
 
 	NetUpdate_Run=false;
-	pthread_join(UpdateThread, NULL);
+	Thread_Destroy(&ThreadNetUpdate);
 
 	// Send disconnect message to server and close/destroy network stuff
-	Network_SocketSend(ClientSocket, (uint8_t *)&(NetworkPacket_t) { .ClientID=ClientID, .PacketMagic=DISCONNECT_PACKETMAGIC }, sizeof(NetworkPacket_t), ServerAddress, ServerPort);
-	Network_SocketClose(ClientSocket);
+	if(ClientSocket!=-1)
+	{
+		Network_SocketSend(ClientSocket, (uint8_t *)&(NetworkPacket_t) { .PacketMagic=DISCONNECT_PACKETMAGIC, .ClientID=ClientID }, sizeof(NetworkPacket_t), ServerAddress, ServerPort);
+		Network_SocketClose(ClientSocket);
+	}
+
 	Network_Destroy();
 
 	Audio_Destroy();

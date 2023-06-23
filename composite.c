@@ -383,7 +383,7 @@ void CompositeDraw(uint32_t Index, uint32_t Eye)
 		vkCmdDraw(PerFrame[Index].CommandBuffer, 3, 1, 0, 0);
 
 		// Draw text in the compositing renderpass
-		Font_Print(PerFrame[Index].CommandBuffer, 0, 0.0f, 32.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms\nPhysics time: %0.5fms", fps, fTimeStep, physicsTime);
+		Font_Print(PerFrame[Index].CommandBuffer, 0, 0.0f, 16.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep);
 
 		vkCmdEndRendering(PerFrame[Index].CommandBuffer);
 	}

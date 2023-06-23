@@ -3,11 +3,13 @@
 layout (push_constant) uniform ubo
 {
 	mat4 mvp;
+	vec4 Color;
+	vec4 Verts[2];
 };
 
 layout (location=0) out vec4 Output;
 
 void main()
 {
-    Output=vec4(1.0);
+    Output=Color;
 }

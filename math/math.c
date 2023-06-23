@@ -76,14 +76,32 @@ float fact(const int32_t n)
 	return j;
 }
 
+static uint32_t _Seed=0;
+
+void RandomSeed(uint32_t Seed)
+{
+	_Seed=Seed;
+}
+
+uint32_t Random(void)
+{
+	_Seed=(_Seed^61u)^(_Seed>>16u);
+	_Seed*=9u;
+	_Seed=_Seed^(_Seed>>4u);
+	_Seed*=0x27d4eb2du;
+	_Seed=_Seed^(_Seed>>15u);
+
+	return _Seed;
+}
+
 float RandFloat(void)
 {
-	return (float)rand()/(float)RAND_MAX;
+	return (float)Random()/(float)UINT32_MAX;
 }
 
 int32_t RandRange(int32_t min, int32_t max)
 {
-	return (rand()%(max-min+1))+min;
+	return (Random()%(max-min+1))+min;
 }
 
 uint32_t IsPower2(uint32_t value)
