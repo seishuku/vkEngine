@@ -716,7 +716,7 @@ void Thread_Skybox(void *Arg)
 	vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 60, 1, 0, 0);
 
 	vkEndCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye]);
-	
+
 	pthread_barrier_wait(&ThreadBarrier);
 }
 
@@ -850,6 +850,7 @@ double physicsTime=0.0;
 // Runs anything physics related
 void Thread_Physics(void *Arg)
 {
+#if 0
 	const double Sixty=1.0/60.0;
 	const float dt=(float)Sixty;//fTimeStep;
 
@@ -861,6 +862,10 @@ void Thread_Physics(void *Arg)
 	{
 		// reset time to current time + time until next run
 		physicsTime=currentTime+Sixty;
+#else
+	{
+		const float dt=fTimeStep;
+#endif
 
 		// Get a pointer to the emitter that's providing the positions
 		ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
@@ -959,7 +964,7 @@ void Thread_Physics(void *Arg)
 	}
 
 	// Barrier now that we're done here
-//	pthread_barrier_wait(&ThreadBarrier_Physics);
+	pthread_barrier_wait(&ThreadBarrier_Physics);
 }
 
 pthread_t UpdateThread;
@@ -1063,7 +1068,7 @@ void Render(void)
 	vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 	// Wait for physics to finish before rendering, particle drawing needs data done first.
-//	pthread_barrier_wait(&ThreadBarrier_Physics);
+	pthread_barrier_wait(&ThreadBarrier_Physics);
 
 	EyeRender(PerFrame[Index].CommandBuffer, Index, 0, Pose);
 

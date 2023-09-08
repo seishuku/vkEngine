@@ -66,13 +66,16 @@ bool LoadFontGylphs(const char *Filename)
 		// Number of bezier curves in this char
 		fread(&Gylphs[i].numPath, sizeof(uint32_t), 1, Stream);
 
-		// Allocate memory and read in the paths
-		Gylphs[i].Path=Zone_Malloc(Zone, sizeof(float)*2*Gylphs[i].numPath);
+		if(Gylphs[i].numPath)
+		{
+			// Allocate memory and read in the paths
+			Gylphs[i].Path=Zone_Malloc(Zone, sizeof(float)*2*Gylphs[i].numPath);
 
-		if(!Gylphs[i].Path)
-			return false;
+			if(!Gylphs[i].Path)
+				return false;
 
-		fread(Gylphs[i].Path, sizeof(float)*2, Gylphs[i].numPath, Stream);
+			fread(Gylphs[i].Path, sizeof(float)*2, Gylphs[i].numPath, Stream);
+		}
 	}
 
 	fclose(Stream);

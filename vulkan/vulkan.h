@@ -119,7 +119,7 @@ typedef struct
 	VkCompareOp FrontStencilCompareOp;
 	uint32_t FrontStencilCompareMask;
 	uint32_t FrontStencilWriteMask;
-	uint32_t FrontStencilRference;
+	uint32_t FrontStencilReference;
 
 	// Back face stencil functions
 	VkStencilOp BackStencilFailOp;
@@ -176,8 +176,7 @@ typedef struct VkuMemBlock_s
 typedef struct
 {
 	size_t Size;
-	VkuMemBlock_t Blocks;
-	VkuMemBlock_t *Current;
+	VkuMemBlock_t *Blocks;
 	VkDeviceMemory DeviceMemory;
 } VkuMemZone_t;
 

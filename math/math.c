@@ -50,13 +50,11 @@ float ftanf(const float x)
 float rsqrtf(float x)
 {
 	long i;
-	float x2, y;
-	const float threehalfs=1.5F;
+	float x2=x*0.5f, y=x;
+	const float threehalfs=1.5f;
 
-	x2=x*0.5F;
-	y=x;
 	i=*(long *)&y;				// evil floating point bit level hacking
-	i=0x5f3759df-(i>>1);		// WTF? 
+	i=0x5F3759DF-(i>>1);		// WTF? 
 	y=*(float *)&i;
 	y=y*(threehalfs-(x2*y*y));	// 1st iteration
 //	y=y*(threehalfs-(x2*y*y));	// 2nd iteration, this can be removed
@@ -85,11 +83,17 @@ void RandomSeed(uint32_t Seed)
 
 uint32_t Random(void)
 {
-	_Seed=(_Seed^61u)^(_Seed>>16u);
-	_Seed*=9u;
-	_Seed=_Seed^(_Seed>>4u);
-	_Seed*=0x27d4eb2du;
+#if 0
+	// Wang
+	_Seed=((_Seed^61u)^(_Seed>>16u))*9u;
+	_Seed=(_Seed^(_Seed>>4u))*0x27d4EB2Du;
 	_Seed=_Seed^(_Seed>>15u);
+#else
+	// PCG
+	uint32_t State=_Seed*0x2C9277B5u+0xAC564B05u;
+	uint32_t Word=((State>>((State>>28u)+4u))^State)*0x108EF2D9u;
+	_Seed=(Word>>22u)^Word;
+#endif
 
 	return _Seed;
 }

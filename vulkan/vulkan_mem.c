@@ -18,19 +18,13 @@ VkuMemZone_t *vkuMem_Init(VkuContext_t *Context, size_t Size)
 	}
 
 	VkuMemBlock_t *Block=(VkuMemBlock_t *)Zone_Malloc(Zone, sizeof(VkuMemBlock_t));
-	Block->Prev=&VkZone->Blocks;
-	Block->Next=&VkZone->Blocks;
-	Block->Free=false;
-	Block->Size=Size;
 	Block->Offset=0;
+	Block->Size=Size;
+	Block->Free=true;
+	Block->Prev=NULL;
+	Block->Next=NULL;
 
-	VkZone->Blocks.Next=Block;
-	VkZone->Blocks.Prev=Block;
-	VkZone->Blocks.Free=true;
-	VkZone->Blocks.Size=0;
-	VkZone->Blocks.Offset=0;
-
-	VkZone->Current=Block;
+	VkZone->Blocks=Block;
 
 	VkZone->Size=Size;
 
@@ -68,12 +62,12 @@ void vkuMem_Destroy(VkuContext_t *Context, VkuMemZone_t *VkZone)
 {
 	if(VkZone)
 	{
-		for(VkuMemBlock_t *Block=VkZone->Blocks.Next;;Block=Block->Next)
+		VkuMemBlock_t *Block=VkZone->Blocks;
+
+		while(Block!=NULL)
 		{
 			Zone_Free(Zone, Block);
-
-			if(Block->Next==&VkZone->Blocks)
-				break;
+			Block=Block->Next;
 		}
 
 		vkFreeMemory(Context->Device, VkZone->DeviceMemory, VK_NULL_HANDLE);
@@ -89,39 +83,43 @@ void vkuMem_Free(VkuMemZone_t *VkZone, VkuMemBlock_t *Block)
 		return;
 	}
 
-	if(!Block->Free)
+	if(Block->Free)
 	{
 		DBGPRINTF(DEBUG_WARNING, "VkuMem_Free: Attempting to free already freed pointer.\n");
 		return;
 	}
 
-	Block->Free=false;
+	Block->Free=true;
 
-	if(Block->Prev&&!Block->Prev->Free)
+	if(Block->Prev&&Block->Prev->Free)
 	{
 		VkuMemBlock_t *Last=Block->Prev;
 
 		Last->Size+=Block->Size;
 		Last->Next=Block->Next;
-		Last->Next->Prev=Last;
 
-		if(Block==VkZone->Current)
-			VkZone->Current=Last;
+		if(Last->Next)
+			Last->Next->Prev=Last;
+
+		if(Block==VkZone->Blocks)
+			VkZone->Blocks=Last;
 
 		Zone_Free(Zone, Block);
 		Block=Last;
 	}
 
-	if(Block->Next&&!Block->Next->Free)
+	if(Block->Next&&Block->Next->Free)
 	{
 		VkuMemBlock_t *Next=Block->Next;
 
 		Block->Size+=Next->Size;
 		Block->Next=Next->Next;
-		Block->Next->Prev=Block;
 
-		if(Next==VkZone->Current)
-			VkZone->Current=Block;
+		if(Block->Next)
+			Block->Next->Prev=Block;
+
+		if(Next==VkZone->Blocks)
+			VkZone->Blocks=Block;
 
 		Zone_Free(Zone, Next);
 	}
@@ -131,67 +129,57 @@ VkuMemBlock_t *vkuMem_Malloc(VkuMemZone_t *VkZone, VkMemoryRequirements Requirem
 {
 	const size_t MinimumBlockSize=64;
 
-	size_t Size=Requirements.size+Requirements.alignment;
-	Size=(Size+7)&~7;				// Align to 64bit boundary
+	// Does size also need this alignment?
+	size_t Size=(Requirements.size+(Requirements.alignment-1))&~(Requirements.alignment-1);
 
-	VkuMemBlock_t *Base=VkZone->Current;
-	VkuMemBlock_t *Current=VkZone->Current;
-	VkuMemBlock_t *Start=Base->Prev;
+	VkuMemBlock_t *Base=VkZone->Blocks;
 
-	do
+	while(Base!=NULL)
 	{
-		if(Current==Start)
+		if(Base->Free&&Base->Size>=Size)
 		{
-			DBGPRINTF(DEBUG_WARNING, "Vulkan mem: Unable to find large enough free block.\n");
-			return NULL;
-		}
+			size_t Extra=Base->Size-Size;
 
-		if(Current->Free)
-		{
-			Base=Current->Next;
-			Current=Current->Next;
-		}
-		else
-			Current=Current->Next;
-	}
-	while(Base->Free||Base->Size<Size);
+			if(Extra>MinimumBlockSize)
+			{
+				VkuMemBlock_t *New=(VkuMemBlock_t *)Zone_Malloc(Zone, sizeof(VkuMemBlock_t));
+				New->Size=Extra;
+				New->Offset=Size;
+				New->Free=true;
+				New->Prev=Base;
+				New->Next=Base->Next;
 
-	size_t Extra=Base->Size-Size;
+				Base->Next=New;
+				Base->Size=Size;
 
-	if(Extra>MinimumBlockSize)
-	{
-		VkuMemBlock_t *New=(VkuMemBlock_t *)Zone_Malloc(Zone, sizeof(VkuMemBlock_t));
-		New->Size=Extra;
-		New->Offset=0;
-		New->Free=false;
-		New->Prev=Base;
-		New->Next=Base->Next;
-		New->Next->Prev=New;
+				if(Base->Prev)
+					Base->Offset=(Base->Prev->Size+Base->Prev->Offset+(Requirements.alignment-1))&~(Requirements.alignment-1);
+			}
 
-		Base->Next=New;
-		Base->Size=Size;
-		Base->Offset=(size_t)(ceilf((float)(Base->Prev->Size+Base->Prev->Offset)/Requirements.alignment)*Requirements.alignment);
-	}
-
-	Base->Free=true;
-
-	VkZone->Current=Base->Next;
+			Base->Free=false;
 
 #ifdef _DEBUG
-	DBGPRINTF(DEBUG_WARNING, "Vulkan mem allocate block - Location offset: %lld Size: %0.3fKB\n", Base->Offset, (float)Base->Size/1000.0f);
+			DBGPRINTF(DEBUG_WARNING, "Vulkan mem allocate block - Location offset: %lld Size: %0.3fKB\n", Base->Offset, (float)Base->Size/1000.0f);
 #endif
-	return Base;
+			return Base;
+		}
+
+		Base=Base->Next;
+	}
+
+	DBGPRINTF(DEBUG_WARNING, "Vulkan mem: Unable to find large enough free block.\n");
+	return NULL;
 }
 
 void vkuMem_Print(VkuMemZone_t *VkZone)
 {
 	DBGPRINTF(DEBUG_WARNING, "Vulkan zone size: %0.2fMB  Location: 0x%p (Vulkan Object Address)\n", (float)(VkZone->Size/1000.0f/1000.0f), VkZone->DeviceMemory);
 
-	for(VkuMemBlock_t *Block=VkZone->Blocks.Next;;Block=Block->Next)
-	{
-		DBGPRINTF(DEBUG_WARNING, "\tOffset: %0.4fMB Size: %0.4fMB Block free: %s\n", (float)Block->Offset/1000.0f/1000.0f, (float)Block->Size/1000.0f/1000.0f, Block->Free?"no":"yes");
+	VkuMemBlock_t *Block=VkZone->Blocks;
 
-		if(Block->Next==&VkZone->Blocks)
-			break;
+	while(Block!=NULL)
+	{
+		DBGPRINTF(DEBUG_WARNING, "\tOffset: %0.4fMB Size: %0.4fMB Block free: %s\n", (float)Block->Offset/1000.0f/1000.0f, (float)Block->Size/1000.0f/1000.0f, Block->Free?"yes":"no");
+		Block=Block->Next;
 	}
 }

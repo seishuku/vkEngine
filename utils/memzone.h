@@ -1,18 +1,15 @@
 #ifndef __MEMZONE_H__
 #define __MEMZONE_H__
 
-typedef struct MemBlock_s
-{
-	size_t Size;
-	bool Free;
-	struct MemBlock_s *Next, *Prev;
-} MemBlock_t;
+#include <pthread.h>
 
 typedef struct
 {
+	pthread_mutex_t Mutex;
+
+	size_t Allocations;
 	size_t Size;
-	MemBlock_t Blocks;
-	MemBlock_t *Current;
+	void *Memory;
 } MemZone_t;
 
 MemZone_t *Zone_Init(size_t Size);

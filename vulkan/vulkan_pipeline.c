@@ -205,7 +205,7 @@ VkBool32 vkuInitPipeline(VkuPipeline_t *Pipeline, VkuContext_t *Context)
 	Pipeline->FrontStencilCompareOp=VK_COMPARE_OP_ALWAYS;
 	Pipeline->FrontStencilCompareMask=0;
 	Pipeline->FrontStencilWriteMask=0;
-	Pipeline->FrontStencilRference=0;
+	Pipeline->FrontStencilReference=0;
 
 	// Back face stencil functions
 	Pipeline->BackStencilFailOp=VK_STENCIL_OP_KEEP;
@@ -304,7 +304,7 @@ VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline, void *pNext)
 				.compareOp=Pipeline->FrontStencilCompareOp,
 				.compareMask=Pipeline->FrontStencilCompareMask,
 				.writeMask=Pipeline->FrontStencilWriteMask,
-				.reference=Pipeline->FrontStencilRference,
+				.reference=Pipeline->FrontStencilReference,
 			},
 			.back=(VkStencilOpState)
 			{
