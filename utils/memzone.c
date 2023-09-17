@@ -113,6 +113,16 @@ void *Zone_Malloc(MemZone_t *Zone, size_t Size)
 	return NULL;
 }
 
+void *Zone_Calloc(MemZone_t *Zone, size_t Size, size_t Count)
+{
+	void *ptr=Zone_Malloc(Zone, Size*Count);
+
+	if(ptr)
+		memset(ptr, 0, Size*Count);
+
+	return ptr;
+}
+
 void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 {
 	size_t *Block=(size_t *)((uint8_t *)Ptr-sizeof(size_t));
@@ -140,7 +150,7 @@ void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 		if(Size==currentSize)
 		{
 #ifdef _DEBUG
-			DBGPRINTF(DEBUG_WARNING, "Zone_Realloc: New size == old size.\n");
+			DBGPRINTF(DEBUG_WARNING, "Zone_Realloc: Location: %p, new size (%0.3fKB) == old size (%0.3fKB).\n", Ptr, (float)Size/1000.0f, (float)currentSize/1000.0f);
 #endif
 			return Ptr;
 		}
@@ -149,7 +159,7 @@ void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 
 		// Otherwise, if there is a free block after, expand that block otherwise, create a new free block if possible.
 #ifdef _DEBUG
-		DBGPRINTF(DEBUG_WARNING, "Zone_Realloc: New size < old size.\n");
+		DBGPRINTF(DEBUG_WARNING, "Zone_Realloc: Location: %p, new size (%0.3fKB) < old size (%0.3fKB).\n", Ptr, (float)Size/1000.0f, (float)currentSize/1000.0f);
 #endif
 		size_t *nextBlock=(size_t *)((uint8_t *)Block+currentSize);
 		size_t nextSize=*nextBlock&SIZE_MASK;
@@ -231,7 +241,7 @@ void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 					*Block=Size&SIZE_MASK;
 
 #ifdef _DEBUG
-					DBGPRINTF(DEBUG_WARNING, "Zone_Realloc: Enlarging block into adjacent free block.\n");
+					DBGPRINTF(DEBUG_WARNING, "Zone_Realloc: Enlarging block (%p) into adjacent free block.\n", Ptr);
 #endif
 				}
 				else
@@ -239,7 +249,7 @@ void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 					*Block=totalSize&SIZE_MASK;
 
 #ifdef _DEBUG
-					DBGPRINTF(DEBUG_WARNING, "Zone_Realloc: Enlarging block, consuming free block.\n");
+					DBGPRINTF(DEBUG_WARNING, "Zone_Realloc: Enlarging block (%p), consuming free block.\n", Ptr);
 #endif
 				}
 
@@ -259,7 +269,7 @@ void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 		}
 
 #ifdef _DEBUG
-		DBGPRINTF(DEBUG_WARNING, "Zone_Realloc: Allocating new block and copying.\n");
+		DBGPRINTF(DEBUG_WARNING, "Zone_Realloc: Allocating new block (%p) and copying.\n", New);
 #endif
 
 		return New;

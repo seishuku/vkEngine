@@ -930,7 +930,6 @@ void Thread_Physics(void *Arg)
 
 		// Update camera and modelview matrix
 		ModelView=CameraUpdate(&Camera, dt);
-		Audio_SetListenerOrigin(Camera.Position, Camera.Right);
 		//////
 
 		// Update instance matrix translation positions
