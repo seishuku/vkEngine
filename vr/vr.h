@@ -1,6 +1,9 @@
 #ifndef __VR_H__
 #define __VR_H__
 
+// undefine __WIN32 for mingw/msys building, otherwise it tries to define bool
+#undef __WIN32
+
 #include <openvr/openvr_capi.h>
 
 extern struct VR_IVRSystem_FnTable *VRSystem;

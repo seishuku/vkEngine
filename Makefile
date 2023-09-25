@@ -44,7 +44,13 @@ OBJS+=audio/wave.o
 
 # core stuff
 OBJS+=vr/vr.o
-OBJS+=system/linux_x11.o
+
+ifeq ($(OS),Windows_NT)
+	OBJS+=system/win32.o
+else
+	OBJS+=system/linux_x11.o
+endif
+
 OBJS+=font/font.o
 OBJS+=threads/threads.o
 OBJS+=utils/input.o
@@ -78,13 +84,27 @@ SHADERS+=shaders/skybox.vert.spv
 SHADERS+=shaders/gaussian.frag.spv
 SHADERS+=shaders/threshold.frag.spv
 
-CC=gcc
-CFLAGS=-Wall -Wno-missing-braces -Wextra -O3 -std=gnu17 -I/usr/X11/include
-LDFLAGS=-Wold-style-definition -L/usr/X11/lib -lvulkan -lX11 -lm -lpthread -lopenvr_api -lportaudio
+CFLAGS=-Wall -Wno-missing-braces -Wextra -O3 -std=gnu17 -march=skylake
+LDFLAGS=-Wold-style-definition -lm -lpthread -lopenvr_api -lportaudio
+
+ifeq ($(OS),Windows_NT)
+	CC=x86_64-w64-mingw32-gcc
+	CFLAGS+=-DWIN32
+	LDFLAGS+=-lvulkan-1 -lws2_32 -lgdi32
+else
+	CC=gcc
+	CFLAGS+=-I/usr/X11/include
+	LDFLAGS+=-lvulkan -lX11 -L/usr/X11/lib
+endif
 
 all: $(TARGET) $(SHADERS)
 
-debug: CFLAGS=-Wall -Wno-missing-braces -Wextra -msse3 -DDEBUG -D_DEBUG -g -ggdb -O1 -std=gnu17 -I/usr/X11/include
+debug: CFLAGS=-Wall -Wno-missing-braces -Wextra -msse3 -DDEBUG -D_DEBUG -g -ggdb -O1 -std=gnu17
+
+ifneq ($(OS),Windows_NT)
+debug: CFLAGS+=-I/usr/X11/include
+endif
+
 debug: $(TARGET) $(SHADERS)
 
 $(TARGET): $(OBJS)
