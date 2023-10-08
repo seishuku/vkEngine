@@ -132,7 +132,7 @@ typedef enum
 
 typedef struct
 {
-	int32_t dx, dy, dz;
+	int32_t x, y, dz;
 	uint32_t button;
 } MouseEvent_t;
 

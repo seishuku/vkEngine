@@ -3,7 +3,8 @@
 
 #include "../vulkan/vulkan.h"
 
-void Font_Print(VkCommandBuffer CommandBuffer, uint32_t Eye, float x, float y, char *string, ...);
+void Font_Print(float size, float x, float y, char *string, ...);
+void Font_Draw(uint32_t Index);
 void Font_Destroy(void);
 
 #endif

@@ -272,11 +272,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					if(Mouse.usButtonFlags&RI_MOUSE_WHEEL)
 						MouseEvent.dz=Mouse.usButtonData;
 
-					if(Mouse.lLastX!=0||Mouse.lLastY!=0)
-					{
-						MouseEvent.dx=Mouse.lLastX;
-						MouseEvent.dy=Mouse.lLastY;
-					}
+					//if(Mouse.usFlags==MOUSE_MOVE_RELATIVE)
+					//{
+					//	if(Mouse.lLastX!=0||Mouse.lLastY!=0)
+					//	{
+					//		MouseEvent.x=Mouse.lLastX;
+					//		MouseEvent.y=Mouse.lLastY;
+					//	}
+					//}
+					POINT mouse;
+					GetCursorPos(&mouse);
+
+					MouseEvent.x=mouse.x;
+					MouseEvent.y=mouse.y;
 
 					Event_Trigger(EVENT_MOUSE, &MouseEvent);
 					break;

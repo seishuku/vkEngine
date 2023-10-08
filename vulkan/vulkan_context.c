@@ -24,7 +24,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 	else
 		DBGPRINTF(DEBUG_WARNING, "\n%s\n", pCallbackData->pMessage);
 
-	return VK_FALSE;
+ 	return VK_FALSE;
 }
 #endif
 

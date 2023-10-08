@@ -30,6 +30,7 @@
     <ClInclude Include="system\system.h" />
     <ClInclude Include="textures.h" />
     <ClInclude Include="threads\threads.h" />
+    <ClInclude Include="ui\ui.h" />
     <ClInclude Include="utils\event.h" />
     <ClInclude Include="utils\genid.h" />
     <ClInclude Include="utils\input.h" />
@@ -65,6 +66,10 @@
     <ClCompile Include="skybox.c" />
     <ClCompile Include="system\win32.c" />
     <ClCompile Include="threads\threads.c" />
+    <ClCompile Include="ui\bargraph.c" />
+    <ClCompile Include="ui\button.c" />
+    <ClCompile Include="ui\checkbox.c" />
+    <ClCompile Include="ui\ui.c" />
     <ClCompile Include="utils\event.c" />
     <ClCompile Include="utils\genid.c" />
     <ClCompile Include="utils\input.c" />
@@ -104,6 +109,8 @@
     <GLSL Include="shaders\sphere.frag" />
     <GLSL Include="shaders\sphere.vert" />
     <GLSL Include="shaders\threshold.frag" />
+    <GLSL Include="shaders\ui_sdf.frag" />
+    <GLSL Include="shaders\ui_sdf.vert" />
     <GLSL Include="shaders\volume.frag" />
     <GLSL Include="shaders\volume.vert" />
   </ItemGroup>

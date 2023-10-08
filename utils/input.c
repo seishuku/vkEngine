@@ -11,6 +11,8 @@
 #include "../audio/audio.h"
 #include "../sounds.h"
 #include "../physics/physics.h"
+#include "../ui/ui.h"
+#include "../font/font.h"
 #include "input.h"
 
 // External data from engine.c
@@ -20,6 +22,8 @@ extern ParticleSystem_t ParticleSystem;
 
 #define NUM_ASTEROIDS 1000
 extern RigidBody_t Asteroids[NUM_ASTEROIDS];
+
+extern UI_t UI;
 
 //////////////////////////////
 
@@ -127,11 +131,25 @@ void Event_KeyUp(void *Arg)
 
 void Event_Mouse(void *Arg)
 {
+	// To save previous mouse position
+	static uint32_t Mouse_OldX=0, Mouse_OldY=0;
+
 	MouseEvent_t *MouseEvent=Arg;
+
+	// Calculate delta movement
+	int32_t dx=MouseEvent->x-Mouse_OldX;
+	int32_t dy=MouseEvent->y-Mouse_OldY;
+
+	// Save old position;
+	Mouse_OldX=MouseEvent->x;
+	Mouse_OldY=MouseEvent->y;
 
 	if(MouseEvent->button&MOUSE_BUTTON_LEFT)
 	{
-		Camera.Yaw-=(float)MouseEvent->dx/8000.0f;
-		Camera.Pitch-=(float)MouseEvent->dy/8000.0f;
+		Camera.Yaw-=(float)dx/8000.0f;
+		Camera.Pitch-=(float)dy/8000.0f;
 	}
+
+	if(MouseEvent->button&MOUSE_BUTTON_RIGHT)
+		UI_TestHit(&UI, Vec2((float)MouseEvent->x, (float)MouseEvent->y));
 }

@@ -100,6 +100,12 @@
     <Filter Include="Header Files\network">
       <UniqueIdentifier>{7cb6b49a-d263-44d7-b222-ebbb89970fdc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\ui">
+      <UniqueIdentifier>{2b09132c-3f9a-4ca1-86fa-200c460c5e52}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\ui">
+      <UniqueIdentifier>{db0c09b1-843e-4b45-9ea8-12923558615d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="audio\audio.h">
@@ -179,6 +185,9 @@
     </ClInclude>
     <ClInclude Include="network\network.h">
       <Filter>Header Files\network</Filter>
+    </ClInclude>
+    <ClInclude Include="ui\ui.h">
+      <Filter>Header Files\ui</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -305,6 +314,18 @@
     <ClCompile Include="audio\hrir.c">
       <Filter>Source Files\audio</Filter>
     </ClCompile>
+    <ClCompile Include="ui\ui.c">
+      <Filter>Source Files\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="ui\bargraph.c">
+      <Filter>Source Files\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="ui\button.c">
+      <Filter>Source Files\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="ui\checkbox.c">
+      <Filter>Source Files\ui</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <GLSL Include="shaders\bezier.frag">
@@ -377,6 +398,12 @@
       <Filter>Shaders</Filter>
     </GLSL>
     <GLSL Include="shaders\line.vert">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\ui_sdf.frag">
+      <Filter>Shaders</Filter>
+    </GLSL>
+    <GLSL Include="shaders\ui_sdf.vert">
       <Filter>Shaders</Filter>
     </GLSL>
   </ItemGroup>

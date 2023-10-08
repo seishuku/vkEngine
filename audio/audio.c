@@ -27,7 +27,7 @@ typedef struct
 	int16_t working[NUM_SAMPLES+NUM_SAMPLES];
 } Channel_t;
 
-vec3 Zero={ 0.0f, 0.0f, 0.0f };
+static vec3 Zero={ 0.0f, 0.0f, 0.0f };
 
 Channel_t channels[MAX_CHANNELS];
 

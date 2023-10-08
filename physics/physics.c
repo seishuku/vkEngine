@@ -273,7 +273,7 @@ void PhysicsParticleToSphereCollisionResponse(Particle_t *Particle, RigidBody_t 
 	const float Particle_Mass=1.0f;
 	const float Particle_invMass=1.0f/Particle_Mass;
 
-	// Calculate the distance between the camera and the sphere's center
+	// Calculate the distance between the particle and the sphere's center
 	vec3 Normal=Vec3_Subv(Body->Position, Particle->pos);
 
 	float DistanceSq=Vec3_Dot(Normal, Normal);

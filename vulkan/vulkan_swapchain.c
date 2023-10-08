@@ -8,6 +8,8 @@
 
 VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, uint32_t Width, uint32_t Height, VkBool32 VSync)
 {
+	VkResult result=VK_SUCCESS;
+
 	if(!Swapchain)
 		return VK_FALSE;
 
@@ -108,7 +110,7 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 	if(SurfCaps.supportedUsageFlags&VK_IMAGE_USAGE_TRANSFER_DST_BIT)
 		ImageUsage|=VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-	vkCreateSwapchainKHR(Context->Device, &(VkSwapchainCreateInfoKHR)
+	result=vkCreateSwapchainKHR(Context->Device, &(VkSwapchainCreateInfoKHR)
 	{
 		.sType=VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
 		.pNext=VK_NULL_HANDLE,
@@ -130,6 +132,12 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 		.clipped=VK_TRUE,
 		.oldSwapchain=VK_NULL_HANDLE,
 	}, VK_NULL_HANDLE, &Swapchain->Swapchain);
+
+	if(result!=VK_SUCCESS)
+	{
+		DBGPRINTF(DEBUG_ERROR, "vkCreateSwapchainKHR failed. (result: %d)\n", result);
+		return VK_FALSE;
+	}
 
 	// Get swap chain image count
 	Swapchain->NumImages=0;

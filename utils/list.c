@@ -138,7 +138,7 @@ void List_GetCopy(List_t *List, const size_t Index, void *Data)
 size_t List_GetCount(List_t *List)
 {
 	// Count=size/stride
-	if(List)
+	if(List&&List->Size)
 		return List->Size/List->Stride;
 
 	return 0;
