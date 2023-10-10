@@ -105,6 +105,7 @@ float UI_GetBarGraphMax(UI_t *UI, uint32_t ID);
 float UI_GetBarGraphValue(UI_t *UI, uint32_t ID);
 
 uint32_t UI_TestHit(UI_t *UI, vec2 Position);
+bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 Position);
 bool UI_Draw(UI_t *UI, uint32_t Index);
 
 #endif

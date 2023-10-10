@@ -42,6 +42,12 @@ OBJS+=audio/audio.o
 OBJS+=audio/hrir.o
 OBJS+=audio/wave.o
 
+# UI
+OBJS+=ui/bargraph.o
+OBJS+=ui/button.o
+OBJS+=ui/checkbox.o
+OBJS+=ui/ui.o
+
 # core stuff
 OBJS+=vr/vr.o
 

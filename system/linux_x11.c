@@ -55,25 +55,21 @@ void EventLoop(void)
 	KeySym Keysym, temp;
 	uint32_t code;
 	XEvent Event;
-	MouseEvent_t MouseEvent={ 0, 0, 0, 0 };
-	int32_t ox, oy;
 	bool Done=false;
+	static MouseEvent_t MouseEvent={ 0, 0, 0, 0 };
 
 	while(!Done)
 	{
 		while(XPending(Context.Dpy)>0)
 		{
-			ox=Event.xmotion.x;
-			oy=Event.xmotion.y;
-
 			XNextEvent(Context.Dpy, &Event);
 
 			switch(Event.type)
 			{
 				case MotionNotify:
 				{
-					MouseEvent.dx=Event.xmotion.x-ox;
-					MouseEvent.dy=Event.xmotion.y-oy;
+					MouseEvent.x=Event.xmotion.x;
+					MouseEvent.y=Event.xmotion.y;
 
 					if(Event.xmotion.state&Button1Mask)
 						MouseEvent.button|=MOUSE_BUTTON_1;
@@ -90,7 +86,7 @@ void EventLoop(void)
 					else
 						MouseEvent.button&=~MOUSE_BUTTON_2;
 
-					Event_Trigger(EVENT_MOUSE, &MouseEvent);
+					Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
 					break;
 				}
 
@@ -104,7 +100,40 @@ void EventLoop(void)
 					break;
 
 				case ButtonPress:
+				{
+					MouseEvent.x=Event.xbutton.x;
+					MouseEvent.y=Event.xbutton.y;
+
+					if(Event.xbutton.state&Button1Mask)
+						MouseEvent.button|=MOUSE_BUTTON_1;
+
+					if(Event.xbutton.state&Button2Mask)
+						MouseEvent.button|=MOUSE_BUTTON_3;
+
+					if(Event.xbutton.state&Button3Mask)
+						MouseEvent.button|=MOUSE_BUTTON_2;
+
+					Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
 					break;
+				}
+
+				case ButtonRelease:
+				{
+					MouseEvent.x=Event.xbutton.x;
+					MouseEvent.y=Event.xbutton.y;
+
+					if(Event.xbutton.state&Button1Mask)
+						MouseEvent.button&=~MOUSE_BUTTON_1;
+
+					if(Event.xbutton.state&Button2Mask)
+						MouseEvent.button&=~MOUSE_BUTTON_3;
+
+					if(Event.xbutton.state&Button3Mask)
+						MouseEvent.button&=~MOUSE_BUTTON_2;
+
+					Event_Trigger(EVENT_MOUSEUP, &MouseEvent);
+					break;
+				}
 
 				case KeyPress:
 					XConvertCase(XLookupKeysym(&Event.xkey, 0), &temp, &Keysym);

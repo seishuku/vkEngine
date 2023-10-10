@@ -1186,7 +1186,9 @@ bool Init(void)
 
 	Event_Add(EVENT_KEYDOWN, Event_KeyDown);
 	Event_Add(EVENT_KEYUP, Event_KeyUp);
-	Event_Add(EVENT_MOUSE, Event_Mouse);
+	Event_Add(EVENT_MOUSEDOWN, Event_MouseDown);
+	Event_Add(EVENT_MOUSEUP, Event_MouseUp);
+	Event_Add(EVENT_MOUSEMOVE, Event_Mouse);
 
 	VkZone=vkuMem_Init(&Context, (size_t)(Context.DeviceProperties2.maxMemoryAllocationSize*0.8f));
 
@@ -1499,6 +1501,9 @@ void RecreateSwapchain(void)
 	{
 		rtWidth=Width;
 		rtHeight=Height;
+
+		UI.Width=rtWidth;
+		UI.Height=rtHeight;
 
 		// Wait for the device to complete any pending work
 		vkDeviceWaitIdle(Context.Device);

@@ -138,6 +138,8 @@ typedef struct
 
 void Event_KeyDown(void *Arg);
 void Event_KeyUp(void *Arg);
+void Event_MouseDown(void *Arg);
+void Event_MouseUp(void *Arg);
 void Event_Mouse(void *Arg);
 
 #endif

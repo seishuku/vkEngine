@@ -237,7 +237,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 //					SetCursor(NULL);
 					
 					RAWMOUSE Mouse=Input->data.mouse;
-					static MouseEvent_t MouseEvent={ 0, 0, 0 };
+					static MouseEvent_t MouseEvent={ 0, 0, 0, 0 };
 
 					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_1_DOWN)
 						MouseEvent.button|=MOUSE_BUTTON_1;
@@ -286,7 +286,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					MouseEvent.x=mouse.x;
 					MouseEvent.y=mouse.y;
 
-					Event_Trigger(EVENT_MOUSE, &MouseEvent);
+					if(Mouse.usButtonFlags&(RI_MOUSE_BUTTON_1_DOWN|RI_MOUSE_BUTTON_2_DOWN|RI_MOUSE_BUTTON_3_DOWN|RI_MOUSE_BUTTON_4_DOWN|RI_MOUSE_BUTTON_5_DOWN))
+						Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
+					else if(Mouse.usButtonFlags&(RI_MOUSE_BUTTON_1_UP|RI_MOUSE_BUTTON_2_UP|RI_MOUSE_BUTTON_3_UP|RI_MOUSE_BUTTON_4_UP|RI_MOUSE_BUTTON_5_UP))
+						Event_Trigger(EVENT_MOUSEUP, &MouseEvent);
+
+					Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
 					break;
 				}
 

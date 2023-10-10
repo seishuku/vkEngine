@@ -129,6 +129,24 @@ void Event_KeyUp(void *Arg)
 	}
 }
 
+static uint32_t ActiveID=UINT32_MAX;
+
+void Event_MouseDown(void *Arg)
+{
+	MouseEvent_t *MouseEvent=Arg;
+
+	if(MouseEvent->button&MOUSE_BUTTON_RIGHT)
+		ActiveID=UI_TestHit(&UI, Vec2((float)MouseEvent->x, (float)MouseEvent->y));
+}
+
+void Event_MouseUp(void *Arg)
+{
+	MouseEvent_t *MouseEvent=Arg;
+
+	if(MouseEvent->button&MOUSE_BUTTON_RIGHT)
+		ActiveID=UINT32_MAX;
+}
+
 void Event_Mouse(void *Arg)
 {
 	// To save previous mouse position
@@ -150,6 +168,6 @@ void Event_Mouse(void *Arg)
 		Camera.Pitch-=(float)dy/8000.0f;
 	}
 
-	if(MouseEvent->button&MOUSE_BUTTON_RIGHT)
-		UI_TestHit(&UI, Vec2((float)MouseEvent->x, (float)MouseEvent->y));
+	if(ActiveID!=UINT32_MAX&&MouseEvent->button&MOUSE_BUTTON_RIGHT)
+		UI_ProcessControl(&UI, ActiveID, Vec2((float)MouseEvent->x, (float)MouseEvent->y));
 }

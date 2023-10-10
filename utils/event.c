@@ -6,11 +6,11 @@
 static struct
 {
 	void (*Callback)(void *Arg);
-} EventList[EVENT_MAX];
+} EventList[NUM_EVENTS];
 
 bool Event_Add(EventID ID, void (*Callback)(void *Arg))
 {
-	if(ID<0||ID>=EVENT_MAX||Callback==NULL)
+	if(ID<0||ID>=NUM_EVENTS||Callback==NULL)
 		return false;
 
 	EventList[ID].Callback=Callback;
@@ -20,7 +20,7 @@ bool Event_Add(EventID ID, void (*Callback)(void *Arg))
 
 bool Event_Delete(EventID ID)
 {
-	if(ID<0||ID>=EVENT_MAX)
+	if(ID<0||ID>=NUM_EVENTS)
 		return false;
 
 	EventList[ID].Callback=NULL;
@@ -31,7 +31,7 @@ bool Event_Delete(EventID ID)
 
 bool Event_Trigger(EventID ID, void *Arg)
 {
-	if(ID<0||ID>=EVENT_MAX||EventList[ID].Callback==NULL)
+	if(ID<0||ID>=NUM_EVENTS||EventList[ID].Callback==NULL)
 		return false;
 
 	EventList[ID].Callback(Arg);
