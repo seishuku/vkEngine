@@ -1,9 +1,11 @@
 /*
-	Copyright 2020 Matt Williams/NitroGL
-	Simple (?) Vulakn Font/Text printing function
-	Uses two vertex buffers, one for a single triangle strip making up
-	a quad, the other contains instancing data for character
-	position, texture altas lookup and color.
+	Copyright 2023 Matt Williams/NitroGL
+	SDF Vulakn Font/Text printing function
+	Uses two vertex buffers, one for a single triangle strip making up a quad,
+	  the other contains instancing data for character position, size, and color.
+	Font is completely internal to the fragment shader, no external texture.
+
+	SDF font design courtesy of André van Kammen (https://www.shadertoy.com/view/4s3XDn)
 */
 #include <stdlib.h>
 #include <stdio.h>
@@ -33,9 +35,6 @@ VkuDescriptorSet_t fontDescriptorSet;
 VkPipelineLayout fontPipelineLayout;
 VkuPipeline_t fontPipeline;
 
-// Texture handles
-VkuImage_t fontTexture;
-
 // Vertex data handles
 VkuBuffer_t fontVertexBuffer;
 
@@ -44,7 +43,7 @@ VkuBuffer_t fontInstanceBuffer;
 void *fontInstanceBufferPtr;
 
 // Initialization flag
-bool Font_Init=false;
+static bool Font_Init=false;
 
 // Global running instance buffer pointer, resets on submit
 static vec4 *Instance=NULL;
@@ -58,7 +57,6 @@ static void _Font_Init(void)
 
 	// Create descriptors and pipeline
 	vkuInitDescriptorSet(&fontDescriptorSet, &Context);
-	vkuDescriptorSet_AddBinding(&fontDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&fontDescriptorSet);
 
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
@@ -115,109 +113,6 @@ static void _Font_Init(void)
 		return;
 	// ---
 
-	// Create sampler and load texture data
-	vkuCreateHostBuffer(&Context, &stagingBuffer, 16*16*223, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-	{
-		FILE *Stream=NULL;
-
-		if((Stream=fopen("./assets/font.bin", "rb"))==NULL)
-			return;
-
-		if(Stream==NULL)
-			return;
-
-		fseek(Stream, 0, SEEK_END);
-		uint32_t Size=ftell(Stream);
-		fseek(Stream, 0, SEEK_SET);
-
-		uint8_t *_FontData=(uint8_t *)Zone_Malloc(Zone, Size);
-
-		if(_FontData==NULL)
-			return;
-
-		fread(_FontData, 1, Size, Stream);
-		fclose(Stream);
-
-		// Map image memory and copy data
-		vkMapMemory(Context.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
-		uint8_t *ptr=(uint8_t *)data;
-		uint8_t *FontPtr=(uint8_t *)_FontData;
-
-		for(uint32_t i=0;i<16*16*223;i++)
-			*ptr++=*FontPtr++;
-		vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
-
-		Zone_Free(Zone, _FontData);
-	}
-
-	// Create the 2D texture object and sampler/imageview
-	vkuCreateImageBuffer(&Context, &fontTexture,
-		VK_IMAGE_TYPE_2D, VK_FORMAT_R8_UNORM, 1, 223, 16, 16, 1,
-		VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
-
-	vkCreateSampler(Context.Device, &(VkSamplerCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-		.maxAnisotropy=1.0f,
-		.magFilter=VK_FILTER_LINEAR,
-		.minFilter=VK_FILTER_LINEAR,
-		.mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR,
-		.addressModeU=VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		.addressModeV=VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		.addressModeW=VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		.mipLodBias=0.0f,
-		.compareOp=VK_COMPARE_OP_NEVER,
-		.minLod=0.0f,
-		.maxLod=0.0f,
-		.maxAnisotropy=1.0,
-		.anisotropyEnable=VK_FALSE,
-		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-	}, VK_NULL_HANDLE, &fontTexture.Sampler);
-
-	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.viewType=VK_IMAGE_VIEW_TYPE_2D_ARRAY,
-		.format=VK_FORMAT_R8_UNORM,
-		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.baseArrayLayer=0,
-		.subresourceRange.layerCount=223,
-		.subresourceRange.levelCount=1,
-		.image=fontTexture.Image,
-	}, VK_NULL_HANDLE, &fontTexture.View);
-
-	// Start a one shot command buffer for image transfer from CPU to GPU
-	CopyCommand=vkuOneShotCommandBufferBegin(&Context);
-
-	// Undefined layout -> Transfer destination
-	vkuTransitionLayout(CopyCommand, fontTexture.Image, 1, 0, 223, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-	// Copy from staging buffer to the texture buffer
-	vkCmdCopyBufferToImage(CopyCommand, stagingBuffer.Buffer, fontTexture.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkBufferImageCopy)
-	{
-		.imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.imageSubresource.mipLevel=0,
-		.imageSubresource.baseArrayLayer=0,
-		.imageSubresource.layerCount=223,
-		.imageExtent.width=16,
-		.imageExtent.height=16,
-		.imageExtent.depth=1,
-		.bufferOffset=0,
-	});
-
-	// Transfer destination -> Shader read-only layout
-	vkuTransitionLayout(CopyCommand, fontTexture.Image, 1, 0, 223, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-	// Done with command buffer, submit it
-	vkuOneShotCommandBufferEnd(&Context, CopyCommand);
-
-	// Done with the staging buffer
-	vkuDestroyBuffer(&Context, &stagingBuffer);
-
 	// Create static vertex data buffer
 	vkuCreateGPUBuffer(&Context, &fontVertexBuffer, sizeof(float)*4*4, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
@@ -232,10 +127,10 @@ static void _Font_Init(void)
 
 	vec4 *Ptr=(vec4 *)data;
 
-	*Ptr++=Vec4(0.0f, 1.0f, 0.0f, 1.0f);	// XYUV
-	*Ptr++=Vec4(0.0f, 0.0f, 0.0f, 0.0f);
-	*Ptr++=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
-	*Ptr++=Vec4(1.0f, 0.0f, 1.0f, 0.0f);
+	*Ptr++=Vec4(-0.5f, 1.0f, -1.0f, 1.0f);	// XYUV
+	*Ptr++=Vec4(-0.5f, 0.0f, -1.0f, -1.0f);
+	*Ptr++=Vec4(0.5f, 1.0f, 1.0f, 1.0f);
+	*Ptr++=Vec4(0.5f, 0.0f, 1.0f, -1.0f);
 
 	vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
 
@@ -249,6 +144,123 @@ static void _Font_Init(void)
 	// Create instance buffer and map it
 	vkuCreateHostBuffer(&Context, &fontInstanceBuffer, sizeof(vec4)*2*8192, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 	vkMapMemory(Context.Device, fontInstanceBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void *)&fontInstanceBufferPtr);
+}
+
+// Returns normalized (base) spacing for each character, to be later scaled by a size
+float Font_CharacterBaseWidth(const char ch)
+{
+	switch(ch)
+	{
+		case 32:	return 0.25f;	// Space
+
+		case 33:	return 0.165f;	// !
+		case 35:	return 0.375f;	// #
+		case 38:	return 0.425f;	// &
+		case 40:	return 0.375f;	// (
+		case 41:	return 0.375f;	// )
+		case 42:	return 0.375f;	// *
+		case 43:	return 0.375;	// +
+		case 44:	return 0.165f;	// ,
+		case 45:	return 0.375f;	// -
+		case 46:	return 0.165f;	// .
+		case 47:	return 0.375f;	// /
+			
+		case 48:    return 0.375f;	// 0
+		case 50:    return 0.375f;	// 2
+		case 49:    return 0.375f;	// 1
+		case 51:    return 0.375f;	// 3
+		case 52:    return 0.375f;	// 4
+		case 53:    return 0.375f;	// 5
+		case 54:    return 0.375f;	// 6
+		case 55:    return 0.375f;	// 7
+		case 56:    return 0.375f;	// 8
+		case 57:    return 0.375f;	// 9
+
+		case 58:	return 0.19f;	// :
+		case 59:	return 0.19f;	// ;
+		case 60:	return 0.375f;	// <
+		case 61:	return 0.375f;	// =
+		case 62:	return 0.375f;	// >
+		case 63:	return 0.4f;	// ?
+		case 64:	return 0.375f;	// @
+
+		case 65:    return 0.375f;	// A
+		case 66:    return 0.375f;	// B
+		case 67:    return 0.375f;	// C
+		case 68:    return 0.375f;	// D
+		case 69:    return 0.375f;	// E
+		case 70:    return 0.375f;	// F
+		case 71:    return 0.375f;	// G
+		case 72:    return 0.375f;	// H
+		case 73:    return 0.275f;	// I
+		case 74:    return 0.275f;	// J
+		case 75:    return 0.375f;	// K
+		case 76:    return 0.275f;	// L
+		case 77:    return 0.475f;	// M
+		case 78:    return 0.375f;	// N
+		case 79:    return 0.375f;	// O
+		case 80:    return 0.375f;	// P
+		case 81:    return 0.375f;	// Q
+		case 82:    return 0.375f;	// R
+		case 83:    return 0.375f;	// S
+		case 84:    return 0.375f;	// T
+		case 85:    return 0.375f;	// U
+		case 86:    return 0.375f;	// V
+		case 87:    return 0.425f;	// W
+		case 88:    return 0.425f;	// X
+		case 89:    return 0.425f;	// Y
+		case 90:    return 0.375f;	// Z
+
+		case 91:	return 0.325f;	// [
+		case 92:	return 0.375f;	// '\'
+		case 93:	return 0.325f;	// ]
+		case 94:	return 0.325f;	// ^
+		case 95:	return 0.375f;	// _
+
+		case 97:    return 0.375f;	// a
+		case 98:    return 0.375f;	// b
+		case 99:    return 0.375f;	// c
+		case 100:   return 0.375f;	// d
+		case 101:   return 0.375f;	// e
+		case 102:   return 0.325f;	// f
+		case 103:   return 0.375f;	// g
+		case 104:   return 0.375f;	// h
+		case 105:   return 0.19f;	// i
+		case 106:   return 0.19f;	// j
+		case 107:   return 0.375f;	// k
+		case 108:   return 0.19f;	// l
+		case 109:   return 0.475f;	// m
+		case 110:   return 0.375f;	// n
+		case 111:   return 0.375f;	// o
+		case 112:   return 0.375f;	// p
+		case 113:   return 0.375f;	// q
+		case 114:   return 0.375f;	// r
+		case 115:   return 0.375f;	// s
+		case 116:   return 0.375f;	// t
+		case 117:   return 0.375f;	// u
+		case 118:   return 0.375f;	// v
+		case 119:   return 0.425f;	// w
+		case 120:   return 0.425f;	// x
+		case 121:   return 0.425f;	// y
+		case 122:   return 0.375f;	// z
+
+		case 123:	return 0.375f;	// {
+		case 124:	return 0.165f;	// |
+		case 125:	return 0.375f;	// }
+
+		default:	return 0.0f;
+	};
+}
+
+// Sums up base character widths in a string to give a total that can be scaled by whatever text size
+float Font_StringBaseWidth(const char *string)
+{
+	float total=0.0f;
+
+	while(*string!='\0')
+		total+=Font_CharacterBaseWidth(*string++);
+
+	return total;
 }
 
 // Accumulates text to render
@@ -316,7 +328,7 @@ void Font_Print(float size, float x, float y, char *string, ...)
 		// Just advance spaces instead of rendering empty quads
 		if(*ptr==' ')
 		{
-			x+=size;
+			x+=Font_CharacterBaseWidth(*ptr)*size;
 			numchar--;
 			continue;
 		}
@@ -327,32 +339,32 @@ void Font_Print(float size, float x, float y, char *string, ...)
 		if(*ptr=='\x1B')
 		{
 			ptr++;
-			     if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{	r=0.0f;	g=0.0f;	b=0.0f;	}	// BLACK
-			else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{	r=0.5f;	g=0.0f;	b=0.0f;	}	// DARK RED
-			else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{	r=0.0f;	g=0.5f;	b=0.0f;	}	// DARK GREEN
-			else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{	r=0.5f;	g=0.5f;	b=0.0f;	}	// DARK YELLOW
-			else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{	r=0.0f;	g=0.0f;	b=0.5f;	}	// DARK BLUE
-			else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{	r=0.5f;	g=0.0f;	b=0.5f;	}	// DARK MAGENTA
-			else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{	r=0.0f;	g=0.5f;	b=0.5f;	}	// DARK CYAN
-			else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{	r=0.5f;	g=0.5f;	b=0.5f;	}	// GREY
-			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{	r=0.5f;	g=0.5f;	b=0.5f;	}	// GREY
-			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{	r=1.0f;	g=0.0f;	b=0.0f;	}	// RED
-			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{	r=0.0f;	g=1.0f;	b=0.0f;	}	// GREEN
-			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{	r=1.0f;	g=1.0f;	b=0.0f;	}	// YELLOW
-			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{	r=0.0f;	g=0.0f;	b=1.0f;	}	// BLUE
-			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{	r=1.0f;	g=0.0f;	b=1.0f;	}	// MAGENTA
-			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{	r=0.0f;	g=1.0f;	b=1.0f;	}	// CYAN
-			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{	r=1.0f;	g=1.0f;	b=1.0f;	}	// WHITE
+			     if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ r=0.0f; g=0.0f; b=0.0f; } // BLACK
+			else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ r=0.5f; g=0.0f; b=0.0f; } // DARK RED
+			else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ r=0.0f; g=0.5f; b=0.0f; } // DARK GREEN
+			else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ r=0.5f; g=0.5f; b=0.0f; } // DARK YELLOW
+			else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ r=0.0f; g=0.0f; b=0.5f; } // DARK BLUE
+			else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ r=0.5f; g=0.0f; b=0.5f; } // DARK MAGENTA
+			else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ r=0.0f; g=0.5f; b=0.5f; } // DARK CYAN
+			else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ r=0.5f; g=0.5f; b=0.5f; } // GREY
+			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ r=0.5f; g=0.5f; b=0.5f; } // GREY
+			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ r=1.0f; g=0.0f; b=0.0f; } // RED
+			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ r=0.0f; g=1.0f; b=0.0f; } // GREEN
+			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ r=1.0f; g=1.0f; b=0.0f; } // YELLOW
+			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ r=0.0f; g=0.0f; b=1.0f; } // BLUE
+			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ r=1.0f; g=0.0f; b=1.0f; } // MAGENTA
+			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ r=0.0f; g=1.0f; b=1.0f; } // CYAN
+			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ r=1.0f; g=1.0f; b=1.0f; } // WHITE
 			ptr+=4;
 			numchar-=5;
 		}
 
-		// Emit position, atlas offset, and color for this character
-		*Instance++=Vec4(x, y, (float)(*ptr-33), size); // Instance position, character to render, size
-		*Instance++=Vec4(r, g, b, 1.0f);				// Instance color
-
 		// Advance one character
-		x+=size;
+		x+=Font_CharacterBaseWidth(*ptr)*size;
+
+		// Emit position, atlas offset, and color for this character
+		*Instance++=Vec4(x-((Font_CharacterBaseWidth(*ptr)*0.5f)*size), y, (float)(*ptr), size);	// Instance position, character to render, size
+		*Instance++=Vec4(r, g, b, 1.0f);															// Instance color
 	}
 	// ---
 }
@@ -362,12 +374,6 @@ void Font_Draw(uint32_t Index)
 {
 	// Bind the font rendering pipeline (sets states and shaders)
 	vkCmdBindPipeline(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, fontPipeline.Pipeline);
-
-	// Bind descriptor sets (sets uniform/texture bindings)
-	vkuDescriptorSet_UpdateBindingImageInfo(&fontDescriptorSet, 0, &fontTexture);
-	vkuAllocateUpdateDescriptorSet(&fontDescriptorSet, PerFrame[Index].DescriptorPool);
-
-	vkCmdBindDescriptorSets(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, fontPipelineLayout, 0, 1, &fontDescriptorSet.DescriptorSet, 0, NULL);
 
 	uint32_t viewport[2]={ Width, Height };
 	vkCmdPushConstants(PerFrame[Index].CommandBuffer, fontPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t)*2, viewport);
@@ -395,9 +401,6 @@ void Font_Destroy(void)
 
 	// Vertex data handles
 	vkuDestroyBuffer(&Context, &fontVertexBuffer);
-
-	// Texture handles
-	vkuDestroyImageBuffer(&Context, &fontTexture);
 
 	// Pipeline
 	vkDestroyPipelineLayout(Context.Device, fontPipelineLayout, VK_NULL_HANDLE);

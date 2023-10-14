@@ -878,7 +878,7 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 			break;
 
 		case 32:
-			Format=VK_FORMAT_B8G8R8A8_UNORM;
+			Format=VK_FORMAT_B8G8R8A8_SRGB;
 			break;
 
 		case 16:

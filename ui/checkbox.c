@@ -26,7 +26,7 @@ uint32_t UI_AddCheckBox(UI_t *UI, vec2 Position, float Radius, vec3 Color, const
 		.CheckBox.Value=Value
 	};
 
-	snprintf(Control.TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
+	snprintf(Control.CheckBox.TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
 
 	if(!List_Add(&UI->Controls, &Control))
 		return UINT32_MAX;
@@ -49,8 +49,8 @@ bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 Position, float Radius, vec3 
 	{
 		Control->Position=Position;
 		Control->Color=Color;
-		snprintf(Control->TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
 
+		snprintf(Control->CheckBox.TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
 		Control->CheckBox.Radius=Radius;
 		Control->CheckBox.Value=Value;
 
@@ -125,7 +125,7 @@ bool UI_UpdateCheckBoxTitleText(UI_t *UI, uint32_t ID, const char *TitleText)
 
 	if(Control!=NULL&&Control->Type==UI_CONTROL_CHECKBOX)
 	{
-		snprintf(Control->TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
+		snprintf(Control->CheckBox.TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
 		return true;
 	}
 

@@ -26,7 +26,7 @@ uint32_t UI_AddButton(UI_t *UI, vec2 Position, vec2 Size, vec3 Color, const char
 		.Button.Callback=Callback
 	};
 
-	snprintf(Control.TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
+	snprintf(Control.Button.TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
 
 	if(!List_Add(&UI->Controls, &Control))
 		return UINT32_MAX;
@@ -49,8 +49,8 @@ bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 Position, vec2 Size, vec3 Color
 	{
 		Control->Position=Position;
 		Control->Color=Color;
-		snprintf(Control->TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
 
+		snprintf(Control->Button.TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
 		Control->Button.Size=Size;
 		Control->Button.Callback=Callback;
 
@@ -125,7 +125,7 @@ bool UI_UpdateButtonTitleText(UI_t *UI, uint32_t ID, const char *TitleText)
 
 	if(Control!=NULL&&Control->Type==UI_CONTROL_BUTTON)
 	{
-		snprintf(Control->TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
+		snprintf(Control->Button.TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
 		return true;
 	}
 

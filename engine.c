@@ -225,8 +225,8 @@ bool CreatePipeline(void)
 			.pPushConstantRanges=&(VkPushConstantRange)
 		{
 			.offset=0,
-				.size=sizeof(matrix),
-				.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+			.size=sizeof(matrix),
+			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 	}, 0, &PipelineLayout);
 
@@ -396,12 +396,12 @@ bool CreateSpherePipeline(void)
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-			.pushConstantRangeCount=1,
-			.pPushConstantRanges=&(VkPushConstantRange)
+		.pushConstantRangeCount=1,
+		.pPushConstantRanges=&(VkPushConstantRange)
 		{
 			.offset=0,
-				.size=sizeof(matrix)+sizeof(vec4),
-				.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+			.size=sizeof(matrix)+sizeof(vec4),
+			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 	}, 0, &SpherePipelineLayout);
 
@@ -442,12 +442,12 @@ bool CreateLinePipeline(void)
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-			.pushConstantRangeCount=1,
-			.pPushConstantRanges=&(VkPushConstantRange)
+		.pushConstantRangeCount=1,
+		.pPushConstantRanges=&(VkPushConstantRange)
 		{
 			.offset=0,
-				.size=sizeof(matrix)+(sizeof(vec4)*3),
-				.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+			.size=sizeof(matrix)+(sizeof(vec4)*3),
+			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 	}, 0, &LinePipelineLayout);
 
@@ -494,25 +494,25 @@ void Thread_Constructor(void *Arg)
 			vkCreateCommandPool(Context.Device, &(VkCommandPoolCreateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-					.flags=0,
-					.queueFamilyIndex=Context.QueueFamilyIndex,
+				.flags=0,
+				.queueFamilyIndex=Context.QueueFamilyIndex,
 			}, VK_NULL_HANDLE, &Data->PerFrame[Frame].CommandPool[Eye]);
 
 			vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-					.commandPool=Data->PerFrame[Frame].CommandPool[Eye],
-					.level=VK_COMMAND_BUFFER_LEVEL_SECONDARY,
-					.commandBufferCount=1,
+				.commandPool=Data->PerFrame[Frame].CommandPool[Eye],
+				.level=VK_COMMAND_BUFFER_LEVEL_SECONDARY,
+				.commandBufferCount=1,
 			}, &Data->PerFrame[Frame].SecCommandBuffer[Eye]);
 
 			// Create a large descriptor pool, so I don't have to worry about readjusting for exactly what I have
 			vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-					.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
-					.poolSizeCount=4,
-					.pPoolSizes=(VkDescriptorPoolSize[])
+				.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
+				.poolSizeCount=4,
+				.pPoolSizes=(VkDescriptorPoolSize[])
 				{
 					{
 						.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -569,10 +569,10 @@ void Thread_Main(void *Arg)
 				.pNext=&(VkCommandBufferInheritanceRenderingInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-					.colorAttachmentCount=1,
-					.pColorAttachmentFormats=&ColorFormat,
-					.depthAttachmentFormat=DepthFormat,
-					.rasterizationSamples=MSAA
+				.colorAttachmentCount=1,
+				.pColorAttachmentFormats=&ColorFormat,
+				.depthAttachmentFormat=DepthFormat,
+				.rasterizationSamples=MSAA
 			},
 		}
 	});
@@ -695,13 +695,13 @@ void Thread_Skybox(void *Arg)
 			.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-				.pNext=&(VkCommandBufferInheritanceRenderingInfo)
+			.pNext=&(VkCommandBufferInheritanceRenderingInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-					.colorAttachmentCount=1,
-					.pColorAttachmentFormats=&ColorFormat,
-					.depthAttachmentFormat=DepthFormat,
-					.rasterizationSamples=MSAA
+				.colorAttachmentCount=1,
+				.pColorAttachmentFormats=&ColorFormat,
+				.depthAttachmentFormat=DepthFormat,
+				.rasterizationSamples=MSAA
 			},
 		}
 	});
@@ -737,17 +737,17 @@ void Thread_Particles(void *Arg)
 	vkBeginCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], &(VkCommandBufferBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-			.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
-			.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
+		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-				.pNext=&(VkCommandBufferInheritanceRenderingInfo)
+			.pNext=&(VkCommandBufferInheritanceRenderingInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-					.colorAttachmentCount=1,
-					.pColorAttachmentFormats=&ColorFormat,
-					.depthAttachmentFormat=DepthFormat,
-					.rasterizationSamples=MSAA
+				.colorAttachmentCount=1,
+				.pColorAttachmentFormats=&ColorFormat,
+				.depthAttachmentFormat=DepthFormat,
+				.rasterizationSamples=MSAA
 			},
 		}
 	});
@@ -797,30 +797,30 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	vkCmdBeginRendering(CommandBuffer, &(VkRenderingInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDERING_INFO,
-			.flags=VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT,
-			.renderArea=(VkRect2D){ { 0, 0 }, { rtWidth, rtHeight } },
-			.layerCount=1,
-			.colorAttachmentCount=1,
-			.pColorAttachments=&(VkRenderingAttachmentInfo)
+		.flags=VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT,
+		.renderArea=(VkRect2D){ { 0, 0 }, { rtWidth, rtHeight } },
+		.layerCount=1,
+		.colorAttachmentCount=1,
+		.pColorAttachments=&(VkRenderingAttachmentInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-				.imageView=ColorImage[Eye].View,
-				.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-				.resolveMode=VK_RESOLVE_MODE_AVERAGE_BIT,
-				.resolveImageView=ColorResolve[Eye].View,
-				.resolveImageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-				.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.clearValue=(VkClearValue){ .color.float32={ 0.0f, 0.0f, 0.0f, 1.0f } },
+			.imageView=ColorImage[Eye].View,
+			.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			.resolveMode=VK_RESOLVE_MODE_AVERAGE_BIT,
+			.resolveImageView=ColorResolve[Eye].View,
+			.resolveImageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.clearValue=(VkClearValue){ .color.float32={ 0.0f, 0.0f, 0.0f, 1.0f } },
 		},
-			.pDepthAttachment=&(VkRenderingAttachmentInfo)
+		.pDepthAttachment=&(VkRenderingAttachmentInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-				.imageView=DepthImage[Eye].View,
-				.imageLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-				.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.clearValue=(VkClearValue){ .depthStencil={ 0.0f, 0 } },
+			.imageView=DepthImage[Eye].View,
+			.imageLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.clearValue=(VkClearValue){ .depthStencil={ 0.0f, 0 } },
 		},
 	});
 
@@ -843,8 +843,8 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	vkCmdExecuteCommands(CommandBuffer, 3, (VkCommandBuffer[])
 	{
 		ThreadData[0].PerFrame[Index].SecCommandBuffer[Eye],
-			ThreadData[1].PerFrame[Index].SecCommandBuffer[Eye],
-			ThreadData[2].PerFrame[Index].SecCommandBuffer[Eye]
+		ThreadData[1].PerFrame[Index].SecCommandBuffer[Eye],
+		ThreadData[2].PerFrame[Index].SecCommandBuffer[Eye]
 	});
 
 	vkCmdEndRendering(CommandBuffer);
@@ -1031,6 +1031,7 @@ void NetUpdate(void *Arg)
 uint32_t RedID=UINT32_MAX;
 uint32_t GreenID=UINT32_MAX;
 uint32_t BlueID=UINT32_MAX;
+uint32_t FaceID=UINT32_MAX;
 
 // Render call from system main event loop
 void Render(void)
@@ -1038,6 +1039,9 @@ void Render(void)
 	static uint32_t Index=0;
 	uint32_t imageIndex;
 	matrix Pose;
+
+	UI_UpdateSpriteRotation(&UI, FaceID, (float)fTime*2.0f);
+	UI_UpdateSpritePosition(&UI, FaceID, Vec2(((float)Width/2.0f)+sinf(-fTime*2.0f)*100.0f, ((float)Height/2.0f)+cosf(-fTime*2.0f)*100.0f));
 
 	Thread_AddJob(&ThreadPhysics, Thread_Physics, NULL);
 	//	Thread_Physics(NULL);
@@ -1067,7 +1071,7 @@ void Render(void)
 	vkBeginCommandBuffer(PerFrame[Index].CommandBuffer, &(VkCommandBufferBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-			.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 	});
 
 	PerFrame[Index].Skybox_UBO[0]->uSunColor.x=UI_GetBarGraphValue(&UI, RedID);
@@ -1113,27 +1117,27 @@ void Render(void)
 	vkQueueSubmit(Context.Queue, 1, &(VkSubmitInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
-			.pWaitDstStageMask=&(VkPipelineStageFlags)
+		.pWaitDstStageMask=&(VkPipelineStageFlags)
 		{
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
 		},
-			.waitSemaphoreCount=1,
-			.pWaitSemaphores=&PerFrame[Index].PresentCompleteSemaphore,
-			.signalSemaphoreCount=1,
-			.pSignalSemaphores=&PerFrame[Index].RenderCompleteSemaphore,
-			.commandBufferCount=1,
-			.pCommandBuffers=&PerFrame[Index].CommandBuffer,
+		.waitSemaphoreCount=1,
+		.pWaitSemaphores=&PerFrame[Index].PresentCompleteSemaphore,
+		.signalSemaphoreCount=1,
+		.pSignalSemaphores=&PerFrame[Index].RenderCompleteSemaphore,
+		.commandBufferCount=1,
+		.pCommandBuffers=&PerFrame[Index].CommandBuffer,
 	}, PerFrame[Index].FrameFence);
 
 	// And present it to the screen
 	Result=vkQueuePresentKHR(Context.Queue, &(VkPresentInfoKHR)
 	{
 		.sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-			.waitSemaphoreCount=1,
-			.pWaitSemaphores=&PerFrame[Index].RenderCompleteSemaphore,
-			.swapchainCount=1,
-			.pSwapchains=&Swapchain.Swapchain,
-			.pImageIndices=&imageIndex,
+		.waitSemaphoreCount=1,
+		.pWaitSemaphores=&PerFrame[Index].RenderCompleteSemaphore,
+		.swapchainCount=1,
+		.pSwapchains=&Swapchain.Swapchain,
+		.pImageIndices=&imageIndex,
 	});
 
 	if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
@@ -1273,6 +1277,8 @@ bool Init(void)
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4], "./assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4_NORMAL], "./assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 
+	Image_Upload(&Context, &Textures[TEXTURE_FACE], "./assets/face.tga", IMAGE_MIPMAP|IMAGE_BILINEAR);
+
 	GenNebulaVolume(&Context, &Textures[TEXTURE_VOLUME]);
 
 	// Create primary pipeline
@@ -1315,7 +1321,7 @@ bool Init(void)
 		CreateCompositeFramebuffers(1, rtWidth, rtHeight);
 	}
 
-	UI_Init(&UI, rtWidth, rtHeight);
+	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)rtWidth, (float)rtHeight));
 
 	RedID=UI_AddBarGraph(&UI,
 						 Vec2(0.0f, 800.0f),		// Position
@@ -1358,6 +1364,8 @@ bool Init(void)
 				   "Checkbox 2",					// Title text
 				   false);							// Initial value
 
+	FaceID=UI_AddSprite(&UI, Vec2((float)Width/2.0f, (float)Height/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &Textures[TEXTURE_FACE], 0.0f);
+
 	// Other per-frame data
 	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
@@ -1375,9 +1383,9 @@ bool Init(void)
 		vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-				.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
-				.poolSizeCount=4,
-				.pPoolSizes=(VkDescriptorPoolSize[])
+			.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
+			.poolSizeCount=4,
+			.pPoolSizes=(VkDescriptorPoolSize[])
 			{
 				{
 					.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -1502,8 +1510,8 @@ void RecreateSwapchain(void)
 		rtWidth=Width;
 		rtHeight=Height;
 
-		UI.Width=rtWidth;
-		UI.Height=rtHeight;
+		UI.Size.x=(float)rtWidth;
+		UI.Size.y=(float)rtHeight;
 
 		// Wait for the device to complete any pending work
 		vkDeviceWaitIdle(Context.Device);

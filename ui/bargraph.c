@@ -27,7 +27,7 @@ uint32_t UI_AddBarGraph(UI_t *UI, vec2 Position, vec2 Size, vec3 Color, const ch
 		.BarGraph.Value=Value
 	};
 
-	snprintf(Control.TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
+	snprintf(Control.BarGraph.TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
 
 	if(!List_Add(&UI->Controls, &Control))
 		return UINT32_MAX;
@@ -47,8 +47,8 @@ bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 Position, vec2 Size, vec3 Col
 	{
 		Control->Position=Position;
 		Control->Color=Color;
-		snprintf(Control->TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
 
+		snprintf(Control->BarGraph.TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
 		Control->BarGraph.Size=Size;
 		Control->BarGraph.Readonly=Readonly;
 		Control->BarGraph.Min=Min;
@@ -126,7 +126,7 @@ bool UI_UpdateBarGraphTitleText(UI_t *UI, uint32_t ID, const char *TitleText)
 
 	if(Control!=NULL&&Control->Type==UI_CONTROL_BARGRAPH)
 	{
-		snprintf(Control->TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
+		snprintf(Control->BarGraph.TitleText, UI_CONTROL_TITLETEXT_MAX, "%s", TitleText);
 		return true;
 	}
 
