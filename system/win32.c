@@ -233,8 +233,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 				case RIM_TYPEMOUSE:
                 {
-//					SetCursorPos(100, 100);
-//					SetCursor(NULL);
+					SetCursorPos(Width>>1, Height>>1);
+					SetCursor(NULL);
 					
 					RAWMOUSE Mouse=Input->data.mouse;
 					static MouseEvent_t MouseEvent={ 0, 0, 0, 0 };
@@ -272,19 +272,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					if(Mouse.usButtonFlags&RI_MOUSE_WHEEL)
 						MouseEvent.dz=Mouse.usButtonData;
 
-					//if(Mouse.usFlags==MOUSE_MOVE_RELATIVE)
-					//{
-					//	if(Mouse.lLastX!=0||Mouse.lLastY!=0)
-					//	{
-					//		MouseEvent.x=Mouse.lLastX;
-					//		MouseEvent.y=Mouse.lLastY;
-					//	}
-					//}
-					POINT mouse;
-					GetCursorPos(&mouse);
+					if(Mouse.usFlags==MOUSE_MOVE_RELATIVE)
+					{
+						if(Mouse.lLastX!=0||Mouse.lLastY!=0)
+						{
+							MouseEvent.dx=Mouse.lLastX;
+							MouseEvent.dy=-Mouse.lLastY;
+						}
+					}
+					//POINT mouse;
+					//GetCursorPos(&mouse);
 
-					MouseEvent.x=mouse.x;
-					MouseEvent.y=mouse.y;
+					//MouseEvent.x=mouse.x;
+					//MouseEvent.y=Height-mouse.y;
 
 					if(Mouse.usButtonFlags&(RI_MOUSE_BUTTON_1_DOWN|RI_MOUSE_BUTTON_2_DOWN|RI_MOUSE_BUTTON_3_DOWN|RI_MOUSE_BUTTON_4_DOWN|RI_MOUSE_BUTTON_5_DOWN))
 						Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
@@ -426,7 +426,7 @@ int main(int argc, char **argv)
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Creating swapchain...\n");
-	vkuCreateSwapchain(&Context, &Swapchain, Width, Height, VK_TRUE);
+	vkuCreateSwapchain(&Context, &Swapchain, VK_TRUE);
 
 	DBGPRINTF(DEBUG_INFO, "Initalizing Vulkan resources...\n");
 	if(!Init())

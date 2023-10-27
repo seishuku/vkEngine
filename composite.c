@@ -28,6 +28,7 @@ VkuImage_t ColorTemp[2];		// left and right eye blur color buffer
 
 //extern VkuImage_t ShadowDepth;
 extern UI_t UI;
+extern Font_t Font;
 
 VkuDescriptorSet_t CompositeDescriptorSet;
 VkPipelineLayout CompositePipelineLayout;
@@ -388,8 +389,8 @@ void CompositeDraw(uint32_t Index, uint32_t Eye)
 		UI_Draw(&UI, Index);
 
 		// Draw text in the compositing renderpass
-		Font_Print(16.0f, 0.0f, 0.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep*1000.0f);
-		Font_Draw(Index);
+		Font_Print(&Font, 16.0f, 0.0f, 0.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep*1000.0f);
+		Font_Draw(&Font, Index);
 
 		vkCmdEndRendering(PerFrame[Index].CommandBuffer);
 	}

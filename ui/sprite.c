@@ -14,10 +14,9 @@ extern VkuContext_t Context;
 // Returns an ID, or UINT32_MAX on failure.
 uint32_t UI_AddSprite(UI_t *UI, vec2 Position, vec2 Size, vec3 Color, VkuImage_t *Image, float Rotation)
 {
-	uint32_t ID=GenID();
-	static uint32_t SpriteDescriptorSetCount=0;
+	uint32_t ID=UI->IDBase++;
 
-	if(ID==UINT32_MAX)
+	if(ID==UINT32_MAX||ID>=UI_HASHTABLE_MAX)
 		return UINT32_MAX;
 
 	UI_Control_t Control=
@@ -26,7 +25,6 @@ uint32_t UI_AddSprite(UI_t *UI, vec2 Position, vec2 Size, vec3 Color, VkuImage_t
 		.ID=ID,
 		.Position=Position,
 		.Color=Color,
-		.Sprite.DescriptorSetOffset=SpriteDescriptorSetCount++,
 		.Sprite.Image=Image,
 		.Sprite.Size=Size,
 		.Sprite.Rotation=Rotation
@@ -35,31 +33,7 @@ uint32_t UI_AddSprite(UI_t *UI, vec2 Position, vec2 Size, vec3 Color, VkuImage_t
 	if(!List_Add(&UI->Controls, &Control))
 		return UINT32_MAX;
 
-	VkDescriptorSet DescriptorSet=VK_NULL_HANDLE;
-	VkDescriptorSetAllocateInfo AllocateInfo=
-	{
-		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-		.descriptorPool=UI->DescriptorPool,
-		.descriptorSetCount=1,
-		.pSetLayouts=&UI->DescriptorSetLayout,
-	};
-
-	vkAllocateDescriptorSets(Context.Device, &AllocateInfo, &DescriptorSet);
-
-	// Need to update destination set handle now that one has been allocated.
-	VkWriteDescriptorSet WriteDescriptorSet=
-	{
-		.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-		.dstSet=DescriptorSet,
-		.dstBinding=0,
-		.descriptorCount=1,
-		.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		.pImageInfo=&(VkDescriptorImageInfo) { Image->Sampler, Image->View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
-	};
-
-	vkUpdateDescriptorSets(Context.Device, 1, &WriteDescriptorSet, 0, VK_NULL_HANDLE);
-
-	List_Add(&UI->DescriptorSets, &DescriptorSet);
+	UI->Controls_Hashtable[ID]=List_GetPointer(&UI->Controls, List_GetCount(&UI->Controls)-1);
 
 	return ID;
 }

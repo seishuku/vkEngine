@@ -69,6 +69,7 @@
     <ClCompile Include="ui\bargraph.c" />
     <ClCompile Include="ui\button.c" />
     <ClCompile Include="ui\checkbox.c" />
+    <ClCompile Include="ui\cursor.c" />
     <ClCompile Include="ui\sprite.c" />
     <ClCompile Include="ui\ui.c" />
     <ClCompile Include="utils\event.c" />

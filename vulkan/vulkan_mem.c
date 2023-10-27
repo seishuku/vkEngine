@@ -159,7 +159,7 @@ VkuMemBlock_t *vkuMem_Malloc(VkuMemZone_t *VkZone, VkMemoryRequirements Requirem
 			Base->Free=false;
 
 #ifdef _DEBUG
-			DBGPRINTF(DEBUG_WARNING, "Vulkan mem allocate block - Location offset: %lld Size: %0.3fKB\n", Base->Offset, (float)Base->Size/1000.0f);
+			DBGPRINTF(DEBUG_WARNING, "Vulkan mem allocate block - Location offset: %zu Size: %0.3fKB\n", Base->Offset, (float)Base->Size/1000.0f);
 #endif
 			return Base;
 		}

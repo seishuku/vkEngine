@@ -329,6 +329,9 @@
     <ClCompile Include="ui\sprite.c">
       <Filter>Source Files\ui</Filter>
     </ClCompile>
+    <ClCompile Include="ui\cursor.c">
+      <Filter>Source Files\ui</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <GLSL Include="shaders\bezier.frag">

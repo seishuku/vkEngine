@@ -36,6 +36,10 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 		return VK_FALSE;
 	}
 
+	//DBGPRINTF(DEBUG_INFO, "Instance extensions:\n");
+	//for(uint32_t i=0;i<ExtensionCount;i++)
+	//	DBGPRINTF(DEBUG_INFO, "\t%s\n", ExtensionProperties[i].extensionName);
+
 	VkBool32 SurfaceOSExtension=VK_FALSE;
 	VkBool32 SurfaceExtension=VK_FALSE;
 	VkBool32 DebugExtension=VK_FALSE;
@@ -48,10 +52,16 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 			DBGPRINTF(DEBUG_INFO, VK_KHR_WIN32_SURFACE_EXTENSION_NAME" extension is supported!\n");
 			SurfaceOSExtension=VK_TRUE;
 		}
-#else
+#elif LINUX
 		if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_XLIB_SURFACE_EXTENSION_NAME)==0)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_KHR_XLIB_SURFACE_EXTENSION_NAME" extension is supported!\n");
+			SurfaceOSExtension=VK_TRUE;
+		}
+#elif ANDROID
+		if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME" extension is supported!\n");
 			SurfaceOSExtension=VK_TRUE;
 		}
 #endif
@@ -91,8 +101,10 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 	{
 #ifdef WIN32
 			VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-#else
+#elif LINUX
 			VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
+#elif ANDROID
+			VK_KHR_ANDROID_SURFACE_EXTENSION_NAME,
 #endif
 			VK_KHR_SURFACE_EXTENSION_NAME,
 #ifdef _DEBUG
@@ -115,16 +127,16 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 		.pApplicationInfo=&AppInfo,
 		.enabledExtensionCount=sizeof(Extensions)/sizeof(void *),
 		.ppEnabledExtensionNames=Extensions,
-#ifdef _DEBUG
+//#ifdef _DEBUG
 		//.pNext=&(VkValidationFeaturesEXT)
 		//{
 		//	.sType=VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
 		//	.pEnabledValidationFeatures=enabledValidationFeatures,
 		//	.enabledValidationFeatureCount=sizeof(enabledValidationFeatures)/sizeof(VkValidationFeatureEnableEXT),
 		//},
+//#endif
 		.enabledLayerCount=1,
 		.ppEnabledLayerNames=(const char *[]) { "VK_LAYER_KHRONOS_validation" },
-#endif
 	};
 
 	if(vkCreateInstance(&InstanceInfo, 0, Instance)!=VK_SUCCESS)
@@ -137,13 +149,13 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 	{
 		if((_vkCreateDebugUtilsMessengerEXT=(PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(*Instance, "vkCreateDebugUtilsMessengerEXT"))==VK_NULL_HANDLE)
 		{
-			DBGPRINTF("vkGetInstanceProcAddr failed on vkCreateDebugUtilsMessengerEXT.\n");
-			return VK_FALSE;
+			DBGPRINTF("vkGetInstanceProcAddr failed on vkCreateDebugUtilsMessengerEXT... Disabling DebugExtension.\n");
+			DebugExtension=VK_FALSE;
 		}
 		else if((_vkDestroyDebugUtilsMessengerEXT=(PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(*Instance, "vkDestroyDebugUtilsMessengerEXT"))==VK_NULL_HANDLE)
 		{
 			DBGPRINTF("vkGetInstanceProcAddr failed on vkDestroyDebugUtilsMessengerEXT.\n");
-			return VK_FALSE;
+			DebugExtension=VK_FALSE;
 		}
 	}
 

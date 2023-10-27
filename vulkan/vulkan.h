@@ -4,10 +4,13 @@
 #ifdef WIN32
 #define VK_USE_PLATFORM_WIN32_KHR
 #include <Windows.h>
-#else
+#elif LINUX
 #define VK_USE_PLATFORM_XLIB_KHR
 #include <X11/Xlib.h>
 #include <GL/glx.h>
+#elif ANDROID
+#define VK_USE_PLATFORM_ANDROID_KHR
+#include <android/native_activity.h>
 #endif
 
 #include <vulkan/vulkan.h>
@@ -42,15 +45,21 @@ typedef struct
 {
 #ifdef WIN32
 	HWND hWnd;
-#else
+#elif LINUX
 	Display *Dpy;
 	Window Win;
+#elif ANDROID
+	ANativeWindow *Win;
 #endif
 
 	VkSurfaceKHR Surface;
 
 	uint32_t QueueFamilyIndex;
 	VkPhysicalDevice PhysicalDevice;
+
+	VkBool32 SwapchainExtension;
+	VkBool32 PushDescriptorExtension;
+	VkBool32 DynamicRenderingExtension;
 
 	VkPhysicalDeviceProperties2 DeviceProperties;
 	VkPhysicalDeviceMaintenance3Properties DeviceProperties2;
@@ -297,7 +306,7 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance);
 VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context);
 void DestroyVulkan(VkInstance Instance, VkuContext_t *Context);
 
-VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, uint32_t Width, uint32_t Height, VkBool32 VSync);
+VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, VkBool32 VSync);
 void vkuDestroySwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain);
 
 VkBool32 vkuFramebufferAddAttachment(VkuFramebuffer_t *Framebuffer, VkImageView Attachment);

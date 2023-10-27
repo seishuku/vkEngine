@@ -22,7 +22,7 @@
 #endif
 
 #ifndef DBGPRINTF
-#define DBGPRINTF(level, ...) fprintf(stderr, level __VA_ARGS__)
+#define DBGPRINTF(level, ...) do { fprintf(stderr, level __VA_ARGS__); fprintf(stderr, DEBUG_NONE); } while(0)
 #endif
 
 #ifndef BUFFER_OFFSET

@@ -6,9 +6,17 @@
 #include "../system/system.h"
 #include "vulkan.h"
 
-VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, uint32_t Width, uint32_t Height, VkBool32 VSync)
+VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, VkBool32 VSync)
 {
 	VkResult result=VK_SUCCESS;
+	VkFormat PreferredFormats[]=
+	{
+		VK_FORMAT_B8G8R8A8_SRGB,
+		VK_FORMAT_B8G8R8A8_UNORM,
+		VK_FORMAT_R8G8B8A8_SRGB,
+		VK_FORMAT_R8G8B8A8_UNORM
+	};
+	bool FoundFormat=false;
 
 	if(!Swapchain)
 		return VK_FALSE;
@@ -23,14 +31,21 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 
 	vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &FormatCount, SurfaceFormats);
 
-	// Find the format we want
-	for(uint32_t i=0;i<FormatCount;i++)
+	// Find a suitable format, best match to top preferred format
+	for(uint32_t i=0;i<sizeof(PreferredFormats);i++)
 	{
-		if(SurfaceFormats[i].format==VK_FORMAT_B8G8R8A8_SRGB)
+		for(uint32_t j=0;j<FormatCount;j++)
 		{
-			Swapchain->SurfaceFormat=SurfaceFormats[i];
-			break;
+			if(SurfaceFormats[j].format==PreferredFormats[i])
+			{
+				Swapchain->SurfaceFormat=SurfaceFormats[j];
+				FoundFormat=true;
+				break;
+			}
 		}
+
+		if(FoundFormat)
+			break;
 	}
 
 	Zone_Free(Zone, SurfaceFormats);
@@ -38,6 +53,18 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 	// Get physical device surface properties and formats
 	VkSurfaceCapabilitiesKHR SurfCaps;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Context->PhysicalDevice, Context->Surface, &SurfCaps);
+
+	if(SurfCaps.currentTransform&VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR)
+	{
+		// Swap to get identity width and height
+		uint32_t width=SurfCaps.currentExtent.width;
+		uint32_t height=SurfCaps.currentExtent.height;
+		SurfCaps.currentExtent.height=width;
+		SurfCaps.currentExtent.width=height;
+	}
+
+	// Set swapchain extents to the surface width/height
+	Swapchain->Extent=SurfCaps.currentExtent;
 
 	// Get available present modes
 	uint32_t PresentModeCount=0;
@@ -49,10 +76,6 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 		return VK_FALSE;
 
 	vkGetPhysicalDeviceSurfacePresentModesKHR(Context->PhysicalDevice, Context->Surface, &PresentModeCount, PresentModes);
-
-	// Set swapchain extents to the surface width/height
-	Swapchain->Extent.width=Width;
-	Swapchain->Extent.height=Height;
 
 	// Select a present mode for the swapchain
 
@@ -91,7 +114,7 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 		VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR
 	};
 
-	for(uint32_t i=0;i<4;i++)
+	for(uint32_t i=0;i<sizeof(CompositeAlphaFlags);i++)
 	{
 		if(SurfCaps.supportedCompositeAlpha&CompositeAlphaFlags[i])
 		{
@@ -125,7 +148,7 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 		.imageSharingMode=VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount=0,
 		.pQueueFamilyIndices=VK_NULL_HANDLE,
-		.preTransform=VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+		.preTransform=SurfCaps.currentTransform,
 		.compositeAlpha=CompositeAlpha,
 		.presentMode=SwapchainPresentMode,
 		// Setting clipped to VK_TRUE allows the implementation to discard rendering outside of the surface area
@@ -135,7 +158,7 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 
 	if(result!=VK_SUCCESS)
 	{
-		DBGPRINTF(DEBUG_ERROR, "vkCreateSwapchainKHR failed. (result: %d)\n", result);
+		DBGPRINTF(DEBUG_ERROR, "vkCreateSwapchainKHR failed. (result: %d)", result);
 		return VK_FALSE;
 	}
 
@@ -146,7 +169,7 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, ui
 	// Check to make sure the driver doesn't want more than what we can support
 	if(Swapchain->NumImages==0||Swapchain->NumImages>VKU_MAX_FRAME_COUNT)
 	{
-		DBGPRINTF(DEBUG_ERROR, "Swapchain minimum image count is greater than supported number of images. (requested: %d, minimum: %d", VKU_MAX_FRAME_COUNT, SurfCaps.minImageCount);
+		DBGPRINTF(DEBUG_ERROR, "Swapchain minimum image count is greater than supported number of images. (requested: %d, minimum: %d)", VKU_MAX_FRAME_COUNT, SurfCaps.minImageCount);
 		return VK_FALSE;
 	}
 

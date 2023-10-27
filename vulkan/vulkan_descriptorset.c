@@ -46,7 +46,7 @@ VkBool32 vkuDescriptorSet_AddBinding(VkuDescriptorSet_t *DescriptorSet, uint32_t
 
 VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkuImage_t *Image)
 {
-	if(!DescriptorSet)
+	if(!DescriptorSet||!Image)
 		return VK_FALSE;
 
 	if(Binding>=VKU_MAX_DESCRIPTORSET_BINDINGS)
@@ -70,7 +70,7 @@ VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *Descriptor
 	return VK_TRUE;
 }
 
-// Initalize the descriptor set layout structures
+// Initialize the descriptor set layout structures
 VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *DescriptorSet, VkuContext_t *Context)
 {
 	if(!DescriptorSet||!Context)

@@ -174,7 +174,14 @@ Camera_t NetCameras[MAX_CLIENTS];
 //////
 
 // UI Stuff
+Font_t Font;
 UI_t UI;
+
+uint32_t RedID=UINT32_MAX;
+uint32_t GreenID=UINT32_MAX;
+uint32_t BlueID=UINT32_MAX;
+uint32_t FaceID=UINT32_MAX;
+uint32_t CursorID=UINT32_MAX;
 //////
 
 void RecreateSwapchain(void);
@@ -1028,11 +1035,6 @@ void NetUpdate(void *Arg)
 	}
 }
 
-uint32_t RedID=UINT32_MAX;
-uint32_t GreenID=UINT32_MAX;
-uint32_t BlueID=UINT32_MAX;
-uint32_t FaceID=UINT32_MAX;
-
 // Render call from system main event loop
 void Render(void)
 {
@@ -1321,6 +1323,8 @@ bool Init(void)
 		CreateCompositeFramebuffers(1, rtWidth, rtHeight);
 	}
 
+	Font_Init(&Font);
+
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)rtWidth, (float)rtHeight));
 
 	RedID=UI_AddBarGraph(&UI,
@@ -1365,6 +1369,8 @@ bool Init(void)
 				   false);							// Initial value
 
 	FaceID=UI_AddSprite(&UI, Vec2((float)Width/2.0f, (float)Height/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &Textures[TEXTURE_FACE], 0.0f);
+
+	CursorID=UI_AddCursor(&UI, Vec2((float)Swapchain.Extent.width/2.0f, (float)Swapchain.Extent.height/2.0f), 16.0f, Vec3(1.0f, 1.0f, 1.0f));
 
 	// Other per-frame data
 	for(uint32_t i=0;i<Swapchain.NumImages;i++)
@@ -1507,12 +1513,6 @@ void RecreateSwapchain(void)
 {
 	if(Context.Device!=VK_NULL_HANDLE) // Windows quirk, WM_SIZE is signaled on window creation, *before* Vulkan get initalized
 	{
-		rtWidth=Width;
-		rtHeight=Height;
-
-		UI.Size.x=(float)rtWidth;
-		UI.Size.y=(float)rtHeight;
-
 		// Wait for the device to complete any pending work
 		vkDeviceWaitIdle(Context.Device);
 
@@ -1539,7 +1539,13 @@ void RecreateSwapchain(void)
 		vkuDestroySwapchain(&Context, &Swapchain);
 
 		// Recreate the swapchain
-		vkuCreateSwapchain(&Context, &Swapchain, Width, Height, VK_TRUE);
+		vkuCreateSwapchain(&Context, &Swapchain, VK_TRUE);
+
+		rtWidth=Swapchain.Extent.width;
+		rtHeight=Swapchain.Extent.height;
+
+		UI.Size.x=(float)Swapchain.Extent.width;
+		UI.Size.y=(float)Swapchain.Extent.height;
 
 		// Recreate the framebuffer
 		CreateFramebuffers(0, rtWidth, rtHeight);
@@ -1637,7 +1643,7 @@ void Destroy(void)
 	//////////
 
 	// Font destruction
-	Font_Destroy();
+	Font_Destroy(&Font);
 	//////////
 
 	// Asteroid instance buffer destruction
@@ -1725,8 +1731,7 @@ void Destroy(void)
 	vkuDestroySwapchain(&Context, &Swapchain);
 	//////////
 
-	DBGPRINTF(DEBUG_INFO"Remaining Vulkan memory blocks:\n");
+	DBGPRINTF(DEBUG_INFO, "Remaining Vulkan memory blocks:\n");
 	vkuMem_Print(VkZone);
 	vkuMem_Destroy(&Context, VkZone);
-	DBGPRINTF(DEBUG_NONE);
 }

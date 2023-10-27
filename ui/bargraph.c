@@ -9,9 +9,9 @@
 
 uint32_t UI_AddBarGraph(UI_t *UI, vec2 Position, vec2 Size, vec3 Color, const char *TitleText, bool Readonly, float Min, float Max, float Value)
 {
-	uint32_t ID=GenID();
+	uint32_t ID=UI->IDBase++;
 
-	if(ID==UINT32_MAX)
+	if(ID==UINT32_MAX||ID>=UI_HASHTABLE_MAX)
 		return UINT32_MAX;
 
 	UI_Control_t Control=
@@ -31,6 +31,8 @@ uint32_t UI_AddBarGraph(UI_t *UI, vec2 Position, vec2 Size, vec3 Color, const ch
 
 	if(!List_Add(&UI->Controls, &Control))
 		return UINT32_MAX;
+
+	UI->Controls_Hashtable[ID]=List_GetPointer(&UI->Controls, List_GetCount(&UI->Controls)-1);
 
 	return ID;
 }
@@ -212,14 +214,10 @@ float UI_GetBarGraphMin(UI_t *UI, uint32_t ID)
 		return NAN;
 
 	// Search list
-	for(uint32_t i=0;i<List_GetCount(&UI->Controls);i++)
-	{
-		UI_Control_t *Control=(UI_Control_t *)List_GetPointer(&UI->Controls, i);
+	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
-		// Check for matching ID and type
-		if(Control->ID==ID&&Control->Type==UI_CONTROL_BARGRAPH)
-			return Control->BarGraph.Min;
-	}
+	if(Control!=NULL&&Control->Type==UI_CONTROL_BARGRAPH)
+		return Control->BarGraph.Min;
 
 	// Not found
 	return NAN;
@@ -231,14 +229,10 @@ float UI_GetBarGraphMax(UI_t *UI, uint32_t ID)
 		return NAN;
 
 	// Search list
-	for(uint32_t i=0;i<List_GetCount(&UI->Controls);i++)
-	{
-		UI_Control_t *Control=(UI_Control_t *)List_GetPointer(&UI->Controls, i);
+	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
-		// Check for matching ID and type
-		if(Control->ID==ID&&Control->Type==UI_CONTROL_BARGRAPH)
-			return Control->BarGraph.Max;
-	}
+	if(Control!=NULL&&Control->Type==UI_CONTROL_BARGRAPH)
+		return Control->BarGraph.Max;
 
 	// Not found
 	return NAN;
@@ -250,15 +244,26 @@ float UI_GetBarGraphValue(UI_t *UI, uint32_t ID)
 		return NAN;
 
 	// Search list
-	for(uint32_t i=0;i<List_GetCount(&UI->Controls);i++)
-	{
-		UI_Control_t *Control=(UI_Control_t *)List_GetPointer(&UI->Controls, i);
+	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
-		// Check for matching ID and type
-		if(Control->ID==ID&&Control->Type==UI_CONTROL_BARGRAPH)
-			return Control->BarGraph.Value;
-	}
+	if(Control!=NULL&&Control->Type==UI_CONTROL_BARGRAPH)
+		return Control->BarGraph.Value;
 
 	// Not found
 	return NAN;
+}
+
+float *UI_GetBarGraphValuePointer(UI_t *UI, uint32_t ID)
+{
+	if(UI==NULL||ID==UINT32_MAX)
+		return NULL;
+
+	// Search list
+	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+
+	if(Control!=NULL&&Control->Type==UI_CONTROL_BARGRAPH)
+		return &Control->BarGraph.Value;
+
+	// Not found
+	return NULL;
 }

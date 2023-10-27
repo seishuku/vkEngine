@@ -99,7 +99,7 @@ ifeq ($(OS),Windows_NT)
 	LDFLAGS+=-lvulkan-1 -lws2_32 -lgdi32
 else
 	CC=gcc
-	CFLAGS+=-I/usr/X11/include
+	CFLAGS+=-DLINUX -I/usr/X11/include
 	LDFLAGS+=-lvulkan -lX11 -L/usr/X11/lib
 endif
 

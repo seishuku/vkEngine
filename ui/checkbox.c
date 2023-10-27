@@ -11,9 +11,9 @@
 // Returns an ID, or UINT32_MAX on failure.
 uint32_t UI_AddCheckBox(UI_t *UI, vec2 Position, float Radius, vec3 Color, const char *TitleText, bool Value)
 {
-	uint32_t ID=GenID();
+	uint32_t ID=UI->IDBase++;
 
-	if(ID==UINT32_MAX)
+	if(ID==UINT32_MAX||ID>=UI_HASHTABLE_MAX)
 		return UINT32_MAX;
 
 	UI_Control_t Control=
@@ -30,6 +30,8 @@ uint32_t UI_AddCheckBox(UI_t *UI, vec2 Position, float Radius, vec3 Color, const
 
 	if(!List_Add(&UI->Controls, &Control))
 		return UINT32_MAX;
+
+	UI->Controls_Hashtable[ID]=List_GetPointer(&UI->Controls, List_GetCount(&UI->Controls)-1);
 
 	return ID;
 }
