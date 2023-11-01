@@ -46,6 +46,8 @@ OBJS+=audio/wave.o
 OBJS+=ui/bargraph.o
 OBJS+=ui/button.o
 OBJS+=ui/checkbox.o
+OBJS+=ui/cursor.o
+OBJS+=ui/sprite.o
 OBJS+=ui/ui.o
 
 # core stuff
@@ -57,13 +59,14 @@ else
 	OBJS+=system/linux_x11.o
 endif
 
+OBJS+=system/threads.o
+OBJS+=system/memzone.o
+
 OBJS+=font/font.o
-OBJS+=threads/threads.o
 OBJS+=utils/input.o
 OBJS+=utils/event.o
 OBJS+=utils/genid.o
 OBJS+=utils/list.o
-OBJS+=utils/memzone.o
 OBJS+=perframe.o
 OBJS+=shadow.o
 OBJS+=skybox.o
@@ -100,7 +103,7 @@ ifeq ($(OS),Windows_NT)
 else
 	CC=gcc
 	CFLAGS+=-DLINUX -I/usr/X11/include
-	LDFLAGS+=-lvulkan -lX11 -L/usr/X11/lib
+	LDFLAGS+=-lvulkan -lX11 -lXi -lXfixes -L/usr/X11/lib
 endif
 
 all: $(TARGET) $(SHADERS)

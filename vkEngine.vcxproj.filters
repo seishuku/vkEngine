@@ -40,9 +40,6 @@
     <Filter Include="Header Files\system">
       <UniqueIdentifier>{56432f3b-cbc2-44dd-865a-6993494c23f1}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\threads">
-      <UniqueIdentifier>{4640276d-e317-44a9-974b-cbf71be48121}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\utils">
       <UniqueIdentifier>{fc5a2534-3d5e-40fd-9f40-f0a54fd4122c}</UniqueIdentifier>
     </Filter>
@@ -78,9 +75,6 @@
     </Filter>
     <Filter Include="Source Files\system">
       <UniqueIdentifier>{00acf21c-db77-44df-b066-4955cb25bbd8}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\threads">
-      <UniqueIdentifier>{321ff1b4-b913-431b-8dc4-2ab316981e99}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\utils">
       <UniqueIdentifier>{d60bc400-b729-43fd-90fe-8afdba12c4a6}</UniqueIdentifier>
@@ -144,12 +138,6 @@
     <ClInclude Include="utils\list.h">
       <Filter>Header Files\utils</Filter>
     </ClInclude>
-    <ClInclude Include="utils\memzone.h">
-      <Filter>Header Files\utils</Filter>
-    </ClInclude>
-    <ClInclude Include="threads\threads.h">
-      <Filter>Header Files\threads</Filter>
-    </ClInclude>
     <ClInclude Include="system\system.h">
       <Filter>Header Files\system</Filter>
     </ClInclude>
@@ -188,6 +176,12 @@
     </ClInclude>
     <ClInclude Include="ui\ui.h">
       <Filter>Header Files\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="system\memzone.h">
+      <Filter>Header Files\system</Filter>
+    </ClInclude>
+    <ClInclude Include="system\threads.h">
+      <Filter>Header Files\system</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -275,12 +269,6 @@
     <ClCompile Include="utils\list.c">
       <Filter>Source Files\utils</Filter>
     </ClCompile>
-    <ClCompile Include="utils\memzone.c">
-      <Filter>Source Files\utils</Filter>
-    </ClCompile>
-    <ClCompile Include="threads\threads.c">
-      <Filter>Source Files\threads</Filter>
-    </ClCompile>
     <ClCompile Include="system\win32.c">
       <Filter>Source Files\system</Filter>
     </ClCompile>
@@ -331,6 +319,12 @@
     </ClCompile>
     <ClCompile Include="ui\cursor.c">
       <Filter>Source Files\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="system\memzone.c">
+      <Filter>Source Files\system</Filter>
+    </ClCompile>
+    <ClCompile Include="system\threads.c">
+      <Filter>Source Files\system</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -118,20 +118,20 @@ static bool _Normalize(VkuImage_t *Image)
 
 	for(uint32_t i=0;i<Image->Width*Image->Height;i++)
 	{
-		vec3 n;
+		// Initialize the normal vector with the image data
+		vec3 n=Vec3((float)Image->Data[Channels*i+2]*OneOver255,
+					(float)Image->Data[Channels*i+1]*OneOver255,
+					(float)Image->Data[Channels*i+0]*OneOver255);
 
-		// scale/bias BGR unorm -> Normal float
-		n.x=2.0f*((float)Image->Data[Channels*i+2]*OneOver255)-1.0f;
-		n.y=2.0f*((float)Image->Data[Channels*i+1]*OneOver255)-1.0f;
-		n.z=2.0f*((float)Image->Data[Channels*i+0]*OneOver255)-1.0f;
-
-		// Normalize it
+		// scale/bias BGR unorm -> Normal float, and normalize it
+		n=Vec3_Subs(Vec3_Muls(n, 2.0f), 1.0f);
 		Vec3_Normalize(&n);
 
 		// scale/bias normal back into a 16bit/channel unorm image
-		Buffer[4*i+0]=(uint16_t)(65535.0f*(0.5f*n.x+0.5f));
-		Buffer[4*i+1]=(uint16_t)(65535.0f*(0.5f*n.y+0.5f));
-		Buffer[4*i+2]=(uint16_t)(65535.0f*(0.5f*n.z+0.5f));
+		n=Vec3_Adds(Vec3_Muls(n, 0.5f), 0.5f);
+		Buffer[4*i+0]=(uint16_t)(65535.0f*n.x);
+		Buffer[4*i+1]=(uint16_t)(65535.0f*n.y);
+		Buffer[4*i+2]=(uint16_t)(65535.0f*n.z);
 
 		// Pass along alpha channel if original image was RGBA
 		if(Channels==4)
@@ -605,7 +605,7 @@ static void _GetPixelBilinear(VkuImage_t *Image, float x, float y, void *Out)
 }
 
 // _GetUVAngularMap, internal function used by _AngularMapFace.
-// Gets angular map lightprobe UV coorinate from a 3D coordinate.
+// Gets angular map lightprobe UV coordinate from a 3D coordinate.
 static vec2 _GetUVAngularMap(vec3 xyz)
 {
 	float phi=-(float)acos(xyz.z), theta=(float)atan2(xyz.y, xyz.x);
@@ -616,7 +616,7 @@ static vec2 _GetUVAngularMap(vec3 xyz)
 }
 
 // _GetXYZFace, internal function used by _AngularMapFace.
-// Gets 3D coordinate from a 2D UV coorinate and face selection.
+// Gets 3D coordinate from a 2D UV coordinate and face selection.
 static vec3 _GetXYZFace(vec2 uv, int face)
 {
 	vec3 xyz;

@@ -16,7 +16,7 @@
 #include "utils/event.h"
 #include "utils/input.h"
 #include "particle/particle.h"
-#include "threads/threads.h"
+#include "system/threads.h"
 #include "vr/vr.h"
 #include "font/font.h"
 #include "audio/audio.h"
@@ -77,13 +77,13 @@ VkuImage_t ColorImage[2];		// left and right eye color buffer
 VkFormat DepthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
 VkuImage_t DepthImage[2];		// left and right eye depth buffers
 
-// Primary rendering vulkan stuff
+// Primary rendering Vulkan stuff
 VkuDescriptorSet_t DescriptorSet;
 VkPipelineLayout PipelineLayout;
 VkuPipeline_t Pipeline;
 //////
 
-// Debug rendering vulkan stuff
+// Debug rendering Vulkan stuff
 VkPipelineLayout SpherePipelineLayout;
 VkuPipeline_t SpherePipeline;
 
@@ -174,7 +174,7 @@ Camera_t NetCameras[MAX_CLIENTS];
 //////
 
 // UI Stuff
-Font_t Font;
+Font_t Fnt; // Fnt instead of Font, because Xlib is dumb and declares a type Font *rolley-eyes*
 UI_t UI;
 
 uint32_t RedID=UINT32_MAX;
@@ -284,7 +284,7 @@ bool CreatePipeline(void)
 void GenerateSkyParams(void)
 {
 	// Build a skybox param struct with random values
-	Skybox_UBO_t Skybox_UBO;
+	Skybox_UBO_t Skybox_UBO={ 0 };
 
 	Skybox_UBO.uOffset=Vec4(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
 	Vec4_Normalize(&Skybox_UBO.uOffset);
@@ -339,7 +339,7 @@ void GenerateSkyParams(void)
 		vec3 RandomDirection=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
 		Vec3_Normalize(&RandomDirection);
 
-		RigidBody_t Asteroid;
+		RigidBody_t Asteroid={ 0 };
 
 		Asteroid.Position=Vec3(
 			RandomDirection.x*(RandFloat()*(AsteroidFieldMaxRadius-AsteroidFieldMinRadius))+AsteroidFieldMinRadius,
@@ -489,7 +489,7 @@ bool CreateLinePipeline(void)
 }
 //////
 
-// General thread contructor for threads using Vulkan
+// General thread constructor for threads using Vulkan
 void Thread_Constructor(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
@@ -633,7 +633,7 @@ void Thread_Main(void *Arg)
 		{
 			matrix mvp;
 			vec4 color, start, end;
-		} line_ubo;
+		} line_ubo={ 0 };
 
 		vec4 position=Vec4(NetCameras[i].Position.x, NetCameras[i].Position.y, NetCameras[i].Position.z, 1.0f);
 		vec4 forward=Vec4(NetCameras[i].Forward.x, NetCameras[i].Forward.y, NetCameras[i].Forward.z, 1.0f);
@@ -665,7 +665,7 @@ void Thread_Main(void *Arg)
 		{
 			matrix mvp;
 			vec4 color;
-		} sphere_ubo;
+		} sphere_ubo={ 0 };
 
 		matrix local=MatrixIdentity();
 		local=MatrixMult(local, MatrixScale(10.0f, 10.0f, 10.0f));
@@ -980,6 +980,7 @@ void Thread_Physics(void *Arg)
 
 pthread_t UpdateThread;
 bool NetUpdate_Run=true;
+uint8_t NetBuffer[32767]={ 0 };
 
 void NetUpdate(void *Arg)
 {
@@ -993,12 +994,12 @@ void NetUpdate(void *Arg)
 
 	while(NetUpdate_Run)
 	{
-		uint8_t Buffer[32767], *pBuffer=Buffer;
+		uint8_t *pBuffer=NetBuffer;
 		uint32_t Magic=0;
 		uint32_t Address=0;
 		uint16_t Port=0;
 
-		Network_SocketReceive(ClientSocket, Buffer, sizeof(Buffer), &Address, &Port);
+		Network_SocketReceive(ClientSocket, NetBuffer, sizeof(NetBuffer), &Address, &Port);
 
 		memcpy(&Magic, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
 
@@ -1323,7 +1324,7 @@ bool Init(void)
 		CreateCompositeFramebuffers(1, rtWidth, rtHeight);
 	}
 
-	Font_Init(&Font);
+	Font_Init(&Fnt);
 
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)rtWidth, (float)rtHeight));
 
@@ -1370,7 +1371,7 @@ bool Init(void)
 
 	FaceID=UI_AddSprite(&UI, Vec2((float)Width/2.0f, (float)Height/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &Textures[TEXTURE_FACE], 0.0f);
 
-	CursorID=UI_AddCursor(&UI, Vec2((float)Swapchain.Extent.width/2.0f, (float)Swapchain.Extent.height/2.0f), 16.0f, Vec3(1.0f, 1.0f, 1.0f));
+	CursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3(1.0f, 1.0f, 1.0f));
 
 	// Other per-frame data
 	for(uint32_t i=0;i<Swapchain.NumImages;i++)
@@ -1449,7 +1450,7 @@ bool Init(void)
 
 
 #if 1
-	// Initalize the network API (mainly for winsock)
+	// Initialize the network API (mainly for winsock)
 	Network_Init();
 
 	// Create a new socket
@@ -1508,7 +1509,7 @@ bool Init(void)
 	return true;
 }
 
-// Rebuild vulkan swapchain and related data
+// Rebuild Vulkan swapchain and related data
 void RecreateSwapchain(void)
 {
 	if(Context.Device!=VK_NULL_HANDLE) // Windows quirk, WM_SIZE is signaled on window creation, *before* Vulkan get initalized
@@ -1517,9 +1518,9 @@ void RecreateSwapchain(void)
 		vkDeviceWaitIdle(Context.Device);
 
 		// To resize a surface, we need to destroy and recreate anything that's tied to the surface.
-		// This is basically just the swapchain, framebuffers, and depthbuffer.
+		// This is basically just the swapchain, framebuffers, and depth buffer.
 
-		// Swapchain, framebuffer, and depthbuffer destruction
+		// Swapchain, framebuffer, and depth buffer destruction
 		vkuDestroyImageBuffer(&Context, &ColorImage[0]);
 		vkuDestroyImageBuffer(&Context, &ColorResolve[0]);
 		vkuDestroyImageBuffer(&Context, &ColorBlur[0]);
@@ -1643,7 +1644,7 @@ void Destroy(void)
 	//////////
 
 	// Font destruction
-	Font_Destroy(&Font);
+	Font_Destroy(&Fnt);
 	//////////
 
 	// Asteroid instance buffer destruction
@@ -1693,7 +1694,7 @@ void Destroy(void)
 	vkDestroyPipelineLayout(Context.Device, PipelineLayout, VK_NULL_HANDLE);
 	//////////
 
-	// Swapchain, framebuffer, and depthbuffer destruction
+	// Swapchain, framebuffer, and depth buffer destruction
 	vkuDestroyImageBuffer(&Context, &ColorImage[0]);
 	vkuDestroyImageBuffer(&Context, &ColorResolve[0]);
 	vkuDestroyImageBuffer(&Context, &ColorBlur[0]);

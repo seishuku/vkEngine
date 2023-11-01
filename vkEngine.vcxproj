@@ -27,15 +27,15 @@
     <ClInclude Include="shadow.h" />
     <ClInclude Include="skybox.h" />
     <ClInclude Include="sounds.h" />
+    <ClInclude Include="system\memzone.h" />
     <ClInclude Include="system\system.h" />
+    <ClInclude Include="system\threads.h" />
     <ClInclude Include="textures.h" />
-    <ClInclude Include="threads\threads.h" />
     <ClInclude Include="ui\ui.h" />
     <ClInclude Include="utils\event.h" />
     <ClInclude Include="utils\genid.h" />
     <ClInclude Include="utils\input.h" />
     <ClInclude Include="utils\list.h" />
-    <ClInclude Include="utils\memzone.h" />
     <ClInclude Include="vr\vr.h" />
     <ClInclude Include="vulkan\vulkan.h" />
   </ItemGroup>
@@ -64,8 +64,9 @@
     <ClCompile Include="physics\physics.c" />
     <ClCompile Include="shadow.c" />
     <ClCompile Include="skybox.c" />
+    <ClCompile Include="system\memzone.c" />
+    <ClCompile Include="system\threads.c" />
     <ClCompile Include="system\win32.c" />
-    <ClCompile Include="threads\threads.c" />
     <ClCompile Include="ui\bargraph.c" />
     <ClCompile Include="ui\button.c" />
     <ClCompile Include="ui\checkbox.c" />
@@ -76,7 +77,6 @@
     <ClCompile Include="utils\genid.c" />
     <ClCompile Include="utils\input.c" />
     <ClCompile Include="utils\list.c" />
-    <ClCompile Include="utils\memzone.c" />
     <ClCompile Include="vr\vr.c" />
     <ClCompile Include="vulkan\vulkan_buffer.c" />
     <ClCompile Include="vulkan\vulkan_context.c" />

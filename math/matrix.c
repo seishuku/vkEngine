@@ -190,7 +190,6 @@ vec3 Matrix3x3MultVec3(const vec3 in, const matrix m)
 	};
 }
 
-// TODO?: Should this multiply with the supplied matrix like the other functions?
 matrix MatrixLookAt(const vec3 position, const vec3 forward, const vec3 up)
 {
 	vec3 f=Vec3_Subv(forward, position);

@@ -238,7 +238,7 @@ void Audio_StopSample(Sample_t *Sample)
 
 int Audio_Init(void)
 {
-	PaStreamParameters outputParameters;
+	PaStreamParameters outputParameters={ 0 };
 
 	// Clear out mixing channels
 	for(int i=0;i<MAX_CHANNELS;i++)

@@ -129,14 +129,14 @@ bool Thread_Init(ThreadWorker_t *Worker)
 		return false;
 	}
 
-	// Initalize the mutex
+	// Initialize the mutex
 	if(pthread_mutex_init(&Worker->Mutex, NULL))
 	{
 		DBGPRINTF("Unable to create mutex.\r\n");
 		return false;
 	}
 
-	// Initalize the condition
+	// Initialize the condition
 	if(pthread_cond_init(&Worker->Condition, NULL))
 	{
 		DBGPRINTF("Unable to create condition.\r\n");

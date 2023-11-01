@@ -173,7 +173,7 @@ void ShadowUpdateMap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 
 	matrix Projection=MatrixOrtho(-1200.0f, 1200.0f, -1200.0f, 1200.0f, 0.1f, 4000.0f);
 
-	// Looking at the asteriod field from the sun's position "a number" away
+	// Looking at the asteroid field from the sun's position "a number" away
 	// This should technically be an infinite distance away, but that's not possible, so "a number" is whatever best compromise.
 	// (uSubPosition is a vec4, so need to recreate that in a vec3)
 	vec3 Position=Vec3_Muls(Vec3(

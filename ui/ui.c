@@ -16,7 +16,7 @@ extern VkSampleCountFlags MSAA;
 extern VkuSwapchain_t Swapchain;
 //extern VkRenderPass RenderPass;
 
-extern Font_t Font;
+extern Font_t Fnt;
 // ---
 
 typedef struct
@@ -382,7 +382,7 @@ bool UI_Draw(UI_t *UI, uint32_t Index)
 				float TextSize=min(Control->Button.Size.x/textlen*0.8f, Control->Button.Size.y*0.8f);
 
 				// Print the text centered
-				Font_Print(&Font,
+				Font_Print(&Fnt,
 						   TextSize,
 						   Control->Position.x-(textlen*TextSize)*0.5f+Control->BarGraph.Size.x*0.5f,
 						   Control->Position.y-(TextSize*0.5f)+(Control->BarGraph.Size.y*0.5f),
@@ -423,7 +423,7 @@ bool UI_Draw(UI_t *UI, uint32_t Index)
 			case UI_CONTROL_CHECKBOX:
 			{
 				// Text size is the radius of the checkbox, placed radius length away horizontally, centered vertically
-				Font_Print(&Font,
+				Font_Print(&Fnt,
 						   Control->CheckBox.Radius,
 						   Control->Position.x+Control->CheckBox.Radius,
 						   Control->Position.y-(Control->CheckBox.Radius/2.0f),
@@ -458,7 +458,7 @@ bool UI_Draw(UI_t *UI, uint32_t Index)
 				float TextSize=min(Control->BarGraph.Size.x/textlen*0.8f, Control->BarGraph.Size.y*0.8f);
 
 				// Print the text centered
-				Font_Print(&Font,
+				Font_Print(&Fnt,
 						   TextSize,
 						   Control->Position.x-(textlen*TextSize)*0.5f+Control->BarGraph.Size.x*0.5f,
 						   Control->Position.y-(TextSize*0.5f)+(Control->BarGraph.Size.y*0.5f),
