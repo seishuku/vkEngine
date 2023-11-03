@@ -1,6 +1,11 @@
 // TODO: Sounds need positional and ID info for tracking through the channels.
 
+#ifdef ANDROID
+#include <aaudio/AAudio.h>
+#else
 #include <portaudio.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,7 +17,11 @@
 #include "../camera/camera.h"
 #include "audio.h"
 
+#ifdef ANDROID
+AAudioStream *stream=NULL;
+#else
 PaStream *stream=NULL;
+#endif
 
 #define MAX_VOLUME 255
 #define MAX_CHANNELS 128
@@ -36,7 +45,7 @@ extern HRIR_Sphere_t Sphere;
 float hrir_l[NUM_SAMPLES], hrir_r[NUM_SAMPLES];
 int16_t sample_l[NUM_SAMPLES], sample_r[NUM_SAMPLES];
 
-extern Camera_t Camera;
+Camera_t Camera;
 
 // This function is very naive, it just interpolates *all* the HRIR positions
 //   and weights then according to whatever is closest to the position.
@@ -102,14 +111,13 @@ void convolve(int16_t *input, int16_t *audio_l, int16_t *audio_r, size_t audio_l
 	}
 }
 
-// Callback function for when PortAudio needs more data.
-int paCallback(const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData)
+void Audio_FillBuffer(void *Buffer, uint32_t Length)
 {
 	// Get pointer to output buffer.
-	int16_t *out=(int16_t *)outputBuffer;
+	int16_t *out=(int16_t *)Buffer;
 
 	// Clear the output buffer, so we don't get annoying repeating samples.
-	memset(out, 0, framesPerBuffer*sizeof(int16_t)*2);
+	memset(out, 0, Length*sizeof(int16_t)*2);
 
 	for(uint32_t i=0;i<MAX_CHANNELS;i++)
 	{
@@ -125,8 +133,8 @@ int paCallback(const void *inputBuffer, void *outputBuffer, unsigned long frames
 
 		// Remaining data runs off end of primary buffer.
 		// Clamp it to buffer size, we'll get the rest later.
-		if(remaining_data>=framesPerBuffer)
-			remaining_data=framesPerBuffer;
+		if(remaining_data>=Length)
+			remaining_data=Length;
 
 		// Interpolate HRIR samples that are closest to the sound's position
 		// TODO: this needs work, it works, but not great
@@ -162,7 +170,7 @@ int paCallback(const void *inputBuffer, void *outputBuffer, unsigned long frames
 		channel->pos+=remaining_data;
 
 		// Reset output buffer pointer for next channel to process.
-		out=(int16_t *)outputBuffer;
+		out=(int16_t *)Buffer;
 
 		// If loop flag was set, reset position to 0 if it's at the end.
 		if(channel->pos==channel->len)
@@ -180,9 +188,24 @@ int paCallback(const void *inputBuffer, void *outputBuffer, unsigned long frames
 			}
 		}
 	}
+}
+
+// Callback functions for when audio driver needs more data.
+#ifdef ANDROID
+aaudio_data_callback_result_t Audio_Callback(AAudioStream *stream, void *userData, void *audioData, int32_t numFrames)
+{
+	Audio_FillBuffer(audioData, numFrames);
+
+	return AAUDIO_CALLBACK_RESULT_CONTINUE;
+}
+#else
+int Audio_Callback(const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData)
+{
+	Audio_FillBuffer(outputBuffer, framesPerBuffer);
 
 	return paContinue;
 }
+#endif
 
 // Add a sound to first open channel.
 void Audio_PlaySample(Sample_t *Sample, bool looping, float vol, vec3 *pos)
@@ -238,8 +261,6 @@ void Audio_StopSample(Sample_t *Sample)
 
 int Audio_Init(void)
 {
-	PaStreamParameters outputParameters={ 0 };
-
 	// Clear out mixing channels
 	for(int i=0;i<MAX_CHANNELS;i++)
 	{
@@ -250,6 +271,52 @@ int Audio_Init(void)
 		channels[i].xyz=&Zero;
 	}
 
+	if(!HRIR_Init())
+	{
+		DBGPRINTF("Audio: HRIR failed to initialize.\n");
+		return false;
+	}
+
+#ifdef ANDROID
+	AAudioStreamBuilder *streamBuilder;
+
+	if(AAudio_createStreamBuilder(&streamBuilder)!=AAUDIO_OK)
+	{
+		DBGPRINTF(DEBUG_ERROR, "Audio: Error creating stream builder\n");
+		return false;
+	}
+
+	AAudioStreamBuilder_setFormat(streamBuilder, AAUDIO_FORMAT_PCM_I16);
+	AAudioStreamBuilder_setChannelCount(streamBuilder, 2);
+	AAudioStreamBuilder_setSampleRate(streamBuilder, SAMPLE_RATE);
+	AAudioStreamBuilder_setPerformanceMode(streamBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+	AAudioStreamBuilder_setDataCallback(streamBuilder, Audio_Callback, NULL);
+
+	// Opens the stream.
+	if(AAudioStreamBuilder_openStream(streamBuilder, &stream)!=AAUDIO_OK)
+	{
+		DBGPRINTF(DEBUG_ERROR, "Audio: Error opening stream\n");
+		return false;
+	}
+
+	if(AAudioStream_getSampleRate(stream)!=SAMPLE_RATE)
+	{
+		DBGPRINTF(DEBUG_ERROR, "Audio: Sample rate mismatch\n");
+		return false;
+	}
+
+	// Sets the buffer size. 
+	AAudioStream_setBufferSizeInFrames(stream, AAudioStream_getFramesPerBurst(stream)*NUM_SAMPLES);
+
+	// Starts the stream.
+	if(AAudioStream_requestStart(stream)!=AAUDIO_OK)
+	{
+		DBGPRINTF(DEBUG_ERROR, "Audio: Error starting stream\n");
+		return false;
+	}
+
+	AAudioStreamBuilder_delete(streamBuilder);
+#else
 	// Initialize PortAudio
 	if(Pa_Initialize()!=paNoError)
 	{
@@ -257,6 +324,7 @@ int Audio_Init(void)
 		return false;
 	}
 
+	PaStreamParameters outputParameters;
 	// Set up output device parameters
 	outputParameters.device=Pa_GetDefaultOutputDevice();
 
@@ -273,7 +341,7 @@ int Audio_Init(void)
 	outputParameters.hostApiSpecificStreamInfo=NULL;
 
 	// Open audio stream
-	if(Pa_OpenStream(&stream, NULL, &outputParameters, SAMPLE_RATE, NUM_SAMPLES, paNoFlag, paCallback, NULL)!=paNoError)
+	if(Pa_OpenStream(&stream, NULL, &outputParameters, SAMPLE_RATE, NUM_SAMPLES, paNoFlag, Audio_Callback, NULL)!=paNoError)
 	{
 		DBGPRINTF("Audio: Unable to open PortAudio stream.\n");
 		Pa_Terminate();
@@ -287,8 +355,7 @@ int Audio_Init(void)
 		Pa_Terminate();
 		return false;
 	}
-
-	HRIR_Init();
+#endif
 
 	return true;
 }
@@ -299,9 +366,14 @@ void Audio_Destroy(void)
 	Zone_Free(Zone, Sphere.Indices);
 	Zone_Free(Zone, Sphere.Vertices);
 
+#ifdef ANDROID
+	AAudioStream_requestStop(stream);
+	AAudioStream_close(stream);
+#else
 	// Shut down PortAudio
 	Pa_AbortStream(stream);
 	Pa_StopStream(stream);
 	Pa_CloseStream(stream);
 	Pa_Terminate();
+#endif
 }

@@ -12,7 +12,7 @@ bool HRIR_Init(void)
 {
 	FILE *Stream=NULL;
 
-	Stream=fopen("./assets/hrir_full.bin", "rb");
+	Stream=fopen("assets/hrir_full.bin", "rb");
 
 	if(!Stream)
 		return false;
