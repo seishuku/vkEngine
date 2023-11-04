@@ -5,6 +5,7 @@
 #include <winsock2.h>
 #else
 #include <sys/socket.h>
+#include <sys/unistd.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <errno.h>

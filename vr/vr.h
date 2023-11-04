@@ -4,17 +4,19 @@
 // undefine __WIN32 for mingw/msys building, otherwise it tries to define bool
 #undef __WIN32
 
+#ifndef ANDROID
 #include <openvr/openvr_capi.h>
 
 extern struct VR_IVRSystem_FnTable *VRSystem;
 extern struct VR_IVRCompositor_FnTable *VRCompositor;
+#endif
 
 extern uint32_t rtWidth;
 extern uint32_t rtHeight;
 
 extern matrix EyeProjection[2];
 
-matrix GetEyeProjection(EVREye Eye);
+matrix GetEyeProjection(uint32_t Eye);
 matrix GetHeadPose(void);
 bool InitOpenVR(void);
 void DestroyOpenVR(void);

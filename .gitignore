@@ -24,6 +24,7 @@ pipelinecache.bin
 mono_crash.*
 
 # Build results
+apk/
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/

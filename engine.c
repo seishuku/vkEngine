@@ -1150,6 +1150,7 @@ void Render(void)
 		return;
 	}
 
+#ifndef ANDROID
 	// Send eye images over to OpenVR
 	if(IsVR)
 	{
@@ -1177,6 +1178,7 @@ void Render(void)
 		vulkanData.m_nImage=(uint64_t)ColorResolve[EVREye_Eye_Right].Image;
 		VRCompositor->Submit(EVREye_Eye_Right, &texture, &bounds, EVRSubmitFlags_Submit_Default);
 	}
+#endif
 
 	Index=(Index+1)%Swapchain.NumImages;
 }
@@ -1207,53 +1209,53 @@ bool Init(void)
 	if(!Audio_Init())
 		return false;
 
-	if(!Audio_LoadStatic("./assets/pew1.wav", &Sounds[SOUND_PEW1]))
+	if(!Audio_LoadStatic("assets/pew1.wav", &Sounds[SOUND_PEW1]))
 		return false;
 
-	if(!Audio_LoadStatic("./assets/pew2.wav", &Sounds[SOUND_PEW2]))
+	if(!Audio_LoadStatic("assets/pew2.wav", &Sounds[SOUND_PEW2]))
 		return false;
 
-	if(!Audio_LoadStatic("./assets/pew3.wav", &Sounds[SOUND_PEW3]))
+	if(!Audio_LoadStatic("assets/pew3.wav", &Sounds[SOUND_PEW3]))
 		return false;
 
-	if(!Audio_LoadStatic("./assets/stone1.wav", &Sounds[SOUND_STONE1]))
+	if(!Audio_LoadStatic("assets/stone1.wav", &Sounds[SOUND_STONE1]))
 		return false;
 
-	if(!Audio_LoadStatic("./assets/stone2.wav", &Sounds[SOUND_STONE2]))
+	if(!Audio_LoadStatic("assets/stone2.wav", &Sounds[SOUND_STONE2]))
 		return false;
 
-	if(!Audio_LoadStatic("./assets/stone3.wav", &Sounds[SOUND_STONE3]))
+	if(!Audio_LoadStatic("assets/stone3.wav", &Sounds[SOUND_STONE3]))
 		return false;
 
-	if(!Audio_LoadStatic("./assets/crash.wav", &Sounds[SOUND_CRASH]))
+	if(!Audio_LoadStatic("assets/crash.wav", &Sounds[SOUND_CRASH]))
 		return false;
 
-	if(!Audio_LoadStatic("./assets/explode1.wav", &Sounds[SOUND_EXPLODE1]))
+	if(!Audio_LoadStatic("assets/explode1.wav", &Sounds[SOUND_EXPLODE1]))
 		return false;
 
-	if(!Audio_LoadStatic("./assets/explode2.wav", &Sounds[SOUND_EXPLODE2]))
+	if(!Audio_LoadStatic("assets/explode2.wav", &Sounds[SOUND_EXPLODE2]))
 		return false;
 
-	if(!Audio_LoadStatic("./assets/explode3.wav", &Sounds[SOUND_EXPLODE3]))
+	if(!Audio_LoadStatic("assets/explode3.wav", &Sounds[SOUND_EXPLODE3]))
 		return false;
 
 	// Load models
-	if(LoadBModel(&Models[MODEL_ASTEROID1], "./assets/asteroid1.bmodel"))
+	if(LoadBModel(&Models[MODEL_ASTEROID1], "assets/asteroid1.bmodel"))
 		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID1]);
 	else
 		return false;
 
-	if(LoadBModel(&Models[MODEL_ASTEROID2], "./assets/asteroid2.bmodel"))
+	if(LoadBModel(&Models[MODEL_ASTEROID2], "assets/asteroid2.bmodel"))
 		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID2]);
 	else
 		return false;
 
-	if(LoadBModel(&Models[MODEL_ASTEROID3], "./assets/asteroid3.bmodel"))
+	if(LoadBModel(&Models[MODEL_ASTEROID3], "assets/asteroid3.bmodel"))
 		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID3]);
 	else
 		return false;
 
-	if(LoadBModel(&Models[MODEL_ASTEROID4], "./assets/asteroid4.bmodel"))
+	if(LoadBModel(&Models[MODEL_ASTEROID4], "assets/asteroid4.bmodel"))
 		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID4]);
 	else
 		return false;
@@ -1271,16 +1273,16 @@ bool Init(void)
 	DBGPRINTF(DEBUG_ERROR, "\nNot an error, just a total triangle count: %d\n\n", TriangleCount);
 
 	// Load textures
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1], "./assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1_NORMAL], "./assets/asteroid1_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID2], "./assets/asteroid2.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID2_NORMAL], "./assets/asteroid2_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID3], "./assets/asteroid3.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID3_NORMAL], "./assets/asteroid3_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4], "./assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4_NORMAL], "./assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1], "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1_NORMAL], "assets/asteroid1_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID2], "assets/asteroid2.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID2_NORMAL], "assets/asteroid2_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID3], "assets/asteroid3.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID3_NORMAL], "assets/asteroid3_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4], "assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4_NORMAL], "assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 
-	Image_Upload(&Context, &Textures[TEXTURE_FACE], "./assets/face.tga", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Context, &Textures[TEXTURE_FACE], "assets/face.tga", IMAGE_MIPMAP|IMAGE_BILINEAR);
 
 	GenNebulaVolume(&Context, &Textures[TEXTURE_VOLUME]);
 

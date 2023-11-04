@@ -1,0 +1,188 @@
+TARGET=vkEngine
+APKFILE=$(TARGET).apk
+
+ANDROIDVERSION=28
+
+BUILD_TOOLS=$(lastword $(wildcard $(ANDROID_HOME)/build-tools/*) )
+NDK=$(firstword $(wildcard $(ANDROID_HOME)/ndk/*) )
+
+ifeq ($(BUILD_TOOLS),)
+$(error BUILD_TOOLS directory not found)
+endif
+
+ifeq ($(NDK),)
+$(error NDK directory not found)
+endif
+
+ifeq ($(UNAME), Linux)
+HOST=linux-x86_64
+endif
+ifeq ($(UNAME), Darwin)
+HOST=darwin-x86_64
+endif
+ifeq ($(OS), Windows_NT)
+HOST=windows-x86_64
+endif
+
+# model loading/drawing
+OBJS=model/bmodel.o
+
+# image loading
+OBJS+=image/qoi.o
+OBJS+=image/tga.o
+OBJS+=image/image.o
+
+# math
+OBJS+=math/math.o
+OBJS+=math/matrix.o
+OBJS+=math/quat.o
+OBJS+=math/vec2.o
+OBJS+=math/vec3.o
+OBJS+=math/vec4.o
+
+# physics
+OBJS+=particle/particle.o
+OBJS+=physics/physics.o
+
+# camera
+OBJS+=camera/camera.o
+
+# network
+OBJS+=network/network.o
+
+# Vulkan
+OBJS+=vulkan/vulkan_buffer.o
+OBJS+=vulkan/vulkan_context.o
+OBJS+=vulkan/vulkan_descriptorset.o
+OBJS+=vulkan/vulkan_framebuffer.o
+OBJS+=vulkan/vulkan_instance.o
+OBJS+=vulkan/vulkan_mem.o
+OBJS+=vulkan/vulkan_pipeline.o
+OBJS+=vulkan/vulkan_renderpass.o
+OBJS+=vulkan/vulkan_swapchain.o
+
+# Audio
+OBJS+=audio/audio.o
+OBJS+=audio/hrir.o
+OBJS+=audio/wave.o
+
+# UI
+OBJS+=ui/bargraph.o
+OBJS+=ui/button.o
+OBJS+=ui/checkbox.o
+OBJS+=ui/cursor.o
+OBJS+=ui/sprite.o
+OBJS+=ui/ui.o
+
+# core stuff
+OBJS+=vr/vr.o
+
+OBJS+=system/threads.o
+OBJS+=system/memzone.o
+
+OBJS+=font/font.o
+OBJS+=utils/input.o
+OBJS+=utils/event.o
+OBJS+=utils/genid.o
+OBJS+=utils/list.o
+OBJS+=perframe.o
+OBJS+=shadow.o
+OBJS+=skybox.o
+OBJS+=nebula.o
+OBJS+=composite.o
+OBJS+=engine.o
+
+# Android
+OBJS+=system/android_fopen.o
+OBJS+=system/android_native_app_glue.o
+OBJS+=system/android_main.o
+
+SHADERS=shaders/bezier.frag.spv
+SHADERS+=shaders/bezier.geom.spv
+SHADERS+=shaders/bezier.vert.spv
+SHADERS+=shaders/composite.frag.spv
+SHADERS+=shaders/compositeVR.frag.spv
+SHADERS+=shaders/fullscreen.vert.spv
+SHADERS+=shaders/font.frag.spv
+SHADERS+=shaders/font.vert.spv
+SHADERS+=shaders/lighting.frag.spv
+SHADERS+=shaders/lighting.vert.spv
+SHADERS+=shaders/particle.frag.spv
+SHADERS+=shaders/particle.geom.spv
+SHADERS+=shaders/particle.vert.spv
+SHADERS+=shaders/shadow.vert.spv
+SHADERS+=shaders/skybox.frag.spv
+SHADERS+=shaders/skybox.vert.spv
+SHADERS+=shaders/gaussian.frag.spv
+SHADERS+=shaders/threshold.frag.spv
+
+CC_X86_64=$(NDK)/toolchains/llvm/prebuilt/$(HOST)/bin/x86_64-linux-android$(ANDROIDVERSION)-clang
+CC_ARM64=$(NDK)/toolchains/llvm/prebuilt/$(HOST)/bin/aarch64-linux-android$(ANDROIDVERSION)-clang
+
+#CFLAGS+=-g2 -gdwarf-2 -O0 -D_DEBUG
+CFLAGS+=-O3 -g2 -gdwarf-2
+
+CFLAGS+=-fpic -fstack-protector -fno-strict-aliasing -fno-rtti -fno-omit-frame-pointer -fno-exceptions -fno-short-enums
+CFLAGS+=-std=gnu17 -Wall -Wno-missing-braces -Wextra
+CFLAGS+=-I$(NDK)/sysroot/usr/include -I$(NDK)/sysroot/usr/include/android
+CFLAGS+=-I$(NDK)/toolchains/llvm/prebuilt/$(HOST)/sysroot/usr/include -I$(NDK)/toolchains/llvm/prebuilt/$(HOST)/sysroot/usr/include/android
+CFLAGS+=-DANDROID -D__ANDROID_MIN_SDK_VERSION__=$(ANDROIDVERSION) -DANDROIDVERSION=$(ANDROIDVERSION) -D__USE_BSD
+CFLAGS+=-include system/android_fopen.h
+
+LDFLAGS+=-shared -lvulkan -lm -landroid -llog -laaudio
+
+all: $(APKFILE)
+
+apk/lib/x86_64/lib$(TARGET).so: $(addprefix x86_64/,$(OBJS))
+	mkdir -p $(@D)
+	$(CC_X86_64) -o $@ $(addprefix x86_64/,$(OBJS)) $(LDFLAGS)
+
+apk/lib/arm64-v8a/lib$(TARGET).so: $(addprefix ARM64/,$(OBJS))
+	mkdir -p $(@D)
+	$(CC_ARM64) -o $@ $(addprefix ARM64/,$(OBJS)) $(LDFLAGS)
+
+x86_64/%.o: %.c
+	mkdir -p $(@D)
+	$(CC_X86_64) -c $(CFLAGS) -o $@ $<
+
+ARM64/%.o: %.c
+	mkdir -p $(@D)
+	$(CC_ARM64) -c $(CFLAGS) -o $@ $<
+
+$(APKFILE): $(SHADERS) apk/lib/arm64-v8a/lib$(TARGET).so apk/lib/x86_64/lib$(TARGET).so
+	rm -rf $(APKFILE)
+
+	mkdir -p apk/assets/shaders
+	cp $(SHADERS) apk/assets/shaders/
+	cp -r assets apk/assets/
+
+	$(BUILD_TOOLS)/aapt package -f -F temp.apk -I $(ANDROID_HOME)/platforms/android-$(ANDROIDVERSION)/android.jar -M AndroidManifest.xml -v --app-as-shared-lib --target-sdk-version $(ANDROIDVERSION) apk
+	$(BUILD_TOOLS)/zipalign -v 4 temp.apk $(APKFILE)
+	$(BUILD_TOOLS)/apksigner sign --key-pass pass:$(STOREPASS) --ks-pass pass:$(STOREPASS) --ks $(KEYSTOREFILE) $(APKFILE)
+	rm -rf temp.apk
+
+STOREPASS=password
+DNAME="CN=example.com, OU=ID, O=Example, L=Doe, S=John, C=GB"
+KEYSTOREFILE=my-release-key.keystore
+ALIASNAME=standkey
+
+keystore:
+	keytool -genkey -v -keystore $(KEYSTOREFILE) -alias $(ALIASNAME) -keyalg RSA -keysize 2048 -validity 10000 -storepass $(STOREPASS) -keypass $(STOREPASS) -dname $(DNAME)
+
+install:
+	adb install $(APKFILE)
+
+%.frag.spv: %.frag
+	glslc --target-env=vulkan1.1 -O $< -o $@
+
+%.vert.spv: %.vert
+	glslc --target-env=vulkan1.1 -O $< -o $@
+
+%.geom.spv: %.geom
+	glslc --target-env=vulkan1.1 -O $< -o $@
+
+%.comp.spv: %.comp
+	glslc --target-env=vulkan1.1 -O $< -o $@
+
+clean:
+	rm -rf apk/lib/x86_64/lib$(TARGET).so apk/lib/arm64-v8a/lib$(TARGET).so $(APKFILE) $(addprefix ARM64/,$(OBJS)) $(addprefix x86_64/,$(OBJS)) ARM64 x86_64 $(SHADERS)

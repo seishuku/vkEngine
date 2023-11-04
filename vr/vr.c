@@ -6,6 +6,7 @@
 #include "../math/math.h"
 #include "vr.h"
 
+#ifndef ANDROID
 intptr_t VR_InitInternal(EVRInitError *peError, EVRApplicationType eType);
 void VR_ShutdownInternal();
 int VR_IsHmdPresent();
@@ -16,12 +17,14 @@ const char *VR_GetVRInitErrorAsEnglishDescription(EVRInitError error);
 
 struct VR_IVRSystem_FnTable *VRSystem=NULL;
 struct VR_IVRCompositor_FnTable *VRCompositor=NULL;
+#endif
 
 uint32_t rtWidth;
 uint32_t rtHeight;
 
 matrix EyeProjection[2];
 
+#ifndef ANDROID
 // Convert from OpenVR's 3x4 matrix to 4x4 matrix format
 matrix HmdMatrix34toMatrix44(HmdMatrix34_t in)
 {
@@ -33,10 +36,12 @@ matrix HmdMatrix34toMatrix44(HmdMatrix34_t in)
 		{ in.m[0][3], in.m[1][3], in.m[2][3], 1.0f }
 	};
 }
+#endif
 
 // Get the current projection and transform for selected eye and output a projection matrix for vulkan
-matrix GetEyeProjection(EVREye Eye)
+matrix GetEyeProjection(uint32_t Eye)
 {
+#ifndef ANDROID
 	if(!VRSystem)
 		return MatrixIdentity();
 
@@ -60,11 +65,15 @@ matrix GetEyeProjection(EVREye Eye)
 
 	// Inverse eye transform and multiply into projection matrix
 	return MatrixMult(Projection, MatrixInverse(HmdMatrix34toMatrix44(VRSystem->GetEyeToHeadTransform(Eye))));
+#else
+	return MatrixIdentity();
+#endif
 }
 
 // Get current inverse head pose matrix
 matrix GetHeadPose(void)
 {
+#ifndef ANDROID
 	if(!VRCompositor)
 		return MatrixIdentity();
 
@@ -74,12 +83,14 @@ matrix GetHeadPose(void)
 
 	if(trackedDevicePose[k_unTrackedDeviceIndex_Hmd].bDeviceIsConnected&&trackedDevicePose[k_unTrackedDeviceIndex_Hmd].bPoseIsValid)
 		return MatrixInverse(HmdMatrix34toMatrix44(trackedDevicePose[k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking));
+#endif
 
 	return MatrixIdentity();
 }
 
 bool InitOpenVR(void)
 {
+#ifndef ANDROID
 	EVRInitError eError=EVRInitError_VRInitError_None;
 	char fnTableName[128]="\0";
 
@@ -141,14 +152,19 @@ bool InitOpenVR(void)
 	EyeProjection[1]=GetEyeProjection(EVREye_Eye_Right);
 
 	return true;
+#else
+	return false;
+#endif
 }
 
 void DestroyOpenVR(void)
 {
+#ifndef ANDROID
 	if(VRSystem)
 	{
 		DBGPRINTF(DEBUG_INFO, "Shutting down OpenVR...\n");
 		VR_ShutdownInternal();
 		VRSystem=NULL;
 	}
+#endif
 }
