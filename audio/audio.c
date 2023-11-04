@@ -45,7 +45,7 @@ extern HRIR_Sphere_t Sphere;
 float hrir_l[NUM_SAMPLES], hrir_r[NUM_SAMPLES];
 int16_t sample_l[NUM_SAMPLES], sample_r[NUM_SAMPLES];
 
-Camera_t Camera;
+extern Camera_t Camera;
 
 // This function is very naive, it just interpolates *all* the HRIR positions
 //   and weights then according to whatever is closest to the position.
