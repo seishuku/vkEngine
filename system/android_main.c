@@ -120,6 +120,7 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			if(Zone==NULL)
 			{
 				DBGPRINTF(DEBUG_ERROR, "\t...zone allocation failed!\n");
+				appState.app->destroyRequested=true;
 				ANativeActivity_finish(app->activity);
 				return;
 			}
@@ -127,7 +128,8 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			DBGPRINTF(DEBUG_INFO, "Creating Vulkan instance...\n");
 			if(!CreateVulkanInstance(&Instance))
 			{
-				DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
+				DBGPRINTF(DEBUG_ERROR, "\t...create Vulkan instance failed.\n");
+				appState.app->destroyRequested=true;
 				ANativeActivity_finish(app->activity);
 				return;
 			}
@@ -135,7 +137,8 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			DBGPRINTF(DEBUG_INFO, "Creating Vulkan context...\n");
 			if(!CreateVulkanContext(Instance, &Context))
 			{
-				DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
+				DBGPRINTF(DEBUG_ERROR, "\t...create Vulkan context failed.\n");
+				appState.app->destroyRequested=true;
 				ANativeActivity_finish(app->activity);
 				return;
 			}
@@ -143,7 +146,8 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			DBGPRINTF(DEBUG_INFO, "Creating swapchain...\n");
 			if(!vkuCreateSwapchain(&Context, &Swapchain, VK_TRUE))
 			{
-				DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
+				DBGPRINTF(DEBUG_ERROR, "\t...create swapchain failed.\n");
+				appState.app->destroyRequested=true;
 				ANativeActivity_finish(app->activity);
 				return;
 			}
@@ -151,7 +155,8 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			DBGPRINTF(DEBUG_INFO, "Init...\n");
 			if(!Init())
 			{
-				DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
+				DBGPRINTF(DEBUG_ERROR, "\t...init failed.\n");
+				appState.app->destroyRequested=true;
 				ANativeActivity_finish(app->activity);
 				return;
 			}
@@ -167,6 +172,7 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			break;
 
 		case APP_CMD_TERM_WINDOW:
+			appState.app->destroyRequested=true;
 			appState.running=false;
 
 			DBGPRINTF(DEBUG_INFO, "Shutting down...\n");

@@ -428,10 +428,10 @@ int main(int argc, char **argv)
 	DBGPRINTF(DEBUG_INFO, "Creating swapchain...\n");
 	vkuCreateSwapchain(&Context, &Swapchain, VK_TRUE);
 
-	DBGPRINTF(DEBUG_INFO, "Initalizing Vulkan resources...\n");
+	DBGPRINTF(DEBUG_INFO, "Initializing Vulkan resources...\n");
 	if(!Init())
 	{
-		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "\t...initializing failed.\n");
 		return -1;
 	}
 

@@ -189,6 +189,30 @@ void RecreateSwapchain(void);
 // Create functions for creating render data for asteroids
 bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeight)
 {
+	VkImageFormatProperties imageFormatProps;
+	VkResult Result;
+
+	DepthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
+	Result=vkGetPhysicalDeviceImageFormatProperties(Context.PhysicalDevice,
+													DepthFormat,
+													VK_IMAGE_TYPE_2D,
+													VK_IMAGE_TILING_OPTIMAL,
+													VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+													0,
+													&imageFormatProps);
+
+	if(Result!=VK_SUCCESS)
+	{
+		DepthFormat=VK_FORMAT_D24_UNORM_S8_UINT;
+		Result=vkGetPhysicalDeviceImageFormatProperties(Context.PhysicalDevice, DepthFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT, 0, &imageFormatProps);
+
+		if(Result!=VK_SUCCESS)
+		{
+			DBGPRINTF(DEBUG_ERROR, "CreateFramebuffers: No suitable depth format found.\n");
+			return false;
+		}
+	}
+
 	vkuCreateTexture2D(&Context, &ColorImage[Eye], targetWidth, targetHeight, ColorFormat, MSAA);
 	vkuCreateTexture2D(&Context, &DepthImage[Eye], targetWidth, targetHeight, DepthFormat, MSAA);
 	vkuCreateTexture2D(&Context, &ColorResolve[Eye], targetWidth, targetHeight, ColorFormat, VK_SAMPLE_COUNT_1_BIT);
@@ -1202,63 +1226,111 @@ bool Init(void)
 	VkZone=vkuMem_Init(&Context, (size_t)(Context.DeviceProperties2.maxMemoryAllocationSize*0.8f));
 
 	if(VkZone==NULL)
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: vkuMem_Init failed.\n");
 		return false;
+	}
 
 	CameraInit(&Camera, Vec3(0.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 
 	if(!Audio_Init())
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Audio_Init failed.\n");
 		return false;
+	}
 
 	if(!Audio_LoadStatic("assets/pew1.wav", &Sounds[SOUND_PEW1]))
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/pew1.wav\n");
 		return false;
+	}
 
 	if(!Audio_LoadStatic("assets/pew2.wav", &Sounds[SOUND_PEW2]))
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/pew2.wav\n");
 		return false;
+	}
 
 	if(!Audio_LoadStatic("assets/pew3.wav", &Sounds[SOUND_PEW3]))
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/pew3.wav\n");
 		return false;
+	}
 
 	if(!Audio_LoadStatic("assets/stone1.wav", &Sounds[SOUND_STONE1]))
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/stone1.wav\n");
 		return false;
+	}
 
 	if(!Audio_LoadStatic("assets/stone2.wav", &Sounds[SOUND_STONE2]))
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/stone2.wav\n");
 		return false;
+	}
 
 	if(!Audio_LoadStatic("assets/stone3.wav", &Sounds[SOUND_STONE3]))
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/stone3.wav\n");
 		return false;
+	}
 
 	if(!Audio_LoadStatic("assets/crash.wav", &Sounds[SOUND_CRASH]))
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/crash.wav\n");
 		return false;
+	}
 
 	if(!Audio_LoadStatic("assets/explode1.wav", &Sounds[SOUND_EXPLODE1]))
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode1.wav\n");
 		return false;
+	}
 
 	if(!Audio_LoadStatic("assets/explode2.wav", &Sounds[SOUND_EXPLODE2]))
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode2.wav\n");
 		return false;
+	}
 
 	if(!Audio_LoadStatic("assets/explode3.wav", &Sounds[SOUND_EXPLODE3]))
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode3.wav\n");
 		return false;
+	}
 
 	// Load models
 	if(LoadBModel(&Models[MODEL_ASTEROID1], "assets/asteroid1.bmodel"))
 		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID1]);
 	else
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid1.bmodel\n");
 		return false;
+	}
 
 	if(LoadBModel(&Models[MODEL_ASTEROID2], "assets/asteroid2.bmodel"))
 		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID2]);
 	else
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid2.bmodel\n");
 		return false;
+	}
 
 	if(LoadBModel(&Models[MODEL_ASTEROID3], "assets/asteroid3.bmodel"))
 		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID3]);
 	else
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid3.bmodel\n");
 		return false;
+	}
 
 	if(LoadBModel(&Models[MODEL_ASTEROID4], "assets/asteroid4.bmodel"))
 		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID4]);
 	else
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid4.bmodel\n");
 		return false;
+	}
 
 	uint32_t TriangleCount=0;
 
@@ -1308,8 +1380,11 @@ bool Init(void)
 
 	// Set up particle system
 	if(!ParticleSystem_Init(&ParticleSystem))
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: ParticleSystem_Init failed.\n");
 		return false;
-
+	}
+	
 	ParticleSystem_SetGravity(&ParticleSystem, 0.0f, 0.0f, 0.0f);
 
 	vec3 Zero=Vec3(0.0f, 0.0f, 0.0f);
@@ -1451,7 +1526,7 @@ bool Init(void)
 	pthread_barrier_init(&ThreadBarrier_Physics, NULL, 2);
 
 
-#if 1
+#if 0
 	// Initialize the network API (mainly for winsock)
 	Network_Init();
 
@@ -1502,11 +1577,11 @@ bool Init(void)
 			break;
 		}
 	}
-#endif
 
 	Thread_Init(&ThreadNetUpdate);
 	Thread_Start(&ThreadNetUpdate);
 	Thread_AddJob(&ThreadNetUpdate, NetUpdate, NULL);
+#endif
 
 	return true;
 }
@@ -1567,6 +1642,7 @@ void Destroy(void)
 {
 	vkDeviceWaitIdle(Context.Device);
 
+#if 0
 	NetUpdate_Run=false;
 	Thread_Destroy(&ThreadNetUpdate);
 
@@ -1581,6 +1657,7 @@ void Destroy(void)
 	}
 
 	Network_Destroy();
+#endif
 
 	Audio_Destroy();
 

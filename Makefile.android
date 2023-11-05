@@ -3,6 +3,11 @@ APKFILE=$(TARGET).apk
 
 ANDROIDVERSION=28
 
+STOREPASS=password
+DNAME="CN=example.com, OU=ID, O=Example, L=Doe, S=John, C=GB"
+KEYSTOREFILE=my-release-key.keystore
+ALIASNAME=standkey
+
 BUILD_TOOLS=$(lastword $(wildcard $(ANDROID_HOME)/build-tools/*) )
 NDK=$(firstword $(wildcard $(ANDROID_HOME)/ndk/*) )
 
@@ -119,8 +124,8 @@ SHADERS+=shaders/threshold.frag.spv
 CC_X86_64=$(NDK)/toolchains/llvm/prebuilt/$(HOST)/bin/x86_64-linux-android$(ANDROIDVERSION)-clang
 CC_ARM64=$(NDK)/toolchains/llvm/prebuilt/$(HOST)/bin/aarch64-linux-android$(ANDROIDVERSION)-clang
 
-#CFLAGS+=-g2 -gdwarf-2 -O0 -D_DEBUG
-CFLAGS+=-O3 -g2 -gdwarf-2
+CFLAGS+=-g2 -gdwarf-2 -O0 -D_DEBUG
+#CFLAGS+=-O3 -g2 -gdwarf-2
 
 CFLAGS+=-fpic -fstack-protector -fno-strict-aliasing -fno-rtti -fno-omit-frame-pointer -fno-exceptions -fno-short-enums
 CFLAGS+=-std=gnu17 -Wall -Wno-missing-braces -Wextra
@@ -130,6 +135,8 @@ CFLAGS+=-DANDROID -D__ANDROID_MIN_SDK_VERSION__=$(ANDROIDVERSION) -DANDROIDVERSI
 CFLAGS+=-include system/android_fopen.h
 
 LDFLAGS+=-shared -lvulkan -lm -landroid -llog -laaudio
+
+.PHONY: all $(KEYSTOREFILE) clean
 
 all: $(APKFILE)
 
@@ -149,7 +156,7 @@ ARM64/%.o: %.c
 	mkdir -p $(@D)
 	$(CC_ARM64) -c $(CFLAGS) -o $@ $<
 
-$(APKFILE): $(SHADERS) apk/lib/arm64-v8a/lib$(TARGET).so apk/lib/x86_64/lib$(TARGET).so
+$(APKFILE): $(SHADERS) apk/lib/arm64-v8a/lib$(TARGET).so apk/lib/x86_64/lib$(TARGET).so $(KEYSTOREFILE)
 	rm -rf $(APKFILE)
 
 	mkdir -p apk/assets/shaders
@@ -160,13 +167,9 @@ $(APKFILE): $(SHADERS) apk/lib/arm64-v8a/lib$(TARGET).so apk/lib/x86_64/lib$(TAR
 	$(BUILD_TOOLS)/zipalign -v 4 temp.apk $(APKFILE)
 	$(BUILD_TOOLS)/apksigner sign --key-pass pass:$(STOREPASS) --ks-pass pass:$(STOREPASS) --ks $(KEYSTOREFILE) $(APKFILE)
 	rm -rf temp.apk
-
-STOREPASS=password
-DNAME="CN=example.com, OU=ID, O=Example, L=Doe, S=John, C=GB"
-KEYSTOREFILE=my-release-key.keystore
-ALIASNAME=standkey
-
-keystore:
+ 
+$(KEYSTOREFILE):
+	rm -f $(KEYSTOREFILE)
 	keytool -genkey -v -keystore $(KEYSTOREFILE) -alias $(ALIASNAME) -keyalg RSA -keysize 2048 -validity 10000 -storepass $(STOREPASS) -keypass $(STOREPASS) -dname $(DNAME)
 
 install:

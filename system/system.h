@@ -21,8 +21,15 @@
 #define DEBUG_NONE "\x1B[97m"
 #endif
 
+#ifdef ANDROID
+#include <android/log.h>
 #ifndef DBGPRINTF
-#define DBGPRINTF(level, ...) do { fprintf(stderr, level __VA_ARGS__); fprintf(stderr, DEBUG_NONE); } while(0)
+#define DBGPRINTF(level, ...) __android_log_print(ANDROID_LOG_INFO, "vkEngine", level __VA_ARGS__)
+#endif
+#else
+#ifndef DBGPRINTF
+#define DBGPRINTF(level, ...) fprintf(stderr, level __VA_ARGS__)
+#endif
 #endif
 
 #ifndef BUFFER_OFFSET

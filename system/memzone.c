@@ -125,22 +125,29 @@ void *Zone_Calloc(MemZone_t *Zone, size_t Size, size_t Count)
 
 void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size)
 {
+	// Input pointer is NULL, just do an allocation
+	if(!Ptr)
+		return Zone_Malloc(Zone, Size);
+
 	size_t *Block=(size_t *)((uint8_t *)Ptr-sizeof(size_t));
 	size_t currentSize=*Block&SIZE_MASK;
+	bool isFree=((*Block&FREE_MASK)>>FREE_SHIFT)==true;
+
+	// Block being reallocated shouldn't be free
+	if(isFree)
+	{
+		DBGPRINTF(DEBUG_ERROR, "Zone_Realloc: attempted to reallocate a free block.\n");
+		return NULL;
+	}
 
 	Size+=sizeof(size_t);	// Block header
 	Size=(Size+7)&~7;		// Align to 8-byte boundary
 
 	if(Size==sizeof(size_t))
 	{
-		// Attempting to reallocate to 0 size (frees pointer)
+		// Size=0, free the block
 		Zone_Free(Zone, Ptr);
 		return NULL;
-	}
-	else if(!Ptr)
-	{
-		// NULL pointer, just allocate a new block.
-		return Zone_Malloc(Zone, Size);
 	}
 	else if(Size<=currentSize)
 	{

@@ -33,7 +33,7 @@ typedef struct
 	bool looping;
 	float vol;
 	vec3 *xyz;
-	int16_t working[NUM_SAMPLES+NUM_SAMPLES];
+	int16_t working[NUM_SAMPLES*2];
 } Channel_t;
 
 static vec3 Zero={ 0.0f, 0.0f, 0.0f };
@@ -43,7 +43,7 @@ Channel_t channels[MAX_CHANNELS];
 // HRTF samples and buffers for interpolated values
 extern HRIR_Sphere_t Sphere;
 float hrir_l[NUM_SAMPLES], hrir_r[NUM_SAMPLES];
-int16_t sample_l[NUM_SAMPLES], sample_r[NUM_SAMPLES];
+int16_t sample_l[NUM_SAMPLES*2], sample_r[NUM_SAMPLES*2];
 
 extern Camera_t Camera;
 

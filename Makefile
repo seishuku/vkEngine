@@ -93,7 +93,7 @@ SHADERS+=shaders/skybox.vert.spv
 SHADERS+=shaders/gaussian.frag.spv
 SHADERS+=shaders/threshold.frag.spv
 
-CFLAGS=-Wall -Wno-missing-braces -Wextra -O3 -std=gnu17 -march=skylake
+CFLAGS=-Wall -Wno-missing-braces -Wextra -O3 -std=gnu17
 LDFLAGS=-Wold-style-definition -lm -lpthread -lopenvr_api -lportaudio
 
 ifeq ($(OS),Windows_NT)
@@ -123,16 +123,16 @@ $(TARGET): $(OBJS)
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 %.frag.spv: %.frag
-	glslc --target-env=vulkan1.2 -O $< -o $@
+	glslc --target-env=vulkan1.1 -O $< -o $@
 
 %.vert.spv: %.vert
-	glslc --target-env=vulkan1.2 -O $< -o $@
+	glslc --target-env=vulkan1.1 -O $< -o $@
 
 %.geom.spv: %.geom
-	glslc --target-env=vulkan1.2 -O $< -o $@
+	glslc --target-env=vulkan1.1 -O $< -o $@
 
 %.comp.spv: %.comp
-	glslc --target-env=vulkan1.2 -O $< -o $@
+	glslc --target-env=vulkan1.1 -O $< -o $@
 
 clean:
 	$(RM) $(TARGET) $(OBJS) $(SHADERS)

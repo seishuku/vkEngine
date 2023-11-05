@@ -180,7 +180,7 @@ void Thread_Resume(ThreadWorker_t *Worker)
 	pthread_mutex_unlock(&Worker->Mutex);
 }
 
-// Stops thread and waits for it to exit and destorys objects.
+// Stops thread and waits for it to exit and destroys objects.
 bool Thread_Destroy(ThreadWorker_t *Worker)
 {
 	if(Worker==NULL)

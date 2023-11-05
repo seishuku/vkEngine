@@ -232,7 +232,7 @@ bool ParticleSystem_Init(ParticleSystem_t *System)
 	// Default generic gravity
 	System->Gravity=Vec3(0.0f, -9.81f, 0.0f);
 
-	if(!Image_Upload(&Context, &ParticleTexture, "./assets/particle.tga", IMAGE_BILINEAR|IMAGE_MIPMAP))
+	if(!Image_Upload(&Context, &ParticleTexture, "assets/particle.tga", IMAGE_BILINEAR|IMAGE_MIPMAP))
 		return false;
 
 	vkuInitDescriptorSet(&ParticleDescriptorSet, &Context);
@@ -272,13 +272,13 @@ bool ParticleSystem_Init(ParticleSystem_t *System)
 	ParticlePipeline.DstAlphaBlendFactor=VK_BLEND_FACTOR_ONE;
 	ParticlePipeline.AlphaBlendOp=VK_BLEND_OP_ADD;
 
-	if(!vkuPipeline_AddStage(&ParticlePipeline, "./shaders/particle.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&ParticlePipeline, "shaders/particle.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
-	if(!vkuPipeline_AddStage(&ParticlePipeline, "./shaders/particle.geom.spv", VK_SHADER_STAGE_GEOMETRY_BIT))
+	if(!vkuPipeline_AddStage(&ParticlePipeline, "shaders/particle.geom.spv", VK_SHADER_STAGE_GEOMETRY_BIT))
 		return false;
 
-	if(!vkuPipeline_AddStage(&ParticlePipeline, "./shaders/particle.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	if(!vkuPipeline_AddStage(&ParticlePipeline, "shaders/particle.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
 	vkuPipeline_AddVertexBinding(&ParticlePipeline, 0, sizeof(vec4)*2, VK_VERTEX_INPUT_RATE_VERTEX);
