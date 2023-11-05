@@ -5,6 +5,7 @@ extern VkuContext_t Context;
 extern VkSampleCountFlags MSAA;
 extern VkFormat ColorFormat;
 extern VkFormat DepthFormat;
+extern VkRenderPass RenderPass;
 
 // Volume rendering vulkan stuff
 VkuDescriptorSet_t VolumeDescriptorSet;
@@ -244,6 +245,7 @@ bool CreateVolumePipeline(void)
 	vkuInitPipeline(&VolumePipeline, &Context);
 
 	vkuPipeline_SetPipelineLayout(&VolumePipeline, VolumePipelineLayout);
+	vkuPipeline_SetRenderPass(&VolumePipeline, RenderPass);
 
 	VolumePipeline.DepthTest=VK_TRUE;
 	VolumePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
@@ -255,10 +257,10 @@ bool CreateVolumePipeline(void)
 	VolumePipeline.DstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 	VolumePipeline.ColorBlendOp=VK_BLEND_OP_ADD;
 
-	if(!vkuPipeline_AddStage(&VolumePipeline, "./shaders/volume.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&VolumePipeline, "shaders/volume.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
-	if(!vkuPipeline_AddStage(&VolumePipeline, "./shaders/volume.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	if(!vkuPipeline_AddStage(&VolumePipeline, "shaders/volume.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
 	VkPipelineRenderingCreateInfo PipelineRenderingCreateInfo=
@@ -269,7 +271,7 @@ bool CreateVolumePipeline(void)
 		.depthAttachmentFormat=DepthFormat,
 	};
 
-	if(!vkuAssemblePipeline(&VolumePipeline, &PipelineRenderingCreateInfo))
+	if(!vkuAssemblePipeline(&VolumePipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
 		return false;
 
 	return true;

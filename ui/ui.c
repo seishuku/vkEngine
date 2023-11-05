@@ -14,7 +14,7 @@
 extern VkuContext_t Context;
 extern VkSampleCountFlags MSAA;
 extern VkuSwapchain_t Swapchain;
-//extern VkRenderPass RenderPass;
+extern VkRenderPass CompositeRenderPass;
 
 extern Font_t Fnt;
 // ---
@@ -135,7 +135,7 @@ static bool UI_VulkanPipeline(UI_t *UI)
 	vkuInitPipeline(&UI->Pipeline, &Context);
 
 	vkuPipeline_SetPipelineLayout(&UI->Pipeline, UI->PipelineLayout);
-	//vkuPipeline_SetRenderPass(&UI->Pipeline, RenderPass);
+	vkuPipeline_SetRenderPass(&UI->Pipeline, CompositeRenderPass);
 
 	UI->Pipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 	UI->Pipeline.CullMode=VK_CULL_MODE_BACK_BIT;
@@ -170,7 +170,7 @@ static bool UI_VulkanPipeline(UI_t *UI)
 		.pColorAttachmentFormats=&Swapchain.SurfaceFormat.format,
 	};
 
-	if(!vkuAssemblePipeline(&UI->Pipeline, /*VK_NULL_HANDLE*/&PipelineRenderingCreateInfo))
+	if(!vkuAssemblePipeline(&UI->Pipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
 		return false;
 
 	UI_VulkanVertex(UI);

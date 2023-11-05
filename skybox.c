@@ -10,7 +10,7 @@
 #include "perframe.h"
 
 extern VkuContext_t Context;
-//extern VkuRenderPass_t RenderPass;
+extern VkRenderPass RenderPass;
 extern VkSampleCountFlags MSAA;
 extern VkuSwapchain_t Swapchain;
 extern VkFormat ColorFormat, DepthFormat;
@@ -46,16 +46,17 @@ bool CreateSkyboxPipeline(void)
 	vkuInitPipeline(&SkyboxPipeline, &Context);
 
 	vkuPipeline_SetPipelineLayout(&SkyboxPipeline, SkyboxPipelineLayout);
+	vkuPipeline_SetRenderPass(&SkyboxPipeline, RenderPass);
 
 	SkyboxPipeline.DepthTest=VK_TRUE;
 	SkyboxPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
 	SkyboxPipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
 	SkyboxPipeline.RasterizationSamples=MSAA;
 
-	if(!vkuPipeline_AddStage(&SkyboxPipeline, "./shaders/skybox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&SkyboxPipeline, "shaders/skybox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
-	if(!vkuPipeline_AddStage(&SkyboxPipeline, "./shaders/skybox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	if(!vkuPipeline_AddStage(&SkyboxPipeline, "shaders/skybox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
 	VkPipelineRenderingCreateInfo PipelineRenderingCreateInfo=

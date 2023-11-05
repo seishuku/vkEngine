@@ -77,6 +77,11 @@ VkuImage_t ColorImage[2];		// left and right eye color buffer
 VkFormat DepthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
 VkuImage_t DepthImage[2];		// left and right eye depth buffers
 
+// Renderpass for primary renderer
+VkRenderPass RenderPass;
+// Framebuffers, per-eye
+VkFramebuffer Framebuffer[2];
+
 // Primary rendering Vulkan stuff
 VkuDescriptorSet_t DescriptorSet;
 VkPipelineLayout PipelineLayout;
@@ -223,11 +228,113 @@ bool CreateFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t targetHeigh
 	vkuTransitionLayout(CommandBuffer, ColorResolve[Eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuOneShotCommandBufferEnd(&Context, CommandBuffer);
 
+	vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+		.renderPass=RenderPass,
+		.attachmentCount=3,
+		.pAttachments=(VkImageView[]){ ColorImage[Eye].View, DepthImage[Eye].View, ColorResolve[Eye].View },
+		.width=targetWidth,
+		.height=targetHeight,
+		.layers=1,
+	}, 0, &Framebuffer[Eye]);
+
 	return true;
 }
 
 bool CreatePipeline(void)
 {
+	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+		.attachmentCount=3,
+		.pAttachments=(VkAttachmentDescription[])
+		{
+			{
+				.format=ColorFormat,
+				.samples=MSAA,
+				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+				.finalLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			},
+			{
+				.format=DepthFormat,
+				.samples=MSAA,
+				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+				.finalLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			},
+			{
+				.format=ColorFormat,
+				.samples=VK_SAMPLE_COUNT_1_BIT,
+				.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
+				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+				.finalLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			},
+		},
+		.subpassCount=1,
+		.pSubpasses=&(VkSubpassDescription)
+		{
+			.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS,
+			.colorAttachmentCount=1,
+			.pColorAttachments=&(VkAttachmentReference)
+			{
+				.attachment=0,
+				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			},
+			.pDepthStencilAttachment=&(VkAttachmentReference)
+			{
+				.attachment=1,
+				.layout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			},
+			.pResolveAttachments=&(VkAttachmentReference)
+			{
+				.attachment=2,
+				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			},
+		},
+		.dependencyCount=3,
+		.pDependencies=(VkSubpassDependency[])
+		{
+			{
+				.srcSubpass=VK_SUBPASS_EXTERNAL,
+				.dstSubpass=0,
+				.srcStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT|VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT|VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+				.srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+				.dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT|VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+				.dependencyFlags=0,
+			},
+			{
+				.srcSubpass=VK_SUBPASS_EXTERNAL,
+				.dstSubpass=0,
+				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.srcAccessMask=0,
+				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT|VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+				.dependencyFlags=0,
+			},
+			{
+				.srcSubpass=0,
+				.dstSubpass=VK_SUBPASS_EXTERNAL,
+				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
+			},
+		},
+	}, 0, &RenderPass);
+
 	for(uint32_t i=0;i<Swapchain.NumImages;i++)
 	{
 		vkuCreateHostBuffer(&Context, &PerFrame[i].Main_UBO_Buffer[0], sizeof(Main_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
@@ -264,16 +371,17 @@ bool CreatePipeline(void)
 	vkuInitPipeline(&Pipeline, &Context);
 
 	vkuPipeline_SetPipelineLayout(&Pipeline, PipelineLayout);
+	vkuPipeline_SetRenderPass(&Pipeline, RenderPass);
 
 	Pipeline.DepthTest=VK_TRUE;
 	Pipeline.CullMode=VK_CULL_MODE_BACK_BIT;
 	Pipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
 	Pipeline.RasterizationSamples=MSAA;
 
-	if(!vkuPipeline_AddStage(&Pipeline, "./shaders/lighting.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&Pipeline, "shaders/lighting.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
-	if(!vkuPipeline_AddStage(&Pipeline, "./shaders/lighting.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	if(!vkuPipeline_AddStage(&Pipeline, "shaders/lighting.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
 	vkuPipeline_AddVertexBinding(&Pipeline, 0, sizeof(vec4)*5, VK_VERTEX_INPUT_RATE_VERTEX);
@@ -297,7 +405,7 @@ bool CreatePipeline(void)
 		.depthAttachmentFormat=DepthFormat,
 	};
 
-	if(!vkuAssemblePipeline(&Pipeline, &PipelineRenderingCreateInfo))
+	if(!vkuAssemblePipeline(&Pipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
 		return false;
 
 	return true;
@@ -446,10 +554,10 @@ bool CreateSpherePipeline(void)
 	SpherePipeline.RasterizationSamples=MSAA;
 	//	SpherePipeline.PolygonMode=VK_POLYGON_MODE_LINE;
 
-	if(!vkuPipeline_AddStage(&SpherePipeline, "./shaders/sphere.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&SpherePipeline, "shaders/sphere.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
-	if(!vkuPipeline_AddStage(&SpherePipeline, "./shaders/sphere.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	if(!vkuPipeline_AddStage(&SpherePipeline, "shaders/sphere.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
 	VkPipelineRenderingCreateInfo PipelineRenderingCreateInfo=
@@ -492,10 +600,10 @@ bool CreateLinePipeline(void)
 	LinePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
 	LinePipeline.RasterizationSamples=MSAA;
 
-	if(!vkuPipeline_AddStage(&LinePipeline, "./shaders/line.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&LinePipeline, "shaders/line.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
-	if(!vkuPipeline_AddStage(&LinePipeline, "./shaders/line.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	if(!vkuPipeline_AddStage(&LinePipeline, "shaders/line.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
 	VkPipelineRenderingCreateInfo PipelineRenderingCreateInfo=
@@ -593,18 +701,25 @@ void Thread_Main(void *Arg)
 	vkBeginCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], &(VkCommandBufferBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-			.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
-			.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
+		//.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+		//{
+		//	.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+		//	.pNext=&(VkCommandBufferInheritanceRenderingInfo)
+		//	{
+		//		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
+		//		.colorAttachmentCount=1,
+		//		.pColorAttachmentFormats=&ColorFormat,
+		//		.depthAttachmentFormat=DepthFormat,
+		//		.rasterizationSamples=MSAA
+		//	},
+		//}
+		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-				.pNext=&(VkCommandBufferInheritanceRenderingInfo)
-			{
-				.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-				.colorAttachmentCount=1,
-				.pColorAttachmentFormats=&ColorFormat,
-				.depthAttachmentFormat=DepthFormat,
-				.rasterizationSamples=MSAA
-			},
+			.pNext=NULL,
+			.renderPass=RenderPass,
+			.framebuffer=Framebuffer[Data->Eye]
 		}
 	});
 
@@ -722,18 +837,25 @@ void Thread_Skybox(void *Arg)
 	vkBeginCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], &(VkCommandBufferBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-			.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
-			.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
+		//.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+		//{
+		//	.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+		//	.pNext=&(VkCommandBufferInheritanceRenderingInfo)
+		//	{
+		//		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
+		//		.colorAttachmentCount=1,
+		//		.pColorAttachmentFormats=&ColorFormat,
+		//		.depthAttachmentFormat=DepthFormat,
+		//		.rasterizationSamples=MSAA
+		//	},
+		//}
+		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-			.pNext=&(VkCommandBufferInheritanceRenderingInfo)
-			{
-				.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-				.colorAttachmentCount=1,
-				.pColorAttachmentFormats=&ColorFormat,
-				.depthAttachmentFormat=DepthFormat,
-				.rasterizationSamples=MSAA
-			},
+			.pNext=NULL,
+			.renderPass=RenderPass,
+			.framebuffer=Framebuffer[Data->Eye]
 		}
 	});
 
@@ -769,17 +891,24 @@ void Thread_Particles(void *Arg)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
+		//.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+		//{
+		//	.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+		//	.pNext=&(VkCommandBufferInheritanceRenderingInfo)
+		//	{
+		//		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
+		//		.colorAttachmentCount=1,
+		//		.pColorAttachmentFormats=&ColorFormat,
+		//		.depthAttachmentFormat=DepthFormat,
+		//		.rasterizationSamples=MSAA
+		//	},
+		//}
 		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-			.pNext=&(VkCommandBufferInheritanceRenderingInfo)
-			{
-				.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-				.colorAttachmentCount=1,
-				.pColorAttachmentFormats=&ColorFormat,
-				.depthAttachmentFormat=DepthFormat,
-				.rasterizationSamples=MSAA
-			},
+			.pNext=NULL,
+			.renderPass=RenderPass,
+			.framebuffer=Framebuffer[Data->Eye]
 		}
 	});
 
@@ -825,35 +954,44 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	PerFrame[Index].Main_UBO[Eye]->light_mvp=Shadow_UBO.mvp;
 
 	// Start a render pass and clear the frame/depth buffer
-	vkCmdBeginRendering(CommandBuffer, &(VkRenderingInfo)
+	//vkCmdBeginRendering(CommandBuffer, &(VkRenderingInfo)
+	//{
+	//	.sType=VK_STRUCTURE_TYPE_RENDERING_INFO,
+	//	.flags=VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT,
+	//	.renderArea=(VkRect2D){ { 0, 0 }, { rtWidth, rtHeight } },
+	//	.layerCount=1,
+	//	.colorAttachmentCount=1,
+	//	.pColorAttachments=&(VkRenderingAttachmentInfo)
+	//	{
+	//		.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+	//		.imageView=ColorImage[Eye].View,
+	//		.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	//		.resolveMode=VK_RESOLVE_MODE_AVERAGE_BIT,
+	//		.resolveImageView=ColorResolve[Eye].View,
+	//		.resolveImageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	//		.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+	//		.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+	//		.clearValue=(VkClearValue){ .color.float32={ 0.0f, 0.0f, 0.0f, 1.0f } },
+	//	},
+	//	.pDepthAttachment=&(VkRenderingAttachmentInfo)
+	//	{
+	//		.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+	//		.imageView=DepthImage[Eye].View,
+	//		.imageLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+	//		.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+	//		.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+	//		.clearValue=(VkClearValue){ .depthStencil={ 0.0f, 0 } },
+	//	},
+	//});
+	vkCmdBeginRenderPass(CommandBuffer, &(VkRenderPassBeginInfo)
 	{
-		.sType=VK_STRUCTURE_TYPE_RENDERING_INFO,
-		.flags=VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT,
+		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+		.renderPass=RenderPass,
+		.framebuffer=Framebuffer[Eye],
+		.clearValueCount=2,
+		.pClearValues=(VkClearValue[]){ {{{ 0.0f, 0.0f, 0.0f, 1.0f }}}, {{{ 0.0f, 0 }}} },
 		.renderArea=(VkRect2D){ { 0, 0 }, { rtWidth, rtHeight } },
-		.layerCount=1,
-		.colorAttachmentCount=1,
-		.pColorAttachments=&(VkRenderingAttachmentInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-			.imageView=ColorImage[Eye].View,
-			.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			.resolveMode=VK_RESOLVE_MODE_AVERAGE_BIT,
-			.resolveImageView=ColorResolve[Eye].View,
-			.resolveImageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-			.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-			.clearValue=(VkClearValue){ .color.float32={ 0.0f, 0.0f, 0.0f, 1.0f } },
-		},
-		.pDepthAttachment=&(VkRenderingAttachmentInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-			.imageView=DepthImage[Eye].View,
-			.imageLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-			.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-			.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-			.clearValue=(VkClearValue){ .depthStencil={ 0.0f, 0 } },
-		},
-	});
+	}, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
 	// Set per thread data and add the job to that worker thread
 	ThreadData[0].Index=Index;
@@ -878,7 +1016,8 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 		ThreadData[2].PerFrame[Index].SecCommandBuffer[Eye]
 	});
 
-	vkCmdEndRendering(CommandBuffer);
+	//vkCmdEndRendering(CommandBuffer);
+	vkCmdEndRenderPass(CommandBuffer);
 }
 
 double physicsTime=0.0;
@@ -1378,6 +1517,17 @@ bool Init(void)
 	// Create compositing pipeline
 	CreateCompositePipeline();
 
+	// Create primary frame buffers, depth image
+	CreateFramebuffers(0, rtWidth, rtHeight);
+	CreateCompositeFramebuffers(0, rtWidth, rtHeight);
+
+	// Second eye framebuffer for VR
+	if(IsVR)
+	{
+		CreateFramebuffers(1, rtWidth, rtHeight);
+		CreateCompositeFramebuffers(1, rtWidth, rtHeight);
+	}
+
 	// Set up particle system
 	if(!ParticleSystem_Init(&ParticleSystem))
 	{
@@ -1389,17 +1539,6 @@ bool Init(void)
 
 	vec3 Zero=Vec3(0.0f, 0.0f, 0.0f);
 	ParticleSystem_AddEmitter(&ParticleSystem, Zero, Zero, Zero, 0.0f, 100, true, NULL);
-
-	// Create primary frame buffers, depth image
-	CreateFramebuffers(0, rtWidth, rtHeight);
-	CreateCompositeFramebuffers(0, rtWidth, rtHeight);
-
-	// Second eye framebuffer for VR
-	if(IsVR)
-	{
-		CreateFramebuffers(1, rtWidth, rtHeight);
-		CreateCompositeFramebuffers(1, rtWidth, rtHeight);
-	}
 
 	Font_Init(&Fnt);
 
@@ -1494,17 +1633,17 @@ bool Init(void)
 		vkCreateCommandPool(Context.Device, &(VkCommandPoolCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-				.flags=0,
-				.queueFamilyIndex=Context.QueueFamilyIndex,
+			.flags=0,
+			.queueFamilyIndex=Context.QueueFamilyIndex,
 		}, VK_NULL_HANDLE, &PerFrame[i].CommandPool);
 
 		// Allocate the command buffers we will be rendering into
 		vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-				.commandPool=PerFrame[i].CommandPool,
-				.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-				.commandBufferCount=1,
+			.commandPool=PerFrame[i].CommandPool,
+			.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+			.commandBufferCount=1,
 		}, &PerFrame[i].CommandBuffer);
 	}
 

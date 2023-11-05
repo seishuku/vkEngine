@@ -26,7 +26,7 @@ extern VkuSwapchain_t Swapchain;
 
 extern VkuMemZone_t *VkZone;
 
-//extern VkRenderPass RenderPass;
+extern VkRenderPass CompositeRenderPass;
 // ---
 
 bool Font_Init(Font_t *Font)
@@ -56,7 +56,7 @@ bool Font_Init(Font_t *Font)
 	vkuInitPipeline(&Font->Pipeline, &Context);
 
 	vkuPipeline_SetPipelineLayout(&Font->Pipeline, Font->PipelineLayout);
-	//vkuPipeline_SetRenderPass(&Font->Pipeline, RenderPass);
+	vkuPipeline_SetRenderPass(&Font->Pipeline, CompositeRenderPass);
 
 	Font->Pipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 	Font->Pipeline.CullMode=VK_CULL_MODE_BACK_BIT;
@@ -90,7 +90,7 @@ bool Font_Init(Font_t *Font)
 		.pColorAttachmentFormats=&Swapchain.SurfaceFormat.format,
 	};
 
-	if(!vkuAssemblePipeline(&Font->Pipeline, /*VK_NULL_HANDLE*/&PipelineRenderingCreateInfo))
+	if(!vkuAssemblePipeline(&Font->Pipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
 		return false;
 	// ---
 

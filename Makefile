@@ -79,9 +79,10 @@ SHADERS+=shaders/bezier.geom.spv
 SHADERS+=shaders/bezier.vert.spv
 SHADERS+=shaders/composite.frag.spv
 SHADERS+=shaders/compositeVR.frag.spv
-SHADERS+=shaders/fullscreen.vert.spv
 SHADERS+=shaders/font.frag.spv
 SHADERS+=shaders/font.vert.spv
+SHADERS+=shaders/fullscreen.vert.spv
+SHADERS+=shaders/gaussian.frag.spv
 SHADERS+=shaders/lighting.frag.spv
 SHADERS+=shaders/lighting.vert.spv
 SHADERS+=shaders/particle.frag.spv
@@ -90,8 +91,11 @@ SHADERS+=shaders/particle.vert.spv
 SHADERS+=shaders/shadow.vert.spv
 SHADERS+=shaders/skybox.frag.spv
 SHADERS+=shaders/skybox.vert.spv
-SHADERS+=shaders/gaussian.frag.spv
 SHADERS+=shaders/threshold.frag.spv
+SHADERS+=shaders/ui_sdf.frag.spv
+SHADERS+=shaders/ui_sdf.vert.spv
+SHADERS+=shaders/volume.frag.spv
+SHADERS+=shaders/volume.vert.spv
 
 CFLAGS=-Wall -Wno-missing-braces -Wextra -O3 -std=gnu17
 LDFLAGS=-Wold-style-definition -lm -lpthread -lopenvr_api -lportaudio

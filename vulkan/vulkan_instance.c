@@ -94,7 +94,7 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 		.applicationVersion=VK_MAKE_VERSION(1, 0, 0),
 		.pEngineName="Engine",
 		.engineVersion=VK_MAKE_VERSION(1, 0, 0),
-		.apiVersion=VK_API_VERSION_1_3
+		.apiVersion=VK_API_VERSION_1_1
 	};
 
 	const char *Extensions[]=

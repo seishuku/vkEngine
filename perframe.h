@@ -27,6 +27,8 @@ typedef struct
 	VkuBuffer_t Main_UBO_Buffer[2];
 	//////
 
+	VkFramebuffer CompositeFramebuffer;
+
 	// Descriptor pool
 	VkDescriptorPool DescriptorPool;
 

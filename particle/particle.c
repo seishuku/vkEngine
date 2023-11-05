@@ -16,6 +16,8 @@ extern VkuContext_t Context;
 extern VkSampleCountFlags MSAA;
 extern VkFormat ColorFormat, DepthFormat;
 
+extern VkRenderPass RenderPass;
+
 extern VkuMemZone_t *VkZone;
 ////////////////////////////
 
@@ -256,6 +258,7 @@ bool ParticleSystem_Init(ParticleSystem_t *System)
 	vkuInitPipeline(&ParticlePipeline, &Context);
 
 	vkuPipeline_SetPipelineLayout(&ParticlePipeline, ParticlePipelineLayout);
+	vkuPipeline_SetRenderPass(&ParticlePipeline, RenderPass);
 
 	ParticlePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 	ParticlePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
@@ -293,7 +296,7 @@ bool ParticleSystem_Init(ParticleSystem_t *System)
 		.depthAttachmentFormat=DepthFormat,
 	};
 
-	if(!vkuAssemblePipeline(&ParticlePipeline, &PipelineRenderingCreateInfo))
+	if(!vkuAssemblePipeline(&ParticlePipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
 		return false;
 
 	return true;

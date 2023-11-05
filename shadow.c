@@ -118,7 +118,7 @@ bool CreateShadowPipeline(void)
 	vkuPipeline_SetRenderPass(&ShadowPipeline, ShadowRenderPass);
 
 	// Add in vertex shader
-	if(!vkuPipeline_AddStage(&ShadowPipeline, "./shaders/shadow.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&ShadowPipeline, "shaders/shadow.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
 	// Set states that are different than defaults
