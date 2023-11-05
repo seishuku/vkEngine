@@ -19,7 +19,7 @@ extern VkFormat ColorFormat, DepthFormat;
 extern VkuMemZone_t *VkZone;
 ////////////////////////////
 
-VkuDescriptorSet_t ParticleDescriptorSet;
+//VkuDescriptorSet_t ParticleDescriptorSet;
 VkPipelineLayout ParticlePipelineLayout;
 VkuPipeline_t ParticlePipeline;
 
@@ -232,18 +232,18 @@ bool ParticleSystem_Init(ParticleSystem_t *System)
 	// Default generic gravity
 	System->Gravity=Vec3(0.0f, -9.81f, 0.0f);
 
-	if(!Image_Upload(&Context, &ParticleTexture, "assets/particle.tga", IMAGE_BILINEAR|IMAGE_MIPMAP))
-		return false;
+	//if(!Image_Upload(&Context, &ParticleTexture, "assets/particle.tga", IMAGE_BILINEAR|IMAGE_MIPMAP))
+	//	return false;
 
-	vkuInitDescriptorSet(&ParticleDescriptorSet, &Context);
-	vkuDescriptorSet_AddBinding(&ParticleDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuAssembleDescriptorSetLayout(&ParticleDescriptorSet);
+	//vkuInitDescriptorSet(&ParticleDescriptorSet, &Context);
+	//vkuDescriptorSet_AddBinding(&ParticleDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+	//vkuAssembleDescriptorSetLayout(&ParticleDescriptorSet);
 
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=1,
-		.pSetLayouts=&ParticleDescriptorSet.DescriptorSetLayout,
+		//.setLayoutCount=1,
+		//.pSetLayouts=&ParticleDescriptorSet.DescriptorSetLayout,
 		.pushConstantRangeCount=1,
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
@@ -389,10 +389,10 @@ void ParticleSystem_Draw(ParticleSystem_t *System, VkCommandBuffer CommandBuffer
 	ParticlePC.Right=Vec4(Modelview.x.x, Modelview.y.x, Modelview.z.x, Modelview.w.x);
 	ParticlePC.Up=Vec4(Modelview.x.y, Modelview.y.y, Modelview.z.y, Modelview.w.y);
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&ParticleDescriptorSet, 0, &ParticleTexture);
-	vkuAllocateUpdateDescriptorSet(&ParticleDescriptorSet, DescriptorPool);
+	//vkuDescriptorSet_UpdateBindingImageInfo(&ParticleDescriptorSet, 0, &ParticleTexture);
+	//vkuAllocateUpdateDescriptorSet(&ParticleDescriptorSet, DescriptorPool);
 
-	vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ParticlePipelineLayout, 0, 1, &ParticleDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
+	//vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ParticlePipelineLayout, 0, 1, &ParticleDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
 	vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ParticlePipeline.Pipeline);
 	vkCmdPushConstants(CommandBuffer, ParticlePipelineLayout, VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(ParticlePC), &ParticlePC);
@@ -408,11 +408,11 @@ void ParticleSystem_Destroy(ParticleSystem_t *System)
 
 	vkuDestroyBuffer(&Context, &System->ParticleBuffer);
 
-	vkuDestroyImageBuffer(&Context, &ParticleTexture);
+	//vkuDestroyImageBuffer(&Context, &ParticleTexture);
 
 	vkDestroyPipeline(Context.Device, ParticlePipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, ParticlePipelineLayout, VK_NULL_HANDLE);
-	vkDestroyDescriptorSetLayout(Context.Device, ParticleDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
+	//vkDestroyDescriptorSetLayout(Context.Device, ParticleDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
 
 	for(uint32_t i=0;i<List_GetCount(&System->Emitters);i++)
 	{

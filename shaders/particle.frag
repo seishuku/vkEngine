@@ -9,7 +9,7 @@ layout (location=0) out vec4 Output;
 
 void main()
 {
-	float Alpha=texture(Particle, vUV).r;
+	float Alpha=1.0-length(vUV*2.0-1.0);
 
 	Output=vColor*vec4(0.5, 0.5, 0.5, Alpha);
 
