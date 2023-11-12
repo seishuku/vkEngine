@@ -1,20 +1,7 @@
 #include <stdio.h>
+#include <string.h>
 #include "threads.h"
-
-#ifdef WIN32
-#include <Windows.h>
-#define DBGPRINTF(...) { char buf[512]; snprintf(buf, sizeof(buf), __VA_ARGS__); OutputDebugString(buf); }
-#else
-#define DBGPRINTF(...) { fprintf(stderr, __VA_ARGS__); }
-#endif
-
-// Structure that holds the function pointer and argument
-// to store in a list that can be iterated as a job list.
-typedef struct
-{
-    ThreadFunction_t Function;
-    void *Arg;
-} ThreadJob_t;
+#include "system.h"
 
 // Main worker thread function, this does the actual calling of various job functions in the thread
 void *Thread_Worker(void *Data)
@@ -33,16 +20,23 @@ void *Thread_Worker(void *Data)
 		pthread_mutex_lock(&Worker->Mutex);
 
 		// Check if there are any jobs
-		while((List_GetCount(&Worker->Jobs)==0&&!Worker->Stop)||Worker->Pause)
+		while((Worker->NumJobs==0&&!Worker->Stop)||Worker->Pause)
 			pthread_cond_wait(&Worker->Condition, &Worker->Mutex);
+
+		if(Worker->NumJobs==0)
+			continue;
 
 		ThreadJob_t Job={ NULL, NULL };
 
 		// Get a copy of the current job
-		List_GetCopy(&Worker->Jobs, 0, (void *)&Job);
+		Job=Worker->Jobs[0];
 
 		// Remove it from the job list
-		List_Del(&Worker->Jobs, 0);
+		Worker->NumJobs--;
+
+		// Shift job list
+		for(uint32_t i=0;i<Worker->NumJobs;i++)
+			Worker->Jobs[i]=Worker->Jobs[i+1];
 
 		// Unlock the mutex
 		pthread_mutex_unlock(&Worker->Mutex);
@@ -62,24 +56,29 @@ void *Thread_Worker(void *Data)
 // Get the number of current jobs
 uint32_t Thread_GetJobCount(ThreadWorker_t *Worker)
 {
-	uint32_t Count=0;
-
 	if(Worker)
-		Count=(uint32_t)List_GetCount(&Worker->Jobs);
+		return Worker->NumJobs;
 
-	return Count;
+	return 0;
 }
 
 // Adds a job function and argument to the job list
-void Thread_AddJob(ThreadWorker_t *Worker, ThreadFunction_t JobFunc, void *Arg)
+bool Thread_AddJob(ThreadWorker_t *Worker, ThreadFunction_t JobFunc, void *Arg)
 {
 	if(Worker)
 	{
+		if(Worker->NumJobs>=THREAD_MAXJOBS)
+			return false;
+
 		pthread_mutex_lock(&Worker->Mutex);
-		List_Add(&Worker->Jobs, &(ThreadJob_t) { JobFunc, Arg });
+		Worker->Jobs[Worker->NumJobs++]=(ThreadJob_t){ JobFunc, Arg };
 		pthread_cond_signal(&Worker->Condition);
 		pthread_mutex_unlock(&Worker->Mutex);
 	}
+	else
+		return false;
+
+	return true;
 }
 
 // Assigns a constructor function and argument to the thread
@@ -122,12 +121,9 @@ bool Thread_Init(ThreadWorker_t *Worker)
 	Worker->Destructor=NULL;
 	Worker->DestructorArg=NULL;
 
-	// initialize the job list, reserve memory for 10 jobs
-	if(!List_Init(&Worker->Jobs, sizeof(ThreadJob_t), 10, NULL))
-	{
-		DBGPRINTF("Unable to create job list.\r\n");
-		return false;
-	}
+	// initialize the job list
+	memset(Worker->Jobs, 0, sizeof(ThreadJob_t)*THREAD_MAXJOBS);
+	Worker->NumJobs=0;
 
 	// Initialize the mutex
 	if(pthread_mutex_init(&Worker->Mutex, NULL))
@@ -199,9 +195,6 @@ bool Thread_Destroy(ThreadWorker_t *Worker)
 
 	// Destroy the condition variable
 	pthread_cond_destroy(&Worker->Condition);
-
-	// Destroy the job list
-	List_Destroy(&Worker->Jobs);
 
 	return true;
 }

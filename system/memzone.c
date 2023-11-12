@@ -369,6 +369,29 @@ void Zone_Free(MemZone_t *Zone, void *Ptr)
 	pthread_mutex_unlock(&Zone->Mutex);
 }
 
+// Walk the blocks in the heap and verify that none go out of bounds
+bool Zone_VerifyHeap(MemZone_t *Zone)
+{
+	size_t *Block=Zone->Memory;
+	size_t *EndZone=(size_t *)((uint8_t *)Zone->Memory+Zone->Size);
+
+	for(size_t i=0;i<Zone->Allocations;i++)
+	{
+		size_t blockSize=*Block&SIZE_MASK;
+		size_t *nextBlock=(size_t *)((uint8_t *)Block+blockSize);
+
+		if(nextBlock>EndZone)
+		{
+			DBGPRINTF(DEBUG_ERROR, "Zone_VerifyHeap: Corrupted heap! Block (%p>%p) went out of range.\n", nextBlock, EndZone);
+			return false;
+		}
+
+		Block=(size_t *)((uint8_t *)Block+blockSize);
+	}
+
+	return true;
+}
+
 // Iterate over the allocations and print out some stats.
 void Zone_Print(MemZone_t *Zone)
 {

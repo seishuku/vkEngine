@@ -33,9 +33,7 @@ float fps=0.0f, fTimeStep, fTime=0.0;
 
 struct
 {
-	int32_t initialFormat;
 	bool running;
-	float x, y, z;
 	struct android_app *app;
 } appState;
 
@@ -77,8 +75,8 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 							break;
 
 						case AMOTION_EVENT_ACTION_MOVE:
-							MouseEvent.dx=AMotionEvent_getX(event, 0)-AMotionEvent_getHistoricalX(event, 0, 0);
-							MouseEvent.dy=AMotionEvent_getHistoricalY(event, 0, 0)-AMotionEvent_getY(event, 0);
+							MouseEvent.dx=(AMotionEvent_getX(event, 0)-AMotionEvent_getHistoricalX(event, 0, 0))*4;
+							MouseEvent.dy=(AMotionEvent_getHistoricalY(event, 0, 0)-AMotionEvent_getY(event, 0))*4;
 							Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
 							break;
 					}
@@ -87,8 +85,81 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 		break;
 
 		case AINPUT_EVENT_TYPE_KEY:
-			DBGPRINTF(DEBUG_INFO, "Key event: action=%d keyCode=%d metaState=0x%x", AKeyEvent_getAction(event), AKeyEvent_getKeyCode(event), AKeyEvent_getMetaState(event));
+		{
+			uint32_t code=0, KeyCode=AKeyEvent_getKeyCode(event);
+
+			switch(KeyCode)
+			{
+				case AKEYCODE_DEL:				code=KB_BACKSPACE;				break;	// Backspace
+				case AKEYCODE_TAB:				code=KB_TAB;					break;	// Tab
+				case AKEYCODE_ENTER:			code=KB_ENTER;					break;	// Enter
+				case AKEYCODE_BREAK:			code=KB_PAUSE;					break;	// Pause
+				case AKEYCODE_CAPS_LOCK:		code=KB_CAPS_LOCK;				break;	// Caps Lock
+				case AKEYCODE_ESCAPE:			code=KB_ESCAPE;					break;	// Esc
+				case AKEYCODE_PAGE_UP:			code=KB_PAGE_UP;				break;	// Page Up
+				case AKEYCODE_PAGE_DOWN:		code=KB_PAGE_DOWN;				break;	// Page Down
+				case AKEYCODE_MOVE_END:			code=KB_END;					break;	// End
+				case AKEYCODE_MOVE_HOME:		code=KB_HOME;					break;	// Home
+				case AKEYCODE_DPAD_LEFT:		code=KB_LEFT;					break;	// Left
+				case AKEYCODE_DPAD_UP:			code=KB_UP;						break;	// Up
+				case AKEYCODE_DPAD_RIGHT:		code=KB_RIGHT;					break;	// Right
+				case AKEYCODE_DPAD_DOWN:		code=KB_DOWN;					break;	// Down
+				case AKEYCODE_SYSRQ:			code=KB_PRINT_SCREEN;			break;	// Prnt Scrn
+				case AKEYCODE_INSERT:			code=KB_INSERT;					break;	// Insert
+				case AKEYCODE_FORWARD_DEL:		code=KB_DEL;					break;	// Delete
+				//case XK_Super_L:				code=KB_LSUPER;					break;	// Left Windows
+				//case XK_Super_R:				code=KB_RSUPER;					break;	// Right Windows
+				case AKEYCODE_MENU:				code=KB_MENU;					break;	// Application
+				case AKEYCODE_NUMPAD_0:			code=KB_NP_0;					break;	// Num 0
+				case AKEYCODE_NUMPAD_1:			code=KB_NP_1;					break;	// Num 1
+				case AKEYCODE_NUMPAD_2:			code=KB_NP_2;					break;	// Num 2
+				case AKEYCODE_NUMPAD_3:			code=KB_NP_3;					break;	// Num 3
+				case AKEYCODE_NUMPAD_4:			code=KB_NP_4;					break;	// Num 4
+				case AKEYCODE_NUMPAD_5:			code=KB_NP_5;					break;	// Num 5
+				case AKEYCODE_NUMPAD_6:			code=KB_NP_6;					break;	// Num 6
+				case AKEYCODE_NUMPAD_7:			code=KB_NP_7;					break;	// Num 7
+				case AKEYCODE_NUMPAD_8:			code=KB_NP_8;					break;	// Num 8
+				case AKEYCODE_NUMPAD_9:			code=KB_NP_9;					break;	// Num 9
+				case AKEYCODE_NUMPAD_MULTIPLY:	code=KB_NP_MULTIPLY;			break;	// Num *
+				case AKEYCODE_NUMPAD_ADD:		code=KB_NP_ADD;					break;	// Num +
+				case AKEYCODE_NUMPAD_SUBTRACT:	code=KB_NP_SUBTRACT;			break;	// Num -
+				case AKEYCODE_NUMPAD_DOT:		code=KB_NP_DECIMAL;				break;	// Num Del
+				case AKEYCODE_NUMPAD_DIVIDE:	code=KB_NP_DIVIDE;				break;	// Num /
+				case AKEYCODE_F1:				code=KB_F1;						break;	// F1
+				case AKEYCODE_F2:				code=KB_F2;						break;	// F2
+				case AKEYCODE_F3:				code=KB_F3;						break;	// F3
+				case AKEYCODE_F4:				code=KB_F4;						break;	// F4
+				case AKEYCODE_F5:				code=KB_F5;						break;	// F5
+				case AKEYCODE_F6:				code=KB_F6;						break;	// F6
+				case AKEYCODE_F7:				code=KB_F7;						break;	// F7
+				case AKEYCODE_F8:				code=KB_F8;						break;	// F8
+				case AKEYCODE_F9:				code=KB_F9;						break;	// F9
+				case AKEYCODE_F10:				code=KB_F10;					break;	// F10
+				case AKEYCODE_F11:				code=KB_F11;					break;	// F11
+				case AKEYCODE_F12:				code=KB_F12;					break;	// F12
+				case AKEYCODE_NUM_LOCK:			code=KB_NUM_LOCK;				break;	// Num Lock
+				case AKEYCODE_SCROLL_LOCK:		code=KB_SCROLL_LOCK;			break;	// Scroll Lock
+				case AKEYCODE_SHIFT_LEFT:		code=KB_LSHIFT;					break;	// Shift
+				case AKEYCODE_SHIFT_RIGHT:		code=KB_RSHIFT;					break;	// Right Shift
+				//case XK_Control_L:				code=KB_LCTRL;					break;	// Left control
+				//case XK_Control_R:				code=KB_RCTRL;					break;	// Right control
+				case AKEYCODE_ALT_LEFT:			code=KB_LALT;					break;	// Left alt
+				case AKEYCODE_ALT_RIGHT:		code=KB_RALT;					break;	// Left alt
+				default:						code=KeyCode-AKEYCODE_A+'A';	break;	// All others
+			}
+
+			switch(AKeyEvent_getAction(event))
+			{
+				case AKEY_EVENT_ACTION_DOWN:
+					Event_Trigger(EVENT_KEYDOWN, &KeyCode);
+					break;
+
+				case AKEY_EVENT_ACTION_UP:
+					Event_Trigger(EVENT_KEYUP, &KeyCode);
+					break;
+			}
 			break;
+		}
 
 		default:
 			break;
@@ -102,20 +173,16 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 	switch(cmd)
 	{
 		case APP_CMD_INIT_WINDOW:
-			appState.initialFormat=ANativeWindow_getFormat(app->window);
-
 			Width=ANativeWindow_getWidth(app->window);
 			Height=ANativeWindow_getHeight(app->window);
 
-			//ANativeWindow_setBuffersGeometry(app->window, Width, Height, AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM);
-
 			Context.Win=app->window;
-
-			DBGPRINTF(DEBUG_INFO, "Allocating zone memory...\n");
-			Zone=Zone_Init(256*1000*1000);
 
 			rtWidth=Width;
 			rtHeight=Height;
+
+			DBGPRINTF(DEBUG_INFO, "Allocating zone memory...\n");
+			Zone=Zone_Init(256*1000*1000);
 
 			if(Zone==NULL)
 			{
@@ -183,8 +250,6 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			DBGPRINTF(DEBUG_WARNING, "Zone remaining block list:\n");
 			Zone_Print(Zone);
 			Zone_Destroy(Zone);
-
-			//ANativeWindow_setBuffersGeometry(app->window, ANativeWindow_getWidth(app->window), ANativeWindow_getHeight(app->window), appState.initialFormat);
 			break;
 
 		case APP_CMD_WINDOW_RESIZED:
@@ -247,7 +312,7 @@ void android_main(struct android_app *app)
 
 			avgfps+=1.0f/fTimeStep;
 
-			static uint32_t Frames=0;
+ 			static uint32_t Frames=0;
 			if(Frames++>100)
 			{
 				fps=avgfps/Frames;

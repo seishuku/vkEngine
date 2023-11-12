@@ -43,7 +43,7 @@ bool QOI_Load(const char *Filename, VkuImage_t *Image)
 	uint8_t channels=0;
 	uint8_t colorspace=0;
 	uint8_t b1=0, b2=0;
-	uint8_t index[64][4], bytes[4];
+	uint8_t index[64][4]={ {0, 0, 0, 0} }, bytes[4]={ 0 };
 	uint32_t run=0;
 
 	if(!(stream=fopen(Filename, "rb")))

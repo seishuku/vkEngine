@@ -85,12 +85,12 @@ float Vec3_Normalize(vec3 *v)
 {
 	if(v)
 	{
-		float length=rsqrtf(Vec3_Dot(*v, *v));
+		float length=sqrtf(Vec3_Dot(*v, *v));
 
 		if(length)
 		{
-			*v=Vec3_Muls(*v, length);
-			return 1.0f/length;
+			*v=Vec3_Muls(*v, 1.0f/length);
+			return length;
 		}
 	}
 

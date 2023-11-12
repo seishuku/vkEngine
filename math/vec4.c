@@ -80,11 +80,11 @@ float Vec4_Normalize(vec4 *v)
 {
 	if(v)
 	{
-		float length=rsqrtf(Vec4_Dot(*v, *v));
+		float length=sqrtf(Vec4_Dot(*v, *v));
 
 		if(length)
 		{
-			*v=Vec4_Muls(*v, length);
+			*v=Vec4_Muls(*v, 1.0f/length);
 			return length;
 		}
 	}

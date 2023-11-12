@@ -4,15 +4,27 @@
 #include <pthread.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "../utils/list.h"
+
+#define THREAD_MAXJOBS 128
 
 typedef void (*ThreadFunction_t)(void *Arg);
 
+// Structure that holds the function pointer and argument
+// to store in a list that can be iterated as a job list.
+typedef struct
+{
+	ThreadFunction_t Function;
+	void *Arg;
+} ThreadJob_t;
+
+// Structure for worker context
 typedef struct
 {
 	bool Pause;
 	bool Stop;
-	List_t Jobs;
+
+	ThreadJob_t Jobs[THREAD_MAXJOBS];
+	uint32_t NumJobs;
 
 	pthread_t Thread;
 	pthread_mutex_t Mutex;
@@ -26,7 +38,7 @@ typedef struct
 } ThreadWorker_t;
 
 uint32_t Thread_GetJobCount(ThreadWorker_t *Worker);
-void Thread_AddJob(ThreadWorker_t *Worker, ThreadFunction_t JobFunc, void *Arg);
+bool Thread_AddJob(ThreadWorker_t *Worker, ThreadFunction_t JobFunc, void *Arg);
 void Thread_AddConstructor(ThreadWorker_t *Worker, ThreadFunction_t ConstructorFunc, void *Arg);
 void Thread_AddDestructor(ThreadWorker_t *Worker, ThreadFunction_t DestructorFunc, void *Arg);
 bool Thread_Init(ThreadWorker_t *Worker);

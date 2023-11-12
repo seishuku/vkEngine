@@ -18,6 +18,7 @@ void Zone_Free(MemZone_t *Zone, void *Ptr);
 void *Zone_Malloc(MemZone_t *Zone, size_t Size);
 void *Zone_Calloc(MemZone_t *Zone, size_t Size, size_t Count);
 void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size);
+bool Zone_VerifyHeap(MemZone_t *Zone);
 void Zone_Print(MemZone_t *Zone);
 
 #endif

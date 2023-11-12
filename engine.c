@@ -1371,6 +1371,7 @@ bool Init(void)
 	}
 
 	CameraInit(&Camera, Vec3(0.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
+	ModelView=CameraUpdate(&Camera, 0.0f);
 
 	if(!Audio_Init())
 	{
@@ -1484,6 +1485,12 @@ bool Init(void)
 	DBGPRINTF(DEBUG_ERROR, "\nNot an error, just a total triangle count: %d\n\n", TriangleCount);
 
 	// Load textures
+	
+	// TODO: For some reason on Linux/Android, the first loaded QOI here has corruption and I'm not sure why.
+	//			If I upload a temp image and delete it afterwards, it's all good.
+	VkuImage_t Temp;
+	Image_Upload(&Context, &Temp, "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1], "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1_NORMAL], "assets/asteroid1_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID2], "assets/asteroid2.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
@@ -1494,6 +1501,8 @@ bool Init(void)
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4_NORMAL], "assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 
 	Image_Upload(&Context, &Textures[TEXTURE_FACE], "assets/face.tga", IMAGE_MIPMAP|IMAGE_BILINEAR);
+
+	vkuDestroyImageBuffer(&Context, &Temp);
 
 	GenNebulaVolume(&Context, &Textures[TEXTURE_VOLUME]);
 
@@ -1664,7 +1673,6 @@ bool Init(void)
 	Thread_Start(&ThreadPhysics);
 	pthread_barrier_init(&ThreadBarrier_Physics, NULL, 2);
 
-
 #if 0
 	// Initialize the network API (mainly for winsock)
 	Network_Init();
@@ -1721,6 +1729,9 @@ bool Init(void)
 	Thread_Start(&ThreadNetUpdate);
 	Thread_AddJob(&ThreadNetUpdate, NetUpdate, NULL);
 #endif
+
+	if(!Zone_VerifyHeap(Zone))
+		exit(-1);
 
 	return true;
 }

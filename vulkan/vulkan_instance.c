@@ -107,8 +107,10 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 			VK_KHR_ANDROID_SURFACE_EXTENSION_NAME,
 #endif
 			VK_KHR_SURFACE_EXTENSION_NAME,
+#ifndef ANDROID
 #ifdef _DEBUG
 			VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+#endif
 #endif
 	};
 
@@ -135,8 +137,8 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 		//	.enabledValidationFeatureCount=sizeof(enabledValidationFeatures)/sizeof(VkValidationFeatureEnableEXT),
 		//},
 //#endif
-		.enabledLayerCount=1,
-		.ppEnabledLayerNames=(const char *[]) { "VK_LAYER_KHRONOS_validation" },
+		//.enabledLayerCount=1,
+		//.ppEnabledLayerNames=(const char *[]) { "VK_LAYER_KHRONOS_validation" },
 	};
 
 	if(vkCreateInstance(&InstanceInfo, 0, Instance)!=VK_SUCCESS)

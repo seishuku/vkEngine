@@ -127,9 +127,10 @@ SHADERS+=shaders/volume.vert.spv
 
 CC_X86_64=$(NDK)/toolchains/llvm/prebuilt/$(HOST)/bin/x86_64-linux-android$(ANDROIDVERSION)-clang
 CC_ARM64=$(NDK)/toolchains/llvm/prebuilt/$(HOST)/bin/aarch64-linux-android$(ANDROIDVERSION)-clang
+CC_ARM32=$(NDK)/toolchains/llvm/prebuilt/$(HOST)/bin/armv7a-linux-androideabi$(ANDROIDVERSION)-clang
 
-CFLAGS+=-g2 -gdwarf-2 -O0 -D_DEBUG
-#CFLAGS+=-O3 -g2 -gdwarf-2
+CFLAGS+=-g2 -gdwarf-2 -O1 -D_DEBUG
+#CFLAGS+=-O3 -DNDEBUG
 
 CFLAGS+=-fpic -fstack-protector -fno-strict-aliasing -fno-rtti -fno-omit-frame-pointer -fno-exceptions -fno-short-enums
 CFLAGS+=-std=gnu17 -Wall -Wno-missing-braces -Wextra
@@ -152,6 +153,10 @@ apk/lib/arm64-v8a/lib$(TARGET).so: $(addprefix ARM64/,$(OBJS))
 	mkdir -p $(@D)
 	$(CC_ARM64) -o $@ $(addprefix ARM64/,$(OBJS)) $(LDFLAGS)
 
+apk/lib/armeabi-v7a/lib$(TARGET).so: $(addprefix ARM32/,$(OBJS))
+	mkdir -p $(@D)
+	$(CC_ARM32) -o $@ $(addprefix ARM32/,$(OBJS)) $(LDFLAGS)
+
 x86_64/%.o: %.c
 	mkdir -p $(@D)
 	$(CC_X86_64) -c $(CFLAGS) -o $@ $<
@@ -160,7 +165,11 @@ ARM64/%.o: %.c
 	mkdir -p $(@D)
 	$(CC_ARM64) -c $(CFLAGS) -o $@ $<
 
-$(APKFILE): $(SHADERS) apk/lib/arm64-v8a/lib$(TARGET).so apk/lib/x86_64/lib$(TARGET).so
+ARM32/%.o: %.c
+	mkdir -p $(@D)
+	$(CC_ARM32) -c $(CFLAGS) -o $@ $<
+
+$(APKFILE): $(SHADERS) apk/lib/armeabi-v7a/lib$(TARGET).so apk/lib/arm64-v8a/lib$(TARGET).so apk/lib/x86_64/lib$(TARGET).so
 	rm -rf $(APKFILE)
 
 	mkdir -p apk/assets/shaders
@@ -192,4 +201,4 @@ install:
 	glslc --target-env=vulkan1.1 -O $< -o $@
 
 clean:
-	rm -rf apk/lib/x86_64/lib$(TARGET).so apk/lib/arm64-v8a/lib$(TARGET).so $(APKFILE) $(addprefix ARM64/,$(OBJS)) $(addprefix x86_64/,$(OBJS)) ARM64 x86_64 $(SHADERS)
+	rm -rf apk/lib/x86_64/lib$(TARGET).so apk/lib/arm64-v8a/lib$(TARGET).so apk/lib/armeabi-v7a/lib$(TARGET).so $(APKFILE) $(addprefix ARM32/,$(OBJS)) $(addprefix ARM64/,$(OBJS)) $(addprefix x86_64/,$(OBJS)) ARM32 ARM64 x86_64 $(SHADERS)

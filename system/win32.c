@@ -31,8 +31,6 @@ extern VkuSwapchain_t Swapchain;
 
 extern uint32_t Width, Height;
 
-extern Camera_t Camera;
-
 float fps=0.0f, fTimeStep, fTime=0.0f;
 
 void Render(void);

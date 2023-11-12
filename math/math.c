@@ -46,7 +46,7 @@ float ftanf(const float x)
 	return fsinf(x)/fcosf(x);
 }
 
-// Bit-fiddle fast reciprical squareroot, ala Quake 3
+// Bit-fiddle fast reciprocal  square root, ala Quake 3
 float rsqrtf(float x)
 {
 	long i;

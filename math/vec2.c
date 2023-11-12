@@ -80,12 +80,12 @@ float Vec2_Normalize(vec2 *v)
 {
 	if(v)
 	{
-		float length=rsqrtf(Vec2_Dot(*v, *v));
+		float length=sqrtf(Vec2_Dot(*v, *v));
 
 		if(length)
 		{
-			*v=Vec2_Muls(*v, length);
-			return 1.0f/length;
+			*v=Vec2_Muls(*v, 1.0f/length);
+			return length;
 		}
 	}
 
