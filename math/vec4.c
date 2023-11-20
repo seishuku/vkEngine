@@ -1,5 +1,6 @@
 #include "math.h"
 
+#ifndef VEC_INLINE
 vec4 Vec4(const float x, const float y, const float z, const float w)
 {
 	return (vec4) { x, y, z, w };
@@ -76,6 +77,23 @@ vec4 Vec4_Reflect(const vec4 N, const vec4 I)
 	return Vec4_Subv(I, Vec4_Muls(N, 2.0f*Vec4_Dot(N, I)));
 }
 
+vec4 Vec4_Lerp(const vec4 a, const vec4 b, const float t)
+{
+	return Vec4_Addv(Vec4_Muls(Vec4_Subv(b, a), t), a);
+}
+
+vec4 Vec4_Clamp(const vec4 v, const float min, const float max)
+{
+	return (vec4)
+	{
+		min(max(v.x, min), max),
+			min(max(v.y, min), max),
+			min(max(v.z, min), max),
+			min(max(v.w, min), max)
+	};
+}
+#endif
+
 float Vec4_Normalize(vec4 *v)
 {
 	if(v)
@@ -90,20 +108,4 @@ float Vec4_Normalize(vec4 *v)
 	}
 
 	return 0.0f;
-}
-
-vec4 Vec4_Lerp(const vec4 a, const vec4 b, const float t)
-{
-	return Vec4_Addv(Vec4_Muls(Vec4_Subv(b, a), t), a);
-}
-
-vec4 Vec4_Clamp(const vec4 v, const float min, const float max)
-{
-	return (vec4)
-	{
-		min(max(v.x, min), max),
-		min(max(v.y, min), max),
-		min(max(v.z, min), max),
-		min(max(v.w, min), max)
-	};
 }

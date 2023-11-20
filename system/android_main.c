@@ -59,17 +59,23 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 	switch(AInputEvent_getType(event))
 	{
 		case AINPUT_EVENT_TYPE_MOTION:
+		{
 			switch(AInputEvent_getSource(event))
 			{
 				case AINPUT_SOURCE_TOUCHSCREEN:
+				case AINPUT_SOURCE_STYLUS:
 					switch(AKeyEvent_getAction(event)&AMOTION_EVENT_ACTION_MASK)
 					{
 						case AMOTION_EVENT_ACTION_DOWN:
-							MouseEvent.button|=MOUSE_BUTTON_LEFT;
+							if(AMotionEvent_getPointerCount(event)==2)
+								MouseEvent.button|=MOUSE_BUTTON_RIGHT;
+							else
+								MouseEvent.button|=MOUSE_BUTTON_LEFT;
 							Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
 							break;
 
 						case AMOTION_EVENT_ACTION_UP:
+							MouseEvent.button&=~MOUSE_BUTTON_RIGHT;
 							MouseEvent.button&=~MOUSE_BUTTON_LEFT;
 							Event_Trigger(EVENT_MOUSEUP, &MouseEvent);
 							break;
@@ -82,7 +88,9 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 					}
 					break;
 			}
-		break;
+	
+			break;
+		}
 
 		case AINPUT_EVENT_TYPE_KEY:
 		{
@@ -107,8 +115,8 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 				case AKEYCODE_SYSRQ:			code=KB_PRINT_SCREEN;			break;	// Prnt Scrn
 				case AKEYCODE_INSERT:			code=KB_INSERT;					break;	// Insert
 				case AKEYCODE_FORWARD_DEL:		code=KB_DEL;					break;	// Delete
-				//case XK_Super_L:				code=KB_LSUPER;					break;	// Left Windows
-				//case XK_Super_R:				code=KB_RSUPER;					break;	// Right Windows
+				case AKEYCODE_META_LEFT:		code=KB_LSUPER;					break;	// Left Windows?
+				case AKEYCODE_META_RIGHT:		code=KB_RSUPER;					break;	// Right Windows?
 				case AKEYCODE_MENU:				code=KB_MENU;					break;	// Application
 				case AKEYCODE_NUMPAD_0:			code=KB_NP_0;					break;	// Num 0
 				case AKEYCODE_NUMPAD_1:			code=KB_NP_1;					break;	// Num 1
@@ -141,8 +149,8 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 				case AKEYCODE_SCROLL_LOCK:		code=KB_SCROLL_LOCK;			break;	// Scroll Lock
 				case AKEYCODE_SHIFT_LEFT:		code=KB_LSHIFT;					break;	// Shift
 				case AKEYCODE_SHIFT_RIGHT:		code=KB_RSHIFT;					break;	// Right Shift
-				//case XK_Control_L:				code=KB_LCTRL;					break;	// Left control
-				//case XK_Control_R:				code=KB_RCTRL;					break;	// Right control
+				case AKEYCODE_CTRL_LEFT:		code=KB_LCTRL;					break;	// Left control
+				case AKEYCODE_CTRL_RIGHT:		code=KB_RCTRL;					break;	// Right control
 				case AKEYCODE_ALT_LEFT:			code=KB_LALT;					break;	// Left alt
 				case AKEYCODE_ALT_RIGHT:		code=KB_RALT;					break;	// Left alt
 				default:						code=KeyCode-AKEYCODE_A+'A';	break;	// All others
@@ -151,11 +159,11 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 			switch(AKeyEvent_getAction(event))
 			{
 				case AKEY_EVENT_ACTION_DOWN:
-					Event_Trigger(EVENT_KEYDOWN, &KeyCode);
+					Event_Trigger(EVENT_KEYDOWN, &code);
 					break;
 
 				case AKEY_EVENT_ACTION_UP:
-					Event_Trigger(EVENT_KEYUP, &KeyCode);
+					Event_Trigger(EVENT_KEYUP, &code);
 					break;
 			}
 			break;
@@ -236,6 +244,11 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 
 			DBGPRINTF(DEBUG_INFO, "\nStarting main loop.\n");
 			appState.running=true;
+			break;
+
+		case APP_CMD_SAVE_STATE:
+			appState.app->destroyRequested=true;
+			ANativeActivity_finish(app->activity);
 			break;
 
 		case APP_CMD_TERM_WINDOW:

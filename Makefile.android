@@ -55,6 +55,9 @@ OBJS+=camera/camera.o
 # network
 OBJS+=network/network.o
 
+# console
+OBJS+=console/console.o
+
 # Vulkan
 OBJS+=vulkan/vulkan_buffer.o
 OBJS+=vulkan/vulkan_context.o
@@ -129,8 +132,8 @@ CC_X86_64=$(NDK)/toolchains/llvm/prebuilt/$(HOST)/bin/x86_64-linux-android$(ANDR
 CC_ARM64=$(NDK)/toolchains/llvm/prebuilt/$(HOST)/bin/aarch64-linux-android$(ANDROIDVERSION)-clang
 CC_ARM32=$(NDK)/toolchains/llvm/prebuilt/$(HOST)/bin/armv7a-linux-androideabi$(ANDROIDVERSION)-clang
 
-CFLAGS+=-g2 -gdwarf-2 -O1 -D_DEBUG
-#CFLAGS+=-O3 -DNDEBUG
+#CFLAGS+=-g2 -gdwarf-2 -O1 -D_DEBUG
+CFLAGS+=-O3 -ffast-math -DNDEBUG
 
 CFLAGS+=-fpic -fstack-protector -fno-strict-aliasing -fno-rtti -fno-omit-frame-pointer -fno-exceptions -fno-short-enums
 CFLAGS+=-std=gnu17 -Wall -Wno-missing-braces -Wextra

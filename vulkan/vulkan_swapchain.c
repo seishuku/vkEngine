@@ -54,7 +54,7 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, Vk
 	VkSurfaceCapabilitiesKHR SurfCaps;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Context->PhysicalDevice, Context->Surface, &SurfCaps);
 
-	if(SurfCaps.currentTransform&VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR)
+	if(SurfCaps.currentTransform&VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR||SurfCaps.currentTransform&VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR)
 	{
 		// Swap to get identity width and height
 		uint32_t width=SurfCaps.currentExtent.width;

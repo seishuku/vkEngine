@@ -79,7 +79,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				if(ToggleFullscreen)
 				{
 					ToggleFullscreen=false;
-					DBGPRINTF("Going full screen...\n");
+					DBGPRINTF(DEBUG_INFO, "Going full screen...\n");
 
 					OldWidth=Width;
 					OldHeight=Height;
@@ -91,7 +91,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				else
 				{
 					ToggleFullscreen=true;
-					DBGPRINTF("Going windowed...\n");
+					DBGPRINTF(DEBUG_INFO, "Going windowed...\n");
 
 					Width=OldWidth;
 					Height=OldHeight;

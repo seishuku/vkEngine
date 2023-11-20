@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdalign.h>
 #include <string.h>
+
 #include "system/system.h"
 #include "network/network.h"
 #include "vulkan/vulkan.h"
@@ -22,6 +23,8 @@
 #include "audio/audio.h"
 #include "physics/physics.h"
 #include "ui/ui.h"
+#include "console/console.h"
+
 #include "models.h"
 #include "textures.h"
 #include "skybox.h"
@@ -30,6 +33,8 @@
 #include "composite.h"
 #include "perframe.h"
 #include "sounds.h"
+
+extern bool Done;
 
 // Initial window size
 uint32_t Width=1920, Height=1080;
@@ -188,6 +193,8 @@ uint32_t BlueID=UINT32_MAX;
 uint32_t FaceID=UINT32_MAX;
 uint32_t CursorID=UINT32_MAX;
 //////
+
+Console_t Console;
 
 void RecreateSwapchain(void);
 
@@ -1206,6 +1213,8 @@ void Render(void)
 	uint32_t imageIndex;
 	matrix Pose;
 
+	Console_Draw(&Console);
+
 	UI_UpdateSpriteRotation(&UI, FaceID, (float)fTime*2.0f);
 	UI_UpdateSpritePosition(&UI, FaceID, Vec2(((float)Width/2.0f)+sinf(-fTime*2.0f)*100.0f, ((float)Height/2.0f)+cosf(-fTime*2.0f)*100.0f));
 
@@ -1221,7 +1230,7 @@ void Render(void)
 
 	if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
 	{
-		DBGPRINTF("Swapchain out of date... Rebuilding.\n");
+		DBGPRINTF(DEBUG_WARNING, "Swapchain out of date... Rebuilding.\n");
 		RecreateSwapchain();
 		return;
 	}
@@ -1275,7 +1284,7 @@ void Render(void)
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 	}
 
-	vkuTransitionLayout(PerFrame[Index].CommandBuffer, Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+//	vkuTransitionLayout(PerFrame[Index].CommandBuffer, Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
 	vkEndCommandBuffer(PerFrame[Index].CommandBuffer);
 
@@ -1308,7 +1317,7 @@ void Render(void)
 
 	if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
 	{
-		DBGPRINTF("Swapchain out of date... Rebuilding.\n");
+		DBGPRINTF(DEBUG_WARNING, "Swapchain out of date... Rebuilding.\n");
 		RecreateSwapchain();
 		return;
 	}
@@ -1351,6 +1360,11 @@ void ButtonCallback(void *arg)
 	Audio_PlaySample(&Sounds[SOUND_EXPLODE1], false, 1.0f, &Camera.Position);
 }
 
+void Console_CmdQuit(Console_t *Console, char *Param)
+{
+	Done=true;
+}
+
 // Initialization call from system main
 bool Init(void)
 {
@@ -1361,6 +1375,9 @@ bool Init(void)
 	Event_Add(EVENT_MOUSEDOWN, Event_MouseDown);
 	Event_Add(EVENT_MOUSEUP, Event_MouseUp);
 	Event_Add(EVENT_MOUSEMOVE, Event_Mouse);
+
+	Console_Init(&Console, 80, 25);
+	Console_AddCommand(&Console, "quit", Console_CmdQuit);
 
 	VkZone=vkuMem_Init(&Context, (size_t)(Context.DeviceProperties2.maxMemoryAllocationSize*0.8f));
 
@@ -1546,7 +1563,7 @@ bool Init(void)
 	
 	ParticleSystem_SetGravity(&ParticleSystem, 0.0f, 0.0f, 0.0f);
 
-	vec3 Zero=Vec3(0.0f, 0.0f, 0.0f);
+	volatile vec3 Zero=Vec3(0.0f, 0.0f, 0.0f);
 	ParticleSystem_AddEmitter(&ParticleSystem, Zero, Zero, Zero, 0.0f, 100, true, NULL);
 
 	Font_Init(&Fnt);
@@ -1559,7 +1576,7 @@ bool Init(void)
 						 Vec3(1.0f, 0.0f, 0.0f),	// Color
 						 "Red",						// Title text
 						 false,						// Read-only
-						 0.0f, 10.0f, 5.0f);			// min/max/initial value
+						 0.0f, 10.0f, 5.0f);		// min/max/initial value
 	GreenID=UI_AddBarGraph(&UI,
 						   Vec2(0.0f, 750.0f),		// Position
 						   Vec2(400.0f, 50.0f),		// Size
@@ -1754,6 +1771,8 @@ void RecreateSwapchain(void)
 		vkuDestroyImageBuffer(&Context, &ColorTemp[0]);
 		vkuDestroyImageBuffer(&Context, &DepthImage[0]);
 
+		vkDestroyFramebuffer(Context.Device, Framebuffer[0], VK_NULL_HANDLE);
+
 		if(IsVR)
 		{
 			vkuDestroyImageBuffer(&Context, &ColorImage[1]);
@@ -1761,6 +1780,8 @@ void RecreateSwapchain(void)
 			vkuDestroyImageBuffer(&Context, &ColorBlur[1]);
 			vkuDestroyImageBuffer(&Context, &ColorTemp[1]);
 			vkuDestroyImageBuffer(&Context, &DepthImage[1]);
+
+			vkDestroyFramebuffer(Context.Device, Framebuffer[1], VK_NULL_HANDLE);
 		}
 
 		// Destroy the swapchain
@@ -1918,7 +1939,7 @@ void Destroy(void)
 	}
 
 	vkDestroyDescriptorSetLayout(Context.Device, DescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
-	//vkDestroyRenderPass(Context.Device, RenderPass.RenderPass, VK_NULL_HANDLE);
+	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);
 	vkDestroyPipeline(Context.Device, Pipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, PipelineLayout, VK_NULL_HANDLE);
 	//////////
@@ -1930,7 +1951,7 @@ void Destroy(void)
 	vkuDestroyImageBuffer(&Context, &ColorTemp[0]);
 	vkuDestroyImageBuffer(&Context, &DepthImage[0]);
 
-	//vkDestroyFramebuffer(Context.Device, Framebuffers[0].Framebuffer, VK_NULL_HANDLE);
+	vkDestroyFramebuffer(Context.Device, Framebuffer[0], VK_NULL_HANDLE);
 
 	if(IsVR)
 	{
@@ -1940,7 +1961,7 @@ void Destroy(void)
 		vkuDestroyImageBuffer(&Context, &ColorTemp[1]);
 		vkuDestroyImageBuffer(&Context, &DepthImage[1]);
 
-		//vkDestroyFramebuffer(Context.Device, Framebuffers[1].Framebuffer, VK_NULL_HANDLE);
+		vkDestroyFramebuffer(Context.Device, Framebuffer[1], VK_NULL_HANDLE);
 	}
 
 	for(uint32_t i=0;i<Swapchain.NumImages;i++)

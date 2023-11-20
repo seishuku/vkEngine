@@ -70,13 +70,11 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 			DBGPRINTF(DEBUG_INFO, VK_KHR_SURFACE_EXTENSION_NAME" extension is supported!\n");
 			SurfaceExtension=VK_TRUE;
 		}
-#ifdef _DEBUG
 		else if(strcmp(ExtensionProperties[i].extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)==0)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_EXT_DEBUG_UTILS_EXTENSION_NAME" extension is supported!\n");
 			DebugExtension=VK_TRUE;
 		}
-#endif
 	}
 
 	Zone_Free(Zone, ExtensionProperties);
@@ -97,49 +95,39 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 		.apiVersion=VK_API_VERSION_1_1
 	};
 
-	const char *Extensions[]=
+	const char *Extensions[10];
+	uint32_t NumExtensions=0;
+
+	if(SurfaceOSExtension)
 	{
 #ifdef WIN32
-			VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+		Extensions[NumExtensions++]=VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
 #elif LINUX
-			VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
+		Extensions[NumExtensions++]=VK_KHR_XLIB_SURFACE_EXTENSION_NAME;
 #elif ANDROID
-			VK_KHR_ANDROID_SURFACE_EXTENSION_NAME,
+		Extensions[NumExtensions++]=VK_KHR_ANDROID_SURFACE_EXTENSION_NAME;
 #endif
-			VK_KHR_SURFACE_EXTENSION_NAME,
-#ifndef ANDROID
-#ifdef _DEBUG
-			VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-#endif
-#endif
-	};
+	}
 
-//#ifdef _DEBUG
-//	VkValidationFeatureEnableEXT enabledValidationFeatures[]=
-//	{
-////		VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
-////		VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
-////		VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
-//	};
-//#endif
+	if(SurfaceExtension)
+		Extensions[NumExtensions++]=VK_KHR_SURFACE_EXTENSION_NAME;
+
+#ifdef _DEBUG
+	if(DebugExtension)
+		Extensions[NumExtensions++]=VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
+#endif
 
 	VkInstanceCreateInfo InstanceInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
 		.pApplicationInfo=&AppInfo,
-		.enabledExtensionCount=sizeof(Extensions)/sizeof(void *),
+		.enabledExtensionCount=NumExtensions,
 		.ppEnabledExtensionNames=Extensions,
-//#ifdef _DEBUG
-		//.pNext=&(VkValidationFeaturesEXT)
-		//{
-		//	.sType=VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
-		//	.pEnabledValidationFeatures=enabledValidationFeatures,
-		//	.enabledValidationFeatureCount=sizeof(enabledValidationFeatures)/sizeof(VkValidationFeatureEnableEXT),
-		//},
-//#endif
-		//.enabledLayerCount=1,
-		//.ppEnabledLayerNames=(const char *[]) { "VK_LAYER_KHRONOS_validation" },
+		.ppEnabledLayerNames=(const char *[]) { "VK_LAYER_KHRONOS_validation" },
 	};
+
+	// Set to 1 to enable validation layer
+	InstanceInfo.enabledLayerCount=0;
 
 	if(vkCreateInstance(&InstanceInfo, 0, Instance)!=VK_SUCCESS)
 	{
@@ -151,12 +139,12 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 	{
 		if((_vkCreateDebugUtilsMessengerEXT=(PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(*Instance, "vkCreateDebugUtilsMessengerEXT"))==VK_NULL_HANDLE)
 		{
-			DBGPRINTF("vkGetInstanceProcAddr failed on vkCreateDebugUtilsMessengerEXT... Disabling DebugExtension.\n");
+			DBGPRINTF(DEBUG_WARNING, "vkGetInstanceProcAddr failed on vkCreateDebugUtilsMessengerEXT... Disabling DebugExtension.\n");
 			DebugExtension=VK_FALSE;
 		}
 		else if((_vkDestroyDebugUtilsMessengerEXT=(PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(*Instance, "vkDestroyDebugUtilsMessengerEXT"))==VK_NULL_HANDLE)
 		{
-			DBGPRINTF("vkGetInstanceProcAddr failed on vkDestroyDebugUtilsMessengerEXT.\n");
+			DBGPRINTF(DEBUG_WARNING, "vkGetInstanceProcAddr failed on vkDestroyDebugUtilsMessengerEXT.\n");
 			DebugExtension=VK_FALSE;
 		}
 	}

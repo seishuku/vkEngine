@@ -37,7 +37,7 @@ MemZone_t *Zone_Init(size_t Size)
 	// Create a mutex for thread safety
 	if(pthread_mutex_init(&Zone->Mutex, NULL))
 	{
-		DBGPRINTF("Zone_Init: Unable to create mutex.\n");
+		DBGPRINTF(DEBUG_ERROR, "Zone_Init: Unable to create mutex.\n");
 		return false;
 	}
 

@@ -105,7 +105,8 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *System, vec3 Position, vec3
 	for(uint32_t i=0;i<Emitter.NumParticles;i++)
 	{
 		Emitter.Particles[i].ID=ID;
-		Emitter.Particles[i].pos=Position;
+		memcpy(&Emitter.Particles[i].pos, &Position, sizeof(vec3));
+//		Emitter.Particles[i].pos=Position;
 		Emitter.Particles[i].life=-1.0f;
 	}
 
@@ -260,7 +261,7 @@ bool ParticleSystem_Init(ParticleSystem_t *System)
 	vkuPipeline_SetPipelineLayout(&ParticlePipeline, ParticlePipelineLayout);
 	vkuPipeline_SetRenderPass(&ParticlePipeline, RenderPass);
 
-	ParticlePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+	ParticlePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
 	ParticlePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
 	ParticlePipeline.DepthTest=VK_TRUE;
 	ParticlePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;

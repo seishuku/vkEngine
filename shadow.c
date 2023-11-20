@@ -146,7 +146,7 @@ bool CreateShadowPipeline(void)
 	};
 
 	// Assemble the pipeline
-	if(!vkuAssemblePipeline(&ShadowPipeline, &PipelineRenderingCreateInfo))
+	if(!vkuAssemblePipeline(&ShadowPipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
 		return false;
 
 	return true;

@@ -25,6 +25,7 @@ char szAppName[]="Vulkan";
 
 static int _xi_opcode=0;
 
+bool Done=false;
 bool ToggleFullscreen=true;
 bool IsVR=true;
 
@@ -59,7 +60,6 @@ void EventLoop(void)
 	KeySym Keysym, temp;
 	uint32_t code;
 	XEvent Event;
-	bool Done=false;
 	static MouseEvent_t MouseEvent={ 0, 0, 0, 0 };
 
 	while(!Done)

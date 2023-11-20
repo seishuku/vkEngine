@@ -2,6 +2,7 @@
 #define __FONT_H__
 
 #include "../vulkan/vulkan.h"
+#include "../math/math.h"
 
 typedef struct
 {

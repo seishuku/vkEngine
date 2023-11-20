@@ -13,6 +13,7 @@
 #include "../physics/physics.h"
 #include "../ui/ui.h"
 #include "../font/font.h"
+#include "../console/console.h"
 #include "input.h"
 
 // External data from engine.c
@@ -42,7 +43,7 @@ void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle
 	Particle->life=RandFloat()*0.25f+0.01f;
 }
 
-// Launch a "missle"
+// Launch a "missile"
 // This is basically the same as an emitter callback, but done manually by working on the particle array directly.
 static void FireParticleEmitter(vec3 Position, vec3 Direction)
 {
@@ -62,7 +63,8 @@ static void FireParticleEmitter(vec3 Position, vec3 Direction)
 		if(Emitter->Particles[i].life<0.0f)
 		{
 			Emitter->Particles[i].ID=ID;
-			Emitter->Particles[i].pos=Position;
+			//Emitter->Particles[i].pos=Position;
+			memcpy(&Emitter->Particles[i].pos, &Position, sizeof(vec3));
 			Vec3_Normalize(&Direction);
 			Emitter->Particles[i].vel=Vec3_Muls(Direction, 100.0f);
 
@@ -73,12 +75,60 @@ static void FireParticleEmitter(vec3 Position, vec3 Direction)
 	}
 }
 
+extern Console_t Console;
+
 void Event_KeyDown(void *Arg)
 {
 	uint32_t *Key=(uint32_t *)Arg;
 
+	if(Console.Active)
+	{
+		switch(*Key)
+		{
+			// Toggle console
+			case KB_GRAVE_ACCENT:
+				Console.Active=!Console.Active;
+				break;
+
+			case KB_UP:
+				Console_History(&Console, true);
+				break;
+
+			case KB_DOWN:
+				Console_History(&Console, false);
+				break;
+
+			case KB_PAGE_UP:
+				Console_Scroll(&Console, true);
+				break;
+
+			case KB_PAGE_DOWN:
+				Console_Scroll(&Console, false);
+				break;
+
+			case KB_BACKSPACE:
+				Console_Backspace(&Console);
+				break;
+
+			case KB_ENTER:
+				Console_Process(&Console);
+				break;
+
+			default:
+				Console_KeyInput(&Console, *Key);
+		}
+
+		// Ignore the rest of event while console is up
+		return;
+	}
+
 	switch(*Key)
 	{
+		// Toggle console
+		case KB_GRAVE_ACCENT:
+			Console.Active=!Console.Active;
+			break;
+
 		case KB_SPACE:
 			Audio_PlaySample(&Sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &Camera.Position);
 			FireParticleEmitter(Camera.Position, Camera.Forward);

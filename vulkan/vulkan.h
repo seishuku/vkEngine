@@ -60,6 +60,9 @@ typedef struct
 	VkBool32 SwapchainExtension;
 	VkBool32 PushDescriptorExtension;
 	VkBool32 DynamicRenderingExtension;
+	VkBool32 GetPhysicalDeviceProperties2Extension;
+	VkBool32 DepthStencilResolveExtension;
+	VkBool32 CreateRenderPass2Extension;
 
 	VkPhysicalDeviceProperties2 DeviceProperties;
 	VkPhysicalDeviceMaintenance3Properties DeviceProperties2;

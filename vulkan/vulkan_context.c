@@ -100,13 +100,12 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 
 	for(uint32_t i=0;i<PhysicalDeviceCount;i++)
 	{
-		uint32_t QueueFamilyCount=0;
-
 		VkPhysicalDeviceProperties DeviceProperties;
 		vkGetPhysicalDeviceProperties(DeviceHandles[i], &DeviceProperties);
 		DBGPRINTF(DEBUG_INFO, "\t#%d: %s VendorID: 0x%0.4X ProductID: 0x%0.4X\n", i, DeviceProperties.deviceName, DeviceProperties.vendorID, DeviceProperties.deviceID);
 
 		// Get the number of queue families for this device
+		uint32_t QueueFamilyCount=0;
 		vkGetPhysicalDeviceQueueFamilyProperties(DeviceHandles[i], &QueueFamilyCount, VK_NULL_HANDLE);
 
 		// Allocate the memory for the structs 
@@ -170,6 +169,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	Context->SwapchainExtension=VK_FALSE;
 	Context->PushDescriptorExtension=VK_FALSE;
 	Context->DynamicRenderingExtension=VK_FALSE;
+	Context->DepthStencilResolveExtension=VK_FALSE;
 
 	for(uint32_t i=0;i<ExtensionCount;i++)
 	{
@@ -192,6 +192,21 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME" extension is supported!\n");
 			Context->DynamicRenderingExtension=VK_TRUE;
+		}		
+		else if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME" extension is supported!\n");
+			Context->GetPhysicalDeviceProperties2Extension=VK_TRUE;
+		}
+		else if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME" extension is supported!\n");
+			Context->DepthStencilResolveExtension=VK_TRUE;
+		}
+		else if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME" extension is supported!\n");
+			Context->CreateRenderPass2Extension=VK_TRUE;
 		}
 	}
 
@@ -234,27 +249,46 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		return VK_FALSE;
 	}
 
-	// Extensions we're going to use
-	const char *Extensions[]=
-	{
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-//		VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
-//		VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
-	};
+	// Enable extensions that are supported
+	const char *Extensions[10];
+	uint32_t NumExtensions=0;
 
-	const VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_feature=
+	if(Context->SwapchainExtension)
+		Extensions[NumExtensions++]=VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+
+	if(Context->PushDescriptorExtension)
+		Extensions[NumExtensions++]=VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME;
+
+	void *pNext=VK_NULL_HANDLE;
+	VkPhysicalDeviceDynamicRenderingFeatures deviceDynamicRenderingFeatures={ 0 };
+	if(Context->DynamicRenderingExtension&&
+	   Context->GetPhysicalDeviceProperties2Extension&&
+	   Context->DepthStencilResolveExtension&&
+	   Context->CreateRenderPass2Extension)
 	{
-		.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
-		.dynamicRendering=VK_TRUE,
-	};
+		Extensions[NumExtensions++]=VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME;
+
+		// These are also required with dynamic rendering
+		Extensions[NumExtensions++]=VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME;
+		Extensions[NumExtensions++]=VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME;
+		Extensions[NumExtensions++]=VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME;
+		// 
+	
+		deviceDynamicRenderingFeatures=(VkPhysicalDeviceDynamicRenderingFeatures)
+		{
+			.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
+			.dynamicRendering=VK_TRUE,
+		};
+		pNext=&deviceDynamicRenderingFeatures;
+	}
 
 	// Create the logical device from the physical device and queue index from above
 	if(vkCreateDevice(Context->PhysicalDevice, &(VkDeviceCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-		.pNext=&dynamic_rendering_feature,
+		.pNext=pNext,
 		.pEnabledFeatures=&Features,
-		.enabledExtensionCount=sizeof(Extensions)/sizeof(void *),
+		.enabledExtensionCount=NumExtensions,
 		.ppEnabledExtensionNames=Extensions,
 		.queueCreateInfoCount=1,
 		.pQueueCreateInfos=&(VkDeviceQueueCreateInfo)

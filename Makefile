@@ -26,6 +26,9 @@ OBJS+=camera/camera.o
 # network
 OBJS+=network/network.o
 
+# console
+OBJS+=console/console.o
+
 # Vulkan
 OBJS+=vulkan/vulkan_buffer.o
 OBJS+=vulkan/vulkan_context.o
@@ -112,7 +115,7 @@ endif
 
 all: $(TARGET) $(SHADERS)
 
-debug: CFLAGS=-Wall -Wno-missing-braces -Wextra -msse3 -DDEBUG -D_DEBUG -g -ggdb -O1 -std=gnu17
+debug: CFLAGS=-Wall -Wno-missing-braces -Wextra -DDEBUG -D_DEBUG -g -ggdb -O1 -std=gnu17
 
 ifneq ($(OS),Windows_NT)
 debug: CFLAGS+=-I/usr/X11/include

@@ -67,7 +67,7 @@ bool CreateSkyboxPipeline(void)
 		.depthAttachmentFormat=DepthFormat,
 	};
 
-	if(!vkuAssemblePipeline(&SkyboxPipeline, &PipelineRenderingCreateInfo))
+	if(!vkuAssemblePipeline(&SkyboxPipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
 		return false;
 
 	return true;

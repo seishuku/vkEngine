@@ -1,5 +1,6 @@
 #include "math.h"
 
+#ifndef VEC_INLINE
 vec2 Vec2(const float x, const float y)
 {
 	return (vec2) { x, y };
@@ -76,6 +77,21 @@ vec2 Vec2_Reflect(const vec2 N, const vec2 I)
 	return Vec2_Subv(I, Vec2_Muls(N, 2.0f*Vec2_Dot(N, I)));
 }
 
+vec2 Vec2_Lerp(const vec2 a, const vec2 b, const float t)
+{
+	return Vec2_Addv(Vec2_Muls(Vec2_Subv(b, a), t), a);
+}
+
+vec2 Vec2_Clamp(const vec2 v, const float min, const float max)
+{
+	return (vec2)
+	{
+		min(max(v.x, min), max),
+			min(max(v.y, min), max)
+	};
+}
+#endif
+
 float Vec2_Normalize(vec2 *v)
 {
 	if(v)
@@ -90,18 +106,4 @@ float Vec2_Normalize(vec2 *v)
 	}
 
 	return 0.0f;
-}
-
-vec2 Vec2_Lerp(const vec2 a, const vec2 b, const float t)
-{
-	return Vec2_Addv(Vec2_Muls(Vec2_Subv(b, a), t), a);
-}
-
-vec2 Vec2_Clamp(const vec2 v, const float min, const float max)
-{
-	return (vec2)
-	{
-		min(max(v.x, min), max),
-		min(max(v.y, min), max)
-	};
 }

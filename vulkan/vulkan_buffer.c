@@ -322,7 +322,7 @@ void vkuTransitionLayout(VkCommandBuffer CommandBuffer, VkImage Image, uint32_t 
 			break;
 
 		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-			DstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			//DstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 			DstStageFlag=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 			break;
 

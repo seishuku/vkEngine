@@ -100,6 +100,12 @@
     <Filter Include="Header Files\ui">
       <UniqueIdentifier>{db0c09b1-843e-4b45-9ea8-12923558615d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\console">
+      <UniqueIdentifier>{8123d866-9057-4a38-b9bf-74935333b7ed}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\console">
+      <UniqueIdentifier>{a8d07778-e430-4346-b55b-74a9294c70ec}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="audio\audio.h">
@@ -182,6 +188,9 @@
     </ClInclude>
     <ClInclude Include="system\threads.h">
       <Filter>Header Files\system</Filter>
+    </ClInclude>
+    <ClInclude Include="console\console.h">
+      <Filter>Header Files\console</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -325,6 +334,9 @@
     </ClCompile>
     <ClCompile Include="system\threads.c">
       <Filter>Source Files\system</Filter>
+    </ClCompile>
+    <ClCompile Include="console\console.c">
+      <Filter>Source Files\console</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

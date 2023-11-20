@@ -1,5 +1,6 @@
 #include "math.h"
 
+#ifndef VEC_INLINE
 vec3 Vec3(const float x, const float y, const float z)
 {
 	return (vec3) { x, y, z };
@@ -81,29 +82,13 @@ vec3 Vec3_Reflect(const vec3 N, const vec3 I)
 	return Vec3_Subv(I, Vec3_Muls(N, 2.0f*Vec3_Dot(N, I)));
 }
 
-float Vec3_Normalize(vec3 *v)
-{
-	if(v)
-	{
-		float length=sqrtf(Vec3_Dot(*v, *v));
-
-		if(length)
-		{
-			*v=Vec3_Muls(*v, 1.0f/length);
-			return length;
-		}
-	}
-
-	return 0.0f;
-}
-
 vec3 Vec3_Cross(const vec3 v0, const vec3 v1)
 {
 	return (vec3)
 	{
-		v0.y*v1.z-v0.z*v1.y,
-		v0.z*v1.x-v0.x*v1.z,
-		v0.x*v1.y-v0.y*v1.x
+		v0.y *v1.z-v0.z*v1.y,
+			v0.z *v1.x-v0.x*v1.z,
+			v0.x *v1.y-v0.y*v1.x
 	};
 }
 
@@ -117,7 +102,24 @@ vec3 Vec3_Clamp(const vec3 v, const float min, const float max)
 	return (vec3)
 	{
 		min(max(v.x, min), max),
-		min(max(v.y, min), max),
-		min(max(v.z, min), max)
+			min(max(v.y, min), max),
+			min(max(v.z, min), max)
 	};
+}
+#endif
+
+float Vec3_Normalize(vec3 *v)
+{
+	if(v)
+	{
+		float length=Vec3_Length(*v);
+
+		if(length)
+		{
+			*v=Vec3_Muls(*v, 1.0f/length);
+			return length;
+		}
+	}
+
+	return 0.0f;
 }

@@ -48,10 +48,13 @@ int16_t sample_l[NUM_SAMPLES*2], sample_r[NUM_SAMPLES*2];
 extern Camera_t Camera;
 
 // This function is very naive, it just interpolates *all* the HRIR positions
-//   and weights then according to whatever is closest to the position.
+//   and weights them according to whatever is closest to the position.
 void hrir_interpolate(vec3 xyz)
 {
+	// Sound distance drop-off
 	const float dist_mult=1.0f/500.0f;
+
+	// Calculate relative position of the sound source to the camera
 	vec3 relative_pos=Vec3_Subv(Camera.Position, xyz);
 	vec3 position=Vec3(
 		Vec3_Dot(relative_pos, Camera.Right),
@@ -59,36 +62,47 @@ void hrir_interpolate(vec3 xyz)
 		Vec3_Dot(relative_pos, Camera.Forward)
 	);
 
+	// Normalize the vector, which also returns the length
+	//     which will be used for calculating distance fall-off later
 	float dist=Vec3_Normalize(&position)*dist_mult;
 
 	// Clamp to full volume
 	if(dist<0.0f)
 		dist=0.0f;
 
+	// HRIR impluse interpolation
 	for(uint32_t i=0;i<Sphere.SampleLength;i++)
 	{
 		float hrirSum_l=0.0f;
 		float hrirSum_r=0.0f;
 		float weightSum=0.0f;
 
+		// Calculate the weight of the nearest HRIR sphere vertex to the relative sound position
 		for(uint32_t j=0;j<Sphere.NumVertex;j++)
 		{
-			float distance=Vec3_Distance(position, Sphere.Vertices[j].Vertex);
-			float weight=expf(-distance*distance);
+			vec3 RelPos=Vec3_Subv(Sphere.Vertices[j].Vertex, position);
+			float distanceSq=Vec3_Dot(RelPos, RelPos);
 
-			hrirSum_l+=Sphere.Vertices[j].Left[i]*weight;
-			hrirSum_r+=Sphere.Vertices[j].Right[i]*weight;
+			// Only weight based on vertices that are contributing meanful data
+			if(distanceSq<1.0f)
+			{
+				float weight=expf(-distanceSq);
 
-			weightSum+=weight;
+				hrirSum_l+=Sphere.Vertices[j].Left[i]*weight;
+				hrirSum_r+=Sphere.Vertices[j].Right[i]*weight;
+
+				weightSum+=weight;
+			}
 		}
 
+		// Blend the HRIR sample according to the calculated weight and apply the distance fall-off
 		weightSum=1.0f/weightSum;
 		hrir_l[i]=(1.0f-dist)*(hrirSum_l*weightSum);
 		hrir_r[i]=(1.0f-dist)*(hrirSum_r*weightSum);
 	}
 }
 
-void convolve(int16_t *input, int16_t *audio_l, int16_t *audio_r, size_t audio_len, float *kernel_l, float *kernel_r, size_t kernel_len)
+void Convolve(int16_t *input, int16_t *audio_l, int16_t *audio_r, size_t audio_len, float *kernel_l, float *kernel_r, size_t kernel_len)
 {
 	int i, j;
 
@@ -108,6 +122,43 @@ void convolve(int16_t *input, int16_t *audio_l, int16_t *audio_r, size_t audio_l
 
 		audio_l[i]=(int16_t)(sum_l*INT16_MAX);
 		audio_r[i]=(int16_t)(sum_r*INT16_MAX);
+	}
+}
+
+void MixAudio(int16_t *dst, const int16_t *src_l, const int16_t *src_r, uint32_t len, int volume)
+{
+	if(volume==0)
+		return;
+
+	int16_t src1, src2;
+
+	int dst_sample;
+
+	while(len--)
+	{
+		src1=((*src_l++)*volume)/128;
+		src2=*dst;
+
+		dst_sample=src1+src2;
+
+		if(dst_sample>INT16_MAX)
+			dst_sample=INT16_MAX;
+		else if(dst_sample<INT16_MIN)
+			dst_sample=INT16_MIN;
+
+		*dst++=dst_sample;
+
+		src1=((*src_r++)*volume)/128;
+		src2=*dst;
+
+		dst_sample=src1+src2;
+
+		if(dst_sample>INT16_MAX)
+			dst_sample=INT16_MAX;
+		else if(dst_sample<INT16_MIN)
+			dst_sample=INT16_MIN;
+
+		*dst++=dst_sample;
 	}
 }
 
@@ -157,14 +208,10 @@ void Audio_FillBuffer(void *Buffer, uint32_t Length)
 		memcpy(channel->working, &channel->data[channel->pos], toFill*sizeof(int16_t));
 
 		// Convolve the samples with the interpolated HRIR sample to produce a stereo sample to mix into the output buffer
-		convolve(channel->working, sample_l, sample_r, remaining_data, hrir_l, hrir_r, Sphere.SampleLength);
+		Convolve(channel->working, sample_l, sample_r, remaining_data, hrir_l, hrir_r, Sphere.SampleLength);
 
 		// Mix out the samples into the output buffer
-		for(uint32_t j=0;j<remaining_data;j++)
-		{
-			(*out++)+=sample_l[j];
-			(*out++)+=sample_r[j];
-		}
+		MixAudio(out, sample_l, sample_r, remaining_data, 128);
 
 		// Advance the sample position by what we've used, next time around will take another chunk.
 		channel->pos+=remaining_data;
@@ -273,7 +320,7 @@ int Audio_Init(void)
 
 	if(!HRIR_Init())
 	{
-		DBGPRINTF("Audio: HRIR failed to initialize.\n");
+		DBGPRINTF(DEBUG_ERROR, "Audio: HRIR failed to initialize.\n");
 		return false;
 	}
 
@@ -320,7 +367,7 @@ int Audio_Init(void)
 	// Initialize PortAudio
 	if(Pa_Initialize()!=paNoError)
 	{
-		DBGPRINTF("Audio: PortAudio failed to initialize.\n");
+		DBGPRINTF(DEBUG_ERROR, "Audio: PortAudio failed to initialize.\n");
 		return false;
 	}
 
@@ -330,7 +377,7 @@ int Audio_Init(void)
 
 	if(outputParameters.device==paNoDevice)
 	{
-		DBGPRINTF("Audio: No default output device.\n");
+		DBGPRINTF(DEBUG_ERROR, "Audio: No default output device.\n");
 		Pa_Terminate();
 		return false;
 	}
@@ -343,7 +390,7 @@ int Audio_Init(void)
 	// Open audio stream
 	if(Pa_OpenStream(&stream, NULL, &outputParameters, SAMPLE_RATE, NUM_SAMPLES, paNoFlag, Audio_Callback, NULL)!=paNoError)
 	{
-		DBGPRINTF("Audio: Unable to open PortAudio stream.\n");
+		DBGPRINTF(DEBUG_ERROR, "Audio: Unable to open PortAudio stream.\n");
 		Pa_Terminate();
 		return false;
 	}
@@ -351,7 +398,7 @@ int Audio_Init(void)
 	// Start audio stream
 	if(Pa_StartStream(stream)!=paNoError)
 	{
-		DBGPRINTF("Audio: Unable to start PortAudio Stream.\n");
+		DBGPRINTF(DEBUG_ERROR, "Audio: Unable to start PortAudio Stream.\n");
 		Pa_Terminate();
 		return false;
 	}
