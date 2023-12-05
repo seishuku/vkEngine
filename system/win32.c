@@ -68,7 +68,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		case WM_SIZE:
 			Width=max(LOWORD(lParam), 2);
 			Height=max(HIWORD(lParam), 2);
-			RecreateSwapchain();
+			//RecreateSwapchain();
 			break;
 
 		case WM_SYSKEYUP:
@@ -276,20 +276,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						{
 							MouseEvent.dx=Mouse.lLastX;
 							MouseEvent.dy=-Mouse.lLastY;
+							Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
 						}
 					}
-					//POINT mouse;
-					//GetCursorPos(&mouse);
-
-					//MouseEvent.x=mouse.x;
-					//MouseEvent.y=Height-mouse.y;
 
 					if(Mouse.usButtonFlags&(RI_MOUSE_BUTTON_1_DOWN|RI_MOUSE_BUTTON_2_DOWN|RI_MOUSE_BUTTON_3_DOWN|RI_MOUSE_BUTTON_4_DOWN|RI_MOUSE_BUTTON_5_DOWN))
 						Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
 					else if(Mouse.usButtonFlags&(RI_MOUSE_BUTTON_1_UP|RI_MOUSE_BUTTON_2_UP|RI_MOUSE_BUTTON_3_UP|RI_MOUSE_BUTTON_4_UP|RI_MOUSE_BUTTON_5_UP))
 						Event_Trigger(EVENT_MOUSEUP, &MouseEvent);
-
-					Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
 					break;
 				}
 
@@ -398,17 +392,6 @@ int main(int argc, char **argv)
 	ShowWindow(Context.hWnd, SW_SHOW);
 	SetForegroundWindow(Context.hWnd);
 
-	DBGPRINTF(DEBUG_INFO, "Initalizing OpenVR...\n");
-	if(!InitOpenVR())
-	{
-		DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
-		IsVR=false;
-		rtWidth=Width;
-		rtHeight=Height;
-	}
-	else
-		MoveWindow(Context.hWnd, 0, 0, rtWidth, rtHeight/2, TRUE);
-
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan instance...\n");
 	if(!CreateVulkanInstance(&Instance))
 	{
@@ -424,7 +407,22 @@ int main(int argc, char **argv)
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Creating swapchain...\n");
-	vkuCreateSwapchain(&Context, &Swapchain, VK_TRUE);
+	if(!vkuCreateSwapchain(&Context, &Swapchain, VK_TRUE))
+	{
+		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
+		return -1;
+	}
+
+	DBGPRINTF(DEBUG_INFO, "Initializing VR...\n");
+	if(!VR_Init(Instance, &Context))
+	{
+		DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
+		IsVR=false;
+		rtWidth=Width;
+		rtHeight=Height;
+	}
+	else
+		MoveWindow(Context.hWnd, 0, 0, rtWidth, rtHeight/2, TRUE);
 
 	DBGPRINTF(DEBUG_INFO, "Initializing Vulkan resources...\n");
 	if(!Init())

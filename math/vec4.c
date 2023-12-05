@@ -6,6 +6,16 @@ vec4 Vec4(const float x, const float y, const float z, const float w)
 	return (vec4) { x, y, z, w };
 }
 
+vec4 Vec4_Vec3(const vec3 a, const float w)
+{
+	return (vec4) { .x=a.x, .y=a.y, .z=a.z, .w=w };
+}
+
+vec4 Vec4_Vec2(const vec2 a, const float z, const float w)
+{
+	return (vec4) { .x=a.x, .y=a.y, .z=z, .w=w };
+}
+
 vec4 Vec4b(const float b)
 {
 	return (vec4) { b, b, b, b };

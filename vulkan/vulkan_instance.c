@@ -117,6 +117,11 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 		Extensions[NumExtensions++]=VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 #endif
 
+	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME;
+	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME;
+	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME;
+	Extensions[NumExtensions++]=VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME;
+
 	VkInstanceCreateInfo InstanceInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,

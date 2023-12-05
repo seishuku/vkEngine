@@ -116,6 +116,8 @@ float Vec3_Normalize(vec3 *v);
 
 #ifdef VEC_INLINE
 inline static vec4 Vec4(const float x, const float y, const float z, const float w) { return (vec4) { .x=x, .y=y, .z=z, .w=w }; }
+inline static vec4 Vec4_Vec3(const vec3 a, const float w) { return (vec4) { .x=a.x, .y=a.y, .z=a.z, .w=w }; }
+inline static vec4 Vec4_Vec2(const vec2 a, const float z, const float w) { return (vec4) { .x=a.x, .y=a.y, .z=z, .w=w }; }
 inline static vec4 Vec4b(const float b) { return (vec4) { .x=b, .y=b, .z=b, .w=b }; }
 inline static vec4 Vec4_Add(const vec4 a, const float x, const float y, const float z, const float w) { return (vec4) { .x=a.x+x, .y=a.y+y, .z=a.z+z, .w=a.w+w }; }
 inline static vec4 Vec4_Addv(const vec4 a, const vec4 b) { return (vec4) { .x=a.x+b.x, .y=a.y+b.y, .z=a.z+b.z, .w=a.w+b.w }; }
@@ -134,6 +136,8 @@ inline static vec4 Vec4_Lerp(const vec4 a, const vec4 b, const float t) { return
 inline static vec4 Vec4_Clamp(const vec4 v, const float min, const float max) { return (vec4) { .x=min(max(v.x, min), max), .y=min(max(v.y, min), max), .z=min(max(v.z, min), max), .w=min(max(v.w, min), max) }; }
 #else
 vec4 Vec4(const float x, const float y, const float z, const float w);
+vec4 Vec4_Vec3(const vec3 a, const float w);
+vec4 Vec4_Vec2(const vec2 a, const float z, const float w);
 vec4 Vec4b(const float b);
 vec4 Vec4_Add(const vec4 a, const float x, const float y, const float z, const float w);
 vec4 Vec4_Addv(const vec4 a, const vec4 b);

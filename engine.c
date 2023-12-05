@@ -554,12 +554,13 @@ bool CreateSpherePipeline(void)
 	vkuInitPipeline(&SpherePipeline, &Context);
 
 	vkuPipeline_SetPipelineLayout(&SpherePipeline, SpherePipelineLayout);
+	vkuPipeline_SetRenderPass(&SpherePipeline, RenderPass);
 
 	SpherePipeline.DepthTest=VK_TRUE;
 	SpherePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
 	SpherePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
 	SpherePipeline.RasterizationSamples=MSAA;
-	//	SpherePipeline.PolygonMode=VK_POLYGON_MODE_LINE;
+	//SpherePipeline.PolygonMode=VK_POLYGON_MODE_LINE;
 
 	if(!vkuPipeline_AddStage(&SpherePipeline, "shaders/sphere.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
@@ -575,10 +576,31 @@ bool CreateSpherePipeline(void)
 		.depthAttachmentFormat=DepthFormat,
 	};
 
-	if(!vkuAssemblePipeline(&SpherePipeline, &PipelineRenderingCreateInfo))
+	if(!vkuAssemblePipeline(&SpherePipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
 		return false;
 
 	return true;
+}
+
+void DrawSphere(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, vec3 Position, float Radius, vec4 Color)
+{
+	struct
+	{
+		matrix mvp;
+		vec4 color;
+	} SpherePC={ 0 };
+
+	matrix local=MatrixIdentity();
+	local=MatrixMult(local, MatrixScale(Radius, Radius, Radius));
+	local=MatrixMult(local, MatrixTranslatev(Position));
+	local=MatrixMult(local, PerFrame[Index].Main_UBO[Eye]->modelview);
+	local=MatrixMult(local, PerFrame[Index].Main_UBO[Eye]->HMD);
+	SpherePC.mvp=MatrixMult(local, PerFrame[Index].Main_UBO[Eye]->projection);
+	SpherePC.color=Color;
+
+	vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, SpherePipeline.Pipeline);
+	vkCmdPushConstants(CommandBuffer, SpherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SpherePC), &SpherePC);
+	vkCmdDraw(CommandBuffer, 60, 1, 0, 0);
 }
 //////
 
@@ -600,6 +622,7 @@ bool CreateLinePipeline(void)
 	vkuInitPipeline(&LinePipeline, &Context);
 
 	vkuPipeline_SetPipelineLayout(&LinePipeline, LinePipelineLayout);
+	vkuPipeline_SetRenderPass(&LinePipeline, RenderPass);
 
 	LinePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
 	LinePipeline.DepthTest=VK_TRUE;
@@ -621,12 +644,85 @@ bool CreateLinePipeline(void)
 		.depthAttachmentFormat=DepthFormat,
 	};
 
-	if(!vkuAssemblePipeline(&LinePipeline, &PipelineRenderingCreateInfo))
+	if(!vkuAssemblePipeline(&LinePipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
 		return false;
 
 	return true;
 }
+
+void DrawLine(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, vec3 Start, vec3 End, vec4 Color)
+{
+	struct
+	{
+		matrix mvp;
+		vec4 Color;
+		vec4 Verts[2];
+	} LinePC;
+
+	matrix local=MatrixMult(PerFrame[Index].Main_UBO[Eye]->modelview, PerFrame[Index].Main_UBO[Eye]->HMD);
+	LinePC.mvp=MatrixMult(local, PerFrame[Index].Main_UBO[Eye]->projection);
+	LinePC.Color=Color;
+	LinePC.Verts[0]=Vec4_Vec3(Start, 1.0f);
+	LinePC.Verts[1]=Vec4_Vec3(End, 1.0f);
+
+	vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, LinePipeline.Pipeline);
+	vkCmdPushConstants(CommandBuffer, LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(LinePC), &LinePC);
+	vkCmdDraw(CommandBuffer, 2, 1, 0, 0);
+}
 //////
+
+void DrawPlayer(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, Camera_t Player)
+{
+	struct
+	{
+		matrix mvp;
+		vec4 color, start, end;
+	} line_ubo={ 0 };
+
+	vec4 position=Vec4_Vec3(Player.Position, 1.0f);
+	vec4 forward=Vec4_Vec3(Player.Forward, 1.0f);
+	vec4 up=Vec4_Vec3(Player.Up, 1.0f);
+	vec4 right=Vec4_Vec3(Player.Right, 1.0f);
+
+	line_ubo.mvp=MatrixMult(PerFrame[Index].Main_UBO[Eye]->modelview, PerFrame[Index].Main_UBO[Eye]->projection);
+	line_ubo.start=position;
+
+	vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, LinePipeline.Pipeline);
+
+	line_ubo.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
+	line_ubo.end=Vec4_Addv(position, Vec4_Muls(forward, 15.0f));
+	vkCmdPushConstants(CommandBuffer, LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
+	vkCmdDraw(CommandBuffer, 2, 1, 0, 0);
+
+	line_ubo.color=Vec4(0.0f, 1.0f, 0.0f, 1.0f);
+	line_ubo.end=Vec4_Addv(position, Vec4_Muls(up, 15.0f));
+	vkCmdPushConstants(CommandBuffer, LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
+	vkCmdDraw(CommandBuffer, 2, 1, 0, 0);
+
+	line_ubo.color=Vec4(0.0f, 0.0f, 1.0f, 1.0f);
+	line_ubo.end=Vec4_Addv(position, Vec4_Muls(right, 15.0f));
+	vkCmdPushConstants(CommandBuffer, LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
+	vkCmdDraw(CommandBuffer, 2, 1, 0, 0);
+
+	struct
+	{
+		matrix mvp;
+		vec4 color;
+	} sphere_ubo={ 0 };
+
+	matrix local=MatrixIdentity();
+	local=MatrixMult(local, MatrixScale(5.0f, 5.0f, 5.0f));
+	local=MatrixMult(local, MatrixInverse(MatrixLookAt(Player.Position, Vec3_Addv(Player.Position, Player.Forward), Player.Up)));
+
+	local=MatrixMult(local, PerFrame[Index].Main_UBO[Eye]->modelview);
+	sphere_ubo.mvp=MatrixMult(local, PerFrame[Index].Main_UBO[Eye]->projection);
+
+	sphere_ubo.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+	vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, SpherePipeline.Pipeline);
+	vkCmdPushConstants(CommandBuffer, SpherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(sphere_ubo), &sphere_ubo);
+	vkCmdDraw(CommandBuffer, 60, 1, 0, 0);
+}
 
 // General thread constructor for threads using Vulkan
 void Thread_Constructor(void *Arg)
@@ -695,6 +791,29 @@ void Thread_Destructor(void *Arg)
 			vkDestroyDescriptorPool(Context.Device, Data->PerFrame[Frame].DescriptorPool[Eye], VK_NULL_HANDLE);
 		}
 	}
+}
+
+vec3 GetChannelPosition(void);
+extern HRIR_Sphere_t Sphere;
+
+static vec3 Barycentric(vec3 p, vec3 a, vec3 b, vec3 c)
+{
+	vec3 v0=Vec3_Subv(b, a), v1=Vec3_Subv(c, a), v2=Vec3_Subv(p, a);
+
+	float d00=Vec3_Dot(v0, v0);
+	float d01=Vec3_Dot(v0, v1);
+	float d11=Vec3_Dot(v1, v1);
+	float d20=Vec3_Dot(v2, v0);
+	float d21=Vec3_Dot(v2, v1);
+	float invDenom=1.0f/(d00*d11-d01*d01);
+
+	float v=(d11*d20-d01*d21)*invDenom;
+	float w=(d00*d21-d01*d20)*invDenom;
+
+	return (vec3)
+	{
+		v, w, 1.0f-v-w
+	};
 }
 
 // Asteroids render pass thread
@@ -766,6 +885,26 @@ void Thread_Main(void *Arg)
 		}
 	}
 
+	vec3 xyz=GetChannelPosition();
+
+	const float dist_mult=1.0f/500.0f;
+
+	// Calculate relative position of the sound source to the camera
+	vec3 position=Vec3_Subv(xyz, Camera.Position);
+
+	// Normalize the vector, which also returns the length
+	//     which will be used for calculating distance fall-off later
+	float dist=Vec3_Normalize(&position)*dist_mult;
+	position=Vec3_Muls(position, 100.0f);
+
+	// Clamp to full volume
+	if(dist<0.0f)
+		dist=0.0f;
+
+	//DrawSphere(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Data->Index, Data->Eye, Camera.Position, 10.0f, Vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	DrawLine(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Data->Index, Data->Eye, Camera.Position, Vec3_Addv(Camera.Position, position), Vec4(1.0f, 1.0f, 1.0f, 1.0f));
+
+#if 0
 	// Draw some simple geometry to represent other client cameras
 	for(uint32_t i=0;i<connectedClients;i++)
 	{
@@ -827,6 +966,7 @@ void Thread_Main(void *Arg)
 		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 60, 1, 0, 0);
 	}
 	//////
+#endif
 
 	vkEndCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye]);
 
@@ -1027,127 +1167,114 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	vkCmdEndRenderPass(CommandBuffer);
 }
 
-double physicsTime=0.0;
-
 // Runs anything physics related
 void Thread_Physics(void *Arg)
 {
-#if 0
-	const double Sixty=1.0/60.0;
-	const float dt=(float)Sixty;//fTimeStep;
+	// Get a pointer to the emitter that's providing the positions
+	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
 
-	// Get the current time
-	double currentTime=GetClock();
-
-	// If current time has elapsed last set time, then run code
-	if(currentTime>physicsTime)
+	for(uint32_t i=0;i<Emitter->NumParticles;i++)
 	{
-		// reset time to current time + time until next run
-		physicsTime=currentTime+Sixty;
-#else
+		if(Emitter->Particles[i].ID!=Emitter->ID)
 		{
-			const float dt=fTimeStep;
+			// Get those positions and set the other emitter's positions to those
+			ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitter->Particles[i].ID, Emitter->Particles[i].pos);
+
+			// If this particle is dead, delete that emitter and reset it's ID 
+			if(Emitter->Particles[i].life<0.0f)
+			{
+				ParticleSystem_DeleteEmitter(&ParticleSystem, Emitter->Particles[i].ID);
+				Emitter->Particles[i].ID=0;
+			}
+		}
+	}
+
+	ParticleSystem_Step(&ParticleSystem, fTimeStep);
+
+	// Loop through objects, integrate and check/resolve collisions
+	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
+	{
+		// Run physics integration on the asteroids
+		PhysicsIntegrate(&Asteroids[i], fTimeStep);
+
+		// Check asteroids against other asteroids
+		for(uint32_t j=i+1;j<NUM_ASTEROIDS;j++)
+			PhysicsSphereToSphereCollisionResponse(&Asteroids[i], &Asteroids[j]);
+
+		// Check asteroids against the camera
+		PhysicsCameraToSphereCollisionResponse(&Camera, &Asteroids[i]);
+
+#if 0
+		for(uint32_t j=0;j<connectedClients;j++)
+		{
+			// Don't check for collision with our own net camera
+			if(j!=ClientID)
+				PhysicsCameraToSphereCollisionResponse(&NetCameras[j], &Asteroids[i]);
+		}
 #endif
 
-			// Get a pointer to the emitter that's providing the positions
-			ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
-
-			for(uint32_t i=0;i<Emitter->NumParticles;i++)
-			{
-				if(Emitter->Particles[i].ID!=Emitter->ID)
-				{
-					// Get those positions and set the other emitter's positions to those
-					ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitter->Particles[i].ID, Emitter->Particles[i].pos);
-
-					// If this particle is dead, delete that emitter and reset it's ID 
-					if(Emitter->Particles[i].life<0.0f)
-					{
-						ParticleSystem_DeleteEmitter(&ParticleSystem, Emitter->Particles[i].ID);
-						Emitter->Particles[i].ID=0;
-					}
-				}
-			}
-
-			ParticleSystem_Step(&ParticleSystem, dt);
-
-			// Loop through objects, integrate and check/resolve collisions
-			for(int i=0;i<NUM_ASTEROIDS;i++)
-			{
-				// Run physics integration on the asteroids
-				PhysicsIntegrate(&Asteroids[i], dt);
-
-				// Check asteroids against other asteroids
-				for(int j=i+1;j<NUM_ASTEROIDS;j++)
-					PhysicsSphereToSphereCollisionResponse(&Asteroids[i], &Asteroids[j]);
-
-				// Check asteroids against the camera
-				PhysicsCameraToSphereCollisionResponse(&Camera, &Asteroids[i]);
-
-				for(uint32_t j=0;j<connectedClients;j++)
-				{
-					// Don't check for collision with our own net camera
-					if(j!=ClientID)
-						PhysicsCameraToSphereCollisionResponse(&NetCameras[j], &Asteroids[i]);
-				}
-
-				// Check asteroids against projectile particles
-				// Emitter '0' on the particle system contains particles that drive the projectile physics
-				ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
-				// Loop through all the possible particles
-				for(uint32_t j=0;j<Emitter->NumParticles;j++)
-				{
-					// If the particle ID matches with the projectile ID, then check collision and respond
-					if(Emitter->Particles[j].ID!=Emitter->ID)
-						PhysicsParticleToSphereCollisionResponse(&Emitter->Particles[j], &Asteroids[i]);
-				}
-			}
-
-			for(uint32_t i=0;i<connectedClients;i++)
-			{
-				// Don't check for collision with our own net camera
-				if(i!=ClientID)
-					PhysicsCameraToCameraCollisionResponse(&Camera, &NetCameras[i]);
-			}
-			//////
-
-			// Update camera and modelview matrix
-			ModelView=CameraUpdate(&Camera, dt);
-			//////
-
-			// Update instance matrix translation positions
-			matrix *Data=NULL;
-			vkMapMemory(Context.Device, Asteroid_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Data);
-
-			for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
-				Data[i].w=Vec4(Asteroids[i].Position.x, Asteroids[i].Position.y, Asteroids[i].Position.z, 1.0f);
-
-			vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
-			//////
-
-			// Network status packet
-			if(ClientSocket!=-1)
-			{
-				NetworkPacket_t StatusPacket;
-
-				memset(&StatusPacket, 0, sizeof(NetworkPacket_t));
-
-				StatusPacket.PacketMagic=STATUS_PACKETMAGIC;
-				StatusPacket.ClientID=ClientID;
-
-				StatusPacket.Camera.Position=Camera.Position;
-				StatusPacket.Camera.Velocity=Camera.Velocity;
-				StatusPacket.Camera.Forward=Camera.Forward;
-				StatusPacket.Camera.Up=Camera.Up;
-
-				Network_SocketSend(ClientSocket, (uint8_t *)&StatusPacket, sizeof(NetworkPacket_t), ServerAddress, ServerPort);
-			}
-			//////
+		// Check asteroids against projectile particles
+		// Emitter '0' on the particle system contains particles that drive the projectile physics
+		ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
+		// Loop through all the possible particles
+		for(uint32_t j=0;j<Emitter->NumParticles;j++)
+		{
+			// If the particle ID matches with the projectile ID, then check collision and respond
+			if(Emitter->Particles[j].ID!=Emitter->ID)
+				PhysicsParticleToSphereCollisionResponse(&Emitter->Particles[j], &Asteroids[i]);
 		}
+	}
 
-		// Barrier now that we're done here
-		pthread_barrier_wait(&ThreadBarrier_Physics);
+#if 0
+	for(uint32_t i=0;i<connectedClients;i++)
+	{
+		// Don't check for collision with our own net camera
+		if(i!=ClientID)
+			PhysicsCameraToCameraCollisionResponse(&Camera, &NetCameras[i]);
+	}
+	//////
+#endif
+
+	// Update camera and modelview matrix
+	ModelView=CameraUpdate(&Camera, fTimeStep);
+	//////
+
+	// Update instance matrix translation positions
+	matrix *Data=NULL;
+	vkMapMemory(Context.Device, Asteroid_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Data);
+
+	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
+		Data[i].w=Vec4(Asteroids[i].Position.x, Asteroids[i].Position.y, Asteroids[i].Position.z, 1.0f);
+
+	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
+	//////
+
+#if 0
+	// Network status packet
+	if(ClientSocket!=-1)
+	{
+		NetworkPacket_t StatusPacket;
+
+		memset(&StatusPacket, 0, sizeof(NetworkPacket_t));
+
+		StatusPacket.PacketMagic=STATUS_PACKETMAGIC;
+		StatusPacket.ClientID=ClientID;
+
+		StatusPacket.Camera.Position=Camera.Position;
+		StatusPacket.Camera.Velocity=Camera.Velocity;
+		StatusPacket.Camera.Forward=Camera.Forward;
+		StatusPacket.Camera.Up=Camera.Up;
+
+		Network_SocketSend(ClientSocket, (uint8_t *)&StatusPacket, sizeof(NetworkPacket_t), ServerAddress, ServerPort);
+	}
+	//////
+#endif
+
+	// Barrier now that we're done here
+	pthread_barrier_wait(&ThreadBarrier_Physics);
 }
 
+#if 0
 pthread_t UpdateThread;
 bool NetUpdate_Run=true;
 uint8_t NetBuffer[32767]={ 0 };
@@ -1205,6 +1332,7 @@ void NetUpdate(void *Arg)
 		}
 	}
 }
+#endif
 
 // Render call from system main event loop
 void Render(void)
@@ -1219,12 +1347,14 @@ void Render(void)
 	UI_UpdateSpritePosition(&UI, FaceID, Vec2(((float)Width/2.0f)+sinf(-fTime*2.0f)*100.0f, ((float)Height/2.0f)+cosf(-fTime*2.0f)*100.0f));
 
 	Thread_AddJob(&ThreadPhysics, Thread_Physics, NULL);
-	//	Thread_Physics(NULL);
+//	Thread_Physics(NULL);
 
-	if(!IsVR)
+//	if(!IsVR)
 		EyeProjection[0]=MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f);
+		EyeProjection[1]=MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f);
 
-	Pose=GetHeadPose();
+	Pose=VR_GetHeadPose();
+//	Pose=MatrixTranslate(0.0f, 0.0f, -100.0f);
 
 	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain.Swapchain, UINT64_MAX, PerFrame[Index].PresentCompleteSemaphore, VK_NULL_HANDLE, &imageIndex);
 
@@ -1249,17 +1379,29 @@ void Render(void)
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 	});
 
-	PerFrame[Index].Skybox_UBO[0]->uSunColor.x=UI_GetBarGraphValue(&UI, RedID);
-	PerFrame[Index].Skybox_UBO[0]->uSunColor.y=UI_GetBarGraphValue(&UI, GreenID);
-	PerFrame[Index].Skybox_UBO[0]->uSunColor.z=UI_GetBarGraphValue(&UI, BlueID);
+	const float RedValue=UI_GetBarGraphValue(&UI, RedID);
+	const float GreenValue=UI_GetBarGraphValue(&UI, GreenID);
+	const float BlueValue=UI_GetBarGraphValue(&UI, BlueID);
+
+	PerFrame[Index].Skybox_UBO[0]->uSunColor.x=RedValue;
+	PerFrame[Index].Skybox_UBO[0]->uSunColor.y=GreenValue;
+	PerFrame[Index].Skybox_UBO[0]->uSunColor.z=BlueValue;
+
+	if(IsVR)
+	{
+
+		PerFrame[Index].Skybox_UBO[1]->uSunColor.x=RedValue;
+		PerFrame[Index].Skybox_UBO[1]->uSunColor.y=GreenValue;
+		PerFrame[Index].Skybox_UBO[1]->uSunColor.z=BlueValue;
+	}
 
 	// Update shadow depth map
 	ShadowUpdateMap(PerFrame[Index].CommandBuffer, Index);
 
-	vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-	// Wait for physics to finish before rendering, particle drawing needs data done first.
+	// Wait for physics to finish before rendering
 	pthread_barrier_wait(&ThreadBarrier_Physics);
+
+	vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 	EyeRender(PerFrame[Index].CommandBuffer, Index, 0, Pose);
 
@@ -1285,6 +1427,18 @@ void Render(void)
 	}
 
 //	vkuTransitionLayout(PerFrame[Index].CommandBuffer, Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+#ifndef ANDROID
+	// Submit eye images to VR HMD
+	if(IsVR)
+	{
+		VR_SendEyeImages(PerFrame[Index].CommandBuffer, (VkImage[])
+		{
+			ColorResolve[0].Image,
+			ColorResolve[1].Image
+		}, ColorFormat, rtWidth, rtHeight);
+	}
+#endif
 
 	vkEndCommandBuffer(PerFrame[Index].CommandBuffer);
 
@@ -1321,36 +1475,6 @@ void Render(void)
 		RecreateSwapchain();
 		return;
 	}
-
-#ifndef ANDROID
-	// Send eye images over to OpenVR
-	if(IsVR)
-	{
-		VRTextureBounds_t bounds={ 0.0f, 0.0f, 1.0f, 1.0f };
-
-		VRVulkanTextureData_t vulkanData=
-		{
-			.m_pDevice=(struct VkDevice_T *)Context.Device,
-			.m_pPhysicalDevice=(struct VkPhysicalDevice_T *)Context.PhysicalDevice,
-			.m_pInstance=(struct VkInstance_T *)Instance,
-			.m_pQueue=(struct VkQueue_T *)Context.Queue,
-			.m_nQueueFamilyIndex=Context.QueueFamilyIndex,
-
-			.m_nWidth=rtWidth,
-			.m_nHeight=rtHeight,
-			.m_nFormat=ColorFormat,
-			.m_nSampleCount=1,
-		};
-
-		struct Texture_t texture={ &vulkanData, ETextureType_TextureType_Vulkan, EColorSpace_ColorSpace_Auto };
-
-		vulkanData.m_nImage=(uint64_t)ColorResolve[EVREye_Eye_Left].Image;
-		VRCompositor->Submit(EVREye_Eye_Left, &texture, &bounds, EVRSubmitFlags_Submit_Default);
-
-		vulkanData.m_nImage=(uint64_t)ColorResolve[EVREye_Eye_Right].Image;
-		VRCompositor->Submit(EVREye_Eye_Right, &texture, &bounds, EVRSubmitFlags_Submit_Default);
-	}
-#endif
 
 	Index=(Index+1)%Swapchain.NumImages;
 }
@@ -1530,8 +1654,8 @@ bool Init(void)
 	CreateSkyboxPipeline();
 	GenerateSkyParams();
 
-	//CreateSpherePipeline();
-	//CreateLinePipeline();
+	CreateSpherePipeline();
+	CreateLinePipeline();
 
 	// Create volumetric rendering pipeline
 	CreateVolumePipeline();
@@ -1843,7 +1967,7 @@ void Destroy(void)
 	Zone_Free(Zone, Sounds[SOUND_EXPLODE2].data);
 	Zone_Free(Zone, Sounds[SOUND_EXPLODE3].data);
 
-	DestroyOpenVR();
+	VR_Destroy();
 
 	for(uint32_t i=0;i<NUM_THREADS;i++)
 		Thread_Destroy(&Thread[i]);

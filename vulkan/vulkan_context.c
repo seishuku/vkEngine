@@ -250,7 +250,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	}
 
 	// Enable extensions that are supported
-	const char *Extensions[10];
+	const char *Extensions[14];
 	uint32_t NumExtensions=0;
 
 	if(Context->SwapchainExtension)
@@ -281,6 +281,15 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		};
 		pNext=&deviceDynamicRenderingFeatures;
 	}
+
+	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME;
+	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME;
+	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME;
+	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME;
+	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME;
+	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME;
+	Extensions[NumExtensions++]=VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME;
+	Extensions[NumExtensions++]=VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME;
 
 	// Create the logical device from the physical device and queue index from above
 	if(vkCreateDevice(Context->PhysicalDevice, &(VkDeviceCreateInfo)

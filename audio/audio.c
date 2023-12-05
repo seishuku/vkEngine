@@ -11,11 +11,15 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <float.h>
 #include <memory.h>
 #include "../system/system.h"
 #include "../math/math.h"
 #include "../camera/camera.h"
 #include "audio.h"
+
+#include "../font/font.h"
+extern Font_t Fnt;
 
 #ifdef ANDROID
 AAudioStream *stream=NULL;
@@ -47,30 +51,95 @@ int16_t sample_l[NUM_SAMPLES*2], sample_r[NUM_SAMPLES*2];
 
 extern Camera_t Camera;
 
-// This function is very naive, it just interpolates *all* the HRIR positions
-//   and weights them according to whatever is closest to the position.
-void hrir_interpolate(vec3 xyz)
+vec3 GetChannelPosition(void)
+{
+	return *channels[0].xyz;
+}
+
+static const float interpolateSamples(const float h0, const float h1, const float h2, const float alpha, const float beta, const float gamma)
+{
+	return alpha*h0+beta*h1+gamma*h2;
+}
+
+static vec2 Barycentric(const vec3 p, const vec3 a, const vec3 b, const vec3 c)
+{
+	const vec3 v0=Vec3_Subv(b, a), v1=Vec3_Subv(c, a), v2=Vec3_Subv(p, a);
+
+	const float d00=Vec3_Dot(v0, v0);
+	const float d01=Vec3_Dot(v0, v1);
+	const float d11=Vec3_Dot(v1, v1);
+	const float d20=Vec3_Dot(v2, v0);
+	const float d21=Vec3_Dot(v2, v1);
+	const float invDenom=1.0f/(d00*d11-d01*d01);
+
+	return (vec2) { (d11*d20-d01*d21)*invDenom, (d00*d21-d01*d20) *invDenom };
+}
+
+static void hrir_interpolate(vec3 xyz)
 {
 	// Sound distance drop-off
 	const float dist_mult=1.0f/500.0f;
 
 	// Calculate relative position of the sound source to the camera
-	vec3 relative_pos=Vec3_Subv(Camera.Position, xyz);
+	const vec3 relative_pos=Vec3_Subv(xyz, Camera.Position);
 	vec3 position=Vec3(
 		Vec3_Dot(relative_pos, Camera.Right),
 		Vec3_Dot(relative_pos, Camera.Up),
 		Vec3_Dot(relative_pos, Camera.Forward)
 	);
 
-	// Normalize the vector, which also returns the length
-	//     which will be used for calculating distance fall-off later
+	// Normalize the vector, also returns the length
+	//     used for calculating distance fall-off later.
 	float dist=Vec3_Normalize(&position)*dist_mult;
+
+	// TODO: Fix in the HRIR sphere generation tool:
+	position=Matrix3x3MultVec3(position, MatrixRotate(deg2rad(90.0f), 0.0f, 1.0f, 0.0f));
 
 	// Clamp to full volume
 	if(dist<0.0f)
 		dist=0.0f;
 
-	// HRIR impluse interpolation
+#if 1
+	float maxDistanceSq=-1.0f;
+	int32_t triangleIndex=-1;
+
+	for(uint32_t i=0;i<Sphere.NumIndex;i+=3)
+	{
+		// Calculate the normal vector of the current triangle
+		// TODO: PRECALCULATE NORMALS
+		const HRIR_Vertex_t *v0=&Sphere.Vertices[Sphere.Indices[i+0]];
+		const HRIR_Vertex_t *v1=&Sphere.Vertices[Sphere.Indices[i+1]];
+		const HRIR_Vertex_t *v2=&Sphere.Vertices[Sphere.Indices[i+2]];
+		const vec3 e0=Vec3_Subv(v1->Vertex, v0->Vertex);
+		const vec3 e1=Vec3_Subv(v2->Vertex, v0->Vertex);
+		vec3 normal=Vec3_Cross(e0, e1);
+		Vec3_Normalize(&normal);
+
+		const float distanceSq=Vec3_Dot(position, normal);
+
+		if(distanceSq>maxDistanceSq)
+		{
+			maxDistanceSq=distanceSq;
+			triangleIndex=i;
+		}
+	}
+
+	const HRIR_Vertex_t *v0=&Sphere.Vertices[Sphere.Indices[triangleIndex+0]];
+	const HRIR_Vertex_t *v1=&Sphere.Vertices[Sphere.Indices[triangleIndex+1]];
+	const HRIR_Vertex_t *v2=&Sphere.Vertices[Sphere.Indices[triangleIndex+2]];
+	const vec2 g=Vec2_Clamp(Barycentric(position, v0->Vertex, v1->Vertex, v2->Vertex), 0.0f, 1.0f);
+	const float det=1.0f-g.x-g.y;
+
+	if(g.x>=0.0f&&g.y>=0.0f&&det>=0.0f)
+	{
+		for(uint32_t j=0;j<Sphere.SampleLength;j++)
+		{
+			hrir_l[j]=(1.0f-dist)*interpolateSamples(v0->Left[j], v1->Left[j], v2->Left[j], g.x, g.y, det);
+			hrir_r[j]=(1.0f-dist)*interpolateSamples(v0->Right[j], v1->Right[j], v2->Right[j], g.x, g.y, det);
+		}
+	}
+#else
+	// This is very naive, it just interpolates *all* the HRIR positions and weights them according to whatever is closest to the direction.
 	for(uint32_t i=0;i<Sphere.SampleLength;i++)
 	{
 		float hrirSum_l=0.0f;
@@ -80,13 +149,13 @@ void hrir_interpolate(vec3 xyz)
 		// Calculate the weight of the nearest HRIR sphere vertex to the relative sound position
 		for(uint32_t j=0;j<Sphere.NumVertex;j++)
 		{
-			vec3 RelPos=Vec3_Subv(Sphere.Vertices[j].Vertex, position);
-			float distanceSq=Vec3_Dot(RelPos, RelPos);
+			const vec3 RelPos=Vec3_Subv(Sphere.Vertices[j].Vertex, position);
+			const float distanceSq=Vec3_Dot(RelPos, RelPos);
 
-			// Only weight based on vertices that are contributing meanful data
+			// Only weight based on vertices that are contributing meaningful data
 			if(distanceSq<1.0f)
 			{
-				float weight=expf(-distanceSq);
+				const float weight=expf(-distanceSq);
 
 				hrirSum_l+=Sphere.Vertices[j].Left[i]*weight;
 				hrirSum_r+=Sphere.Vertices[j].Right[i]*weight;
@@ -100,18 +169,17 @@ void hrir_interpolate(vec3 xyz)
 		hrir_l[i]=(1.0f-dist)*(hrirSum_l*weightSum);
 		hrir_r[i]=(1.0f-dist)*(hrirSum_r*weightSum);
 	}
+#endif
 }
 
-void Convolve(int16_t *input, int16_t *audio_l, int16_t *audio_r, size_t audio_len, float *kernel_l, float *kernel_r, size_t kernel_len)
+static void Convolve(int16_t *input, int16_t *audio_l, int16_t *audio_r, size_t audio_len, float *kernel_l, float *kernel_r, size_t kernel_len)
 {
-	int i, j;
-
-	for(i=0;i<audio_len+kernel_len-1;i++)
+	for(size_t i=0;i<audio_len+kernel_len-1;i++)
 	{
 		float sum_l=0.0f;
 		float sum_r=0.0f;
 
-		for(j=0;j<kernel_len;j++)
+		for(size_t j=0;j<kernel_len;j++)
 		{
 			if(i-j>=0&&i-j<audio_len)
 			{
@@ -125,50 +193,33 @@ void Convolve(int16_t *input, int16_t *audio_l, int16_t *audio_r, size_t audio_l
 	}
 }
 
-void MixAudio(int16_t *dst, const int16_t *src_l, const int16_t *src_r, uint32_t len, int volume)
+static void MixAudio(int16_t *dst, const int16_t *src_l, const int16_t *src_r, uint32_t len, int volume)
 {
 	if(volume==0)
 		return;
 
-	int16_t src1, src2;
+	int16_t src;
 
-	int dst_sample;
-
-	while(len--)
+	for(size_t i=0;i<len;i++)
 	{
-		src1=((*src_l++)*volume)/128;
-		src2=*dst;
+		size_t dstIdxL=2*i+0;
+		src=(src_l[i]*volume)/128;
+		dst[dstIdxL]=min(max(src+dst[dstIdxL], INT16_MIN), INT16_MAX);
 
-		dst_sample=src1+src2;
-
-		if(dst_sample>INT16_MAX)
-			dst_sample=INT16_MAX;
-		else if(dst_sample<INT16_MIN)
-			dst_sample=INT16_MIN;
-
-		*dst++=dst_sample;
-
-		src1=((*src_r++)*volume)/128;
-		src2=*dst;
-
-		dst_sample=src1+src2;
-
-		if(dst_sample>INT16_MAX)
-			dst_sample=INT16_MAX;
-		else if(dst_sample<INT16_MIN)
-			dst_sample=INT16_MIN;
-
-		*dst++=dst_sample;
+		size_t dstIdxR=2*i+1;
+		src=(src_r[i]*volume)/128;
+		dst[dstIdxR]=min(max(src+dst[dstIdxR], INT16_MIN), INT16_MAX);
 	}
 }
 
-void Audio_FillBuffer(void *Buffer, uint32_t Length)
+static void Audio_FillBuffer(void *Buffer, uint32_t Length)
 {
 	// Get pointer to output buffer.
 	int16_t *out=(int16_t *)Buffer;
 
 	// Clear the output buffer, so we don't get annoying repeating samples.
-	memset(out, 0, Length*sizeof(int16_t)*2);
+	for(size_t dataIdx=0;dataIdx<Length*2;dataIdx++)
+		out[dataIdx]=0;
 
 	for(uint32_t i=0;i<MAX_CHANNELS;i++)
 	{
@@ -179,45 +230,49 @@ void Audio_FillBuffer(void *Buffer, uint32_t Length)
 		if(!channel->data)
 			continue;
 
+		// Interpolate HRIR samples that are closest to the sound's position
+		// TODO: this needs work, it works, but not great
+		hrir_interpolate(*channel->xyz);
+
 		// Calculate the remaining amount of data to process.
-		uint32_t remaining_data=channel->len-channel->pos;
+		size_t remaining_data=channel->len-channel->pos;
 
 		// Remaining data runs off end of primary buffer.
 		// Clamp it to buffer size, we'll get the rest later.
 		if(remaining_data>=Length)
 			remaining_data=Length;
 
-		// Interpolate HRIR samples that are closest to the sound's position
-		// TODO: this needs work, it works, but not great
-		hrir_interpolate(*channel->xyz);
-
 		// Calculate the amount to fill the convolution buffer.
 		// The convolve buffer needs to be at least NUM_SAMPLE+HRIR length,
 		//   but to stop annoying pops/clicks and other discontinuities, we need to copy ahead,
 		//   which is either the full input sample length OR the full buffer+HRIR sample length.
-		uint32_t toFill=(channel->len-channel->pos);
+		size_t toFill=(channel->len-channel->pos);
 
 		if(toFill>=(NUM_SAMPLES+Sphere.SampleLength))
 			toFill=(NUM_SAMPLES+Sphere.SampleLength);
 		else if(toFill>=channel->len)
 			toFill=channel->len;
 
-		// Zero out the full buffer size.
-		memset(channel->working, 0, NUM_SAMPLES*2*sizeof(int16_t));
 		// Copy the samples.
-		memcpy(channel->working, &channel->data[channel->pos], toFill*sizeof(int16_t));
+		for(size_t dataIdx=0;dataIdx<(NUM_SAMPLES*2);dataIdx++)
+		{
+			if(dataIdx<=toFill)
+				channel->working[dataIdx]=channel->data[channel->pos+dataIdx];
+			else
+			{
+				// Zero out the remaining buffer size.
+				channel->working[dataIdx]=0;
+			}
+		}
 
 		// Convolve the samples with the interpolated HRIR sample to produce a stereo sample to mix into the output buffer
 		Convolve(channel->working, sample_l, sample_r, remaining_data, hrir_l, hrir_r, Sphere.SampleLength);
 
 		// Mix out the samples into the output buffer
-		MixAudio(out, sample_l, sample_r, remaining_data, 128);
+		MixAudio(out, sample_l, sample_r, (uint32_t)remaining_data, 128);
 
 		// Advance the sample position by what we've used, next time around will take another chunk.
-		channel->pos+=remaining_data;
-
-		// Reset output buffer pointer for next channel to process.
-		out=(int16_t *)Buffer;
+		channel->pos+=(uint32_t)remaining_data;
 
 		// If loop flag was set, reset position to 0 if it's at the end.
 		if(channel->pos==channel->len)
@@ -239,14 +294,14 @@ void Audio_FillBuffer(void *Buffer, uint32_t Length)
 
 // Callback functions for when audio driver needs more data.
 #ifdef ANDROID
-aaudio_data_callback_result_t Audio_Callback(AAudioStream *stream, void *userData, void *audioData, int32_t numFrames)
+static aaudio_data_callback_result_t Audio_Callback(AAudioStream *stream, void *userData, void *audioData, int32_t numFrames)
 {
 	Audio_FillBuffer(audioData, numFrames);
 
 	return AAUDIO_CALLBACK_RESULT_CONTINUE;
 }
 #else
-int Audio_Callback(const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData)
+static int Audio_Callback(const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData)
 {
 	Audio_FillBuffer(outputBuffer, framesPerBuffer);
 

@@ -100,7 +100,7 @@ SHADERS+=shaders/ui_sdf.vert.spv
 SHADERS+=shaders/volume.frag.spv
 SHADERS+=shaders/volume.vert.spv
 
-CFLAGS=-Wall -Wno-missing-braces -Wextra -O3 -std=gnu17
+CFLAGS=-Wall -Wextra -Wpedantic -O3 -std=gnu17
 LDFLAGS=-Wold-style-definition -lm -lpthread -lopenvr_api -lportaudio
 
 ifeq ($(OS),Windows_NT)
@@ -108,14 +108,14 @@ ifeq ($(OS),Windows_NT)
 	CFLAGS+=-DWIN32
 	LDFLAGS+=-lvulkan-1 -lws2_32 -lgdi32
 else
-	CC=gcc
+	CC=clang
 	CFLAGS+=-DLINUX -I/usr/X11/include
 	LDFLAGS+=-lvulkan -lX11 -lXi -lXfixes -L/usr/X11/lib
 endif
 
 all: $(TARGET) $(SHADERS)
 
-debug: CFLAGS=-Wall -Wno-missing-braces -Wextra -DDEBUG -D_DEBUG -g -ggdb -O1 -std=gnu17
+debug: CFLAGS=-Wall -Wextra -DDEBUG -D_DEBUG -g -ggdb -O1 -std=gnu17
 
 ifneq ($(OS),Windows_NT)
 debug: CFLAGS+=-I/usr/X11/include

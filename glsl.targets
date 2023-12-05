@@ -11,7 +11,7 @@
   <ItemGroup>
     <GLSL>
       <Message>%(Identity).spv</Message>
-      <Command>"$(VULKAN_SDK)\bin\glslc.exe" --target-env=vulkan1.1 -O "%(Identity)" -o "%(Identity).spv" </Command>
+      <Command>"$(VULKAN_SDK)\bin\glslc.exe" --target-env=vulkan1.2 -O "%(Identity)" -o "%(Identity).spv" </Command>
       <Outputs>%(Identity).spv</Outputs>
     </GLSL>
   </ItemGroup>

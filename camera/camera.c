@@ -8,7 +8,7 @@
 #include "../camera/camera.h"
 
 // Camera collision stuff
-static int32_t ClassifySphere(vec3 Center, vec3 Normal, vec3 Point, float radius, float *distance)
+static int32_t ClassifySphere(const vec3 Center, const vec3 Normal, const vec3 Point, const float radius, float *distance)
 {
 	*distance=Vec3_Dot(Normal, Center)-Vec3_Dot(Normal, Point);
 
@@ -27,9 +27,9 @@ static bool InsidePolygon(const vec3 Intersection, const vec3 Tri[3])
 {
 	float Angle=0.0f;
 
-	vec3 A=Vec3_Subv(Tri[0], Intersection);
-	vec3 B=Vec3_Subv(Tri[1], Intersection);
-	vec3 C=Vec3_Subv(Tri[2], Intersection);
+	const vec3 A=Vec3_Subv(Tri[0], Intersection);
+	const vec3 B=Vec3_Subv(Tri[1], Intersection);
+	const vec3 C=Vec3_Subv(Tri[2], Intersection);
 
 	Angle =Vec3_GetAngle(A, B);
 	Angle+=Vec3_GetAngle(B, C);
@@ -41,21 +41,22 @@ static bool InsidePolygon(const vec3 Intersection, const vec3 Tri[3])
 	return false;
 }
 
-static vec3 ClosestPointOnLine(vec3 A, vec3 B, vec3 Point)
+static vec3 ClosestPointOnLine(const vec3 A, const vec3 B, const vec3 Point)
 {
-	vec3 PointDir={ Point.x-A.x, Point.y-A.y, Point.z-A.z };
-	vec3 Slope={ B.x-A.y, B.y-A.y, B.z-A.z };
-	float d=Vec3_Dot(Slope, Slope), recip_d=0.0f;
+	const vec3 PointDir={ Point.x-A.x, Point.y-A.y, Point.z-A.z };
+	const vec3 Slope={ B.x-A.y, B.y-A.y, B.z-A.z };
+	const float d=Vec3_Dot(Slope, Slope);
+	float recip_d=0.0f;
 
 	if(d)
 		recip_d=1.0f/d;
 
-	float t=fmaxf(0.0f, fminf(1.0f, Vec3_Dot(PointDir, Slope)*recip_d));
+	const float t=fmaxf(0.0f, fminf(1.0f, Vec3_Dot(PointDir, Slope)*recip_d));
 
 	return Vec3_Addv(A, Vec3_Muls(Slope, t));
 }
 
-int32_t EdgeSphereCollision(vec3 Center, vec3 Tri[3], float radius)
+int32_t EdgeSphereCollision(const vec3 Center, const vec3 Tri[3], const float radius)
 {
 	for(uint32_t i=0;i<3;i++)
 	{
@@ -66,7 +67,7 @@ int32_t EdgeSphereCollision(vec3 Center, vec3 Tri[3], float radius)
 	return 0;
 }
 
-vec3 GetCollisionOffset(vec3 Normal, float radius, float distance)
+vec3 GetCollisionOffset(const vec3 Normal, const float radius, const float distance)
 {
 	if(distance>0.0f)
 		return Vec3_Muls(Normal, radius-distance);
@@ -81,22 +82,22 @@ void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32
 
 	for(int32_t i=0;i<NumFace;i++)
 	{
-		vec3 Tri[3]=
+		const vec3 Tri[3]=
 		{
 			{ Vertex[3*Face[3*i+0]], Vertex[3*Face[3*i+0]+1], Vertex[3*Face[3*i+0]+2] },
 			{ Vertex[3*Face[3*i+1]], Vertex[3*Face[3*i+1]+1], Vertex[3*Face[3*i+1]+2] },
 			{ Vertex[3*Face[3*i+2]], Vertex[3*Face[3*i+2]+1], Vertex[3*Face[3*i+2]+2] }
 		};
 
-		vec3 v0=Vec3_Subv(Tri[1], Tri[0]);
-		vec3 v1=Vec3_Subv(Tri[2], Tri[0]);
+		const vec3 v0=Vec3_Subv(Tri[1], Tri[0]);
+		const vec3 v1=Vec3_Subv(Tri[2], Tri[0]);
 
 		vec3 n=Vec3_Cross(v0, v1);
 		Vec3_Normalize(&n);
 
 		if(ClassifySphere(Camera->Position, n, Tri[0], Camera->Radius, &distance)==1)
 		{
-			vec3 Intersection=Vec3_Subv(Camera->Position, Vec3_Muls(n, distance));
+			const vec3 Intersection=Vec3_Subv(Camera->Position, Vec3_Muls(n, distance));
 
 			if(InsidePolygon(Intersection, Tri)||EdgeSphereCollision(Camera->Position, Tri, Camera->Radius*0.5f))
 				Camera->Position=Vec3_Addv(Camera->Position, GetCollisionOffset(n, Camera->Radius, distance));
@@ -107,7 +108,7 @@ void CameraCheckCollision(Camera_t *Camera, float *Vertex, uint32_t *Face, int32
 bool SphereBBOXIntersection(const vec3 Center, const float Radius, const vec3 BBMin, const vec3 BBMax)
 {
 	float dmin=0.0f;
-	float R2=Radius*Radius;
+	const float R2=Radius*Radius;
 
 	if(Center.x<BBMin.x)
 		dmin+=(Center.x-BBMin.x)*(Center.x-BBMin.x);
@@ -169,7 +170,7 @@ void CameraInit(Camera_t *Camera, const vec3 Position, const vec3 Right, const v
 
 static void CameraRotate(Camera_t *Camera)
 {
-	vec4 PitchYaw=QuatMultiply(QuatAnglev(-Camera->Pitch, Camera->Right), QuatAnglev(Camera->Yaw, Camera->Up));
+	const vec4 PitchYaw=QuatMultiply(QuatAnglev(-Camera->Pitch, Camera->Right), QuatAnglev(Camera->Yaw, Camera->Up));
 	Camera->Forward=QuatRotate(PitchYaw, Camera->Forward);
 	Vec3_Normalize(&Camera->Forward);
 
@@ -226,14 +227,14 @@ matrix CameraUpdate(Camera_t *Camera, float dt)
 		Camera->Pitch-=rotation*dt;
 
 	const float maxVelocity=100.0f;
-	float magnitude=Vec3_Length(Camera->Velocity);
+	const float magnitude=Vec3_Length(Camera->Velocity);
 
 	// If velocity magnitude is higher than our max, normalize the velocity vector and scale by maximum speed
 	if(magnitude>maxVelocity)
 		Camera->Velocity=Vec3_Muls(Camera->Velocity, (1.0f/magnitude)*maxVelocity);
 
 	// Dampen velocity
-	float Damp=powf(0.9f, dt*60.0f);
+	const float Damp=powf(0.9f, dt*60.0f);
 
 	Camera->Velocity=Vec3_Muls(Camera->Velocity, Damp);
 	Camera->Pitch*=Damp;
@@ -244,7 +245,7 @@ matrix CameraUpdate(Camera_t *Camera, float dt)
 	CameraRotate(Camera);
 
 	// Combine the velocity with the 3 directional vectors to give overall directional velocity
-	volatile vec3 velocity=Vec3b(0.0f);
+	vec3 velocity=Vec3b(0.0f);
 	velocity=Vec3_Addv(velocity, Vec3_Muls(Camera->Right, Camera->Velocity.x));
 	velocity=Vec3_Addv(velocity, Vec3_Muls(Camera->Up, Camera->Velocity.y));
 	velocity=Vec3_Addv(velocity, Vec3_Muls(Camera->Forward, Camera->Velocity.z));

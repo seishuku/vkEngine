@@ -63,8 +63,7 @@ static void FireParticleEmitter(vec3 Position, vec3 Direction)
 		if(Emitter->Particles[i].life<0.0f)
 		{
 			Emitter->Particles[i].ID=ID;
-			//Emitter->Particles[i].pos=Position;
-			memcpy(&Emitter->Particles[i].pos, &Position, sizeof(vec3));
+			Emitter->Particles[i].pos=Position;
 			Vec3_Normalize(&Direction);
 			Emitter->Particles[i].vel=Vec3_Muls(Direction, 100.0f);
 
@@ -188,7 +187,7 @@ void Event_MouseDown(void *Arg)
 {
 	MouseEvent_t *MouseEvent=Arg;
 
-	if(MouseEvent->button&MOUSE_BUTTON_RIGHT)
+	if(MouseEvent->button&MOUSE_BUTTON_LEFT)
 		ActiveID=UI_TestHit(&UI, MousePosition);
 }
 
@@ -196,7 +195,7 @@ void Event_MouseUp(void *Arg)
 {
 	MouseEvent_t *MouseEvent=Arg;
 
-	if(MouseEvent->button&MOUSE_BUTTON_RIGHT)
+	if(MouseEvent->button&MOUSE_BUTTON_LEFT)
 		ActiveID=UINT32_MAX;
 }
 
@@ -212,12 +211,11 @@ void Event_Mouse(void *Arg)
 
 	UI_UpdateCursorPosition(&UI, CursorID, MousePosition);
 
-	if(MouseEvent->button&MOUSE_BUTTON_LEFT)
+	if(ActiveID!=UINT32_MAX&&MouseEvent->button&MOUSE_BUTTON_LEFT)
+		UI_ProcessControl(&UI, ActiveID, MousePosition);
+	else if(MouseEvent->button&MOUSE_BUTTON_LEFT)
 	{
 		Camera.Yaw-=(float)MouseEvent->dx/8000.0f;
 		Camera.Pitch+=(float)MouseEvent->dy/8000.0f;
 	}
-
-	if(ActiveID!=UINT32_MAX&&MouseEvent->button&MOUSE_BUTTON_RIGHT)
-		UI_ProcessControl(&UI, ActiveID, MousePosition);
 }
