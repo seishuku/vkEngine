@@ -308,9 +308,6 @@
     <ClCompile Include="network\network.c">
       <Filter>Source Files\network</Filter>
     </ClCompile>
-    <ClCompile Include="audio\hrir.c">
-      <Filter>Source Files\audio</Filter>
-    </ClCompile>
     <ClCompile Include="ui\ui.c">
       <Filter>Source Files\ui</Filter>
     </ClCompile>

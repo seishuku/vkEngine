@@ -12,45 +12,45 @@
 #define DATA_MAGIC ('d'|('a'<<8)|('t'<<16)|('a'<<24))
 
 // Simple resampling function, based off of what id Software used in Quake, seems to work well enough.
-void Resample(void *in, int inwidth, int inrate, int inchannel, int inlength, int16_t *out, int outrate)
+void Resample(void *in, int inWidth, int inRate, int inChannel, int inLength, int16_t *out, int outRate)
 {
-    float stepscale=(float)inrate/SAMPLE_RATE;
+    float stepScale=(float)inRate/SAMPLE_RATE;
 
-    uint32_t outcount=(uint32_t)(inlength/stepscale);
+    uint32_t outCount=(uint32_t)(inLength/stepScale);
 
-    for(uint32_t i=0, samplefrac=0;i<outcount; i++, samplefrac+=(int32_t)(stepscale*256))
+    for(uint32_t i=0, sampleFrac=0;i<outCount;i++, sampleFrac+=(int32_t)(stepScale*256))
     {
-        int32_t samplel=0, sampler=0;
-        int32_t srcsample=samplefrac>>8;
+        int32_t sampleL=0, sampleR=0;
+        int32_t srcSample=sampleFrac>>8;
 
-        if(inwidth==2)
+        if(inWidth==2)
         {
-            if(inchannel==2)
+            if(inChannel==2)
             {
-                samplel=((int16_t *)in)[2*srcsample+0];
-                sampler=((int16_t *)in)[2*srcsample+1];
+                sampleL=((int16_t *)in)[2*srcSample+0];
+                sampleR=((int16_t *)in)[2*srcSample+1];
             }
             else
-                samplel=((int16_t *)in)[srcsample];
+                sampleL=((int16_t *)in)[srcSample];
         }
         else
         {
-            if(inchannel==2)
+            if(inChannel==2)
             {
-                samplel=(int16_t)(((int8_t *)in)[2*srcsample+0]-128)<<8;
-                sampler=(int16_t)(((int8_t *)in)[2*srcsample+1]-128)<<8;
+                sampleL=(int16_t)(((int8_t *)in)[2*srcSample+0]-128)<<8;
+                sampleR=(int16_t)(((int8_t *)in)[2*srcSample+1]-128)<<8;
             }
             else
-                samplel=(int16_t)(((int8_t *)in)[srcsample]-128)<<8;
+                sampleL=(int16_t)(((int8_t *)in)[srcSample]-128)<<8;
         }
 
-        if(inchannel==2)
+        if(inChannel==2)
         {
-            out[2*i+0]=samplel;
-            out[2*i+1]=sampler;
+            out[2*i+0]=sampleL;
+            out[2*i+1]=sampleR;
         }
         else
-            out[i]=samplel;
+            out[i]=sampleL;
     }
 }
 
@@ -60,103 +60,107 @@ void Resample(void *in, int inwidth, int inrate, int inchannel, int inlength, in
 // but stereo is needed for the HRTF samples.
 bool Audio_LoadStatic(char *Filename, Sample_t *Sample)
 {
-    FILE *stream=NULL;
-    uint32_t riff_magic, wave_magic, fmt_magic, data_magic;
-    uint16_t format;
-    uint16_t channels;
-    uint32_t frequency;
-    uint16_t sample;
-    uint32_t length;
+    FILE *Stream=NULL;
+    uint32_t riffMagic, waveMagic, fmtMagic, dataMagic;
+    uint16_t Format;
+    uint16_t Channels;
+    uint32_t samplesPerSec;
+    uint16_t bitPerSample;
+    uint32_t Length;
 
-    if((stream=fopen(Filename, "rb"))==NULL)
+    if((Stream=fopen(Filename, "rb"))==NULL)
         return 0;
 
     // Header
-    fread(&riff_magic, sizeof(uint32_t), 1, stream);    // RIFF magic marker ("RIFF")
-    fseek(stream, sizeof(uint32_t), SEEK_CUR);          // File size
+    fread(&riffMagic, sizeof(uint32_t), 1, Stream);    // RIFF magic marker ("RIFF")
+    fseek(Stream, sizeof(uint32_t), SEEK_CUR);          // File size
 
-    if(riff_magic!=RIFF_MAGIC)
+    if(riffMagic!=RIFF_MAGIC)
     {
-        fclose(stream);
+        fclose(Stream);
         return 0;
     }
 
-    fread(&wave_magic, sizeof(uint32_t), 1, stream);    // WAVE magic marker ("WAVE")
+    // WAVE magic marker ("WAVE")
+    fread(&waveMagic, sizeof(uint32_t), 1, Stream);
 
-    if(wave_magic!=WAVE_MAGIC)
+    if(waveMagic!=WAVE_MAGIC)
     {
-        fclose(stream);
+        fclose(Stream);
         return 0;
     }
 
-    // Wave format block
-    fread(&fmt_magic, sizeof(uint32_t), 1, stream);     // Wave format header magic marker ("fmt ")
-    if(fmt_magic!=FMT_MAGIC)
+    // Wave format header magic marker ("fmt ")
+    fread(&fmtMagic, sizeof(uint32_t), 1, Stream);
+
+    if(fmtMagic!=FMT_MAGIC)
     {
-        fclose(stream);
+        fclose(Stream);
         return 0;
     }
 
-    fseek(stream, sizeof(uint32_t), SEEK_CUR);          // Format header size?
+    fseek(Stream, sizeof(uint32_t), SEEK_CUR);          // Format header size?
 
-    fread(&format, sizeof(uint16_t), 1, stream);        // wFormatTag
-    fread(&channels, sizeof(uint16_t), 1, stream);      // nChannels
-    fread(&frequency, sizeof(uint32_t), 1, stream);     // nSamplesPerSec
-    fseek(stream, sizeof(uint32_t), SEEK_CUR);          // nAvgBytesPerSec
-    fseek(stream, sizeof(uint16_t), SEEK_CUR);          // nBlockAlign
-    fread(&sample, sizeof(uint16_t), 1, stream);        // wBitsPerSample
+    fread(&Format, sizeof(uint16_t), 1, Stream);        // wFormatTag
+    fread(&Channels, sizeof(uint16_t), 1, Stream);      // nChannels
+    fread(&samplesPerSec, sizeof(uint32_t), 1, Stream);     // nSamplesPerSec
+    fseek(Stream, sizeof(uint32_t), SEEK_CUR);          // nAvgBytesPerSec
+    fseek(Stream, sizeof(uint16_t), SEEK_CUR);          // nBlockAlign
+    fread(&bitPerSample, sizeof(uint16_t), 1, Stream);  // wBitsPerSample
 
-    if(format!=1&&channels>2)
+    // Only support PCM streams and stereo
+    if(Format!=1&&Channels>2)
     {
-        // Only support PCM streams and stereo
-        fclose(stream);
+        fclose(Stream);
         return 0;
     }
 
-    fread(&data_magic, sizeof(uint32_t), 1, stream);    // Data block magic marker ("data")
+    // Data block magic marker ("data")
+    fread(&dataMagic, sizeof(uint32_t), 1, Stream);
 
-    if(data_magic!=DATA_MAGIC)
+    if(dataMagic!=DATA_MAGIC)
     {
-        fclose(stream);
+        fclose(Stream);
         return 0;
     }
 
-    fread(&length, sizeof(uint32_t), 1, stream);        // Length of data block
+    // Length of data block
+    fread(&Length, sizeof(uint32_t), 1, Stream);
 
-    int16_t *buffer=(int16_t *)Zone_Malloc(Zone, length);
+    int16_t *Buffer=(int16_t *)Zone_Malloc(Zone, Length);
 
-    if(buffer==NULL)
+    if(Buffer==NULL)
     {
-        fclose(stream);
+        fclose(Stream);
         return 0;
     }
 
-    fread(buffer, 1, length, stream);
+    fread(Buffer, 1, Length, Stream);
 
-    fclose(stream);
+    fclose(Stream);
 
-    length/=sample>>3;
-    length/=channels;
+    Length/=bitPerSample>>3;
+    Length/=Channels;
 
     // Covert to match primary buffer sampling rate
-    uint32_t outputSize=(uint32_t)(length/((float)frequency/SAMPLE_RATE));
+    uint32_t outputSize=(uint32_t)(Length/((float)samplesPerSec/SAMPLE_RATE));
 
-    int16_t *resampled=(int16_t *)Zone_Malloc(Zone, sizeof(int16_t)*outputSize*channels);
+    int16_t *Resampled=(int16_t *)Zone_Malloc(Zone, sizeof(int16_t)*outputSize*Channels);
 
-    if(resampled==NULL)
+    if(Resampled==NULL)
     {
-        Zone_Free(Zone, buffer);
+        Zone_Free(Zone, Buffer);
         return 0;
     }
 
-    Resample(buffer, sample>>3, frequency, channels, length, resampled, SAMPLE_RATE);
+    Resample(Buffer, bitPerSample>>3, samplesPerSec, Channels, Length, Resampled, SAMPLE_RATE);
 
-    Zone_Free(Zone, buffer);
+    Zone_Free(Zone, Buffer);
 
-    Sample->data=resampled;
-    Sample->len=outputSize;
-    Sample->pos=0;
-    Sample->channels=(uint8_t)channels;
+    Sample->Data=Resampled;
+    Sample->Length=outputSize;
+    Sample->Position=0;
+    Sample->Channels=(uint8_t)Channels;
     Sample->xyz=Vec3b(0.0f);
 
     return 1;

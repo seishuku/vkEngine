@@ -793,29 +793,6 @@ void Thread_Destructor(void *Arg)
 	}
 }
 
-vec3 GetChannelPosition(void);
-extern HRIR_Sphere_t Sphere;
-
-static vec3 Barycentric(vec3 p, vec3 a, vec3 b, vec3 c)
-{
-	vec3 v0=Vec3_Subv(b, a), v1=Vec3_Subv(c, a), v2=Vec3_Subv(p, a);
-
-	float d00=Vec3_Dot(v0, v0);
-	float d01=Vec3_Dot(v0, v1);
-	float d11=Vec3_Dot(v1, v1);
-	float d20=Vec3_Dot(v2, v0);
-	float d21=Vec3_Dot(v2, v1);
-	float invDenom=1.0f/(d00*d11-d01*d01);
-
-	float v=(d11*d20-d01*d21)*invDenom;
-	float w=(d00*d21-d01*d20)*invDenom;
-
-	return (vec3)
-	{
-		v, w, 1.0f-v-w
-	};
-}
-
 // Asteroids render pass thread
 void Thread_Main(void *Arg)
 {
@@ -884,25 +861,6 @@ void Thread_Main(void *Arg)
 			vkCmdDrawIndexed(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Models[i].Mesh[j].NumFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*i);
 		}
 	}
-
-	vec3 xyz=GetChannelPosition();
-
-	const float dist_mult=1.0f/500.0f;
-
-	// Calculate relative position of the sound source to the camera
-	vec3 position=Vec3_Subv(xyz, Camera.Position);
-
-	// Normalize the vector, which also returns the length
-	//     which will be used for calculating distance fall-off later
-	float dist=Vec3_Normalize(&position)*dist_mult;
-	position=Vec3_Muls(position, 100.0f);
-
-	// Clamp to full volume
-	if(dist<0.0f)
-		dist=0.0f;
-
-	//DrawSphere(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Data->Index, Data->Eye, Camera.Position, 10.0f, Vec4(1.0f, 1.0f, 1.0f, 1.0f));
-	DrawLine(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Data->Index, Data->Eye, Camera.Position, Vec3_Addv(Camera.Position, position), Vec4(1.0f, 1.0f, 1.0f, 1.0f));
 
 #if 0
 	// Draw some simple geometry to represent other client cameras
@@ -1956,16 +1914,16 @@ void Destroy(void)
 
 	Audio_Destroy();
 
-	Zone_Free(Zone, Sounds[SOUND_PEW1].data);
-	Zone_Free(Zone, Sounds[SOUND_PEW2].data);
-	Zone_Free(Zone, Sounds[SOUND_PEW3].data);
-	Zone_Free(Zone, Sounds[SOUND_STONE1].data);
-	Zone_Free(Zone, Sounds[SOUND_STONE2].data);
-	Zone_Free(Zone, Sounds[SOUND_STONE3].data);
-	Zone_Free(Zone, Sounds[SOUND_CRASH].data);
-	Zone_Free(Zone, Sounds[SOUND_EXPLODE1].data);
-	Zone_Free(Zone, Sounds[SOUND_EXPLODE2].data);
-	Zone_Free(Zone, Sounds[SOUND_EXPLODE3].data);
+	Zone_Free(Zone, Sounds[SOUND_PEW1].Data);
+	Zone_Free(Zone, Sounds[SOUND_PEW2].Data);
+	Zone_Free(Zone, Sounds[SOUND_PEW3].Data);
+	Zone_Free(Zone, Sounds[SOUND_STONE1].Data);
+	Zone_Free(Zone, Sounds[SOUND_STONE2].Data);
+	Zone_Free(Zone, Sounds[SOUND_STONE3].Data);
+	Zone_Free(Zone, Sounds[SOUND_CRASH].Data);
+	Zone_Free(Zone, Sounds[SOUND_EXPLODE1].Data);
+	Zone_Free(Zone, Sounds[SOUND_EXPLODE2].Data);
+	Zone_Free(Zone, Sounds[SOUND_EXPLODE3].Data);
 
 	VR_Destroy();
 
