@@ -2,7 +2,7 @@
 #define __AUDIO_H__
 
 #define SAMPLE_RATE 44100
-#define NUM_SAMPLES 1024
+#define NUM_SAMPLES 4096
 #define MAX_HRIR_SAMPLES 1024
 
 typedef struct

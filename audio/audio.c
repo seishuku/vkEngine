@@ -1,5 +1,3 @@
-// TODO: Sounds need positional and ID info for tracking through the channels.
-
 #ifdef ANDROID
 #include <aaudio/AAudio.h>
 #else
@@ -18,16 +16,11 @@
 #include "../camera/camera.h"
 #include "audio.h"
 
-#include "../font/font.h"
-extern Font_t Fnt;
-
 #ifdef ANDROID
 AAudioStream *stream=NULL;
 #else
 PaStream *stream=NULL;
 #endif
-
-#define HRIR_MAGIC ('H'|('R'<<8)|('I'<<16)|('R'<<24))
 
 // HRIR sphere model and audio samples
 typedef struct
@@ -49,7 +42,8 @@ typedef struct
 
 HRIR_Sphere_t Sphere;
 
-#define MAX_VOLUME 255
+#define MAX_VOLUME 128
+
 #define MAX_CHANNELS 128
 
 typedef struct
@@ -64,22 +58,20 @@ typedef struct
 
 static Channel_t Channels[MAX_CHANNELS];
 
-static vec3 Zero={ 0.0f, 0.0f, 0.0f };
-
 // HRIR interpolation buffers
-float HRIRSamples[2*NUM_SAMPLES];
+int16_t HRIRSamples[2*MAX_HRIR_SAMPLES];
 
 // Audio buffers after HRTF convolve
 int16_t audioBuffer[2*(NUM_SAMPLES+MAX_HRIR_SAMPLES)];
 
 extern Camera_t Camera;
 
-static const float BaryInterpolate(const float h0, const float h1, const float h2, const float alpha, const float beta, const float gamma)
+static const float BarycentricInterpolate(const float h0, const float h1, const float h2, const float alpha, const float beta, const float gamma)
 {
 	return alpha*h0+beta*h1+gamma*h2;
 }
 
-static vec2 BarycentricCalc(const vec3 p, const vec3 a, const vec3 b, const vec3 c)
+static vec2 CalculateBarycentric(const vec3 p, const vec3 a, const vec3 b, const vec3 c)
 {
 	const vec3 v0=Vec3_Subv(b, a), v1=Vec3_Subv(c, a), v2=Vec3_Subv(p, a);
 
@@ -90,13 +82,15 @@ static vec2 BarycentricCalc(const vec3 p, const vec3 a, const vec3 b, const vec3
 	const float d21=Vec3_Dot(v2, v1);
 	const float invDenom=1.0f/(d00*d11-d01*d01);
 
-	return (vec2) { (d11*d20-d01*d21)*invDenom, (d00*d21-d01*d20) *invDenom };
+	return (vec2) { (d11*d20-d01*d21)*invDenom, (d00*d21-d01*d20)*invDenom };
 }
 
+// HRIR sample interpolation, takes world-space position as input.
+// HRIR samples are taken as float, but interpolated output is int16.
 static void HRIRInterpolate(vec3 xyz)
 {
 	// Sound distance drop-off constant, this is the radius of the hearable range
-	const float invRadius=1.0f/500.0f;
+	const float invRadius=1.0f/300.0f;
 
 	// Calculate relative position of the sound source to the camera
 	const vec3 relPosition=Vec3_Subv(xyz, Camera.Position);
@@ -107,12 +101,10 @@ static void HRIRInterpolate(vec3 xyz)
 	);
 
 	// Normalize also returns the length of the vector...
-	// So use that to calculate the distance fall-off,
-	//     I know this makes this line of code look messy, deal with it. :P
-	float falloffDist=1.0f-max(Vec3_Normalize(&Position)*invRadius, 0.0f);
+	float falloffDist=Vec3_Normalize(&Position);
 
-	// TODO: Fix in the HRIR sphere generation tool:
-	Position=Matrix3x3MultVec3(Position, MatrixRotate(deg2rad(90.0f), 0.0f, 1.0f, 0.0f));
+	// Use that to calculate distance fall-off.
+	falloffDist=max(0.0f, 1.0f-falloffDist*invRadius);
 
 	// Find closest triangle to the sound direction
 	float maxDistanceSq=-1.0f;
@@ -133,48 +125,59 @@ static void HRIRInterpolate(vec3 xyz)
 	const HRIR_Vertex_t *v0=&Sphere.Vertices[Sphere.Indices[triangleIndex+0]];
 	const HRIR_Vertex_t *v1=&Sphere.Vertices[Sphere.Indices[triangleIndex+1]];
 	const HRIR_Vertex_t *v2=&Sphere.Vertices[Sphere.Indices[triangleIndex+2]];
-	const vec2 g=Vec2_Clamp(BarycentricCalc(Position, v0->Vertex, v1->Vertex, v2->Vertex), 0.0f, 1.0f);
-	const float det=1.0f-g.x-g.y;
+	const vec2 g=Vec2_Clamp(CalculateBarycentric(Position, v0->Vertex, v1->Vertex, v2->Vertex), 0.0f, 1.0f);
+	const vec3 Coords=Vec3(g.x, g.y, 1.0f-g.x-g.y);
 
-	if(g.x>=0.0f&&g.y>=0.0f&&det>=0.0f)
+	if(Coords.x>=0.0f&&Coords.y>=0.0f&&Coords.z>=0.0f)
 	{
 		for(uint32_t j=0;j<Sphere.SampleLength;j++)
 		{
-			HRIRSamples[2*j+0]=falloffDist*BaryInterpolate(v0->Left[j], v1->Left[j], v2->Left[j], g.x, g.y, det);
-			HRIRSamples[2*j+1]=falloffDist*BaryInterpolate(v0->Right[j], v1->Right[j], v2->Right[j], g.x, g.y, det);
+			const vec3 Left=Vec3(v0->Left[j], v1->Left[j], v2->Left[j]);
+			const vec3 Right=Vec3(v0->Right[j], v1->Right[j], v2->Right[j]);
+
+			HRIRSamples[2*j+0]=(int16_t)(falloffDist*Vec3_Dot(Left, Coords)*INT16_MAX);
+			HRIRSamples[2*j+1]=(int16_t)(falloffDist*Vec3_Dot(Right, Coords)*INT16_MAX);
 		}
 	}
 }
 
-static void Convolve(int16_t *input, int16_t *output, size_t audio_len, float *kernel, size_t kernel_len)
+// Integer audio convolvution, this is a current chokepoint in the audio system at 25% CPU usage in the profiler.
+// I don't think I can optimize this any more without going to SIMD or multithreading.
+static void Convolve(const int16_t *Input, int16_t *Output, const size_t Length, const int16_t *Kernel, const size_t kernelLength)
 {
-	for(size_t i=0;i<audio_len+kernel_len-1;i++)
-	{
-		float sum[2]={ 0.0f, 0.0f };
+	int16_t *outputPtr=Output;
+	int32_t sum[2];
 
-		for(size_t j=0;j<kernel_len;j++)
+	for(size_t i=0;i<Length+kernelLength-1;i++)
+	{
+		const int16_t *inputPtr=&Input[i+kernelLength];
+		const int16_t *kernelPtr=Kernel;
+
+		sum[0]=1<<14;
+		sum[1]=1<<14;
+
+		for(size_t j=0;j<kernelLength;j++)
 		{
-			if(i-j>=0&&i-j<audio_len)
-			{
-				sum[0]+=((float)input[i-j]/INT16_MAX)*kernel[2*j+0];
-				sum[1]+=((float)input[i-j]/INT16_MAX)*kernel[2*j+1];
-			}
+			sum[0]+=(int32_t)(*kernelPtr++)*(int32_t)(*inputPtr);
+			sum[1]+=(int32_t)(*kernelPtr++)*(int32_t)(*inputPtr);
+			inputPtr--;
 		}
 
-		output[2*i+0]=(int16_t)(sum[0]*INT16_MAX);
-		output[2*i+1]=(int16_t)(sum[1]*INT16_MAX);
+		*outputPtr++=(int16_t)(min(0x3fffffff, max(-0x40000000, sum[0]))>>15);
+		*outputPtr++=(int16_t)(min(0x3fffffff, max(-0x40000000, sum[1]))>>15);
 	}
 }
 
-static void MixAudio(int16_t *Dst, const int16_t *Src, uint32_t Length, int Volume)
+// Additively mix source into destination
+static void MixAudio(int16_t *Dst, const int16_t *Src, const uint32_t Length, const int8_t Volume)
 {
 	if(Volume==0)
 		return;
 
 	for(size_t i=0;i<Length*2;i+=2)
 	{
-		Dst[i+0]=min(max(((Src[i+0]*Volume)/128)+Dst[i+0], INT16_MIN), INT16_MAX);
-		Dst[i+1]=min(max(((Src[i+1]*Volume)/128)+Dst[i+1], INT16_MIN), INT16_MAX);
+		Dst[i+0]=min(max(((Src[i+0]*Volume)>>7)+Dst[i+0], INT16_MIN), INT16_MAX);
+		Dst[i+1]=min(max(((Src[i+1]*Volume)>>7)+Dst[i+1], INT16_MIN), INT16_MAX);
 	}
 }
 
@@ -197,7 +200,7 @@ static void Audio_FillBuffer(void *Buffer, uint32_t Length)
 			continue;
 
 		// If there's a position set, use it.
-		vec3 Position=Zero;
+		vec3 Position=Vec3b(0.0f);
 		if(Channel->xyz)
 			Position=*Channel->xyz;
 
@@ -239,7 +242,7 @@ static void Audio_FillBuffer(void *Buffer, uint32_t Length)
 		Convolve(Channel->Working, audioBuffer, remainingData, HRIRSamples, Sphere.SampleLength);
 
 		// Mix out the samples into the output buffer
-		MixAudio(out, audioBuffer, (uint32_t)remainingData, 128);
+		MixAudio(out, audioBuffer, (uint32_t)remainingData, (int8_t)(Channel->Volume*MAX_VOLUME));
 
 		// Advance the sample position by what we've used, next time around will take another chunk.
 		Channel->Position+=(uint32_t)remainingData;
@@ -339,7 +342,7 @@ bool HRIR_Init(void)
 
 	fread(&Sphere, sizeof(uint32_t), 5, Stream);
 
-	if(Sphere.Magic!=HRIR_MAGIC)
+	if(Sphere.Magic!=('H'|('R'<<8)|('I'<<16)|('R'<<24)))
 		return false;
 
 	if(Sphere.SampleLength>MAX_HRIR_SAMPLES)
@@ -369,19 +372,18 @@ bool HRIR_Init(void)
 
 	fclose(Stream);
 
+	// Pre-calculate the normal vector of the HRIR sphere triangles
 	for(uint32_t i=0;i<Sphere.NumIndex;i+=3)
 	{
-		// Calculate the normal vector of the current triangle
-		// TODO: PRECALCULATE NORMALS
 		HRIR_Vertex_t *v0=&Sphere.Vertices[Sphere.Indices[i+0]];
 		HRIR_Vertex_t *v1=&Sphere.Vertices[Sphere.Indices[i+1]];
 		HRIR_Vertex_t *v2=&Sphere.Vertices[Sphere.Indices[i+2]];
 		vec3 Normal=Vec3_Cross(Vec3_Subv(v1->Vertex, v0->Vertex), Vec3_Subv(v2->Vertex, v0->Vertex));
 		Vec3_Normalize(&Normal);
 
-		v0->Normal=Normal;
-		v1->Normal=Normal;
-		v2->Normal=Normal;
+		v0->Normal=Vec3_Addv(v0->Normal, Normal);
+		v1->Normal=Vec3_Addv(v1->Normal, Normal);
+		v2->Normal=Vec3_Addv(v2->Normal, Normal);
 	}
 
 	return true;
