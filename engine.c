@@ -33,6 +33,7 @@
 #include "composite.h"
 #include "perframe.h"
 #include "sounds.h"
+#include "music.h"
 
 extern bool Done;
 
@@ -187,9 +188,7 @@ Camera_t NetCameras[MAX_CLIENTS];
 Font_t Fnt; // Fnt instead of Font, because Xlib is dumb and declares a type Font *rolley-eyes*
 UI_t UI;
 
-uint32_t RedID=UINT32_MAX;
-uint32_t GreenID=UINT32_MAX;
-uint32_t BlueID=UINT32_MAX;
+uint32_t VolumeID=UINT32_MAX;
 uint32_t FaceID=UINT32_MAX;
 uint32_t CursorID=UINT32_MAX;
 //////
@@ -1304,6 +1303,11 @@ void Render(void)
 	UI_UpdateSpriteRotation(&UI, FaceID, (float)fTime*2.0f);
 	UI_UpdateSpritePosition(&UI, FaceID, Vec2(((float)Width/2.0f)+sinf(-fTime*2.0f)*100.0f, ((float)Height/2.0f)+cosf(-fTime*2.0f)*100.0f));
 
+	const float VolumeValue=UI_GetBarGraphValue(&UI, VolumeID);
+	Audio_SetStreamVolume(VolumeValue);
+
+	Font_Print(&Fnt, 16.0f, rtWidth-400.0f, rtHeight-75.0f-16.0f, "Current track: %s", MusicList[CurrentMusic].String);
+
 	Thread_AddJob(&ThreadPhysics, Thread_Physics, NULL);
 //	Thread_Physics(NULL);
 
@@ -1336,22 +1340,6 @@ void Render(void)
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 	});
-
-	const float RedValue=UI_GetBarGraphValue(&UI, RedID);
-	const float GreenValue=UI_GetBarGraphValue(&UI, GreenID);
-	const float BlueValue=UI_GetBarGraphValue(&UI, BlueID);
-
-	PerFrame[Index].Skybox_UBO[0]->uSunColor.x=RedValue;
-	PerFrame[Index].Skybox_UBO[0]->uSunColor.y=GreenValue;
-	PerFrame[Index].Skybox_UBO[0]->uSunColor.z=BlueValue;
-
-	if(IsVR)
-	{
-
-		PerFrame[Index].Skybox_UBO[1]->uSunColor.x=RedValue;
-		PerFrame[Index].Skybox_UBO[1]->uSunColor.y=GreenValue;
-		PerFrame[Index].Skybox_UBO[1]->uSunColor.z=BlueValue;
-	}
 
 	// Update shadow depth map
 	ShadowUpdateMap(PerFrame[Index].CommandBuffer, Index);
@@ -1437,7 +1425,7 @@ void Render(void)
 	Index=(Index+1)%Swapchain.NumImages;
 }
 
-void ButtonCallback(void *arg)
+void PlayExplosionCallback(void *arg)
 {
 	Audio_PlaySample(&Sounds[SOUND_EXPLODE1], false, 1.0f, &Camera.Position);
 }
@@ -1450,7 +1438,7 @@ void Console_CmdQuit(Console_t *Console, char *Param)
 // Initialization call from system main
 bool Init(void)
 {
-	RandomSeed(123);
+	RandomSeed((uint32_t)GetClock()*UINT32_MAX);
 
 	Event_Add(EVENT_KEYDOWN, Event_KeyDown);
 	Event_Add(EVENT_KEYUP, Event_KeyUp);
@@ -1537,6 +1525,9 @@ bool Init(void)
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode3.wav\n");
 		return false;
 	}
+
+	Music_Init();
+	StartStreamCallback(NULL);
 
 	// Load models
 	if(LoadBModel(&Models[MODEL_ASTEROID1], "assets/asteroid1.bmodel"))
@@ -1652,34 +1643,44 @@ bool Init(void)
 
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)rtWidth, (float)rtHeight));
 
-	RedID=UI_AddBarGraph(&UI,
-						 Vec2(0.0f, 800.0f),		// Position
-						 Vec2(400.0f, 50.0f),		// Size
-						 Vec3(1.0f, 0.0f, 0.0f),	// Color
-						 "Red",						// Title text
-						 false,						// Read-only
-						 0.0f, 10.0f, 5.0f);		// min/max/initial value
-	GreenID=UI_AddBarGraph(&UI,
-						   Vec2(0.0f, 750.0f),		// Position
-						   Vec2(400.0f, 50.0f),		// Size
-						   Vec3(0.0f, 1.0f, 0.0f),	// Color
-						   "Green",					// Title text
-						   false,					// Read-only
-						   0.0f, 10.0f, 5.0f);		// min/max/initial value
-	BlueID=UI_AddBarGraph(&UI,
-						  Vec2(0.0f, 700.0f),		// Position
-						  Vec2(400.0f, 50.0f),		// Size
-						  Vec3(0.0f, 0.0f, 1.0f),	// Color
-						  "Blue",					// Title text
-						  false,					// Read-only
-						  0.0f, 10.0f, 5.0f);		// min/max/initial value
+	UI_AddButton(&UI,
+				 Vec2(rtWidth-400.0f, rtHeight-75.0f),	// Position
+				 Vec2(100.0f, 75.0f),					// Size
+				 Vec3(0.25f, 0.25f, 0.25f),				// Color
+				 "Play",								// Title text
+				 StartStreamCallback);					// Callback
+	UI_AddButton(&UI,
+				 Vec2(rtWidth-300.0f, rtHeight-75.0f),	// Position
+				 Vec2(100.0f, 75.0f),					// Size
+				 Vec3(0.25f, 0.25f, 0.25f),				// Color
+				 "Pause",								// Title text
+				 StopStreamCallback);					// Callback
+	UI_AddButton(&UI,
+				 Vec2(rtWidth-200.0f, rtHeight-75.0f),	// Position
+				 Vec2(100.0f, 75.0f),					// Size
+				 Vec3(0.25f, 0.25f, 0.25f),				// Color
+				 "Prev",								// Title text
+				 PrevTrackCallback);					// Callback
+	UI_AddButton(&UI,
+				 Vec2(rtWidth-100.0f, rtHeight-75.0f),	// Position
+				 Vec2(100.0f, 75.0f),					// Size
+				 Vec3(0.25f, 0.25f, 0.25f),				// Color
+				 "Next",								// Title text
+				 NextTrackCallback);					// Callback
+	VolumeID=UI_AddBarGraph(&UI,
+							Vec2(rtWidth-400.0f, rtHeight-150.0f),// Position
+							Vec2(400.0f, 50.0f),		// Size
+							Vec3(0.25f, 0.25f, 0.25f),	// Color
+							"Volume",					// Title text
+							false,						// Read-only
+							0.0f, 1.0f, 0.125f);		// min/max/initial value
 
 	UI_AddButton(&UI,
 				 Vec2(0.0f, 500.0f),				// Position
 				 Vec2(200.0f, 75.0f),				// Size
 				 Vec3(0.25f, 0.25f, 0.25f),			// Color
 				 "Button",							// Title text
-				 ButtonCallback);					// Callback
+				 PlayExplosionCallback);			// Callback
 	UI_AddCheckBox(&UI,
 				   Vec2(37.5f, 400.0f),				// Position
 				   37.5f,							// Radius
@@ -1913,6 +1914,7 @@ void Destroy(void)
 #endif
 
 	Audio_Destroy();
+	Music_Destroy();
 
 	Zone_Free(Zone, Sounds[SOUND_PEW1].Data);
 	Zone_Free(Zone, Sounds[SOUND_PEW2].Data);

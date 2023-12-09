@@ -17,16 +17,16 @@
 #include "audio.h"
 
 #ifdef ANDROID
-AAudioStream *stream=NULL;
+static AAudioStream *AudioStream=NULL;
 #else
-PaStream *stream=NULL;
+static PaStream *AudioStream=NULL;
 #endif
 
 // HRIR sphere model and audio samples
 typedef struct
 {
 	vec3 Vertex, Normal;
-	float Left[NUM_SAMPLES], Right[NUM_SAMPLES];
+	float Left[MAX_HRIR_SAMPLES], Right[MAX_HRIR_SAMPLES];
 } HRIR_Vertex_t;
 
 typedef struct
@@ -40,7 +40,7 @@ typedef struct
 	HRIR_Vertex_t *Vertices;
 } HRIR_Sphere_t;
 
-HRIR_Sphere_t Sphere;
+static HRIR_Sphere_t Sphere;
 
 #define MAX_VOLUME 128
 
@@ -53,16 +53,29 @@ typedef struct
 	bool Looping;
 	float Volume;
 	vec3 *xyz;
-	int16_t Working[NUM_SAMPLES+MAX_HRIR_SAMPLES];
+	int16_t Working[MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES];
 } Channel_t;
 
 static Channel_t Channels[MAX_CHANNELS];
 
 // HRIR interpolation buffers
-int16_t HRIRSamples[2*MAX_HRIR_SAMPLES];
+static int16_t HRIRSamples[2*MAX_HRIR_SAMPLES];
 
-// Audio buffers after HRTF convolve
-int16_t audioBuffer[2*(NUM_SAMPLES+MAX_HRIR_SAMPLES)];
+// Audio buffer after HRTF convolve
+static int16_t audioBuffer[2*(MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES)];
+
+// Streaming audio
+
+typedef struct
+{
+	bool Playing;
+	float Volume;
+	uint32_t Position;
+	int16_t Buffer[MAX_STREAM_SAMPLES*2];
+	void (*StreamCallback)(void *Buffer, size_t Length);
+} AudioStream_t;
+
+static AudioStream_t streamBuffer;
 
 extern Camera_t Camera;
 
@@ -90,7 +103,7 @@ static vec2 CalculateBarycentric(const vec3 p, const vec3 a, const vec3 b, const
 static void HRIRInterpolate(vec3 xyz)
 {
 	// Sound distance drop-off constant, this is the radius of the hearable range
-	const float invRadius=1.0f/300.0f;
+	const float invRadius=1.0f/500.0f;
 
 	// Calculate relative position of the sound source to the camera
 	const vec3 relPosition=Vec3_Subv(xyz, Camera.Position);
@@ -141,7 +154,7 @@ static void HRIRInterpolate(vec3 xyz)
 	}
 }
 
-// Integer audio convolvution, this is a current chokepoint in the audio system at 25% CPU usage in the profiler.
+// Integer audio convolution, this is a current chokepoint in the audio system at 25% CPU usage in the profiler.
 // I don't think I can optimize this any more without going to SIMD or multithreading.
 static void Convolve(const int16_t *Input, int16_t *Output, const size_t Length, const int16_t *Kernel, const size_t kernelLength)
 {
@@ -169,7 +182,7 @@ static void Convolve(const int16_t *Input, int16_t *Output, const size_t Length,
 }
 
 // Additively mix source into destination
-static void MixAudio(int16_t *Dst, const int16_t *Src, const uint32_t Length, const int8_t Volume)
+static void MixAudio(int16_t *Dst, const int16_t *Src, const size_t Length, const int8_t Volume)
 {
 	if(Volume==0)
 		return;
@@ -221,13 +234,13 @@ static void Audio_FillBuffer(void *Buffer, uint32_t Length)
 		//   which is either the full input sample length OR the full buffer+HRIR sample length.
 		size_t toFill=(Channel->Length-Channel->Position);
 
-		if(toFill>=(NUM_SAMPLES+Sphere.SampleLength))
-			toFill=(NUM_SAMPLES+Sphere.SampleLength);
+		if(toFill>=(MAX_AUDIO_SAMPLES+Sphere.SampleLength))
+			toFill=(MAX_AUDIO_SAMPLES+Sphere.SampleLength);
 		else if(toFill>=Channel->Length)
 			toFill=Channel->Length;
 
 		// Copy the samples.
-		for(size_t dataIdx=0;dataIdx<(NUM_SAMPLES+MAX_HRIR_SAMPLES);dataIdx++)
+		for(size_t dataIdx=0;dataIdx<(MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES);dataIdx++)
 		{
 			if(dataIdx<=toFill)
 				Channel->Working[dataIdx]=Channel->Data[Channel->Position+dataIdx];
@@ -260,6 +273,22 @@ static void Audio_FillBuffer(void *Buffer, uint32_t Length)
 			}
 		}
 	}
+
+	if(streamBuffer.Playing)
+	{
+		size_t remainingData=min(MAX_STREAM_SAMPLES-streamBuffer.Position, Length);
+
+		// If there's an assigned callback, call it to load more audio data
+		if(streamBuffer.StreamCallback)
+		{
+			streamBuffer.StreamCallback(&streamBuffer.Buffer[streamBuffer.Position], remainingData);
+			MixAudio(out, &streamBuffer.Buffer[streamBuffer.Position], remainingData, (int8_t)(streamBuffer.Volume*MAX_VOLUME));
+			streamBuffer.Position+=remainingData;
+
+			if(streamBuffer.Position>=MAX_STREAM_SAMPLES)
+				streamBuffer.Position=0;
+		}
+	}
 }
 
 // Callback functions for when audio driver needs more data.
@@ -280,7 +309,7 @@ static int Audio_Callback(const void *inputBuffer, void *outputBuffer, unsigned 
 #endif
 
 // Add a sound to first open channel.
-void Audio_PlaySample(Sample_t *Sample, bool Looping, float Volume, vec3 *Position)
+void Audio_PlaySample(Sample_t *Sample, const bool Looping, const float Volume, vec3 *Position)
 {
 	int32_t index;
 
@@ -329,6 +358,26 @@ void Audio_StopSample(Sample_t *Sample)
 	// Set the position to the end and allow the callback to resolve the removal
 	Channels[index].Position=Channels[index].Length-1;
 	Channels[index].Looping=false;
+}
+
+void Audio_SetStreamCallback(void (*StreamCallback)(void *Buffer, size_t Length))
+{
+	streamBuffer.StreamCallback=StreamCallback;
+}
+
+void Audio_SetStreamVolume(const float Volume)
+{
+	streamBuffer.Volume=min(1.0f, max(0.0f, Volume));
+}
+
+void Audio_StartStream(void)
+{
+	streamBuffer.Playing=true;
+}
+
+void Audio_StopStream(void)
+{
+	streamBuffer.Playing=false;
 }
 
 bool HRIR_Init(void)
@@ -394,6 +443,9 @@ int Audio_Init(void)
 	// Clear out mixing channels
 	memset(Channels, 0, sizeof(Channel_t)*MAX_CHANNELS);
 
+	// Clear out stream buffer
+	memset(&streamBuffer, 0, sizeof(AudioStream_t));
+
 	if(!HRIR_Init())
 	{
 		DBGPRINTF(DEBUG_ERROR, "Audio: HRIR failed to initialize.\n");
@@ -416,23 +468,23 @@ int Audio_Init(void)
 	AAudioStreamBuilder_setDataCallback(streamBuilder, Audio_Callback, NULL);
 
 	// Opens the stream.
-	if(AAudioStreamBuilder_openStream(streamBuilder, &stream)!=AAUDIO_OK)
+	if(AAudioStreamBuilder_openStream(streamBuilder, &AudioStream)!=AAUDIO_OK)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Audio: Error opening stream\n");
 		return false;
 	}
 
-	if(AAudioStream_getSampleRate(stream)!=SAMPLE_RATE)
+	if(AAudioStream_getSampleRate(AudioStream)!=SAMPLE_RATE)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Audio: Sample rate mismatch\n");
 		return false;
 	}
 
 	// Sets the buffer size. 
-	AAudioStream_setBufferSizeInFrames(stream, AAudioStream_getFramesPerBurst(stream)*NUM_SAMPLES);
+	AAudioStream_setBufferSizeInFrames(AudioStream, AAudioStream_getFramesPerBurst(AudioStream)*NUM_SAMPLES);
 
 	// Starts the stream.
-	if(AAudioStream_requestStart(stream)!=AAUDIO_OK)
+	if(AAudioStream_requestStart(AudioStream)!=AAUDIO_OK)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Audio: Error starting stream\n");
 		return false;
@@ -447,7 +499,7 @@ int Audio_Init(void)
 		return false;
 	}
 
-	PaStreamParameters outputParameters;
+	PaStreamParameters outputParameters={ 0 };
 	// Set up output device parameters
 	outputParameters.device=Pa_GetDefaultOutputDevice();
 
@@ -464,7 +516,7 @@ int Audio_Init(void)
 	outputParameters.hostApiSpecificStreamInfo=NULL;
 
 	// Open audio stream
-	if(Pa_OpenStream(&stream, NULL, &outputParameters, SAMPLE_RATE, NUM_SAMPLES, paNoFlag, Audio_Callback, NULL)!=paNoError)
+	if(Pa_OpenStream(&AudioStream, NULL, &outputParameters, AUDIO_SAMPLE_RATE, MAX_AUDIO_SAMPLES, paNoFlag, Audio_Callback, NULL)!=paNoError)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Audio: Unable to open PortAudio stream.\n");
 		Pa_Terminate();
@@ -472,7 +524,7 @@ int Audio_Init(void)
 	}
 
 	// Start audio stream
-	if(Pa_StartStream(stream)!=paNoError)
+	if(Pa_StartStream(AudioStream)!=paNoError)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Audio: Unable to start PortAudio Stream.\n");
 		Pa_Terminate();
@@ -490,13 +542,13 @@ void Audio_Destroy(void)
 	Zone_Free(Zone, Sphere.Vertices);
 
 #ifdef ANDROID
-	AAudioStream_requestStop(stream);
-	AAudioStream_close(stream);
+	AAudioStream_requestStop(AudioStream);
+	AAudioStream_close(AudioStream);
 #else
 	// Shut down PortAudio
-	Pa_AbortStream(stream);
-	Pa_StopStream(stream);
-	Pa_CloseStream(stream);
+	Pa_AbortStream(AudioStream);
+	Pa_StopStream(AudioStream);
+	Pa_CloseStream(AudioStream);
 	Pa_Terminate();
 #endif
 }

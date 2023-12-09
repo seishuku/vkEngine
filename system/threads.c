@@ -16,9 +16,6 @@ void *Thread_Worker(void *Data)
 	// Loop until stop is set
 	while(!Worker->Stop)
 	{
-		// Lock the mutex
-		pthread_mutex_lock(&Worker->Mutex);
-
 		// Check if there are any jobs
 		while((Worker->NumJobs==0&&!Worker->Stop)||Worker->Pause)
 			pthread_cond_wait(&Worker->Condition, &Worker->Mutex);
@@ -182,11 +179,11 @@ bool Thread_Destroy(ThreadWorker_t *Worker)
 	if(Worker==NULL)
 		return false;
 
-	// Wake up thread
-	Thread_Resume(Worker);
-
 	// Stop the thread
 	Worker->Stop=true;
+
+	// Wake up thread
+	Thread_Resume(Worker);
 
 	pthread_join(Worker->Thread, NULL);
 

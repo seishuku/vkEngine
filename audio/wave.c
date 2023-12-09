@@ -12,16 +12,15 @@
 #define DATA_MAGIC ('d'|('a'<<8)|('t'<<16)|('a'<<24))
 
 // Simple resampling function, based off of what id Software used in Quake, seems to work well enough.
-void Resample(void *in, int inWidth, int inRate, int inChannel, int inLength, int16_t *out, int outRate)
+static void Resample(const void *in, const int inWidth, const int inRate, const int inChannel, const int inLength, int16_t *out, const int outRate)
 {
-    float stepScale=(float)inRate/SAMPLE_RATE;
-
-    uint32_t outCount=(uint32_t)(inLength/stepScale);
+    const float stepScale=(float)inRate/AUDIO_SAMPLE_RATE;
+    const uint32_t outCount=(uint32_t)(inLength/stepScale);
 
     for(uint32_t i=0, sampleFrac=0;i<outCount;i++, sampleFrac+=(int32_t)(stepScale*256))
     {
+        const int32_t srcSample=sampleFrac>>8;
         int32_t sampleL=0, sampleR=0;
-        int32_t srcSample=sampleFrac>>8;
 
         if(inWidth==2)
         {
@@ -58,7 +57,7 @@ void Resample(void *in, int inWidth, int inRate, int inChannel, int inLength, in
 // This also will only accept PCM audio streams and stereo, ideally stereo isn't needed
 // because most sound effcts will be panned/spatialized into stereo for "3D" audio,
 // but stereo is needed for the HRTF samples.
-bool Audio_LoadStatic(char *Filename, Sample_t *Sample)
+bool Audio_LoadStatic(const char *Filename, Sample_t *Sample)
 {
     FILE *Stream=NULL;
     uint32_t riffMagic, waveMagic, fmtMagic, dataMagic;
@@ -143,7 +142,7 @@ bool Audio_LoadStatic(char *Filename, Sample_t *Sample)
     Length/=Channels;
 
     // Covert to match primary buffer sampling rate
-    uint32_t outputSize=(uint32_t)(Length/((float)samplesPerSec/SAMPLE_RATE));
+    const uint32_t outputSize=(uint32_t)(Length/((float)samplesPerSec/AUDIO_SAMPLE_RATE));
 
     int16_t *Resampled=(int16_t *)Zone_Malloc(Zone, sizeof(int16_t)*outputSize*Channels);
 
@@ -153,7 +152,7 @@ bool Audio_LoadStatic(char *Filename, Sample_t *Sample)
         return 0;
     }
 
-    Resample(Buffer, bitPerSample>>3, samplesPerSec, Channels, Length, Resampled, SAMPLE_RATE);
+    Resample(Buffer, bitPerSample>>3, samplesPerSec, Channels, Length, Resampled, AUDIO_SAMPLE_RATE);
 
     Zone_Free(Zone, Buffer);
 

@@ -231,14 +231,14 @@ bool CreateVolumePipeline(void)
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-			.setLayoutCount=1,
-			.pSetLayouts=&VolumeDescriptorSet.DescriptorSetLayout,
-			.pushConstantRangeCount=1,
-			.pPushConstantRanges=&(VkPushConstantRange)
+		.setLayoutCount=1,
+		.pSetLayouts=&VolumeDescriptorSet.DescriptorSetLayout,
+		.pushConstantRangeCount=1,
+		.pPushConstantRanges=&(VkPushConstantRange)
 		{
 			.offset=0,
-				.size=sizeof(uint32_t),
-				.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
+			.size=sizeof(uint32_t),
+			.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 	}, 0, &VolumePipelineLayout);
 
@@ -250,12 +250,16 @@ bool CreateVolumePipeline(void)
 	VolumePipeline.DepthTest=VK_TRUE;
 	VolumePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
 	VolumePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
+	//VolumePipeline.DepthWrite=VK_FALSE;
 	VolumePipeline.RasterizationSamples=MSAA;
 
 	VolumePipeline.Blend=VK_TRUE;
 	VolumePipeline.SrcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	VolumePipeline.DstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+	VolumePipeline.DstColorBlendFactor=VK_BLEND_FACTOR_ONE;
 	VolumePipeline.ColorBlendOp=VK_BLEND_OP_ADD;
+	VolumePipeline.SrcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
+	VolumePipeline.DstAlphaBlendFactor=VK_BLEND_FACTOR_ONE;
+	VolumePipeline.AlphaBlendOp=VK_BLEND_OP_ADD;
 
 	if(!vkuPipeline_AddStage(&VolumePipeline, "shaders/volume.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;

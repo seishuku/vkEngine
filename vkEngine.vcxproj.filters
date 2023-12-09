@@ -335,6 +335,9 @@
     <ClCompile Include="console\console.c">
       <Filter>Source Files\console</Filter>
     </ClCompile>
+    <ClCompile Include="music.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <GLSL Include="shaders\bezier.frag">

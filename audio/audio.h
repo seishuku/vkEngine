@@ -1,8 +1,9 @@
 #ifndef __AUDIO_H__
 #define __AUDIO_H__
 
-#define SAMPLE_RATE 44100
-#define NUM_SAMPLES 4096
+#define AUDIO_SAMPLE_RATE 44100
+#define MAX_AUDIO_SAMPLES 4096
+#define MAX_STREAM_SAMPLES (MAX_AUDIO_SAMPLES*2)
 #define MAX_HRIR_SAMPLES 1024
 
 typedef struct
@@ -13,9 +14,13 @@ typedef struct
     vec3 xyz;
 } Sample_t;
 
-bool Audio_LoadStatic(char *Filename, Sample_t *Sample);
-void Audio_PlaySample(Sample_t *Sample, bool Looping, float Volume, vec3 *Position);
+bool Audio_LoadStatic(const char *Filename, Sample_t *Sample);
+void Audio_PlaySample(Sample_t *Sample, const bool Looping, const float Volume, vec3 *Position);
 void Audio_StopSample(Sample_t *Sample);
+void Audio_SetStreamCallback(void (*StreamCallback)(void *Buffer, size_t Length));
+void Audio_SetStreamVolume(const float Volume);
+void Audio_StartStream(void);
+void Audio_StopStream(void);
 int Audio_Init(void);
 void Audio_Destroy(void);
 
