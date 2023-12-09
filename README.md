@@ -20,6 +20,7 @@ To-do (in no particular order):
 
 
 External dependencies needed for building this (versions as of this writing, newer *should* work):
+ - libvorbis 1.3.7
  - OpenVR 1.23.7
  - OpenXR 1.2??? (working on porting to this)
  - pthread (whatever Linux has, or pthread-win32 2.0 for windows)
