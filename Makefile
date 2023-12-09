@@ -42,7 +42,6 @@ OBJS+=vulkan/vulkan_swapchain.o
 
 # Audio
 OBJS+=audio/audio.o
-OBJS+=audio/hrir.o
 OBJS+=audio/wave.o
 
 # UI
@@ -70,6 +69,7 @@ OBJS+=utils/input.o
 OBJS+=utils/event.o
 OBJS+=utils/genid.o
 OBJS+=utils/list.o
+OBJS+=music.o
 OBJS+=perframe.o
 OBJS+=shadow.o
 OBJS+=skybox.o
@@ -101,7 +101,7 @@ SHADERS+=shaders/volume.frag.spv
 SHADERS+=shaders/volume.vert.spv
 
 CFLAGS=-Wall -Wextra -Wpedantic -O3 -std=gnu17
-LDFLAGS=-Wold-style-definition -lm -lpthread -lopenvr_api -lportaudio
+LDFLAGS=-Wold-style-definition -lm -lpthread -lopenvr_api -lopenxr_loader -lvorbisfile -lportaudio
 
 ifeq ($(OS),Windows_NT)
 	CC=x86_64-w64-mingw32-gcc

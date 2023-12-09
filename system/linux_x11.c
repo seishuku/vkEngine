@@ -389,7 +389,7 @@ void EventLoop(void)
 							if(ToggleFullscreen)
 							{
 								ToggleFullscreen=false;
-								DBGPRINTF("Going full screen...\n");
+								DBGPRINTF(DEBUG_INFO, "Going full screen...\n");
 
 								OldWidth=Width;
 								OldHeight=Height;
@@ -401,7 +401,7 @@ void EventLoop(void)
 							else
 							{
 								ToggleFullscreen=true;
-								DBGPRINTF("Going windowed...\n");
+								DBGPRINTF(DEBUG_INFO, "Going windowed...\n");
 
 								Width=OldWidth;
 								Height=OldHeight;
@@ -658,17 +658,6 @@ int main(int argc, char **argv)
 	XFlush(Context.Dpy);
 	XSync(Context.Dpy, False);
 
-	DBGPRINTF(DEBUG_INFO, "Initalizing OpenVR...\n");
-	if(!InitOpenVR())
-	{
-		DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
-		IsVR=false;
-		rtWidth=Width;
-		rtHeight=Height;
-	}
-	else
-		XMoveResizeWindow(Context.Dpy, Context.Win, 0, 0, rtWidth, rtHeight/2);
-
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Instance...\n");
 	if(!CreateVulkanInstance(&Instance))
 	{
@@ -690,7 +679,18 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	DBGPRINTF(DEBUG_INFO, "Initalizing Vulkan resources...\n");
+	DBGPRINTF(DEBUG_INFO, "Initializing VR...\n");
+	if(!VR_Init(Instance, &Context))
+	{
+		DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
+		IsVR=false;
+		rtWidth=Width;
+		rtHeight=Height;
+	}
+	else
+		XMoveResizeWindow(Context.Dpy, Context.Win, 0, 0, rtWidth, rtHeight/2);
+
+	DBGPRINTF(DEBUG_INFO, "Initializing Vulkan resources...\n");
 	if(!Init())
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");

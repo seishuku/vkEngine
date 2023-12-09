@@ -50,7 +50,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		.window=Context->Win,
 	}, VK_NULL_HANDLE, &Context->Surface)!=VK_SUCCESS)
 	{
-		DBGPRINTF("vkCreateXlibSurfaceKHR failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "vkCreateXlibSurfaceKHR failed.\n");
 		return VK_FALSE;
 	}
 #elif ANDROID
@@ -62,7 +62,7 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		.window=Context->Win,
 	}, VK_NULL_HANDLE, &Context->Surface)!=VK_SUCCESS)
 	{
-		DBGPRINTF("vkCreateAndroidSurfaceKHR failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "vkCreateAndroidSurfaceKHR failed.\n");
 		return VK_FALSE;
 	}
 #endif
@@ -282,14 +282,23 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		pNext=&deviceDynamicRenderingFeatures;
 	}
 
+#if 0
 	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME;
-	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME;
 	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME;
-	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME;
 	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME;
-	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME;
 	Extensions[NumExtensions++]=VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME;
 	Extensions[NumExtensions++]=VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME;
+
+#ifdef WIN32
+	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME;
+	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME;
+	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME;
+#else
+	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME;
+	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME;
+	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME;
+#endif
+#endif
 
 	// Create the logical device from the physical device and queue index from above
 	if(vkCreateDevice(Context->PhysicalDevice, &(VkDeviceCreateInfo)

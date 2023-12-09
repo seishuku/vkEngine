@@ -54,7 +54,11 @@ static void FireParticleEmitter(vec3 Position, vec3 Direction)
 	vec3 RandVec=Vec3(RandFloat(), RandFloat(), RandFloat());
 	Vec3_Normalize(&RandVec);
 	RandVec=Vec3_Muls(RandVec, 100.0f);
-	uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 0.0f, 0.0f), RandVec, 5.0f, 500, false, EmitterCallback);
+
+	// Fire the emitter X units away from Position in the direction of Direction
+	vec3 NewPosition=Vec3_Addv(Position, Vec3_Muls(Direction, 5.0f));
+
+	uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, NewPosition, Vec3(0.0f, 0.0f, 0.0f), RandVec, 5.0f, 500, false, EmitterCallback);
 
 	// Search list for first dead particle
 	for(uint32_t i=0;i<Emitter->NumParticles;i++)
@@ -63,7 +67,7 @@ static void FireParticleEmitter(vec3 Position, vec3 Direction)
 		if(Emitter->Particles[i].life<0.0f)
 		{
 			Emitter->Particles[i].ID=ID;
-			Emitter->Particles[i].pos=Position;
+			Emitter->Particles[i].pos=NewPosition;
 			Vec3_Normalize(&Direction);
 			Emitter->Particles[i].vel=Vec3_Muls(Direction, 100.0f);
 
