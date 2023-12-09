@@ -8,14 +8,13 @@ This started long long ago in 2004, with OpenGL and ATI GPU demos... My only gam
 I also have the [OpenGL version](https://github.com/seishuku/Engine), this is a *far* more evolved codebase than that though, the OpenGL version I should archive the repo as I haven't touched it in quite some time.
 
 To-do (in no particular order):
-- Improve audio (~~3D spatializer~~, streaming support, synth?)
+- Improve audio (~~3D spatializer~~, ~~streaming support~~, synth?)
 - Improve physics (more collision object support, angular velocity, ???)
 - Streamline post processing effects (it's kind of tacked on right now)
 - Networking? (I want to have multiplayer support at some point) **This gets a half check, it does *kind of* work.**
 - 3D model animation?
 - Hud? (is this considered part of GUI?)
 - ~~GUI?~~
-- HMI?
 - ???
 - Profit?
 
