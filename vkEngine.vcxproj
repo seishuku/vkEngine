@@ -212,7 +212,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>vorbisfile.lib;vorbis.lib;openxr_loaderd.lib;openvr_api.lib;portaudio.lib;pthreadVC3d.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vorbisfile.lib;ogg.lib;openxr_loaderd.lib;openvr_api.lib;portaudio.lib;pthreadVC3d.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug (Clang)|x64'">
@@ -231,7 +231,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>openxr_loaderd.lib;openvr_api.lib;portaudio.lib;pthreadVC3d.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vorbisfile.lib;ogg.lib;openxr_loaderd.lib;openvr_api.lib;portaudio.lib;pthreadVC3d.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -260,7 +260,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>vorbisfile.lib;vorbis.lib;openxr_loader.lib;openvr_api.lib;portaudio.lib;pthreadVC3.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vorbisfile.lib;ogg.lib;openxr_loader.lib;openvr_api.lib;portaudio.lib;pthreadVC3.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <Profile>true</Profile>
     </Link>
@@ -289,7 +289,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>vorbisfile.lib;vorbis.lib;openxr_loader.lib;openvr_api.lib;portaudio.lib;pthreadVC3.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vorbisfile.lib;ogg.lib;openxr_loader.lib;openvr_api.lib;portaudio.lib;pthreadVC3.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

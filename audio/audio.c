@@ -79,11 +79,6 @@ static AudioStream_t streamBuffer;
 
 extern Camera_t Camera;
 
-static const float BarycentricInterpolate(const float h0, const float h1, const float h2, const float alpha, const float beta, const float gamma)
-{
-	return alpha*h0+beta*h1+gamma*h2;
-}
-
 static vec2 CalculateBarycentric(const vec3 p, const vec3 a, const vec3 b, const vec3 c)
 {
 	const vec3 v0=Vec3_Subv(b, a), v1=Vec3_Subv(c, a), v2=Vec3_Subv(p, a);

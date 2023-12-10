@@ -1300,13 +1300,9 @@ void Render(void)
 
 	Console_Draw(&Console);
 
-	UI_UpdateSpriteRotation(&UI, FaceID, (float)fTime*2.0f);
-	UI_UpdateSpritePosition(&UI, FaceID, Vec2(((float)Width/2.0f)+sinf(-fTime*2.0f)*100.0f, ((float)Height/2.0f)+cosf(-fTime*2.0f)*100.0f));
+	Audio_SetStreamVolume(UI_GetBarGraphValue(&UI, VolumeID));
 
-	const float VolumeValue=UI_GetBarGraphValue(&UI, VolumeID);
-	Audio_SetStreamVolume(VolumeValue);
-
-	Font_Print(&Fnt, 16.0f, rtWidth-400.0f, rtHeight-75.0f-16.0f, "Current track: %s", MusicList[CurrentMusic].String);
+	Font_Print(&Fnt, 16.0f, rtWidth-400.0f, rtHeight-50.0f-16.0f, "Current track: %s", MusicList[CurrentMusic].String);
 
 	Thread_AddJob(&ThreadPhysics, Thread_Physics, NULL);
 //	Thread_Physics(NULL);
@@ -1316,7 +1312,6 @@ void Render(void)
 		EyeProjection[1]=MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f);
 
 	Pose=VR_GetHeadPose();
-//	Pose=MatrixTranslate(0.0f, 0.0f, -100.0f);
 
 	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain.Swapchain, UINT64_MAX, PerFrame[Index].PresentCompleteSemaphore, VK_NULL_HANDLE, &imageIndex);
 
@@ -1578,9 +1573,10 @@ bool Init(void)
 	
 	// TODO: For some reason on Linux/Android, the first loaded QOI here has corruption and I'm not sure why.
 	//			If I upload a temp image and delete it afterwards, it's all good.
-	VkuImage_t Temp;
-	Image_Upload(&Context, &Temp, "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	
+	//VkuImage_t Temp;
+	//Image_Upload(&Context, &Temp, "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&Context, &Textures[TEXTURE_CROSSHAIR], "assets/crosshair.qoi", IMAGE_NONE);
+
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1], "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1_NORMAL], "assets/asteroid1_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID2], "assets/asteroid2.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
@@ -1590,9 +1586,7 @@ bool Init(void)
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4], "assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4_NORMAL], "assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 
-	Image_Upload(&Context, &Textures[TEXTURE_FACE], "assets/face.tga", IMAGE_MIPMAP|IMAGE_BILINEAR);
-
-	vkuDestroyImageBuffer(&Context, &Temp);
+	//vkuDestroyImageBuffer(&Context, &Temp);
 
 	GenNebulaVolume(&Context, &Textures[TEXTURE_VOLUME]);
 
@@ -1637,39 +1631,39 @@ bool Init(void)
 	ParticleSystem_SetGravity(&ParticleSystem, 0.0f, 0.0f, 0.0f);
 
 	volatile vec3 Zero=Vec3(0.0f, 0.0f, 0.0f);
-	ParticleSystem_AddEmitter(&ParticleSystem, Zero, Zero, Zero, 0.0f, 100, true, NULL);
+	ParticleSystem_AddEmitter(&ParticleSystem, Zero, Zero, Zero, 0.0f, 1000, true, NULL);
 
 	Font_Init(&Fnt);
 
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)rtWidth, (float)rtHeight));
 
 	UI_AddButton(&UI,
-				 Vec2(rtWidth-400.0f, rtHeight-75.0f),	// Position
-				 Vec2(100.0f, 75.0f),					// Size
+				 Vec2(rtWidth-400.0f, rtHeight-50.0f),	// Position
+				 Vec2(100.0f, 50.0f),					// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Play",								// Title text
 				 StartStreamCallback);					// Callback
 	UI_AddButton(&UI,
-				 Vec2(rtWidth-300.0f, rtHeight-75.0f),	// Position
-				 Vec2(100.0f, 75.0f),					// Size
+				 Vec2(rtWidth-300.0f, rtHeight-50.0f),	// Position
+				 Vec2(100.0f, 50.0f),					// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Pause",								// Title text
 				 StopStreamCallback);					// Callback
 	UI_AddButton(&UI,
-				 Vec2(rtWidth-200.0f, rtHeight-75.0f),	// Position
-				 Vec2(100.0f, 75.0f),					// Size
+				 Vec2(rtWidth-200.0f, rtHeight-50.0f),	// Position
+				 Vec2(100.0f, 50.0f),					// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Prev",								// Title text
 				 PrevTrackCallback);					// Callback
 	UI_AddButton(&UI,
-				 Vec2(rtWidth-100.0f, rtHeight-75.0f),	// Position
-				 Vec2(100.0f, 75.0f),					// Size
+				 Vec2(rtWidth-100.0f, rtHeight-50.0f),	// Position
+				 Vec2(100.0f, 50.0f),					// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Next",								// Title text
 				 NextTrackCallback);					// Callback
 	VolumeID=UI_AddBarGraph(&UI,
-							Vec2(rtWidth-400.0f, rtHeight-150.0f),// Position
-							Vec2(400.0f, 50.0f),		// Size
+							Vec2(rtWidth-400.0f, rtHeight-50.0f-16.0f-30.0f),// Position
+							Vec2(400.0f, 30.0f),		// Size
 							Vec3(0.25f, 0.25f, 0.25f),	// Color
 							"Volume",					// Title text
 							false,						// Read-only
@@ -1694,7 +1688,7 @@ bool Init(void)
 				   "Checkbox 2",					// Title text
 				   false);							// Initial value
 
-	FaceID=UI_AddSprite(&UI, Vec2((float)Width/2.0f, (float)Height/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &Textures[TEXTURE_FACE], 0.0f);
+	UI_AddSprite(&UI, Vec2((float)rtWidth/2.0f, (float)rtHeight/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &Textures[TEXTURE_CROSSHAIR], 0.0f);
 
 	CursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3(1.0f, 1.0f, 1.0f));
 

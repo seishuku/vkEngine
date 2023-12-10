@@ -55,7 +55,7 @@ String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFi
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-String_t *BuildFileList(const char *DirName, const char *Filter, int *NumFiles)
+String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFiles)
 {
 	HANDLE hList;
 	char szDir[MAX_PATH+1];

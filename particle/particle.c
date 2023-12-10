@@ -68,7 +68,7 @@ bool ParticleSystem_ResizeBuffer(ParticleSystem_t *System)
 uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *System, vec3 Position, vec3 StartColor, vec3 EndColor, float ParticleSize, uint32_t NumParticles, bool Burst, ParticleInitCallback InitCallback)
 {
 	if(System==NULL)
-		return false;
+		return UINT32_MAX;
 
 	// Pull the next ID from the global ID count
 	uint32_t ID=GenID();
@@ -105,8 +105,7 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *System, vec3 Position, vec3
 	for(uint32_t i=0;i<Emitter.NumParticles;i++)
 	{
 		Emitter.Particles[i].ID=ID;
-		memcpy(&Emitter.Particles[i].pos, &Position, sizeof(vec3));
-//		Emitter.Particles[i].pos=Position;
+		Emitter.Particles[i].pos=Position;
 		Emitter.Particles[i].life=-1.0f;
 	}
 

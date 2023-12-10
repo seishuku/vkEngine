@@ -55,10 +55,14 @@ static void FireParticleEmitter(vec3 Position, vec3 Direction)
 	Vec3_Normalize(&RandVec);
 	RandVec=Vec3_Muls(RandVec, 100.0f);
 
-	// Fire the emitter X units away from Position in the direction of Direction
-	vec3 NewPosition=Vec3_Addv(Position, Vec3_Muls(Direction, 5.0f));
+	// Fire the emitter camera radius units away from Position in the direction of Direction
+	vec3 NewPosition=Vec3_Addv(Position, Vec3_Muls(Direction, Camera.Radius));
 
 	uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, NewPosition, Vec3(0.0f, 0.0f, 0.0f), RandVec, 5.0f, 500, false, EmitterCallback);
+
+	// Emitter list full?
+	if(ID==UINT32_MAX)
+		return;
 
 	// Search list for first dead particle
 	for(uint32_t i=0;i<Emitter->NumParticles;i++)
