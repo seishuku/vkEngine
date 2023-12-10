@@ -115,7 +115,7 @@ endif
 
 all: $(TARGET) $(SHADERS)
 
-debug: CFLAGS=-Wall -Wextra -DDEBUG -D_DEBUG -g -ggdb -O1 -std=gnu17
+debug: CFLAGS+=-Wall -Wextra -DDEBUG -D_DEBUG -g -ggdb -O1 -std=gnu17
 
 ifneq ($(OS),Windows_NT)
 debug: CFLAGS+=-I/usr/X11/include

@@ -19,11 +19,10 @@ uint32_t NumMusic=0, CurrentMusic=0;
 #include <dirent.h>
 #include <sys/stat.h>
 
-String_t *BuildFileList(char *DirName, char *Filter, int *NumFiles)
+String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFiles)
 {
 	DIR *dp;
 	struct dirent *dir_entry;
-	struct stat stat_info;
 	String_t *Ret=NULL;
 
 	if((dp=opendir(DirName))==NULL)
@@ -31,9 +30,7 @@ String_t *BuildFileList(char *DirName, char *Filter, int *NumFiles)
 
 	while((dir_entry=readdir(dp))!=NULL)
 	{
-		lstat(dir_entry->d_name, &stat_info);
-
-		if(!S_ISDIR(stat_info.st_mode))
+		if(dir_entry->d_type==DT_REG)
 		{
 			const char *ptr=strrchr(dir_entry->d_name, '.');
 
@@ -195,7 +192,7 @@ void Music_Init(void)
 	{
 		char FilePath[1024]={ 0 };
 
-		CurrentMusic=RandRange(0, NumMusic);
+		CurrentMusic=RandRange(0, NumMusic-1);
 		sprintf(FilePath, "%s%s", MusicPath, MusicList[CurrentMusic].String);
 		oggFile=fopen(FilePath, "rb");
 
@@ -217,7 +214,6 @@ void Music_Init(void)
 void Music_Destroy(void)
 {
 	ov_clear(&oggStream);
-	fclose(oggFile);
 
 	if(MusicList)
 		Zone_Free(Zone, MusicList);
