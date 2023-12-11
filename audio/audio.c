@@ -98,7 +98,7 @@ static vec2 CalculateBarycentric(const vec3 p, const vec3 a, const vec3 b, const
 static void HRIRInterpolate(vec3 xyz)
 {
 	// Sound distance drop-off constant, this is the radius of the hearable range
-	const float invRadius=1.0f/500.0f;
+	const float invRadius=1.0f/1000.0f;
 
 	// Calculate relative position of the sound source to the camera
 	const vec3 relPosition=Vec3_Subv(xyz, Camera.Position);
@@ -108,11 +108,11 @@ static void HRIRInterpolate(vec3 xyz)
 		Vec3_Dot(relPosition, Camera.Forward)
 	);
 
-	// Normalize also returns the length of the vector...
-	float falloffDist=Vec3_Normalize(&Position);
+	// Calculate distance fall-off
+	float falloffDist=max(0.0f, 1.0f-Vec3_Length(Vec3_Muls(Position, invRadius)));
 
-	// Use that to calculate distance fall-off.
-	falloffDist=max(0.0f, 1.0f-falloffDist*invRadius);
+	// Normalize also returns the length of the vector...
+	Vec3_Normalize(&Position);
 
 	// Find closest triangle to the sound direction
 	float maxDistanceSq=-1.0f;
@@ -184,8 +184,8 @@ static void MixAudio(int16_t *Dst, const int16_t *Src, const size_t Length, cons
 
 	for(size_t i=0;i<Length*2;i+=2)
 	{
-		Dst[i+0]=min(max(((Src[i+0]*Volume)>>7)+Dst[i+0], INT16_MIN), INT16_MAX);
-		Dst[i+1]=min(max(((Src[i+1]*Volume)>>7)+Dst[i+1], INT16_MIN), INT16_MAX);
+		Dst[i+0]=min(max(((Src[i+0]*Volume)/MAX_VOLUME)+Dst[i+0], INT16_MIN), INT16_MAX);
+		Dst[i+1]=min(max(((Src[i+1]*Volume)/MAX_VOLUME)+Dst[i+1], INT16_MIN), INT16_MAX);
 	}
 }
 
