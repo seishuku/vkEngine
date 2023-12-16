@@ -2,6 +2,7 @@
 #define __MEMZONE_H__
 
 #include <pthread.h>
+#include <stdbool.h>
 
 typedef struct
 {

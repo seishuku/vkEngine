@@ -51,6 +51,66 @@ double GetClock(void)
 	return (double)Count/Frequency;
 }
 
+static bool RegisterRawInput(HWND hWnd)
+{
+	RAWINPUTDEVICE devices[2];
+
+	// Keyboard
+	devices[0].usUsagePage=HID_USAGE_PAGE_GENERIC;
+	devices[0].usUsage=HID_USAGE_GENERIC_KEYBOARD;
+	devices[0].dwFlags=0; // RIDEV_NOLEGACY ?
+	devices[0].hwndTarget=hWnd;
+
+	// Mouse
+	devices[1].usUsagePage=HID_USAGE_PAGE_GENERIC;
+	devices[1].usUsage=HID_USAGE_GENERIC_MOUSE;
+	devices[1].dwFlags=RIDEV_NOLEGACY;
+	devices[1].hwndTarget=hWnd;
+
+	DBGPRINTF(DEBUG_INFO, "Registering raw input devices...\n");
+
+	if(RegisterRawInputDevices(devices, 2, sizeof(RAWINPUTDEVICE)))
+	{
+		DBGPRINTF(DEBUG_INFO, "\t...registered raw input devices.\n");
+		return true;
+	}
+	else
+	{
+		DBGPRINTF(DEBUG_ERROR, "\t...failed to register raw input devices.\n");
+		return false;
+	}
+}
+
+static bool UnregisterRawInput(void)
+{
+	RAWINPUTDEVICE devices[2];
+
+	// Keyboard
+	devices[0].usUsagePage=HID_USAGE_PAGE_GENERIC;
+	devices[0].usUsage=HID_USAGE_GENERIC_KEYBOARD;
+	devices[0].dwFlags=RIDEV_REMOVE;
+	devices[0].hwndTarget=NULL;
+
+	// Mouse
+	devices[1].usUsagePage=HID_USAGE_PAGE_GENERIC;
+	devices[1].usUsage=HID_USAGE_GENERIC_MOUSE;
+	devices[1].dwFlags=RIDEV_REMOVE;
+	devices[1].hwndTarget=NULL;
+
+	DBGPRINTF(DEBUG_INFO, "Unregistering raw input devices...\n");
+
+	if(RegisterRawInputDevices(devices, 2, sizeof(RAWINPUTDEVICE)))
+	{
+		DBGPRINTF(DEBUG_INFO, "\t...unregistered raw input devices.\n");
+		return true;
+	}
+	else
+	{
+		DBGPRINTF(DEBUG_ERROR, "\t...failed to unregister raw input devices.\n");
+		return false;
+	}
+}
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	switch(uMsg)
@@ -69,6 +129,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			Width=max(LOWORD(lParam), 2);
 			Height=max(HIWORD(lParam), 2);
 			//RecreateSwapchain();
+			break;
+
+		case WM_ACTIVATE:
+			if(LOWORD(wParam)!=WA_INACTIVE)
+			{
+				RECT rc;
+
+				while(!ShowCursor(FALSE));
+
+				GetWindowRect(hWnd, &rc);
+				ClipCursor(&rc);
+				RegisterRawInput(hWnd);
+			}
+			else
+			{
+				ShowCursor(TRUE);
+				UnregisterRawInput();
+			}
 			break;
 
 		case WM_SYSKEYUP:
@@ -102,10 +180,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		case WM_INPUT:
 		{
+#define RAWMESSAGE_SIZE 64
+			BYTE bRawMessage[RAWMESSAGE_SIZE];
 			UINT dwSize=0;
-			BYTE bRawMessage[64];
 
 			GetRawInputData((HRAWINPUT)lParam, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
+
+			// Check if the message size exceeds the buffer size, shouldn't happen have to be safe.
+			if(dwSize>RAWMESSAGE_SIZE)
+				break;
+
 			GetRawInputData((HRAWINPUT)lParam, RID_INPUT, bRawMessage, &dwSize, sizeof(RAWINPUTHEADER));
 
 			RAWINPUT *Input=(RAWINPUT *)bRawMessage;
@@ -231,9 +315,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 				case RIM_TYPEMOUSE:
                 {
-					SetCursorPos(Width>>1, Height>>1);
-					SetCursor(NULL);
-					
 					RAWMOUSE Mouse=Input->data.mouse;
 					static MouseEvent_t MouseEvent={ 0, 0, 0, 0 };
 
@@ -299,36 +380,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
 
-bool RegisterRawInput(HWND hWnd)
-{
-	RAWINPUTDEVICE devices[2];
-
-	// Keyboard
-	devices[0].usUsagePage=HID_USAGE_PAGE_GENERIC;
-	devices[0].usUsage=HID_USAGE_GENERIC_KEYBOARD;
-	devices[0].dwFlags=0; // RIDEV_NOLEGACY ?
-	devices[0].hwndTarget=hWnd;
-
-	// Mouse
-	devices[1].usUsagePage=HID_USAGE_PAGE_GENERIC;
-	devices[1].usUsage=HID_USAGE_GENERIC_MOUSE;
-	devices[1].dwFlags=RIDEV_NOLEGACY;
-	devices[1].hwndTarget=hWnd;
-
-	DBGPRINTF(DEBUG_INFO, "Registering raw input devices...\n");
-
-	if(RegisterRawInputDevices(devices, 2, sizeof(RAWINPUTDEVICE)))
-	{
-		DBGPRINTF(DEBUG_INFO, "\t...registered raw input devices.\n");
-		return true;
-	}
-	else
-	{
-		DBGPRINTF(DEBUG_ERROR, "\t...failed to register raw input devices.\n");
-		return false;
-	}
-}
-
 #ifndef _CONSOLE
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int iCmdShow)
 {
@@ -387,7 +438,7 @@ int main(int argc, char **argv)
 
 	Context.hWnd=CreateWindow(szAppName, szAppName, WS_POPUP|WS_CLIPSIBLINGS, 0, 0, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
 
-	RegisterRawInput(Context.hWnd);
+	//RegisterRawInput(Context.hWnd);
 
 	ShowWindow(Context.hWnd, SW_SHOW);
 	SetForegroundWindow(Context.hWnd);

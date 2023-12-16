@@ -53,6 +53,7 @@ VkuMemZone_t *VkZone;
 // Camera data
 Camera_t Camera;
 matrix ModelView;
+matrix Projection[2];
 
 // extern timing data from system main
 extern float fps, fTimeStep, fTime;
@@ -1044,7 +1045,7 @@ void Thread_Particles(void *Arg)
 void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matrix Pose)
 {
 	// Generate the projection matrix
-	PerFrame[Index].Main_UBO[Eye]->projection=EyeProjection[Eye];
+	PerFrame[Index].Main_UBO[Eye]->projection=Projection[Eye];
 
 	// Set up the modelview matrix
 	PerFrame[Index].Main_UBO[Eye]->modelview=ModelView;
@@ -1296,7 +1297,11 @@ void Render(void)
 {
 	static uint32_t Index=0;
 	uint32_t imageIndex;
+	uint32_t eyeIndex[2]={ 0, 0 };
 	matrix Pose;
+
+	Thread_AddJob(&ThreadPhysics, Thread_Physics, NULL);
+	//	Thread_Physics(NULL);
 
 	Console_Draw(&Console);
 
@@ -1304,23 +1309,29 @@ void Render(void)
 
 	Font_Print(&Fnt, 16.0f, rtWidth-400.0f, rtHeight-50.0f-16.0f, "Current track: %s", MusicList[CurrentMusic].String);
 
-	Thread_AddJob(&ThreadPhysics, Thread_Physics, NULL);
-//	Thread_Physics(NULL);
+	if(!IsVR)
+		Projection[0]=MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f);
+	else
+	{
+		Projection[0]=VR_GetEyeProjection(0);
+		Projection[1]=VR_GetEyeProjection(1);
+	}
 
-//	if(!IsVR)
-		EyeProjection[0]=MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f);
-		EyeProjection[1]=MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f);
+	if(IsVR)
+		VR_StartFrame(&eyeIndex[0], &eyeIndex[1]);
+	else
+	{
+		VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain.Swapchain, UINT64_MAX, PerFrame[Index].PresentCompleteSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+		if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
+		{
+			DBGPRINTF(DEBUG_WARNING, "Swapchain out of date... Rebuilding.\n");
+			RecreateSwapchain();
+			return;
+		}
+	}
 
 	Pose=VR_GetHeadPose();
-
-	VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain.Swapchain, UINT64_MAX, PerFrame[Index].PresentCompleteSemaphore, VK_NULL_HANDLE, &imageIndex);
-
-	if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
-	{
-		DBGPRINTF(DEBUG_WARNING, "Swapchain out of date... Rebuilding.\n");
-		RecreateSwapchain();
-		return;
-	}
 
 	vkWaitForFences(Context.Device, 1, &PerFrame[Index].FrameFence, VK_TRUE, UINT64_MAX);
 
@@ -1339,10 +1350,10 @@ void Render(void)
 	// Update shadow depth map
 	ShadowUpdateMap(PerFrame[Index].CommandBuffer, Index);
 
+	vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
 	// Wait for physics to finish before rendering
 	pthread_barrier_wait(&ThreadBarrier_Physics);
-
-	vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 	EyeRender(PerFrame[Index].CommandBuffer, Index, 0, Pose);
 
@@ -1357,71 +1368,67 @@ void Render(void)
 	CompositeDraw(Index, 0);
 	//////
 
+	// Other eye compositing
 	if(IsVR)
-	{
-		// Other eye compositing
 		CompositeDraw(Index, 1);
-
-		// Transition layouts into transfer source for OpenVR
-		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-	}
-
-//	vkuTransitionLayout(PerFrame[Index].CommandBuffer, Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-
-#ifndef ANDROID
-	// Submit eye images to VR HMD
-	if(IsVR)
-	{
-		VR_SendEyeImages(PerFrame[Index].CommandBuffer, (VkImage[])
-		{
-			ColorResolve[0].Image,
-			ColorResolve[1].Image
-		}, ColorFormat, rtWidth, rtHeight);
-	}
-#endif
 
 	vkEndCommandBuffer(PerFrame[Index].CommandBuffer);
 
 	// Submit command queue
-	vkQueueSubmit(Context.Queue, 1, &(VkSubmitInfo)
+	VkSubmitInfo SubmitInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.pWaitDstStageMask=&(VkPipelineStageFlags)
-		{
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
-		},
+		.pWaitDstStageMask=&(VkPipelineStageFlags) { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT },
 		.waitSemaphoreCount=1,
 		.pWaitSemaphores=&PerFrame[Index].PresentCompleteSemaphore,
 		.signalSemaphoreCount=1,
 		.pSignalSemaphores=&PerFrame[Index].RenderCompleteSemaphore,
 		.commandBufferCount=1,
 		.pCommandBuffers=&PerFrame[Index].CommandBuffer,
-	}, PerFrame[Index].FrameFence);
+	};
 
-	// And present it to the screen
-	Result=vkQueuePresentKHR(Context.Queue, &(VkPresentInfoKHR)
+	if(IsVR)
 	{
-		.sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-		.waitSemaphoreCount=1,
-		.pWaitSemaphores=&PerFrame[Index].RenderCompleteSemaphore,
-		.swapchainCount=1,
-		.pSwapchains=&Swapchain.Swapchain,
-		.pImageIndices=&imageIndex,
-	});
-
-	if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
-	{
-		DBGPRINTF(DEBUG_WARNING, "Swapchain out of date... Rebuilding.\n");
-		RecreateSwapchain();
-		return;
+		SubmitInfo.signalSemaphoreCount=0;
+		SubmitInfo.waitSemaphoreCount=0;
 	}
 
-	Index=(Index+1)%Swapchain.NumImages;
+	vkQueueSubmit(Context.Queue, 1, &SubmitInfo, PerFrame[Index].FrameFence);
+
+	if(IsVR)
+	{
+		VR_EndFrame();
+		Index=(Index+1)%xrSwapchain[0].NumImages;
+	}
+	else
+	{
+		// And present it to the screen
+		VkResult Result=vkQueuePresentKHR(Context.Queue, &(VkPresentInfoKHR)
+		{
+			.sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+			.waitSemaphoreCount=1,
+			.pWaitSemaphores=&PerFrame[Index].RenderCompleteSemaphore,
+			.swapchainCount=1,
+			.pSwapchains=&Swapchain.Swapchain,
+			.pImageIndices=&imageIndex,
+		});
+
+		if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
+		{
+			DBGPRINTF(DEBUG_WARNING, "Swapchain out of date... Rebuilding.\n");
+			RecreateSwapchain();
+			return;
+		}
+
+		Index=(Index+1)%Swapchain.NumImages;
+	}
 }
+
+#include <assert.h>
 
 void PlayExplosionCallback(void *arg)
 {
+	assert(false);
 	Audio_PlaySample(&Sounds[SOUND_EXPLODE1], false, 1.0f, &Camera.Position);
 }
 
@@ -1433,6 +1440,10 @@ void Console_CmdQuit(Console_t *Console, char *Param)
 // Initialization call from system main
 bool Init(void)
 {
+	// TODO: This is a hack, fix it proper.
+	if(IsVR)
+		Swapchain.NumImages=xrSwapchain[0].NumImages;
+
 	RandomSeed((uint32_t)GetClock()*UINT32_MAX);
 
 	Event_Add(EVENT_KEYDOWN, Event_KeyDown);
@@ -1921,7 +1932,8 @@ void Destroy(void)
 	Zone_Free(Zone, Sounds[SOUND_EXPLODE2].Data);
 	Zone_Free(Zone, Sounds[SOUND_EXPLODE3].Data);
 
-	VR_Destroy();
+	if(IsVR)
+		VR_Destroy();
 
 	for(uint32_t i=0;i<NUM_THREADS;i++)
 		Thread_Destroy(&Thread[i]);

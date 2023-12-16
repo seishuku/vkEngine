@@ -7,6 +7,7 @@
 #include "font/font.h"
 #include "camera/camera.h"
 #include "ui/ui.h"
+#include "vr/vr.h"
 #include "perframe.h"
 
 extern VkuContext_t Context;
@@ -255,8 +256,8 @@ void CreateCompositeFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t ta
 		.renderPass=ThresholdRenderPass,
 		.attachmentCount=1,
 		.pAttachments=(VkImageView[]){ ColorBlur[Eye].View },
-		.width=rtWidth>>2,
-		.height=rtHeight>>2,
+		.width=targetWidth>>2,
+		.height=targetHeight>>2,
 		.layers=1,
 	}, 0, &ThresholdFramebuffer[Eye]);
 
@@ -267,8 +268,8 @@ void CreateCompositeFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t ta
 		.renderPass=GaussianRenderPass,
 		.attachmentCount=1,
 		.pAttachments=(VkImageView[]){ ColorTemp[Eye].View },
-		.width=rtWidth>>2,
-		.height=rtHeight>>2,
+		.width=targetWidth>>2,
+		.height=targetHeight>>2,
 		.layers=1,
 	}, 0, &GaussianFramebufferTemp[Eye]);
 
@@ -279,12 +280,12 @@ void CreateCompositeFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t ta
 		.renderPass=GaussianRenderPass,
 		.attachmentCount=1,
 		.pAttachments=(VkImageView[]){ ColorBlur[Eye].View },
-		.width=rtWidth>>2,
-		.height=rtHeight>>2,
+		.width=targetWidth>>2,
+		.height=targetHeight>>2,
 		.layers=1,
 	}, 0, &GaussianFramebufferBlur[Eye]);
 
-	if(!Eye)
+	if(!IsVR)
 	{
 		// Compositing pipeline images, these are the actual swapchain framebuffers that will get presented
 		for(uint32_t i=0;i<Swapchain.NumImages;i++)
@@ -295,16 +296,50 @@ void CreateCompositeFramebuffers(uint32_t Eye, uint32_t targetWidth, uint32_t ta
 				.renderPass=CompositeRenderPass,
 				.attachmentCount=1,
 				.pAttachments=(VkImageView[]){ Swapchain.ImageView[i] },
-				.width=Width,
-				.height=Height,
+				.width=targetWidth,
+				.height=targetHeight,
 				.layers=1,
-			}, 0, &PerFrame[i].CompositeFramebuffer);
+			}, 0, &PerFrame[i].CompositeFramebuffer[0]);
+		}
+	}
+	else
+	{
+		// Compositing pipeline images, these are the actual swapchain framebuffers that will get presented
+		for(uint32_t i=0;i<xrSwapchain[0].NumImages;i++)
+		{
+			vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
+			{
+				.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+				.renderPass=CompositeRenderPass,
+				.attachmentCount=1,
+				.pAttachments=(VkImageView[]){ xrSwapchain[0].ImageView[i] },
+				.width=targetWidth,
+				.height=targetHeight,
+				.layers=1,
+			}, 0, &PerFrame[i].CompositeFramebuffer[0]);
+
+			vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
+			{
+				.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+				.renderPass=CompositeRenderPass,
+				.attachmentCount=1,
+				.pAttachments=(VkImageView[]){ xrSwapchain[1].ImageView[i] },
+				.width=targetWidth,
+				.height=targetHeight,
+				.layers=1,
+			}, 0, &PerFrame[i].CompositeFramebuffer[1]);
 		}
 	}
 }
 
 bool CreateCompositePipeline(void)
 {
+	VkImageLayout attachementFinalLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	// VR gets rendered directly to HMD, desktop needs to be presented
+	if(!IsVR)
+		attachementFinalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
 	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
@@ -319,7 +354,7 @@ bool CreateCompositePipeline(void)
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+				.finalLayout=attachementFinalLayout,
 			}
 		},
 		.subpassCount=1,
@@ -339,11 +374,11 @@ bool CreateCompositePipeline(void)
 	vkuDescriptorSet_AddBinding(&CompositeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&CompositeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-	if(IsVR)
-	{
-		vkuDescriptorSet_AddBinding(&CompositeDescriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-		vkuDescriptorSet_AddBinding(&CompositeDescriptorSet, 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	}
+	//if(IsVR)
+	//{
+	//	vkuDescriptorSet_AddBinding(&CompositeDescriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+	//	vkuDescriptorSet_AddBinding(&CompositeDescriptorSet, 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+	//}
 
 	vkuAssembleDescriptorSetLayout(&CompositeDescriptorSet);
 
@@ -365,12 +400,12 @@ bool CreateCompositePipeline(void)
 	if(!vkuPipeline_AddStage(&CompositePipeline, "shaders/fullscreen.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
-	if(IsVR)
-	{
-		if(!vkuPipeline_AddStage(&CompositePipeline, "shaders/compositeVR.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-			return false;
-	}
-	else
+	//if(IsVR)
+	//{
+	//	if(!vkuPipeline_AddStage(&CompositePipeline, "shaders/compositeVR.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	//		return false;
+	//}
+	//else
 	{
 		if(!vkuPipeline_AddStage(&CompositePipeline, "shaders/composite.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 			return false;
@@ -428,7 +463,7 @@ void DestroyComposite(void)
 	vkDestroyDescriptorSetLayout(Context.Device, CompositeDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
 
 	for(uint32_t i=0;i<Swapchain.NumImages;i++)
-		vkDestroyFramebuffer(Context.Device, PerFrame[i].CompositeFramebuffer, VK_NULL_HANDLE);
+		vkDestroyFramebuffer(Context.Device, PerFrame[i].CompositeFramebuffer[0], VK_NULL_HANDLE);
 
 	vkDestroyPipeline(Context.Device, CompositePipeline.Pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(Context.Device, CompositePipelineLayout, VK_NULL_HANDLE);
@@ -584,71 +619,60 @@ void CompositeDraw(uint32_t Index, uint32_t Eye)
 	vkCmdEndRenderPass(PerFrame[Index].CommandBuffer);
 	//////
 
-	// Only draw final pass to swapchain on left eye pass,
-	// need to fix this so it can also be composited out to the VR display and not just the swapchain.
-	if(!Eye)
+	// Draw final composited image
+	// Input = ColorResolve, ColorBlur
+	// Output = Swapchain
+	// NOTE: ColorResolve should already be in shader read-only
+	//vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorBlur[Eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	//vkuTransitionLayout(PerFrame[Index].CommandBuffer, Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+	//vkCmdBeginRendering(PerFrame[Index].CommandBuffer, &(VkRenderingInfo)
+	//{
+	//	.sType=VK_STRUCTURE_TYPE_RENDERING_INFO,
+	//	.renderArea=(VkRect2D){ { 0, 0 }, { Width, Height } },
+	//	.layerCount=1,
+	//	.viewMask=0,
+	//	.colorAttachmentCount=1,
+	//	.pColorAttachments=&(VkRenderingAttachmentInfo)
+	//	{
+	//		.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+	//		.imageView=Swapchain.ImageView[Index],
+	//		.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	//		.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+	//		.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
+	//	},
+	//});
+	vkCmdBeginRenderPass(PerFrame[Index].CommandBuffer, &(VkRenderPassBeginInfo)
 	{
-		// Draw final composited image
-		// Input = ColorResolve, ColorBlur
-		// Output = Swapchain
-		// NOTE: ColorResolve should already be in shader read-only
-		//vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorBlur[Eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		//vkuTransitionLayout(PerFrame[Index].CommandBuffer, Swapchain.Image[Index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+		.renderPass=CompositeRenderPass,
+		.framebuffer=PerFrame[Index].CompositeFramebuffer[Eye],
+		.clearValueCount=1,
+		.pClearValues=(VkClearValue[]){ {{{ 0.0f, 0.0f, 0.0f, 1.0f }}} },
+		.renderArea={ { 0, 0 }, { rtWidth, rtHeight } },
+	}, VK_SUBPASS_CONTENTS_INLINE);
 
-		//vkCmdBeginRendering(PerFrame[Index].CommandBuffer, &(VkRenderingInfo)
-		//{
-		//	.sType=VK_STRUCTURE_TYPE_RENDERING_INFO,
-		//	.renderArea=(VkRect2D){ { 0, 0 }, { Width, Height } },
-		//	.layerCount=1,
-		//	.viewMask=0,
-		//	.colorAttachmentCount=1,
-		//	.pColorAttachments=&(VkRenderingAttachmentInfo)
-		//	{
-		//		.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-		//		.imageView=Swapchain.ImageView[Index],
-		//		.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		//		.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-		//		.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-		//	},
-		//});
-		vkCmdBeginRenderPass(PerFrame[Index].CommandBuffer, &(VkRenderPassBeginInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-			.renderPass=CompositeRenderPass,
-			.framebuffer=PerFrame[Index].CompositeFramebuffer,
-			.clearValueCount=1,
-			.pClearValues=(VkClearValue[]){ {{{ 0.0f, 0.0f, 0.0f, 1.0f }}} },
-			.renderArea={ { 0, 0 }, { Width, Height } },
-		}, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdSetViewport(PerFrame[Index].CommandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)rtWidth, (float)rtHeight, 0.0f, 1.0f });
+	vkCmdSetScissor(PerFrame[Index].CommandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { rtWidth, rtHeight } });
 
-		vkCmdSetViewport(PerFrame[Index].CommandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)Width, (float)Height, 0.0f, 1.0f });
-		vkCmdSetScissor(PerFrame[Index].CommandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { Width, Height } });
+	vkCmdBindPipeline(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CompositePipeline.Pipeline);
 
-		vkCmdBindPipeline(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CompositePipeline.Pipeline);
+	vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet, 0, &ColorResolve[Eye]);
+//	vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet, 0, &ShadowDepth);
+	vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet, 1, &ColorBlur[Eye]);
 
-		vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet, 0, &ColorResolve[0]);
-//		vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet, 0, &ShadowDepth);
-		vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet, 1, &ColorBlur[0]);
+	vkuAllocateUpdateDescriptorSet(&CompositeDescriptorSet, PerFrame[Index].DescriptorPool);
+	vkCmdBindDescriptorSets(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CompositePipelineLayout, 0, 1, &CompositeDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
-		if(IsVR)
-		{
-			vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet, 2, &ColorResolve[1]);
-			vkuDescriptorSet_UpdateBindingImageInfo(&CompositeDescriptorSet, 3, &ColorBlur[1]);
-		}
+	vkCmdDraw(PerFrame[Index].CommandBuffer, 3, 1, 0, 0);
 
-		vkuAllocateUpdateDescriptorSet(&CompositeDescriptorSet, PerFrame[Index].DescriptorPool);
-		vkCmdBindDescriptorSets(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CompositePipelineLayout, 0, 1, &CompositeDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
+	// Draw UI controls
+	UI_Draw(&UI, Index);
 
-		vkCmdDraw(PerFrame[Index].CommandBuffer, 3, 1, 0, 0);
+	// Draw text in the compositing renderpass
+	Font_Print(&Fnt, 16.0f, 0.0f, 100.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep*1000.0f);
+	Font_Draw(&Fnt, Index);
 
-		// Draw UI controls
-		UI_Draw(&UI, Index);
-
-		// Draw text in the compositing renderpass
-		Font_Print(&Fnt, 16.0f, 0.0f, 100.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep*1000.0f);
-		Font_Draw(&Fnt, Index);
-
-		//vkCmdEndRendering(PerFrame[Index].CommandBuffer);
-		vkCmdEndRenderPass(PerFrame[Index].CommandBuffer);
-	}
+	//vkCmdEndRendering(PerFrame[Index].CommandBuffer);
+	vkCmdEndRenderPass(PerFrame[Index].CommandBuffer);
 }

@@ -95,7 +95,7 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 		.apiVersion=VK_API_VERSION_1_1
 	};
 
-	const char *Extensions[10];
+	const char *Extensions[100];
 	uint32_t NumExtensions=0;
 
 	if(SurfaceOSExtension)
@@ -121,6 +121,11 @@ VkBool32 CreateVulkanInstance(VkInstance *Instance)
 	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME;
 	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME;
 	Extensions[NumExtensions++]=VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME;
+	//VK_KHR_external_memory_capabilities
+	//VK_KHR_get_physical_device_properties2
+	//VK_KHR_surface
+	//VK_KHR_win32_surface
+	//VK_NV_external_memory_capabilities
 
 	VkInstanceCreateInfo InstanceInfo=
 	{
