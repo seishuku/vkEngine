@@ -22,8 +22,7 @@ To-do (in no particular order):
 External dependencies needed for building this (versions as of this writing, newer *should* work):
  - libvorbis 1.3.7
  - libogg 1.3.5
- - OpenVR 1.23.7
- - OpenXR 1.2??? (working on porting to this)
+ - OpenXR 1.2
  - pthread (whatever Linux has, or pthread-win32 2.0 for windows)
  - portaudio 2.0
  - Vulkan 1.3.231.1
