@@ -33,15 +33,22 @@
 #include "composite.h"
 #include "perframe.h"
 #include "sounds.h"
+
+#ifndef ANDROID
 #include "music.h"
+#endif
 
 extern bool Done;
 
 // Initial window size
-uint32_t Width=1920, Height=1080;
+extern uint32_t windowWidth, windowHeight;
+uint32_t renderWidth=1920, renderHeight=1080;
 
-// extern switch from vr.c for if we have VR available
+uint32_t primaryNumSwapchainImages=0;
+
+// external switch from system for if VR was initialized
 extern bool IsVR;
+XruContext_t xrContext;
 
 // Vulkan instance handle and context structs
 VkInstance Instance;
@@ -52,8 +59,7 @@ VkuMemZone_t *VkZone;
 
 // Camera data
 Camera_t Camera;
-matrix ModelView;
-matrix Projection[2];
+matrix ModelView, Projection[2], HeadPose;
 
 // extern timing data from system main
 extern float fps, fTimeStep, fTime;
@@ -195,6 +201,11 @@ uint32_t CursorID=UINT32_MAX;
 //////
 
 Console_t Console;
+
+XrPosef leftHand, rightHand;
+float leftTrigger, rightTrigger;
+float leftGrip, rightGrip;
+vec2 leftThumbstick, rightThumbstick;
 
 void RecreateSwapchain(void);
 
@@ -826,8 +837,8 @@ void Thread_Main(void *Arg)
 		}
 	});
 
-	vkCmdSetViewport(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)rtWidth, (float)rtHeight, 0.0f, 1.0f });
-	vkCmdSetScissor(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { rtWidth, rtHeight } });
+	vkCmdSetViewport(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
+	vkCmdSetScissor(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
 
 	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
 	vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
@@ -860,6 +871,68 @@ void Thread_Main(void *Arg)
 			vkCmdBindIndexBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Models[i].Mesh[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Models[i].Mesh[j].NumFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*i);
 		}
+	}
+
+	// Draw VR "hands"
+	if(IsVR)
+	{
+		struct
+		{
+			matrix mvp;
+			vec4 color;
+		} spherePC;
+
+		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, SpherePipeline.Pipeline);
+
+		vec3 leftPos=Vec3(leftHand.position.x, leftHand.position.y, leftHand.position.z);
+		vec4 leftRot=Vec4(leftHand.orientation.x, leftHand.orientation.y, leftHand.orientation.z, leftHand.orientation.w);
+		matrix local=MatrixMult(MatrixMult(QuatMatrix(leftRot), MatrixScale(0.1f, 0.1f, 0.1f)), MatrixTranslatev(leftPos));
+		local=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->HMD);
+		spherePC.mvp=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
+
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], SpherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
+		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 60, 1, 0, 0);
+
+		vec3 rightPos=Vec3(rightHand.position.x, rightHand.position.y, rightHand.position.z);
+		vec4 rightRot=Vec4(rightHand.orientation.x, rightHand.orientation.y, rightHand.orientation.z, rightHand.orientation.w);
+		local=MatrixMult(MatrixMult(QuatMatrix(rightRot), MatrixScale(0.1f, 0.1f, 0.1f)), MatrixTranslatev(rightPos));
+		local=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->HMD);
+		spherePC.mvp=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
+
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], SpherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
+		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 60, 1, 0, 0);
+
+		struct
+		{
+			matrix mvp;
+			vec4 Color;
+			vec4 Verts[2];
+		} LinePC;
+
+		LinePC.Verts[0]=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		LinePC.Verts[1]=Vec4(0.0f, 0.0f, -1.0f, 1.0f);
+
+		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, LinePipeline.Pipeline);
+
+		LinePC.Color=Vec4(leftTrigger*100.0f+1.0f, 1.0f, leftGrip*100.0f+1.0f, 1.0f);
+
+		local=MatrixMult(QuatMatrix(leftRot), MatrixTranslatev(leftPos));
+		local=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->HMD);
+		LinePC.mvp=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
+
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(LinePC), &LinePC);
+		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
+
+		LinePC.Color=Vec4(rightTrigger*100.0f+1.0f, 1.0f, rightGrip*100.0f+1.0f, 1.0f);
+
+		local=MatrixMult(QuatMatrix(rightRot), MatrixTranslatev(rightPos));
+		local=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->HMD);
+		LinePC.mvp=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
+
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(LinePC), &LinePC);
+		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
 	}
 
 #if 0
@@ -964,8 +1037,8 @@ void Thread_Skybox(void *Arg)
 		}
 	});
 
-	vkCmdSetViewport(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)rtWidth, (float)rtHeight, 0.0f, 1.0f });
-	vkCmdSetScissor(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { rtWidth, rtHeight } });
+	vkCmdSetViewport(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
+	vkCmdSetScissor(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
 
 	vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipeline.Pipeline);
 
@@ -1017,8 +1090,8 @@ void Thread_Particles(void *Arg)
 		}
 	});
 
-	vkCmdSetViewport(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)rtWidth, (float)rtHeight, 0.0f, 1.0f });
-	vkCmdSetScissor(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { rtWidth, rtHeight } });
+	vkCmdSetViewport(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
+	vkCmdSetScissor(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
 
 	matrix Modelview=MatrixMult(PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->HMD);
 	ParticleSystem_Draw(&ParticleSystem, Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Data->PerFrame[Data->Index].DescriptorPool[Data->Eye], Modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
@@ -1095,7 +1168,7 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 		.framebuffer=Framebuffer[Eye],
 		.clearValueCount=2,
 		.pClearValues=(VkClearValue[]){ {{{ 0.0f, 0.0f, 0.0f, 1.0f }}}, {{{ 0.0f, 0 }}} },
-		.renderArea=(VkRect2D){ { 0, 0 }, { rtWidth, rtHeight } },
+		.renderArea=(VkRect2D){ { 0, 0 }, { renderWidth, renderHeight } },
 	}, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
 	// Set per thread data and add the job to that worker thread
@@ -1292,33 +1365,26 @@ void NetUpdate(void *Arg)
 }
 #endif
 
+extern vec2 MousePosition;
+
+void FireParticleEmitter(vec3 Position, vec3 Direction);
+
+bool leftTriggerOnce=true;
+bool rightTriggerOnce=true;
+
+static vec3 lastLeftPosition={ 0.0f, 0.0f, 0.0f };
+
 // Render call from system main event loop
 void Render(void)
 {
 	static uint32_t Index=0;
 	uint32_t imageIndex;
-	uint32_t eyeIndex[2]={ 0, 0 };
-	matrix Pose;
-
-	Thread_AddJob(&ThreadPhysics, Thread_Physics, NULL);
-	//	Thread_Physics(NULL);
-
-	Console_Draw(&Console);
-
-	Audio_SetStreamVolume(UI_GetBarGraphValue(&UI, VolumeID));
-
-	Font_Print(&Fnt, 16.0f, rtWidth-400.0f, rtHeight-50.0f-16.0f, "Current track: %s", MusicList[CurrentMusic].String);
-
-	if(!IsVR)
-		Projection[0]=MatrixInfPerspective(90.0f, (float)Width/Height, 0.01f);
-	else
-	{
-		Projection[0]=VR_GetEyeProjection(0);
-		Projection[1]=VR_GetEyeProjection(1);
-	}
 
 	if(IsVR)
-		VR_StartFrame(&eyeIndex[0], &eyeIndex[1]);
+	{
+		if(!VR_StartFrame(&xrContext))
+			return;
+	}
 	else
 	{
 		VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain.Swapchain, UINT64_MAX, PerFrame[Index].PresentCompleteSemaphore, VK_NULL_HANDLE, &imageIndex);
@@ -1331,12 +1397,92 @@ void Render(void)
 		}
 	}
 
-	Pose=VR_GetHeadPose();
+	// Handle VR input
+	// TODO: this needs to go somewhere else?
+	if(IsVR)
+	{
+		HeadPose=VR_GetHeadPose(&xrContext);
 
-	vkWaitForFences(Context.Device, 1, &PerFrame[Index].FrameFence, VK_TRUE, UINT64_MAX);
+		leftHand=VR_GetActionPose(&xrContext, xrContext.handPose, xrContext.leftHandSpace, 0);
+		leftTrigger=VR_GetActionFloat(&xrContext, xrContext.handTrigger, 0);
+		leftGrip=VR_GetActionFloat(&xrContext, xrContext.handGrip, 0);
+		leftThumbstick=VR_GetActionVec2(&xrContext, xrContext.handThumbstick, 0);
+
+		rightHand=VR_GetActionPose(&xrContext, xrContext.handPose, xrContext.rightHandSpace, 1);
+		rightTrigger=VR_GetActionFloat(&xrContext, xrContext.handTrigger, 1);
+		rightGrip=VR_GetActionFloat(&xrContext, xrContext.handGrip, 1);
+		rightThumbstick=VR_GetActionVec2(&xrContext, xrContext.handThumbstick, 1);
+
+		const float speed=400.0f;
+		const float rotation=0.1f;
+
+		Camera.Velocity.x-=leftThumbstick.x*speed*fTimeStep;
+		Camera.Velocity.z+=leftThumbstick.y*speed*fTimeStep;
+		Camera.Yaw-=rightThumbstick.x*rotation*fTimeStep;
+		Camera.Pitch+=rightThumbstick.y*rotation*fTimeStep;
+
+		if(leftTrigger>0.1f)
+		{
+			vec3 deltaLeftPosition=Vec3_Muls(Vec3_Subv(Vec3(leftHand.position.x, leftHand.position.y, leftHand.position.z), lastLeftPosition), 100.0f);
+			MouseEvent_t MouseEvent={ .dx=(int32_t)deltaLeftPosition.x, .dy=(int32_t)deltaLeftPosition.y };
+
+			Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
+
+			if(leftTrigger>0.75f&&leftTriggerOnce)
+			{
+				leftTriggerOnce=false;
+				MouseEvent.button|=MOUSE_BUTTON_LEFT;
+				Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
+			}
+			else
+				MouseEvent.button&=~MOUSE_BUTTON_LEFT;
+
+
+			if(leftTrigger<0.25f&&!leftTriggerOnce)
+				leftTriggerOnce=true;
+		}
+		else
+			lastLeftPosition=Vec3(leftHand.position.x, leftHand.position.y, leftHand.position.z);
+
+		if(rightTrigger>0.75f&&rightTriggerOnce)
+		{
+			rightTriggerOnce=false;
+
+			vec4 rightOrientation=Vec4(rightHand.orientation.x, rightHand.orientation.y, rightHand.orientation.z, rightHand.orientation.w);
+			vec3 Direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatMatrix(rightOrientation), MatrixInverse(ModelView)));
+
+			FireParticleEmitter(Vec3_Addv(Camera.Position, Vec3_Muls(Direction, Camera.Radius)), Direction);
+			Audio_PlaySample(&Sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &Camera.Position);
+		}
+
+		if(rightTrigger<0.25f&&!rightTriggerOnce)
+			rightTriggerOnce=true;
+	}
+	else
+		HeadPose=MatrixIdentity();
+
+	if(!IsVR)
+		Projection[0]=MatrixInfPerspective(90.0f, (float)renderWidth/renderHeight, 0.01f);
+	else
+	{
+		Projection[0]=VR_GetEyeProjection(&xrContext, 0);
+		Projection[1]=VR_GetEyeProjection(&xrContext, 1);
+	}
+
+	Thread_AddJob(&ThreadPhysics, Thread_Physics, NULL);
+
+	Console_Draw(&Console);
+
+	Audio_SetStreamVolume(UI_GetBarGraphValue(&UI, VolumeID));
+
+#ifndef ANDROID
+	Font_Print(&Fnt, 16.0f, renderWidth-400.0f, renderHeight-50.0f-16.0f, "Current track: %s", MusicList[CurrentMusic].String);
+#endif
+
+	//vkWaitForFences(Context.Device, 1, &PerFrame[Index].FrameFence, VK_TRUE, UINT64_MAX);
 
 	// Reset the frame fence and command pool (and thus the command buffer)
-	vkResetFences(Context.Device, 1, &PerFrame[Index].FrameFence);
+	//vkResetFences(Context.Device, 1, &PerFrame[Index].FrameFence);
 	vkResetDescriptorPool(Context.Device, PerFrame[Index].DescriptorPool, 0);
 	vkResetCommandPool(Context.Device, PerFrame[Index].CommandPool, 0);
 
@@ -1355,13 +1501,13 @@ void Render(void)
 	// Wait for physics to finish before rendering
 	pthread_barrier_wait(&ThreadBarrier_Physics);
 
-	EyeRender(PerFrame[Index].CommandBuffer, Index, 0, Pose);
+	EyeRender(PerFrame[Index].CommandBuffer, Index, 0, HeadPose);
 
 	if(IsVR)
 	{
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-		EyeRender(PerFrame[Index].CommandBuffer, Index, 1, Pose);
+		EyeRender(PerFrame[Index].CommandBuffer, Index, 1, HeadPose);
 	}
 
 	// Final drawing compositing
@@ -1371,6 +1517,9 @@ void Render(void)
 	// Other eye compositing
 	if(IsVR)
 		CompositeDraw(Index, 1);
+
+	// Reset the font text collection for the next frame
+	Font_Reset(&Fnt);
 
 	vkEndCommandBuffer(PerFrame[Index].CommandBuffer);
 
@@ -1389,16 +1538,18 @@ void Render(void)
 
 	if(IsVR)
 	{
-		SubmitInfo.signalSemaphoreCount=0;
 		SubmitInfo.waitSemaphoreCount=0;
+		SubmitInfo.pWaitSemaphores=VK_NULL_HANDLE;
+		SubmitInfo.signalSemaphoreCount=0;
+		SubmitInfo.pSignalSemaphores=VK_NULL_HANDLE;
 	}
 
-	vkQueueSubmit(Context.Queue, 1, &SubmitInfo, PerFrame[Index].FrameFence);
+	vkQueueSubmit(Context.Queue, 1, &SubmitInfo, VK_NULL_HANDLE/*PerFrame[Index].FrameFence*/);
 
 	if(IsVR)
 	{
-		VR_EndFrame();
-		Index=(Index+1)%xrSwapchain[0].NumImages;
+		VR_EndFrame(&xrContext);
+		Index=(Index+1)%xrContext.swapchain[0].numImages;
 	}
 	else
 	{
@@ -1406,8 +1557,8 @@ void Render(void)
 		VkResult Result=vkQueuePresentKHR(Context.Queue, &(VkPresentInfoKHR)
 		{
 			.sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-			.waitSemaphoreCount=1,
-			.pWaitSemaphores=&PerFrame[Index].RenderCompleteSemaphore,
+			//.waitSemaphoreCount=1,
+			//.pWaitSemaphores=&PerFrame[Index].RenderCompleteSemaphore,
 			.swapchainCount=1,
 			.pSwapchains=&Swapchain.Swapchain,
 			.pImageIndices=&imageIndex,
@@ -1424,11 +1575,8 @@ void Render(void)
 	}
 }
 
-#include <assert.h>
-
 void PlayExplosionCallback(void *arg)
 {
-	assert(false);
 	Audio_PlaySample(&Sounds[SOUND_EXPLODE1], false, 1.0f, &Camera.Position);
 }
 
@@ -1442,7 +1590,7 @@ bool Init(void)
 {
 	// TODO: This is a hack, fix it proper.
 	if(IsVR)
-		Swapchain.NumImages=xrSwapchain[0].NumImages;
+		Swapchain.NumImages=xrContext.swapchain[0].numImages;
 
 	RandomSeed((uint32_t)GetClock()*UINT32_MAX);
 
@@ -1532,8 +1680,10 @@ bool Init(void)
 		return false;
 	}
 
+#ifndef ANDROID
 	Music_Init();
 	StartStreamCallback(NULL);
+#endif
 
 	// Load models
 	if(LoadBModel(&Models[MODEL_ASTEROID1], "assets/asteroid1.bmodel"))
@@ -1584,9 +1734,8 @@ bool Init(void)
 	
 	// TODO: For some reason on Linux/Android, the first loaded QOI here has corruption and I'm not sure why.
 	//			If I upload a temp image and delete it afterwards, it's all good.
-	//VkuImage_t Temp;
-	//Image_Upload(&Context, &Temp, "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_CROSSHAIR], "assets/crosshair.qoi", IMAGE_NONE);
+	VkuImage_t Temp;
+	Image_Upload(&Context, &Temp, "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1], "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1_NORMAL], "assets/asteroid1_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
@@ -1596,8 +1745,9 @@ bool Init(void)
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID3_NORMAL], "assets/asteroid3_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4], "assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4_NORMAL], "assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&Context, &Textures[TEXTURE_CROSSHAIR], "assets/crosshair.qoi", IMAGE_NONE);
 
-	//vkuDestroyImageBuffer(&Context, &Temp);
+	vkuDestroyImageBuffer(&Context, &Temp);
 
 	GenNebulaVolume(&Context, &Textures[TEXTURE_VOLUME]);
 
@@ -1622,14 +1772,14 @@ bool Init(void)
 	CreateCompositePipeline();
 
 	// Create primary frame buffers, depth image
-	CreateFramebuffers(0, rtWidth, rtHeight);
-	CreateCompositeFramebuffers(0, rtWidth, rtHeight);
+	CreateFramebuffers(0, renderWidth, renderHeight);
+	CreateCompositeFramebuffers(0, renderWidth, renderHeight);
 
 	// Second eye framebuffer for VR
 	if(IsVR)
 	{
-		CreateFramebuffers(1, rtWidth, rtHeight);
-		CreateCompositeFramebuffers(1, rtWidth, rtHeight);
+		CreateFramebuffers(1, renderWidth, renderHeight);
+		CreateCompositeFramebuffers(1, renderWidth, renderHeight);
 	}
 
 	// Set up particle system
@@ -1646,39 +1796,41 @@ bool Init(void)
 
 	Font_Init(&Fnt);
 
-	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)rtWidth, (float)rtHeight));
+	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)renderWidth, (float)renderHeight));
 
+#ifndef ANDROID
 	UI_AddButton(&UI,
-				 Vec2(rtWidth-400.0f, rtHeight-50.0f),	// Position
+				 Vec2(renderWidth-400.0f, renderHeight-50.0f),	// Position
 				 Vec2(100.0f, 50.0f),					// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Play",								// Title text
 				 StartStreamCallback);					// Callback
 	UI_AddButton(&UI,
-				 Vec2(rtWidth-300.0f, rtHeight-50.0f),	// Position
+				 Vec2(renderWidth-300.0f, renderHeight-50.0f),	// Position
 				 Vec2(100.0f, 50.0f),					// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Pause",								// Title text
 				 StopStreamCallback);					// Callback
 	UI_AddButton(&UI,
-				 Vec2(rtWidth-200.0f, rtHeight-50.0f),	// Position
+				 Vec2(renderWidth-200.0f, renderHeight-50.0f),	// Position
 				 Vec2(100.0f, 50.0f),					// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Prev",								// Title text
 				 PrevTrackCallback);					// Callback
 	UI_AddButton(&UI,
-				 Vec2(rtWidth-100.0f, rtHeight-50.0f),	// Position
+				 Vec2(renderWidth-100.0f, renderHeight-50.0f),	// Position
 				 Vec2(100.0f, 50.0f),					// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Next",								// Title text
 				 NextTrackCallback);					// Callback
 	VolumeID=UI_AddBarGraph(&UI,
-							Vec2(rtWidth-400.0f, rtHeight-50.0f-16.0f-30.0f),// Position
+							Vec2(renderWidth-400.0f, renderHeight-50.0f-16.0f-30.0f),// Position
 							Vec2(400.0f, 30.0f),		// Size
 							Vec3(0.25f, 0.25f, 0.25f),	// Color
 							"Volume",					// Title text
 							false,						// Read-only
 							0.0f, 1.0f, 0.125f);		// min/max/initial value
+#endif
 
 	UI_AddButton(&UI,
 				 Vec2(0.0f, 500.0f),				// Position
@@ -1699,7 +1851,7 @@ bool Init(void)
 				   "Checkbox 2",					// Title text
 				   false);							// Initial value
 
-	UI_AddSprite(&UI, Vec2((float)rtWidth/2.0f, (float)rtHeight/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &Textures[TEXTURE_CROSSHAIR], 0.0f);
+	UI_AddSprite(&UI, Vec2((float)renderWidth/2.0f, (float)renderHeight/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &Textures[TEXTURE_CROSSHAIR], 0.0f);
 
 	CursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3(1.0f, 1.0f, 1.0f));
 
@@ -1878,20 +2030,20 @@ void RecreateSwapchain(void)
 		// Recreate the swapchain
 		vkuCreateSwapchain(&Context, &Swapchain, VK_TRUE);
 
-		rtWidth=Swapchain.Extent.width;
-		rtHeight=Swapchain.Extent.height;
+		renderWidth=Swapchain.Extent.width;
+		renderHeight=Swapchain.Extent.height;
 
 		UI.Size.x=(float)Swapchain.Extent.width;
 		UI.Size.y=(float)Swapchain.Extent.height;
 
 		// Recreate the framebuffer
-		CreateFramebuffers(0, rtWidth, rtHeight);
-		CreateCompositeFramebuffers(0, rtWidth, rtHeight);
+		CreateFramebuffers(0, renderWidth, renderHeight);
+		CreateCompositeFramebuffers(0, renderWidth, renderHeight);
 
 		if(IsVR)
 		{
-			CreateFramebuffers(1, rtWidth, rtHeight);
-			CreateCompositeFramebuffers(1, rtWidth, rtHeight);
+			CreateFramebuffers(1, renderWidth, renderHeight);
+			CreateCompositeFramebuffers(1, renderWidth, renderHeight);
 		}
 	}
 }
@@ -1919,7 +2071,10 @@ void Destroy(void)
 #endif
 
 	Audio_Destroy();
+
+#ifndef ANDROID
 	Music_Destroy();
+#endif
 
 	Zone_Free(Zone, Sounds[SOUND_PEW1].Data);
 	Zone_Free(Zone, Sounds[SOUND_PEW2].Data);
@@ -1932,8 +2087,10 @@ void Destroy(void)
 	Zone_Free(Zone, Sounds[SOUND_EXPLODE2].Data);
 	Zone_Free(Zone, Sounds[SOUND_EXPLODE3].Data);
 
+#ifndef ANDROID
 	if(IsVR)
-		VR_Destroy();
+		VR_Destroy(&xrContext);
+#endif
 
 	for(uint32_t i=0;i<NUM_THREADS;i++)
 		Thread_Destroy(&Thread[i]);

@@ -192,6 +192,9 @@
     <ClInclude Include="console\console.h">
       <Filter>Header Files\console</Filter>
     </ClInclude>
+    <ClInclude Include="renderdoc_app.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="audio\audio.c">

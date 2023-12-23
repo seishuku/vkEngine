@@ -20,7 +20,7 @@ void *Thread_Worker(void *Data)
 		pthread_mutex_lock(&Worker->Mutex);
 
 		// Check if there are any jobs
-		while((Worker->NumJobs==0)&&(!Worker->Stop)||(Worker->Pause))
+		while((Worker->NumJobs==0)&&((!Worker->Stop)||(Worker->Pause)))
 			pthread_cond_wait(&Worker->Condition, &Worker->Mutex);
 
 		if(Worker->Stop)
@@ -132,14 +132,14 @@ bool Thread_Init(ThreadWorker_t *Worker)
 	// Initialize the mutex
 	if(pthread_mutex_init(&Worker->Mutex, NULL))
 	{
-		DBGPRINTF("Unable to create mutex.\r\n");
+		DBGPRINTF(DEBUG_ERROR, "Unable to create mutex.\r\n");
 		return false;
 	}
 
 	// Initialize the condition
 	if(pthread_cond_init(&Worker->Condition, NULL))
 	{
-		DBGPRINTF("Unable to create condition.\r\n");
+		DBGPRINTF(DEBUG_ERROR, "Unable to create condition.\r\n");
 		return false;
 	}
 
@@ -154,7 +154,7 @@ bool Thread_Start(ThreadWorker_t *Worker)
 
 	if(pthread_create(&Worker->Thread, NULL, Thread_Worker, (void *)Worker))
 	{
-		DBGPRINTF("Unable to create worker thread.\r\n");
+		DBGPRINTF(DEBUG_ERROR, "Unable to create worker thread.\r\n");
 		return false;
 	}
 

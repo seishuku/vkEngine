@@ -163,6 +163,6 @@ bool UI_UpdateCursorColor(UI_t *UI, uint32_t ID, vec3 Color);
 
 uint32_t UI_TestHit(UI_t *UI, vec2 Position);
 bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 Position);
-bool UI_Draw(UI_t *UI, uint32_t Index);
+bool UI_Draw(UI_t *UI, uint32_t Index, uint32_t Eye);
 
 #endif

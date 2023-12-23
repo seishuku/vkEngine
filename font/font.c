@@ -18,6 +18,7 @@
 #include "../math/math.h"
 #include "../font/font.h"
 #include "../perframe.h"
+#include "../vr/vr.h"
 
 // external Vulkan context data/functions for this module:
 extern VkuContext_t Context;
@@ -48,7 +49,7 @@ bool Font_Init(Font_t *Font)
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
 			.offset=0,
-			.size=sizeof(uint32_t)*2,
+			.size=(sizeof(uint32_t)*4)+sizeof(matrix),
 			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 	}, 0, &Font->PipelineLayout);
@@ -349,13 +350,36 @@ void Font_Print(Font_t *Font, float size, float x, float y, char *string, ...)
 	// ---
 }
 
+extern bool IsVR;
+extern XruContext_t xrContext;
+extern matrix ModelView, Projection[2], HeadPose;
+
 // Submits text draw data to GPU and resets for next frame
-void Font_Draw(Font_t *Font, uint32_t Index)
+void Font_Draw(Font_t *Font, uint32_t Index, uint32_t Eye)
 {
+	struct
+	{
+		VkExtent2D extent;
+		vec2 pad;
+		matrix mvp;
+	} FontPC;
+
+	float z=-1.0f;
+
+	if(IsVR)
+	{
+		z=-1.5f;
+		FontPC.extent=(VkExtent2D){ xrContext.swapchainExtent.width, xrContext.swapchainExtent.height };
+	}
+	else
+		FontPC.extent=Swapchain.Extent;
+
+	FontPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale((float)FontPC.extent.width/(float)FontPC.extent.height, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), HeadPose), Projection[Eye]);
+
 	// Bind the font rendering pipeline (sets states and shaders)
 	vkCmdBindPipeline(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Font->Pipeline.Pipeline);
 
-	vkCmdPushConstants(PerFrame[Index].CommandBuffer, Font->PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkExtent2D), &Swapchain.Extent);
+	vkCmdPushConstants(PerFrame[Index].CommandBuffer, Font->PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(FontPC), &FontPC);
 
 	// Bind vertex data buffer
 	vkCmdBindVertexBuffers(PerFrame[Index].CommandBuffer, 0, 1, &Font->VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
@@ -364,7 +388,10 @@ void Font_Draw(Font_t *Font, uint32_t Index)
 
 	// Draw the number of characters
 	vkCmdDraw(PerFrame[Index].CommandBuffer, 4, Font->NumChar, 0, 0);
+}
 
+void Font_Reset(Font_t *Font)
+{
 	// Reset instance data pointer and character count
 	Font->Instance=Font->InstanceBufferPtr;
 	Font->NumChar=0;

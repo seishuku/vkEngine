@@ -124,9 +124,9 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 		// Find a queue index on a device that supports both graphics rendering and present support
 		for(uint32_t j=0;j<QueueFamilyCount;j++)
 		{
-			VkBool32 SupportsPresent=VK_FALSE;
+			VkBool32 SupportsPresent=VK_TRUE;
 
-			vkGetPhysicalDeviceSurfaceSupportKHR(DeviceHandles[i], j, Context->Surface, &SupportsPresent);
+			//vkGetPhysicalDeviceSurfaceSupportKHR(DeviceHandles[i], j, Context->Surface, &SupportsPresent);
 
 			if(SupportsPresent&&(QueueFamilyProperties[j].queueFlags&VK_QUEUE_GRAPHICS_BIT))
 			{

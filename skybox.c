@@ -4,6 +4,7 @@
 #include "system/system.h"
 #include "vulkan/vulkan.h"
 #include "math/math.h"
+#include "vr/vr.h"
 #include "model/bmodel.h"
 #include "skybox.h"
 #include "models.h"

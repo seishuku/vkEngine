@@ -18,7 +18,9 @@
 MemZone_t *Zone;
 
 bool Done=false;
+
 bool IsVR=false;
+extern XruContext_t xrContext;
 
 extern VkInstance Instance;
 extern VkuContext_t Context;
@@ -27,7 +29,8 @@ extern VkuMemZone_t *VkZone;
 
 extern VkuSwapchain_t Swapchain;
 
-extern uint32_t Width, Height;
+uint32_t winWidth, winHeight;
+extern uint32_t renderWidth, renderHeight;
 
 float fps=0.0f, fTimeStep, fTime=0.0;
 
@@ -181,13 +184,10 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 	switch(cmd)
 	{
 		case APP_CMD_INIT_WINDOW:
-			Width=ANativeWindow_getWidth(app->window);
-			Height=ANativeWindow_getHeight(app->window);
+			winWidth=ANativeWindow_getWidth(app->window);
+			winHeight=ANativeWindow_getHeight(app->window);
 
 			Context.Win=app->window;
-
-			rtWidth=Width;
-			rtHeight=Height;
 
 			DBGPRINTF(DEBUG_INFO, "Allocating zone memory...\n");
 			Zone=Zone_Init(256*1000*1000);
@@ -225,6 +225,23 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 				appState.app->destroyRequested=true;
 				ANativeActivity_finish(app->activity);
 				return;
+			}
+			else
+			{
+				renderWidth=Swapchain.Extent.width;
+				renderHeight=Swapchain.Extent.height;
+			}
+
+			DBGPRINTF(DEBUG_INFO, "Initializing VR...\n");
+			if(!VR_Init(&xrContext, Instance, &Context))
+			{
+				DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
+				IsVR=false;
+			}
+			else
+			{
+				renderWidth=xrContext.swapchainExtent.width;
+				renderHeight=xrContext.swapchainExtent.height;
 			}
 
 			DBGPRINTF(DEBUG_INFO, "Init...\n");
@@ -293,6 +310,20 @@ void android_main(struct android_app *app)
 	appState.app=app;
 
 	android_asset_manager=app->activity->assetManager;
+
+	PFN_xrInitializeLoaderKHR xrInitializeLoaderKHR=XR_NULL_HANDLE;
+	xrGetInstanceProcAddr(XR_NULL_HANDLE, "xrInitializeLoaderKHR", (PFN_xrVoidFunction *)&xrInitializeLoaderKHR);
+
+	if(xrInitializeLoaderKHR!=NULL)
+	{
+		XrLoaderInitInfoAndroidKHR loaderInitializeInfoAndroid=
+		{
+			.type=XR_TYPE_LOADER_INIT_INFO_ANDROID_KHR,
+			.applicationVM=app->activity->vm,
+			.applicationContext=app->activity->clazz
+		};
+		xrInitializeLoaderKHR((XrLoaderInitInfoBaseHeaderKHR *)&loaderInitializeInfoAndroid);
+	}
 
 	while(1)
 	{

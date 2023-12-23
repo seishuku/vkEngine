@@ -278,7 +278,7 @@ static void Audio_FillBuffer(void *Buffer, uint32_t Length)
 		{
 			streamBuffer.StreamCallback(&streamBuffer.Buffer[streamBuffer.Position], remainingData);
 			MixAudio(out, &streamBuffer.Buffer[streamBuffer.Position], remainingData, (int8_t)(streamBuffer.Volume*MAX_VOLUME));
-			streamBuffer.Position+=remainingData;
+			streamBuffer.Position+=(uint32_t)remainingData;
 
 			if(streamBuffer.Position>=MAX_STREAM_SAMPLES)
 				streamBuffer.Position=0;
@@ -458,7 +458,7 @@ int Audio_Init(void)
 
 	AAudioStreamBuilder_setFormat(streamBuilder, AAUDIO_FORMAT_PCM_I16);
 	AAudioStreamBuilder_setChannelCount(streamBuilder, 2);
-	AAudioStreamBuilder_setSampleRate(streamBuilder, SAMPLE_RATE);
+	AAudioStreamBuilder_setSampleRate(streamBuilder, AUDIO_SAMPLE_RATE);
 	AAudioStreamBuilder_setPerformanceMode(streamBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
 	AAudioStreamBuilder_setDataCallback(streamBuilder, Audio_Callback, NULL);
 
@@ -469,14 +469,14 @@ int Audio_Init(void)
 		return false;
 	}
 
-	if(AAudioStream_getSampleRate(AudioStream)!=SAMPLE_RATE)
+	if(AAudioStream_getSampleRate(AudioStream)!=AUDIO_SAMPLE_RATE)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Audio: Sample rate mismatch\n");
 		return false;
 	}
 
 	// Sets the buffer size. 
-	AAudioStream_setBufferSizeInFrames(AudioStream, AAudioStream_getFramesPerBurst(AudioStream)*NUM_SAMPLES);
+	AAudioStream_setBufferSizeInFrames(AudioStream, AAudioStream_getFramesPerBurst(AudioStream)*MAX_AUDIO_SAMPLES);
 
 	// Starts the stream.
 	if(AAudioStream_requestStart(AudioStream)!=AAUDIO_OK)

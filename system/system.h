@@ -2,6 +2,7 @@
 #define __SYSTEM_H__
 
 #include <stdint.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include "memzone.h"
 
@@ -24,11 +25,31 @@
 #ifdef ANDROID
 #include <android/log.h>
 #ifndef DBGPRINTF
-#define DBGPRINTF(level, ...) __android_log_print(ANDROID_LOG_INFO, "vkEngine", level __VA_ARGS__)
+inline static void DBGPRINTF(const char *level, const char *format, ...)
+{
+	char string[256];
+	va_list	ap;
+
+	va_start(ap, format);
+	vsnprintf(string, 255, format, ap);
+	va_end(ap);
+
+	__android_log_print(ANDROID_LOG_INFO, "vkEngine", "%s%s%s", level, string, DEBUG_NONE);
+}
 #endif
 #else
 #ifndef DBGPRINTF
-#define DBGPRINTF(level, ...) fprintf(stderr, level __VA_ARGS__)
+inline static void DBGPRINTF(const char *level, const char *format, ...)
+{
+	char string[256];
+	va_list	ap;
+
+	va_start(ap, format);
+	vsnprintf(string, 255, format, ap);
+	va_end(ap);
+
+	fprintf(stderr, "%s%s%s", level, string, DEBUG_NONE);
+}
 #endif
 #endif
 

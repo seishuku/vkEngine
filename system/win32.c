@@ -21,6 +21,7 @@ bool Done=false;
 bool ToggleFullscreen=true;
 
 bool IsVR=true;
+extern XruContext_t xrContext;
 
 extern VkInstance Instance;
 extern VkuContext_t Context;
@@ -29,7 +30,8 @@ extern VkuMemZone_t *VkZone;
 
 extern VkuSwapchain_t Swapchain;
 
-extern uint32_t Width, Height;
+uint32_t windowWidth=1920, windowHeight=1080;
+extern uint32_t renderWidth, renderHeight;
 
 float fps=0.0f, fTimeStep, fTime=0.0f;
 
@@ -126,8 +128,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			break;
 
 		case WM_SIZE:
-			Width=max(LOWORD(lParam), 2);
-			Height=max(HIWORD(lParam), 2);
+			windowWidth=max(LOWORD(lParam), 2);
+			windowHeight=max(HIWORD(lParam), 2);
 			//RecreateSwapchain();
 			break;
 
@@ -159,21 +161,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					ToggleFullscreen=false;
 					DBGPRINTF(DEBUG_INFO, "Going full screen...\n");
 
-					OldWidth=Width;
-					OldHeight=Height;
+					OldWidth=windowWidth;
+					OldHeight=windowHeight;
 
-					Width=GetSystemMetrics(SM_CXSCREEN);
-					Height=GetSystemMetrics(SM_CYSCREEN);
-					SetWindowPos(Context.hWnd, HWND_TOPMOST, 0, 0, Width, Height, 0);
+					windowWidth=GetSystemMetrics(SM_CXSCREEN);
+					windowHeight=GetSystemMetrics(SM_CYSCREEN);
+					SetWindowPos(Context.hWnd, HWND_TOPMOST, 0, 0, windowWidth, windowHeight, 0);
 				}
 				else
 				{
 					ToggleFullscreen=true;
 					DBGPRINTF(DEBUG_INFO, "Going windowed...\n");
 
-					Width=OldWidth;
-					Height=OldHeight;
-					SetWindowPos(Context.hWnd, HWND_TOPMOST, 0, 0, Width, Height, 0);
+					windowWidth=OldWidth;
+					windowHeight=OldHeight;
+					SetWindowPos(Context.hWnd, HWND_TOPMOST, 0, 0, windowWidth, windowHeight, 0);
 				}
 			}
 			break;
@@ -380,6 +382,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
 
+#include "../renderdoc_app.h"
+RENDERDOC_API_1_1_2 *rdoc_api=NULL;
+
 #ifndef _CONSOLE
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int iCmdShow)
 {
@@ -433,12 +438,10 @@ int main(int argc, char **argv)
 
 	RECT Rect;
 
-	SetRect(&Rect, 0, 0, Width, Height);
+	SetRect(&Rect, 0, 0, windowWidth, windowHeight);
 	AdjustWindowRect(&Rect, WS_POPUP, FALSE);
 
 	Context.hWnd=CreateWindow(szAppName, szAppName, WS_POPUP|WS_CLIPSIBLINGS, 0, 0, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
-
-	//RegisterRawInput(Context.hWnd);
 
 	ShowWindow(Context.hWnd, SW_SHOW);
 	SetForegroundWindow(Context.hWnd);
@@ -463,17 +466,26 @@ int main(int argc, char **argv)
 		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
 		return -1;
 	}
+	else
+	{
+		renderWidth=Swapchain.Extent.width;
+		renderHeight=Swapchain.Extent.height;
+	}
 
 	DBGPRINTF(DEBUG_INFO, "Initializing VR...\n");
-	if(!VR_Init(Instance, &Context))
+	if(!VR_Init(&xrContext, Instance, &Context))
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
 		IsVR=false;
-		rtWidth=Width;
-		rtHeight=Height;
 	}
 	else
-		MoveWindow(Context.hWnd, 0, 0, rtWidth, rtHeight/2, TRUE);
+	{
+		renderWidth=xrContext.swapchainExtent.width;
+		renderHeight=xrContext.swapchainExtent.height;
+		windowWidth=renderWidth;
+		windowHeight=renderHeight;
+		MoveWindow(Context.hWnd, 0, 0, windowWidth/2, windowHeight/2, TRUE);
+	}
 
 	DBGPRINTF(DEBUG_INFO, "Initializing Vulkan resources...\n");
 	if(!Init())
@@ -487,6 +499,20 @@ int main(int argc, char **argv)
 
 	DBGPRINTF(DEBUG_INFO, "\nCurrent vulkan zone memory allocations:\n");
 	vkuMem_Print(VkZone);
+
+#if 0
+	// RenderDoc frame capture for VR mode
+	HMODULE mod=GetModuleHandleA("renderdoc.dll");
+	if(mod)
+	{
+		pRENDERDOC_GetAPI RENDERDOC_GetAPI=(pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
+
+		if(!RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_6_0, (void **)&rdoc_api))
+			return -1;
+	}
+	
+	bool captureThisFrame=false;
+#endif
 
 	DBGPRINTF(DEBUG_INFO, "\nStarting main loop.\n");
 	while(!Done)
@@ -508,6 +534,13 @@ int main(int argc, char **argv)
 			static float avgfps=0.0f;
 
 			double StartTime=GetClock();
+
+#if 0
+			// RenderDoc frame capture for VR mode
+			if(captureThisFrame&&rdoc_api)
+				rdoc_api->StartFrameCapture(NULL, NULL);
+#endif
+
 			Render();
 
 			fTimeStep=(float)(GetClock()-StartTime);
@@ -516,8 +549,20 @@ int main(int argc, char **argv)
 			avgfps+=1.0f/fTimeStep;
 
 			static uint32_t Frames=0;
+
+#if 0
+			// RenderDoc frame capture for VR mode
+			if(captureThisFrame&&rdoc_api)
+			{
+				captureThisFrame=false;
+				rdoc_api->EndFrameCapture(NULL, NULL);
+			}
+#endif
+
 			if(Frames++>100)
 			{
+//				captureThisFrame=true;
+
 				fps=avgfps/Frames;
 				avgfps=0.0f;
 				Frames=0;

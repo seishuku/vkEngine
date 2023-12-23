@@ -17,7 +17,7 @@
 #include "input.h"
 
 // External data from engine.c
-extern uint32_t Width, Height;
+extern uint32_t renderWidth, renderHeight;
 
 void GenerateSkyParams(void);
 extern Camera_t Camera;
@@ -45,7 +45,7 @@ void EmitterCallback(uint32_t Index, uint32_t NumParticles, Particle_t *Particle
 
 // Launch a "missile"
 // This is basically the same as an emitter callback, but done manually by working on the particle array directly.
-static void FireParticleEmitter(vec3 Position, vec3 Direction)
+void FireParticleEmitter(vec3 Position, vec3 Direction)
 {
 	// Get pointer to the emitter that's being used to drive the other emitters
 	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
@@ -56,9 +56,7 @@ static void FireParticleEmitter(vec3 Position, vec3 Direction)
 	RandVec=Vec3_Muls(RandVec, 100.0f);
 
 	// Fire the emitter camera radius units away from Position in the direction of Direction
-	vec3 NewPosition=Vec3_Addv(Position, Vec3_Muls(Direction, Camera.Radius));
-
-	uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, NewPosition, Vec3(0.0f, 0.0f, 0.0f), RandVec, 5.0f, 500, false, EmitterCallback);
+	uint32_t ID=ParticleSystem_AddEmitter(&ParticleSystem, Position, Vec3(0.0f, 0.0f, 0.0f), RandVec, 5.0f, 500, false, EmitterCallback);
 
 	// Emitter list full?
 	if(ID==UINT32_MAX)
@@ -71,7 +69,7 @@ static void FireParticleEmitter(vec3 Position, vec3 Direction)
 		if(Emitter->Particles[i].life<0.0f)
 		{
 			Emitter->Particles[i].ID=ID;
-			Emitter->Particles[i].pos=NewPosition;
+			Emitter->Particles[i].pos=Position;
 			Vec3_Normalize(&Direction);
 			Emitter->Particles[i].vel=Vec3_Muls(Direction, 100.0f);
 
@@ -138,7 +136,7 @@ void Event_KeyDown(void *Arg)
 
 		case KB_SPACE:
 			Audio_PlaySample(&Sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &Camera.Position);
-			FireParticleEmitter(Camera.Position, Camera.Forward);
+			FireParticleEmitter(Vec3_Addv(Camera.Position, Vec3_Muls(Camera.Forward, Camera.Radius)), Camera.Forward);
 			break;
 		case KB_P:		GenerateSkyParams();	break;
 		case KB_W:		Camera.key_w=true;		break;
@@ -189,7 +187,7 @@ void Event_KeyUp(void *Arg)
 }
 
 static uint32_t ActiveID=UINT32_MAX;
-static vec2 MousePosition={ 0.0f, 0.0f };
+vec2 MousePosition={ 0.0f, 0.0f };
 
 void Event_MouseDown(void *Arg)
 {
@@ -214,8 +212,8 @@ void Event_Mouse(void *Arg)
 	// Calculate relative movement
 	MousePosition=Vec2_Add(MousePosition, (float)MouseEvent->dx, (float)MouseEvent->dy);
 
-	MousePosition.x=min(max(MousePosition.x, 0.0f), (float)Width);
-	MousePosition.y=min(max(MousePosition.y, 0.0f), (float)Height);
+	MousePosition.x=min(max(MousePosition.x, 0.0f), (float)renderWidth);
+	MousePosition.y=min(max(MousePosition.y, 0.0f), (float)renderHeight);
 
 	UI_UpdateCursorPosition(&UI, CursorID, MousePosition);
 

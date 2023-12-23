@@ -71,7 +71,6 @@ OBJS+=vulkan/vulkan_swapchain.o
 
 # Audio
 OBJS+=audio/audio.o
-OBJS+=audio/hrir.o
 OBJS+=audio/wave.o
 
 # UI
@@ -142,7 +141,7 @@ CFLAGS+=-I$(NDK)/toolchains/llvm/prebuilt/$(HOST)/sysroot/usr/include -I$(NDK)/t
 CFLAGS+=-DANDROID -D__ANDROID_MIN_SDK_VERSION__=$(ANDROIDVERSION) -DANDROIDVERSION=$(ANDROIDVERSION) -D__USE_BSD
 CFLAGS+=-include system/android_fopen.h
 
-LDFLAGS+=-shared -lvulkan -lm -landroid -llog -laaudio
+LDFLAGS+=-shared -lvulkan -lm -landroid -llog -laaudio -lopenxr_loader
 
 .PHONY: all $(KEYSTOREFILE) clean
 

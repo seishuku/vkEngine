@@ -13,7 +13,7 @@ VkuMemZone_t *vkuMem_Init(VkuContext_t *Context, size_t Size)
 
 	if(VkZone==NULL)
 	{
-		DBGPRINTF("Unable to allocate memory for vulkan memory zone.\n");
+		DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for vulkan memory zone.\n");
 		return false;
 	}
 

@@ -8,6 +8,7 @@
 #include "../math/math.h"
 #include "../utils/list.h"
 #include "../font/font.h"
+#include "../vr/vr.h"
 #include "ui.h"
 
 // external Vulkan data and font
@@ -127,7 +128,7 @@ static bool UI_VulkanPipeline(UI_t *UI)
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
 			.offset=0,
-			.size=sizeof(vec2),
+			.size=(sizeof(vec2)*2)+sizeof(matrix),
 			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
 		},		
 	}, 0, &UI->PipelineLayout);
@@ -356,7 +357,12 @@ bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 Position)
 	return true;
 }
 
-bool UI_Draw(UI_t *UI, uint32_t Index)
+extern bool IsVR;
+extern VkuSwapchain_t Swapchain;
+extern XruContext_t xrContext;
+extern matrix ModelView, Projection[2], HeadPose;
+
+bool UI_Draw(UI_t *UI, uint32_t Index, uint32_t Eye)
 {
 	if(UI==NULL)
 		return false;
@@ -559,7 +565,26 @@ bool UI_Draw(UI_t *UI, uint32_t Index)
 	// Bind object instance buffer
 	vkCmdBindVertexBuffers(PerFrame[Index].CommandBuffer, 1, 1, &UI->InstanceBuffer.Buffer, &(VkDeviceSize) { 0 });
 
-	vkCmdPushConstants(PerFrame[Index].CommandBuffer, UI->PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &UI->Size);
+	struct
+	{
+		vec2 Viewport;
+		vec2 pad;
+		matrix mvp;
+	} UIPC;
+
+	float z=-1.0f;
+
+	if(IsVR)
+	{
+		z=-1.5f;
+		UIPC.Viewport=Vec2((float)xrContext.swapchainExtent.width, (float)xrContext.swapchainExtent.height);
+	}
+	else
+		UIPC.Viewport=Vec2((float)Swapchain.Extent.width, (float)Swapchain.Extent.height);
+
+	UIPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale(UIPC.Viewport.x/UIPC.Viewport.y, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), HeadPose), Projection[Eye]);
+
+	vkCmdPushConstants(PerFrame[Index].CommandBuffer, UI->PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(UIPC), &UIPC);
 
 	// Draw sprites, they need descriptor set changes and aren't easy to draw instanced...
 	uint32_t spriteCount=instanceCount;

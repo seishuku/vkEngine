@@ -1,16 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-		  package="org.NitroGL.vkEngine">
-	<uses-sdk android:minSdkVersion="28"
-			  android:targetSdkVersion="28"/>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.NitroGL.vkEngine">
+	<uses-sdk android:minSdkVersion="28" android:targetSdkVersion="28"/>
+	<uses-feature android:name="android.hardware.vr.headtracking" android:required="true"/>
     <application android:debuggable="true"
 				 android:hasCode="false"
 				 android:label="vkEngine">
         <activity android:configChanges="screenSize|orientation|keyboardHidden"
-				  android:label="vkEngine"
-				  android:name="android.app.NativeActivity">
+				android:label="vkEngine"
+				android:launchMode="singleTask"
+				android:name="android.app.NativeActivity">
             <meta-data android:name="android.app.lib_name" android:value="vkEngine"/>
-            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+            <intent-filter>
+				<action android:name="android.intent.action.MAIN"/>
+				<!--<category android:name="com.oculus.intent.category.VR" /> -->
+				<category android:name="android.intent.category.LAUNCHER"/>
+			</intent-filter>
         </activity>
     </application>
 </manifest>

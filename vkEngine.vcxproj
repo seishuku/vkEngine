@@ -33,6 +33,7 @@
     <ClInclude Include="particle\particle.h" />
     <ClInclude Include="perframe.h" />
     <ClInclude Include="physics\physics.h" />
+    <ClInclude Include="renderdoc_app.h" />
     <ClInclude Include="shadow.h" />
     <ClInclude Include="skybox.h" />
     <ClInclude Include="sounds.h" />
