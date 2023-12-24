@@ -3,11 +3,11 @@
 vec4 QuatAngle(const float angle, const float x, const float y, const float z)
 {
 	vec3 v={ x, y, z };
-	float s=sinf(angle*0.5f);
-
 	Vec3_Normalize(&v);
 
-	return Vec4(s*v.x, s*v.y, s*v.z, cosf(angle*0.5f));
+	v=Vec3_Muls(v, sinf(angle*0.5f));
+
+	return Vec4(v.x, v.y, v.z, cosf(angle*0.5f));
 }
 
 vec4 QuatAnglev(const float angle, const vec3 v)

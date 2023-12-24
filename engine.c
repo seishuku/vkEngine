@@ -529,17 +529,18 @@ void GenerateSkyParams(void)
 		const float radiusScale=1.5f;
 
 		Data[i]=MatrixIdentity();
-		Data[i]=MatrixMult(Data[i], MatrixTranslatev(Asteroids[i].Position));
-		Data[i]=MatrixMult(Data[i], MatrixRotate(RandFloat()*PI*2.0f, 1.0f, 0.0f, 0.0f));
-		Data[i]=MatrixMult(Data[i], MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 1.0f, 0.0f));
-		Data[i]=MatrixMult(Data[i], MatrixRotate(RandFloat()*PI*2.0f, 0.0f, 0.0f, 1.0f));
-		Data[i]=MatrixMult(Data[i], MatrixScale(Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale));
 
 		Asteroids[i].Velocity=Vec3b(0.0f);
 		Asteroids[i].Force=Vec3b(0.0f);
 
+		Asteroids[i].Orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		Asteroids[i].AngularVelocity=Vec3((RandFloat()-0.5f)*PI, (RandFloat()-0.5f)*PI, (RandFloat()-0.5f)*PI);
+
 		Asteroids[i].Mass=(1.0f/3000.0f)*(1.33333333f*PI*Asteroids[i].Radius);
 		Asteroids[i].invMass=1.0f/Asteroids[i].Mass;
+
+		Asteroids[i].Inertia=0.4f*Asteroids[i].Mass*(Asteroids[i].Radius*Asteroids[i].Radius);
+		Asteroids[i].invInertia=1.0f/Asteroids[i].Inertia;
 	}
 
 	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
@@ -858,8 +859,8 @@ void Thread_Main(void *Arg)
 		vkCmdBindDescriptorSets(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
 		matrix local=MatrixIdentity();
-		local=MatrixMult(local, MatrixRotate(fTime, 1.0f, 0.0f, 0.0f));
-		local=MatrixMult(local, MatrixRotate(fTime, 0.0f, 1.0f, 0.0f));
+		//local=MatrixMult(local, MatrixRotate(fTime, 1.0f, 0.0f, 0.0f));
+		//local=MatrixMult(local, MatrixRotate(fTime, 0.0f, 1.0f, 0.0f));
 
 		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(matrix), &local);
 
@@ -1270,12 +1271,17 @@ void Thread_Physics(void *Arg)
 	ModelView=CameraUpdate(&Camera, fTimeStep);
 	//////
 
-	// Update instance matrix translation positions
+	// Update instance matrix data
 	matrix *Data=NULL;
 	vkMapMemory(Context.Device, Asteroid_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Data);
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
-		Data[i].w=Vec4(Asteroids[i].Position.x, Asteroids[i].Position.y, Asteroids[i].Position.z, 1.0f);
+	{
+		const float radiusScale=1.5f;
+		matrix local=MatrixScale(Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale);
+		local=MatrixMult(local, QuatMatrix(Asteroids[i].Orientation));
+		Data[i]=MatrixMult(local, MatrixTranslatev(Asteroids[i].Position));
+	}
 
 	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
 	//////
@@ -1500,6 +1506,8 @@ void Render(void)
 
 	// Wait for physics to finish before rendering
 	pthread_barrier_wait(&ThreadBarrier_Physics);
+
+	Font_Print(&Fnt, 64.0f, 100.0f, 100.0f, "%f %f %f", Asteroids[0].AngularVelocity.x, Asteroids[0].AngularVelocity.y, Asteroids[0].AngularVelocity.z);
 
 	EyeRender(PerFrame[Index].CommandBuffer, Index, 0, HeadPose);
 

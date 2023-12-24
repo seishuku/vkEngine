@@ -383,7 +383,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 }
 
 #include "../renderdoc_app.h"
-RENDERDOC_API_1_1_2 *rdoc_api=NULL;
+RENDERDOC_API_1_6_0 *rdoc_api=NULL;
 
 #ifndef _CONSOLE
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int iCmdShow)
@@ -574,6 +574,7 @@ int main(int argc, char **argv)
 	Destroy();
 	DestroyVulkan(Instance, &Context);
 	vkDestroyInstance(Instance, VK_NULL_HANDLE);
+
 	DestroyWindow(Context.hWnd);
 
 	DBGPRINTF(DEBUG_INFO, "Zone remaining block list:\n");

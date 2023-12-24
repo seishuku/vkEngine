@@ -194,8 +194,8 @@ void ShadowUpdateMap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex)
 	for(uint32_t j=0;j<NUM_MODELS;j++)
 	{
 		Shadow_UBO.local=MatrixIdentity();
-		Shadow_UBO.local=MatrixMult(Shadow_UBO.local, MatrixRotate(fTime, 1.0f, 0.0f, 0.0f));
-		Shadow_UBO.local=MatrixMult(Shadow_UBO.local, MatrixRotate(fTime, 0.0f, 1.0f, 0.0f));
+		//Shadow_UBO.local=MatrixMult(Shadow_UBO.local, MatrixRotate(fTime, 1.0f, 0.0f, 0.0f));
+		//Shadow_UBO.local=MatrixMult(Shadow_UBO.local, MatrixRotate(fTime, 0.0f, 1.0f, 0.0f));
 
 		vkCmdPushConstants(CommandBuffer, ShadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Shadow_UBO_t), &Shadow_UBO);
 

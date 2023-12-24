@@ -34,6 +34,10 @@ static void apply_constraints(RigidBody_t *Body)
 		// Simple velocity reflection to bounce off the "wall"
 		Body->Velocity=Vec3_Reflect(Normal, Body->Velocity);
 	}
+
+	// Apply angular velocity damping
+	//const float angularDamping=0.9999f;
+	//Body->AngularVelocity=Vec3_Muls(Body->AngularVelocity, angularDamping);
 }
 
 void PhysicsIntegrate(RigidBody_t *body, float dt)
@@ -59,6 +63,12 @@ void PhysicsIntegrate(RigidBody_t *body, float dt)
 	body->Velocity=Vec3_Addv(body->Velocity, Vec3_Muls(body->Force, body->invMass*dt));
 
 	body->Force=Vec3b(0.0f);
+
+	// Integrate angular velocity using quaternions
+	vec3 axis=body->AngularVelocity;
+	Vec3_Normalize(&axis);
+
+	body->Orientation=QuatMultiply(body->Orientation, QuatAnglev(dt, axis));
 
 	apply_constraints(body);
 }
@@ -115,6 +125,9 @@ void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 		a->Velocity=Vec3_Subv(a->Velocity, Vec3_Muls(Normal, j*a->invMass));
 		b->Velocity=Vec3_Addv(b->Velocity, Vec3_Muls(Normal, j*b->invMass));
 
+		a->AngularVelocity=Vec3_Subv(a->AngularVelocity, Vec3_Muls(Normal, VdotN*a->invInertia));
+		b->AngularVelocity=Vec3_Addv(b->AngularVelocity, Vec3_Muls(Normal, VdotN*b->invInertia));
+
 		const float relVelMag=sqrtf(fabsf(VdotN));
 
 		if(relVelMag>1.0f)
@@ -166,6 +179,9 @@ void PhysicsSphereToAABBCollisionResponse(RigidBody_t *sphere, RigidBody_t *aabb
 
 		sphere->Velocity=Vec3_Subv(sphere->Velocity, Vec3_Muls(Normal, j*sphere->invMass));
 		aabb->Velocity=Vec3_Addv(aabb->Velocity, Vec3_Muls(Normal, j*aabb->invMass));
+
+		sphere->AngularVelocity=Vec3_Subv(sphere->AngularVelocity, Vec3_Muls(Normal, VdotN*sphere->invInertia));
+		aabb->AngularVelocity=Vec3_Addv(aabb->AngularVelocity, Vec3_Muls(Normal, VdotN*aabb->invInertia));
 	}
 }
 
@@ -207,6 +223,9 @@ void PhysicsCameraToSphereCollisionResponse(Camera_t *Camera, RigidBody_t *Body)
 
 		Camera->Velocity=Vec3_Subv(Camera->Velocity, Vec3_Muls(Normal, j*Camera_invMass));
 		Body->Velocity=Vec3_Addv(Body->Velocity, Vec3_Muls(Normal, j*Body->invMass));
+
+		//Camera->AngularVelocity=Vec3_Subv(Camera->AngularVelocity, Vec3_Muls(Normal, j*Camera_invInertia));
+		Body->AngularVelocity=Vec3_Addv(Body->AngularVelocity, Vec3_Muls(Normal, VdotN*Body->invInertia));
 
 		const float relVelMag=sqrtf(fabsf(VdotN));
 
@@ -310,6 +329,9 @@ void PhysicsParticleToSphereCollisionResponse(Particle_t *Particle, RigidBody_t 
 
 		Particle->vel=Vec3_Subv(Particle->vel, Vec3_Muls(Normal, j*Particle_invMass));
 		Body->Velocity=Vec3_Addv(Body->Velocity, Vec3_Muls(Normal, j*Body->invMass));
+
+		//a->AngularVelocity=Vec3_Subv(a->AngularVelocity, Vec3_Muls(Normal, VdotN*a->invInertia));
+		Body->AngularVelocity=Vec3_Addv(Body->AngularVelocity, Vec3_Muls(Normal, VdotN*Body->invInertia));
 
 		Particle->life=-1.0f;
 

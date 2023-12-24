@@ -14,6 +14,11 @@ typedef struct
 	vec3 Position;
 	vec3 Velocity;
 	vec3 Force;
+
+	vec4 Orientation;
+	vec3 AngularVelocity;
+	float Inertia, invInertia;
+
 	float Mass, invMass;
 
 	float Radius;	// radius if it's a sphere
