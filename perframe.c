@@ -9,4 +9,4 @@
 #include "models.h"
 #include "perframe.h"
 
-PerFrame_t PerFrame[VKU_MAX_FRAME_COUNT];
+PerFrame_t perFrame[VKU_MAX_FRAME_COUNT];

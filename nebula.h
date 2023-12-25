@@ -2,9 +2,9 @@
 #define __NEBULA_H__
 
 // Volume rendering vulkan stuff
-extern VkuDescriptorSet_t VolumeDescriptorSet;
-extern VkPipelineLayout VolumePipelineLayout;
-extern VkuPipeline_t VolumePipeline;
+extern VkuDescriptorSet_t volumeDescriptorSet;
+extern VkPipelineLayout volumePipelineLayout;
+extern VkuPipeline_t volumePipeline;
 //////
 
 VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *Image);

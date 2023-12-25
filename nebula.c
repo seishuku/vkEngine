@@ -8,9 +8,9 @@ extern VkFormat DepthFormat;
 extern VkRenderPass RenderPass;
 
 // Volume rendering vulkan stuff
-VkuDescriptorSet_t VolumeDescriptorSet;
-VkPipelineLayout VolumePipelineLayout;
-VkuPipeline_t VolumePipeline;
+VkuDescriptorSet_t volumeDescriptorSet;
+VkPipelineLayout volumePipelineLayout;
+VkuPipeline_t volumePipeline;
 //////
 
 // Nebula volume texture generation
@@ -116,26 +116,26 @@ static float nebula(vec3 p)
 
 VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *Image)
 {
-	VkCommandBuffer CommandBuffer;
-	VkuBuffer_t StagingBuffer;
-	void *Data=NULL;
+	VkCommandBuffer commandBuffer;
+	VkuBuffer_t stagingBuffer;
+	void *data=NULL;
 
 	Image->Width=64;
 	Image->Height=64;
 	Image->Depth=64; // Slight abuse of image struct, depth is supposed to be color depth, not image depth.
 
 	// Byte size of image data
-	uint32_t Size=Image->Width*Image->Height*Image->Depth;
+	uint32_t size=Image->Width*Image->Height*Image->Depth;
 
 	// Create staging buffer
-	vkuCreateHostBuffer(Context, &StagingBuffer, Size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+	vkuCreateHostBuffer(Context, &stagingBuffer, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 	// Map image memory and copy data
-	vkMapMemory(Context->Device, StagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+	vkMapMemory(Context->Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
 
 	const float Scale=2.0f;
 
-	for(uint32_t i=0;i<Size;i++)
+	for(uint32_t i=0;i<size;i++)
 	{
 		uint32_t x=i%Image->Width;
 		uint32_t y=(i%(Image->Width*Image->Height))/Image->Width;
@@ -150,10 +150,10 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *Image)
 
 		float p=nebula(Vec3_Muls(v, Scale));
 
-		((uint8_t *)Data)[i]=(uint8_t)(p*255.0f);
+		((uint8_t *)data)[i]=(uint8_t)(p*255.0f);
 	}
 
-	vkUnmapMemory(Context->Device, StagingBuffer.DeviceMemory);
+	vkUnmapMemory(Context->Device, stagingBuffer.DeviceMemory);
 
 	if(!vkuCreateImageBuffer(Context, Image,
 		VK_IMAGE_TYPE_3D, VK_FORMAT_R8_UNORM, 1, 1, Image->Width, Image->Height, Image->Depth,
@@ -163,13 +163,13 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *Image)
 		return VK_FALSE;
 
 	// Start a one shot command buffer
-	CommandBuffer=vkuOneShotCommandBufferBegin(Context);
+	commandBuffer=vkuOneShotCommandBufferBegin(Context);
 
 	// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
-	vkuTransitionLayout(CommandBuffer, Image->Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, Image->Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 	// Copy from staging buffer to the texture buffer.
-	vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer.Buffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, (VkBufferImageCopy[1])
+	vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.Buffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, (VkBufferImageCopy[1])
 	{
 		{
 			0, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }, { 0, 0, 0 }, { Image->Width, Image->Height, Image->Depth }
@@ -178,13 +178,13 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *Image)
 
 	// Final change to image layout from destination optimal to be optimal reading only by shader.
 	// This is also done by generating mipmaps, if requested.
-	vkuTransitionLayout(CommandBuffer, Image->Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, Image->Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	// End one shot command buffer and submit
-	vkuOneShotCommandBufferEnd(Context, CommandBuffer);
+	vkuOneShotCommandBufferEnd(Context, commandBuffer);
 
 	// Delete staging buffers
-	vkuDestroyBuffer(Context, &StagingBuffer);
+	vkuDestroyBuffer(Context, &stagingBuffer);
 
 	// Create texture sampler object
 	vkCreateSampler(Context->Device, &(VkSamplerCreateInfo)
@@ -223,16 +223,16 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *Image)
 // Create functions for volume rendering
 bool CreateVolumePipeline(void)
 {
-	vkuInitDescriptorSet(&VolumeDescriptorSet, &Context);
-	vkuDescriptorSet_AddBinding(&VolumeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&VolumeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuAssembleDescriptorSetLayout(&VolumeDescriptorSet);
+	vkuInitDescriptorSet(&volumeDescriptorSet, &Context);
+	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuAssembleDescriptorSetLayout(&volumeDescriptorSet);
 
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
-		.pSetLayouts=&VolumeDescriptorSet.DescriptorSetLayout,
+		.pSetLayouts=&volumeDescriptorSet.DescriptorSetLayout,
 		.pushConstantRangeCount=1,
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
@@ -240,42 +240,42 @@ bool CreateVolumePipeline(void)
 			.size=sizeof(uint32_t),
 			.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
-	}, 0, &VolumePipelineLayout);
+	}, 0, &volumePipelineLayout);
 
-	vkuInitPipeline(&VolumePipeline, &Context);
+	vkuInitPipeline(&volumePipeline, &Context);
 
-	vkuPipeline_SetPipelineLayout(&VolumePipeline, VolumePipelineLayout);
-	vkuPipeline_SetRenderPass(&VolumePipeline, RenderPass);
+	vkuPipeline_SetPipelineLayout(&volumePipeline, volumePipelineLayout);
+	vkuPipeline_SetRenderPass(&volumePipeline, RenderPass);
 
-	VolumePipeline.DepthTest=VK_TRUE;
-	VolumePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
-	VolumePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
-	//VolumePipeline.DepthWrite=VK_FALSE;
-	VolumePipeline.RasterizationSamples=MSAA;
+	volumePipeline.DepthTest=VK_TRUE;
+	volumePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+	volumePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
+	//volumePipeline.DepthWrite=VK_FALSE;
+	volumePipeline.RasterizationSamples=MSAA;
 
-	VolumePipeline.Blend=VK_TRUE;
-	VolumePipeline.SrcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	VolumePipeline.DstColorBlendFactor=VK_BLEND_FACTOR_ONE;
-	VolumePipeline.ColorBlendOp=VK_BLEND_OP_ADD;
-	VolumePipeline.SrcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	VolumePipeline.DstAlphaBlendFactor=VK_BLEND_FACTOR_ONE;
-	VolumePipeline.AlphaBlendOp=VK_BLEND_OP_ADD;
+	volumePipeline.Blend=VK_TRUE;
+	volumePipeline.SrcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
+	volumePipeline.DstColorBlendFactor=VK_BLEND_FACTOR_ONE;
+	volumePipeline.ColorBlendOp=VK_BLEND_OP_ADD;
+	volumePipeline.SrcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
+	volumePipeline.DstAlphaBlendFactor=VK_BLEND_FACTOR_ONE;
+	volumePipeline.AlphaBlendOp=VK_BLEND_OP_ADD;
 
-	if(!vkuPipeline_AddStage(&VolumePipeline, "shaders/volume.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&volumePipeline, "shaders/volume.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
-	if(!vkuPipeline_AddStage(&VolumePipeline, "shaders/volume.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	if(!vkuPipeline_AddStage(&volumePipeline, "shaders/volume.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
-	VkPipelineRenderingCreateInfo PipelineRenderingCreateInfo=
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-		.colorAttachmentCount=1,
-		.pColorAttachmentFormats=&ColorFormat,
-		.depthAttachmentFormat=DepthFormat,
-	};
+	//VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo=
+	//{
+	//	.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+	//	.colorAttachmentCount=1,
+	//	.pColorAttachmentFormats=&ColorFormat,
+	//	.depthAttachmentFormat=DepthFormat,
+	//};
 
-	if(!vkuAssemblePipeline(&VolumePipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
+	if(!vkuAssemblePipeline(&volumePipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
 		return false;
 
 	return true;

@@ -18,7 +18,7 @@ extern VkuBuffer_t asteroidInstance;
 extern float fTime;
 extern Camera_t Camera;
 
-Shadow_UBO_t Shadow_UBO;
+Shadow_UBO_t shadowUBO;
 
 static VkuPipeline_t shadowPipeline;
 static VkPipelineLayout shadowPipelineLayout;
@@ -177,27 +177,23 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 	// This should technically be an infinite distance away, but that's not possible, so "a number" is whatever best compromise.
 	// (uSubPosition is a vec4, so need to recreate that in a vec3)
 	vec3 position=Vec3_Muls(Vec3(
-		PerFrame[frameIndex].Skybox_UBO[0]->uSunPosition.x,
-		PerFrame[frameIndex].Skybox_UBO[0]->uSunPosition.y,
-		PerFrame[frameIndex].Skybox_UBO[0]->uSunPosition.z
+		perFrame[frameIndex].skyboxUBO[0]->uSunPosition.x,
+		perFrame[frameIndex].skyboxUBO[0]->uSunPosition.y,
+		perFrame[frameIndex].skyboxUBO[0]->uSunPosition.z
 	), 3000.0f);
 
 	// Following the camera's position, so we don't have to composite multiple shadow maps or have super large maps.
 	matrix modelView=MatrixLookAt(Vec3_Addv(position, Camera.Position), Camera.Position, Vec3(0.0f, 1.0f, 0.0f));
 
 	// Multiply matrices together, so we can just send one matrix as a push constant.
-	Shadow_UBO.mvp=MatrixMult(modelView, projection);
+	shadowUBO.mvp=MatrixMult(modelView, projection);
 
 	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &asteroidInstance.Buffer, &(VkDeviceSize) { 0 });
 
 	// Draw the models
 	for(uint32_t j=0;j<NUM_MODELS;j++)
 	{
-		Shadow_UBO.local=MatrixIdentity();
-		//Shadow_UBO.local=MatrixMult(Shadow_UBO.local, MatrixRotate(fTime, 1.0f, 0.0f, 0.0f));
-		//Shadow_UBO.local=MatrixMult(Shadow_UBO.local, MatrixRotate(fTime, 0.0f, 1.0f, 0.0f));
-
-		vkCmdPushConstants(commandBuffer, shadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Shadow_UBO_t), &Shadow_UBO);
+		vkCmdPushConstants(commandBuffer, shadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Shadow_UBO_t), &shadowUBO);
 
 		// Bind model data buffers and draw the triangles
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &Models[j].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });

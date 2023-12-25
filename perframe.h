@@ -9,39 +9,39 @@ typedef struct
 {
 	matrix HMD;
 	matrix projection;
-	matrix modelview;
-	matrix light_mvp;
-	vec4 light_color;
-	vec4 light_direction;
+	matrix modelView;
+	matrix lightMVP;
+	vec4 lightColor;
+	vec4 lightDirection;
 } Main_UBO_t;
 
 typedef struct
 {
 	// Skybox per-frame, per-eye data
-	Skybox_UBO_t *Skybox_UBO[2];
-	VkuBuffer_t Skybox_UBO_Buffer[2];
+	Skybox_UBO_t *skyboxUBO[2];
+	VkuBuffer_t skyboxUBOBuffer[2];
 	//////
 
 	// Main render per-frame, per-eye data
-	Main_UBO_t *Main_UBO[2];
-	VkuBuffer_t Main_UBO_Buffer[2];
+	Main_UBO_t *mainUBO[2];
+	VkuBuffer_t mainUBOBuffer[2];
 	//////
 
-	VkFramebuffer CompositeFramebuffer[2];
+	VkFramebuffer compositeFramebuffer[2];
 
 	// Descriptor pool
-	VkDescriptorPool DescriptorPool;
+	VkDescriptorPool descriptorPool;
 
 	// Command buffer
-	VkCommandPool CommandPool;
-	VkCommandBuffer CommandBuffer;
+	VkCommandPool commandPool;
+	VkCommandBuffer commandBuffer;
 
 	// Fences/semaphores
-	VkFence FrameFence;
-	VkSemaphore PresentCompleteSemaphore;
-	VkSemaphore RenderCompleteSemaphore;
+	VkFence frameFence;
+	VkSemaphore presentCompleteSemaphore;
+	VkSemaphore renderCompleteSemaphore;
 } PerFrame_t;
 
-extern PerFrame_t PerFrame[VKU_MAX_FRAME_COUNT];
+extern PerFrame_t perFrame[VKU_MAX_FRAME_COUNT];
 
 #endif

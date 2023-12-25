@@ -27,7 +27,11 @@ extern VkuSwapchain_t Swapchain;
 
 extern VkuMemZone_t *VkZone;
 
-extern VkRenderPass CompositeRenderPass;
+extern VkRenderPass compositeRenderPass;
+
+extern bool isVR;
+extern XruContext_t xrContext;
+extern matrix modelView, projection[2], headPose;
 // ---
 
 bool Font_Init(Font_t *Font)
@@ -57,7 +61,7 @@ bool Font_Init(Font_t *Font)
 	vkuInitPipeline(&Font->Pipeline, &Context);
 
 	vkuPipeline_SetPipelineLayout(&Font->Pipeline, Font->PipelineLayout);
-	vkuPipeline_SetRenderPass(&Font->Pipeline, CompositeRenderPass);
+	vkuPipeline_SetRenderPass(&Font->Pipeline, compositeRenderPass);
 
 	Font->Pipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 	Font->Pipeline.CullMode=VK_CULL_MODE_BACK_BIT;
@@ -350,44 +354,40 @@ void Font_Print(Font_t *Font, float size, float x, float y, char *string, ...)
 	// ---
 }
 
-extern bool isVR;
-extern XruContext_t xrContext;
-extern matrix modelView, Projection[2], HeadPose;
-
 // Submits text draw data to GPU and resets for next frame
-void Font_Draw(Font_t *Font, uint32_t Index, uint32_t Eye)
+void Font_Draw(Font_t *Font, uint32_t index, uint32_t eye)
 {
 	struct
 	{
 		VkExtent2D extent;
 		vec2 pad;
 		matrix mvp;
-	} FontPC;
+	} fontPC;
 
 	float z=-1.0f;
 
 	if(isVR)
 	{
 		z=-1.5f;
-		FontPC.extent=(VkExtent2D){ xrContext.swapchainExtent.width, xrContext.swapchainExtent.height };
+		fontPC.extent=(VkExtent2D){ xrContext.swapchainExtent.width, xrContext.swapchainExtent.height };
 	}
 	else
-		FontPC.extent=Swapchain.Extent;
+		fontPC.extent=Swapchain.Extent;
 
-	FontPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale((float)FontPC.extent.width/(float)FontPC.extent.height, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), HeadPose), Projection[Eye]);
+	fontPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale((float)fontPC.extent.width/(float)fontPC.extent.height, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[eye]);
 
 	// Bind the font rendering pipeline (sets states and shaders)
-	vkCmdBindPipeline(PerFrame[Index].CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Font->Pipeline.Pipeline);
+	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Font->Pipeline.Pipeline);
 
-	vkCmdPushConstants(PerFrame[Index].CommandBuffer, Font->PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(FontPC), &FontPC);
+	vkCmdPushConstants(perFrame[index].commandBuffer, Font->PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(fontPC), &fontPC);
 
 	// Bind vertex data buffer
-	vkCmdBindVertexBuffers(PerFrame[Index].CommandBuffer, 0, 1, &Font->VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(perFrame[index].commandBuffer, 0, 1, &Font->VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
 	// Bind object instance buffer
-	vkCmdBindVertexBuffers(PerFrame[Index].CommandBuffer, 1, 1, &Font->InstanceBuffer.Buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(perFrame[index].commandBuffer, 1, 1, &Font->InstanceBuffer.Buffer, &(VkDeviceSize) { 0 });
 
 	// Draw the number of characters
-	vkCmdDraw(PerFrame[Index].CommandBuffer, 4, Font->NumChar, 0, 0);
+	vkCmdDraw(perFrame[index].commandBuffer, 4, Font->NumChar, 0, 0);
 }
 
 void Font_Reset(Font_t *Font)

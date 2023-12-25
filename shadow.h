@@ -7,10 +7,9 @@
 typedef struct
 {
 	matrix mvp;
-	matrix local;
 } Shadow_UBO_t;
 
-extern Shadow_UBO_t Shadow_UBO;
+extern Shadow_UBO_t shadowUBO;
 
 extern VkuImage_t shadowDepth;
 

@@ -6,7 +6,6 @@ layout (location=1) in mat4 iPosition;
 layout (push_constant) uniform ubo
 {
     mat4 mvp;
-    mat4 local;
 };
 
 out gl_PerVertex
@@ -16,5 +15,5 @@ out gl_PerVertex
 
 void main()
 {
-	gl_Position=mvp*iPosition*local*vec4(vPosition.xyz, 1.0);
+	gl_Position=mvp*iPosition*vec4(vPosition.xyz, 1.0);
 }
