@@ -28,7 +28,7 @@ static int _xi_opcode=0;
 bool Done=false;
 bool ToggleFullscreen=true;
 
-bool IsVR=true;
+bool isVR=true;
 extern XruContext_t xrContext;
 
 extern VkInstance Instance;
@@ -465,7 +465,7 @@ int main(int argc, char **argv)
 	if(!VR_Init(&xrContext, Instance, &Context))
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
-		IsVR=false;
+		isVR=false;
 	}
 	else
 	{

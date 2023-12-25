@@ -357,10 +357,10 @@ bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 Position)
 	return true;
 }
 
-extern bool IsVR;
+extern bool isVR;
 extern VkuSwapchain_t Swapchain;
 extern XruContext_t xrContext;
-extern matrix ModelView, Projection[2], HeadPose;
+extern matrix modelView, Projection[2], HeadPose;
 
 bool UI_Draw(UI_t *UI, uint32_t Index, uint32_t Eye)
 {
@@ -574,7 +574,7 @@ bool UI_Draw(UI_t *UI, uint32_t Index, uint32_t Eye)
 
 	float z=-1.0f;
 
-	if(IsVR)
+	if(isVR)
 	{
 		z=-1.5f;
 		UIPC.Viewport=Vec2((float)xrContext.swapchainExtent.width, (float)xrContext.swapchainExtent.height);

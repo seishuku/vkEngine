@@ -19,7 +19,7 @@ MemZone_t *Zone;
 
 bool Done=false;
 
-bool IsVR=false;
+bool isVR=false;
 extern XruContext_t xrContext;
 
 extern VkInstance Instance;
@@ -236,7 +236,7 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			if(!VR_Init(&xrContext, Instance, &Context))
 			{
 				DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
-				IsVR=false;
+				isVR=false;
 			}
 			else
 			{

@@ -350,9 +350,9 @@ void Font_Print(Font_t *Font, float size, float x, float y, char *string, ...)
 	// ---
 }
 
-extern bool IsVR;
+extern bool isVR;
 extern XruContext_t xrContext;
-extern matrix ModelView, Projection[2], HeadPose;
+extern matrix modelView, Projection[2], HeadPose;
 
 // Submits text draw data to GPU and resets for next frame
 void Font_Draw(Font_t *Font, uint32_t Index, uint32_t Eye)
@@ -366,7 +366,7 @@ void Font_Draw(Font_t *Font, uint32_t Index, uint32_t Eye)
 
 	float z=-1.0f;
 
-	if(IsVR)
+	if(isVR)
 	{
 		z=-1.5f;
 		FontPC.extent=(VkExtent2D){ xrContext.swapchainExtent.width, xrContext.swapchainExtent.height };

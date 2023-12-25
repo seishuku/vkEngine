@@ -47,7 +47,7 @@ uint32_t renderWidth=1920, renderHeight=1080;
 uint32_t primaryNumSwapchainImages=0;
 
 // external switch from system for if VR was initialized
-extern bool IsVR;
+extern bool isVR;
 XruContext_t xrContext;
 
 // Vulkan instance handle and context structs
@@ -59,13 +59,13 @@ VkuMemZone_t *VkZone;
 
 // Camera data
 Camera_t Camera;
-matrix ModelView, Projection[2], HeadPose;
+matrix modelView, Projection[2], HeadPose;
 
 // extern timing data from system main
 extern float fps, fTimeStep, fTime;
 
 // Main particle system struct
-ParticleSystem_t ParticleSystem;
+ParticleSystem_t particleSystem;
 
 // 3D Model data
 BModel_t Models[NUM_MODELS];
@@ -110,7 +110,8 @@ VkuPipeline_t LinePipeline;
 //////
 
 // Asteroid data
-VkuBuffer_t Asteroid_Instance;
+VkuBuffer_t asteroidInstance;
+matrix *asteroidInstanceData;
 
 #define NUM_ASTEROIDS 1000
 RigidBody_t Asteroids[NUM_ASTEROIDS];
@@ -179,16 +180,16 @@ typedef struct
 	};
 } NetworkPacket_t;
 
-uint32_t ServerAddress=NETWORK_ADDRESS(192, 168, 1, 10);
-uint16_t ServerPort=4545;
+uint32_t serverAddress=NETWORK_ADDRESS(192, 168, 1, 10);
+uint16_t serverPort=4545;
 
-uint16_t ClientPort=0;
-uint32_t ClientID=0;
+uint16_t clientPort=0;
+uint32_t clientID=0;
 
-Socket_t ClientSocket=-1;
+Socket_t clientSocket=-1;
 
 uint32_t connectedClients=0;
-Camera_t NetCameras[MAX_CLIENTS];
+Camera_t netCameras[MAX_CLIENTS];
 //////
 
 // UI Stuff
@@ -448,21 +449,21 @@ void GenerateSkyParams(void)
 	Skybox_UBO.uSunPosition=Vec4(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
 	Vec4_Normalize(&Skybox_UBO.uSunPosition);
 
-	const float MinSunBrightness=0.5f;
-	const float MaxSunBrightness=5.0f;
-	const float MinSunSize=100.0f;
-	const float MaxSunSize=1000.0f;
-	const float MinSunFalloff=8.0f;
-	const float MaxSunFalloff=16.0f;
+	const float minSunBrightness=0.5f;
+	const float maxSunBrightness=5.0f;
+	const float minSunSize=100.0f;
+	const float maxSunSize=1000.0f;
+	const float minSunFalloff=8.0f;
+	const float maxSunFalloff=16.0f;
 
 	Skybox_UBO.uSunColor=Vec4(
-		RandFloat()*(MaxSunBrightness-MinSunBrightness)+MinSunBrightness,
-		RandFloat()*(MaxSunBrightness-MinSunBrightness)+MinSunBrightness,
-		RandFloat()*(MaxSunBrightness-MinSunBrightness)+MinSunBrightness,
+		RandFloatRange(minSunBrightness, maxSunBrightness),
+		RandFloatRange(minSunBrightness, maxSunBrightness),
+		RandFloatRange(minSunBrightness, maxSunBrightness),
 		0.0f
 	);
-	Skybox_UBO.uSunSize=1.0f/(RandFloat()*(MaxSunSize-MinSunSize)+MinSunSize);
-	Skybox_UBO.uSunFalloff=RandFloat()*(MaxSunFalloff-MinSunFalloff)+MinSunFalloff;
+	Skybox_UBO.uSunSize=1.0f/RandFloatRange(minSunSize, maxSunSize);
+	Skybox_UBO.uSunFalloff=RandFloatRange(minSunFalloff, maxSunFalloff);
 
 	Skybox_UBO.uStarsScale=200.0f;
 	Skybox_UBO.uStarDensity=8.0f;
@@ -475,10 +476,10 @@ void GenerateSkyParams(void)
 	}
 
 	// Set up rigid body reps for asteroids
-	const float AsteroidFieldMinRadius=50.0f;
-	const float AsteroidFieldMaxRadius=1000.0f;
-	const float AsteroidMinRadius=0.05f;
-	const float AsteroidMaxRadius=40.0f;
+	const float asteroidFieldMinRadius=50.0f;
+	const float asteroidFieldMaxRadius=1000.0f;
+	const float asteroidMinRadius=0.05f;
+	const float asteroidMaxRadius=40.0f;
 
 	uint32_t i=0, tries=0;
 
@@ -486,28 +487,28 @@ void GenerateSkyParams(void)
 
 	while(i<NUM_ASTEROIDS)
 	{
-		vec3 RandomDirection=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
-		Vec3_Normalize(&RandomDirection);
+		vec3 randomDirection=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
+		Vec3_Normalize(&randomDirection);
 
-		RigidBody_t Asteroid={ 0 };
+		RigidBody_t asteroid={ 0 };
 
-		Asteroid.Position=Vec3(
-			RandomDirection.x*(RandFloat()*(AsteroidFieldMaxRadius-AsteroidFieldMinRadius))+AsteroidFieldMinRadius,
-			RandomDirection.y*(RandFloat()*(AsteroidFieldMaxRadius-AsteroidFieldMinRadius))+AsteroidFieldMinRadius,
-			RandomDirection.z*(RandFloat()*(AsteroidFieldMaxRadius-AsteroidFieldMinRadius))+AsteroidFieldMinRadius
+		asteroid.position=Vec3(
+			randomDirection.x*RandFloatRange(asteroidFieldMinRadius, asteroidFieldMaxRadius),
+			randomDirection.y*RandFloatRange(asteroidFieldMinRadius, asteroidFieldMaxRadius),
+			randomDirection.z*RandFloatRange(asteroidFieldMinRadius, asteroidFieldMaxRadius)
 		);
-		Asteroid.Radius=(RandFloat()*(AsteroidMaxRadius-AsteroidMinRadius))+AsteroidMinRadius;
+		asteroid.radius=RandFloatRange(asteroidMinRadius, asteroidMaxRadius);
 
 		bool overlapping=false;
 
 		for(uint32_t j=0;j<i;j++)
 		{
-			if(Vec3_Distance(Asteroid.Position, Asteroids[j].Position)<Asteroid.Radius+Asteroids[j].Radius)
+			if(Vec3_Distance(asteroid.position, Asteroids[j].position)<asteroid.radius+Asteroids[j].radius)
 				overlapping=true;
 		}
 
 		if(!overlapping)
-			Asteroids[i++]=Asteroid;
+			Asteroids[i++]=asteroid;
 
 		tries++;
 
@@ -517,33 +518,30 @@ void GenerateSkyParams(void)
 	//////
 
 	// Set up instance data for asteroid rendering
-	matrix *Data=NULL;
+	if(!asteroidInstance.Buffer)
+		vkuCreateHostBuffer(&Context, &asteroidInstance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-	if(!Asteroid_Instance.Buffer)
-		vkuCreateHostBuffer(&Context, &Asteroid_Instance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-	vkMapMemory(Context.Device, Asteroid_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Data);
+	vkMapMemory(Context.Device, asteroidInstance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&asteroidInstanceData);
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
 	{
+		vec3 randomDirection=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
+		Vec3_Normalize(&randomDirection);
+
 		const float radiusScale=1.5f;
 
-		Data[i]=MatrixIdentity();
+		Asteroids[i].velocity=Vec3_Muls(randomDirection, 10.0f);
+		Asteroids[i].force=Vec3b(0.0f);
 
-		Asteroids[i].Velocity=Vec3b(0.0f);
-		Asteroids[i].Force=Vec3b(0.0f);
+		Asteroids[i].orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		Asteroids[i].angularVelocity=randomDirection;
 
-		Asteroids[i].Orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-		Asteroids[i].AngularVelocity=Vec3((RandFloat()-0.5f)*PI, (RandFloat()-0.5f)*PI, (RandFloat()-0.5f)*PI);
+		Asteroids[i].mass=(1.0f/3000.0f)*(1.33333333f*PI*Asteroids[i].radius);
+		Asteroids[i].invMass=1.0f/Asteroids[i].mass;
 
-		Asteroids[i].Mass=(1.0f/3000.0f)*(1.33333333f*PI*Asteroids[i].Radius);
-		Asteroids[i].invMass=1.0f/Asteroids[i].Mass;
-
-		Asteroids[i].Inertia=0.4f*Asteroids[i].Mass*(Asteroids[i].Radius*Asteroids[i].Radius);
-		Asteroids[i].invInertia=1.0f/Asteroids[i].Inertia;
+		Asteroids[i].inertia=0.4f*Asteroids[i].mass*(Asteroids[i].radius*Asteroids[i].radius);
+		Asteroids[i].invInertia=1.0f/Asteroids[i].inertia;
 	}
-
-	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
 	//////
 }
 //////
@@ -845,13 +843,13 @@ void Thread_Main(void *Arg)
 	vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 
 	// Draw the models
-	vkCmdBindVertexBuffers(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 1, 1, &Asteroid_Instance.Buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 1, 1, &asteroidInstance.Buffer, &(VkDeviceSize) { 0 });
 
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet, 0, &Textures[2*i+0]);
 		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet, 1, &Textures[2*i+1]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet, 2, &ShadowDepth);
+		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet, 2, &shadowDepth);
 		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet, 3, PerFrame[Data->Index].Main_UBO_Buffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
 		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet, 4, PerFrame[Data->Index].Skybox_UBO_Buffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
 		vkuAllocateUpdateDescriptorSet(&DescriptorSet, Data->PerFrame[Data->Index].DescriptorPool[Data->Eye]);
@@ -875,7 +873,7 @@ void Thread_Main(void *Arg)
 	}
 
 	// Draw VR "hands"
-	if(IsVR)
+	if(isVR)
 	{
 		struct
 		{
@@ -941,7 +939,7 @@ void Thread_Main(void *Arg)
 	for(uint32_t i=0;i<connectedClients;i++)
 	{
 		// Only draw others, not ourselves
-		if(i==ClientID)
+		if(i==clientID)
 			continue;
 
 		// Note: These draw calls don't have any external geometry attached, it's in the vertex shader.
@@ -952,11 +950,11 @@ void Thread_Main(void *Arg)
 			vec4 color, start, end;
 		} line_ubo={ 0 };
 
-		vec4 position=Vec4(NetCameras[i].Position.x, NetCameras[i].Position.y, NetCameras[i].Position.z, 1.0f);
-		vec4 forward=Vec4(NetCameras[i].Forward.x, NetCameras[i].Forward.y, NetCameras[i].Forward.z, 1.0f);
-		vec4 up=Vec4(NetCameras[i].Up.x, NetCameras[i].Up.y, NetCameras[i].Up.z, 1.0f);
-		NetCameras[i].Right=Vec3_Cross(NetCameras[i].Forward, NetCameras[i].Up);
-		vec4 right=Vec4(NetCameras[i].Right.x, NetCameras[i].Right.y, NetCameras[i].Right.z, 1.0f);
+		vec4 position=Vec4(netCameras[i].Position.x, netCameras[i].Position.y, netCameras[i].Position.z, 1.0f);
+		vec4 forward=Vec4(netCameras[i].Forward.x, netCameras[i].Forward.y, netCameras[i].Forward.z, 1.0f);
+		vec4 up=Vec4(netCameras[i].Up.x, netCameras[i].Up.y, netCameras[i].Up.z, 1.0f);
+		netCameras[i].Right=Vec3_Cross(netCameras[i].Forward, netCameras[i].Up);
+		vec4 right=Vec4(netCameras[i].Right.x, netCameras[i].Right.y, netCameras[i].Right.z, 1.0f);
 
 		line_ubo.mvp=MatrixMult(PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
 		line_ubo.start=position;
@@ -986,7 +984,7 @@ void Thread_Main(void *Arg)
 
 		matrix local=MatrixIdentity();
 		local=MatrixMult(local, MatrixScale(10.0f, 10.0f, 10.0f));
-		local=MatrixMult(local, MatrixInverse(MatrixLookAt(NetCameras[i].Position, Vec3_Addv(NetCameras[i].Position, NetCameras[i].Forward), NetCameras[i].Up)));
+		local=MatrixMult(local, MatrixInverse(MatrixLookAt(netCameras[i].Position, Vec3_Addv(netCameras[i].Position, netCameras[i].Forward), netCameras[i].Up)));
 
 		local=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview);
 		sphere_ubo.mvp=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
@@ -1095,7 +1093,7 @@ void Thread_Particles(void *Arg)
 	vkCmdSetScissor(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
 
 	matrix Modelview=MatrixMult(PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->HMD);
-	ParticleSystem_Draw(&ParticleSystem, Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Data->PerFrame[Data->Index].DescriptorPool[Data->Eye], Modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
+	ParticleSystem_Draw(&particleSystem, Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Data->PerFrame[Data->Index].DescriptorPool[Data->Eye], Modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
 
 	vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, VolumePipeline.Pipeline);
 
@@ -1122,7 +1120,7 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 	PerFrame[Index].Main_UBO[Eye]->projection=Projection[Eye];
 
 	// Set up the modelview matrix
-	PerFrame[Index].Main_UBO[Eye]->modelview=ModelView;
+	PerFrame[Index].Main_UBO[Eye]->modelview=modelView;
 
 	PerFrame[Index].Main_UBO[Eye]->HMD=Pose;
 
@@ -1203,25 +1201,25 @@ void EyeRender(VkCommandBuffer CommandBuffer, uint32_t Index, uint32_t Eye, matr
 void Thread_Physics(void *Arg)
 {
 	// Get a pointer to the emitter that's providing the positions
-	ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
+	ParticleEmitter_t *emitter=List_GetPointer(&particleSystem.emitters, 0);
 
-	for(uint32_t i=0;i<Emitter->NumParticles;i++)
+	for(uint32_t i=0;i<emitter->numParticles;i++)
 	{
-		if(Emitter->Particles[i].ID!=Emitter->ID)
+		if(emitter->particles[i].ID!=emitter->ID)
 		{
 			// Get those positions and set the other emitter's positions to those
-			ParticleSystem_SetEmitterPosition(&ParticleSystem, Emitter->Particles[i].ID, Emitter->Particles[i].pos);
+			ParticleSystem_SetEmitterPosition(&particleSystem, emitter->particles[i].ID, emitter->particles[i].position);
 
 			// If this particle is dead, delete that emitter and reset it's ID 
-			if(Emitter->Particles[i].life<0.0f)
+			if(emitter->particles[i].life<0.0f)
 			{
-				ParticleSystem_DeleteEmitter(&ParticleSystem, Emitter->Particles[i].ID);
-				Emitter->Particles[i].ID=0;
+				ParticleSystem_DeleteEmitter(&particleSystem, emitter->particles[i].ID);
+				emitter->particles[i].ID=0;
 			}
 		}
 	}
 
-	ParticleSystem_Step(&ParticleSystem, fTimeStep);
+	ParticleSystem_Step(&particleSystem, fTimeStep);
 
 	// Loop through objects, integrate and check/resolve collisions
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
@@ -1240,20 +1238,20 @@ void Thread_Physics(void *Arg)
 		for(uint32_t j=0;j<connectedClients;j++)
 		{
 			// Don't check for collision with our own net camera
-			if(j!=ClientID)
-				PhysicsCameraToSphereCollisionResponse(&NetCameras[j], &Asteroids[i]);
+			if(j!=clientID)
+				PhysicsCameraToSphereCollisionResponse(&netCameras[j], &Asteroids[i]);
 		}
 #endif
 
 		// Check asteroids against projectile particles
 		// Emitter '0' on the particle system contains particles that drive the projectile physics
-		ParticleEmitter_t *Emitter=List_GetPointer(&ParticleSystem.Emitters, 0);
+		ParticleEmitter_t *emitter=List_GetPointer(&particleSystem.emitters, 0);
 		// Loop through all the possible particles
-		for(uint32_t j=0;j<Emitter->NumParticles;j++)
+		for(uint32_t j=0;j<emitter->numParticles;j++)
 		{
 			// If the particle ID matches with the projectile ID, then check collision and respond
-			if(Emitter->Particles[j].ID!=Emitter->ID)
-				PhysicsParticleToSphereCollisionResponse(&Emitter->Particles[j], &Asteroids[i]);
+			if(emitter->particles[j].ID!=emitter->ID)
+				PhysicsParticleToSphereCollisionResponse(&emitter->particles[j], &Asteroids[i]);
 		}
 	}
 
@@ -1261,48 +1259,48 @@ void Thread_Physics(void *Arg)
 	for(uint32_t i=0;i<connectedClients;i++)
 	{
 		// Don't check for collision with our own net camera
-		if(i!=ClientID)
-			PhysicsCameraToCameraCollisionResponse(&Camera, &NetCameras[i]);
+		if(i!=clientID)
+			PhysicsCameraToCameraCollisionResponse(&Camera, &netCameras[i]);
 	}
 	//////
 #endif
 
 	// Update camera and modelview matrix
-	ModelView=CameraUpdate(&Camera, fTimeStep);
+	modelView=CameraUpdate(&Camera, fTimeStep);
 	//////
 
 	// Update instance matrix data
-	matrix *Data=NULL;
-	vkMapMemory(Context.Device, Asteroid_Instance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Data);
+	//matrix *Data=NULL;
+	//vkMapMemory(Context.Device, asteroidInstance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&Data);
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
 	{
 		const float radiusScale=1.5f;
-		matrix local=MatrixScale(Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale, Asteroids[i].Radius/radiusScale);
-		local=MatrixMult(local, QuatMatrix(Asteroids[i].Orientation));
-		Data[i]=MatrixMult(local, MatrixTranslatev(Asteroids[i].Position));
+		matrix local=MatrixScale(Asteroids[i].radius/radiusScale, Asteroids[i].radius/radiusScale, Asteroids[i].radius/radiusScale);
+		local=MatrixMult(local, QuatMatrix(Asteroids[i].orientation));
+		asteroidInstanceData[i]=MatrixMult(local, MatrixTranslatev(Asteroids[i].position));
 	}
 
-	vkUnmapMemory(Context.Device, Asteroid_Instance.DeviceMemory);
+	//vkUnmapMemory(Context.Device, asteroidInstance.DeviceMemory);
 	//////
 
 #if 0
 	// Network status packet
-	if(ClientSocket!=-1)
+	if(clientSocket!=-1)
 	{
 		NetworkPacket_t StatusPacket;
 
 		memset(&StatusPacket, 0, sizeof(NetworkPacket_t));
 
 		StatusPacket.PacketMagic=STATUS_PACKETMAGIC;
-		StatusPacket.ClientID=ClientID;
+		StatusPacket.ClientID=clientID;
 
 		StatusPacket.Camera.Position=Camera.Position;
 		StatusPacket.Camera.Velocity=Camera.Velocity;
 		StatusPacket.Camera.Forward=Camera.Forward;
 		StatusPacket.Camera.Up=Camera.Up;
 
-		Network_SocketSend(ClientSocket, (uint8_t *)&StatusPacket, sizeof(NetworkPacket_t), ServerAddress, ServerPort);
+		Network_SocketSend(clientSocket, (uint8_t *)&StatusPacket, sizeof(NetworkPacket_t), serverAddress, serverPort);
 	}
 	//////
 #endif
@@ -1318,9 +1316,9 @@ uint8_t NetBuffer[32767]={ 0 };
 
 void NetUpdate(void *Arg)
 {
-	memset(NetCameras, 0, sizeof(Camera_t)*MAX_CLIENTS);
+	memset(netCameras, 0, sizeof(Camera_t)*MAX_CLIENTS);
 
-	if(ClientSocket==-1)
+	if(clientSocket==-1)
 	{
 		NetUpdate_Run=false;
 		return;
@@ -1333,7 +1331,7 @@ void NetUpdate(void *Arg)
 		uint32_t Address=0;
 		uint16_t Port=0;
 
-		Network_SocketReceive(ClientSocket, NetBuffer, sizeof(NetBuffer), &Address, &Port);
+		Network_SocketReceive(clientSocket, NetBuffer, sizeof(NetBuffer), &Address, &Port);
 
 		memcpy(&Magic, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
 
@@ -1347,10 +1345,10 @@ void NetUpdate(void *Arg)
 
 				memcpy(&clientID, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
 
-				memcpy(&NetCameras[clientID].Position, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-				memcpy(&NetCameras[clientID].Velocity, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-				memcpy(&NetCameras[clientID].Forward, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-				memcpy(&NetCameras[clientID].Up, pBuffer, sizeof(float)*3);			pBuffer+=sizeof(float)*3;
+				memcpy(&netCameras[clientID].Position, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
+				memcpy(&netCameras[clientID].Velocity, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
+				memcpy(&netCameras[clientID].Forward, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
+				memcpy(&netCameras[clientID].Up, pBuffer, sizeof(float)*3);			pBuffer+=sizeof(float)*3;
 
 				//DBGPRINTF(DEBUG_INFO, "\033[%d;0H\033[KID %d Pos: %0.1f %0.1f %0.1f", clientID+1, clientID, NetCameras[clientID].Position.x, NetCameras[clientID].Position.y, NetCameras[clientID].Position.z);
 			}
@@ -1371,9 +1369,9 @@ void NetUpdate(void *Arg)
 }
 #endif
 
-extern vec2 MousePosition;
+extern vec2 mousePosition;
 
-void FireParticleEmitter(vec3 Position, vec3 Direction);
+void FireParticleEmitter(vec3 position, vec3 direction);
 
 bool leftTriggerOnce=true;
 bool rightTriggerOnce=true;
@@ -1386,7 +1384,7 @@ void Render(void)
 	static uint32_t Index=0;
 	uint32_t imageIndex;
 
-	if(IsVR)
+	if(isVR)
 	{
 		if(!VR_StartFrame(&xrContext))
 			return;
@@ -1405,7 +1403,7 @@ void Render(void)
 
 	// Handle VR input
 	// TODO: this needs to go somewhere else?
-	if(IsVR)
+	if(isVR)
 	{
 		HeadPose=VR_GetHeadPose(&xrContext);
 
@@ -1455,7 +1453,7 @@ void Render(void)
 			rightTriggerOnce=false;
 
 			vec4 rightOrientation=Vec4(rightHand.orientation.x, rightHand.orientation.y, rightHand.orientation.z, rightHand.orientation.w);
-			vec3 Direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatMatrix(rightOrientation), MatrixInverse(ModelView)));
+			vec3 Direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatMatrix(rightOrientation), MatrixInverse(modelView)));
 
 			FireParticleEmitter(Vec3_Addv(Camera.Position, Vec3_Muls(Direction, Camera.Radius)), Direction);
 			Audio_PlaySample(&Sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &Camera.Position);
@@ -1467,7 +1465,7 @@ void Render(void)
 	else
 		HeadPose=MatrixIdentity();
 
-	if(!IsVR)
+	if(!isVR)
 		Projection[0]=MatrixInfPerspective(90.0f, (float)renderWidth/renderHeight, 0.01f);
 	else
 	{
@@ -1507,11 +1505,9 @@ void Render(void)
 	// Wait for physics to finish before rendering
 	pthread_barrier_wait(&ThreadBarrier_Physics);
 
-	Font_Print(&Fnt, 64.0f, 100.0f, 100.0f, "%f %f %f", Asteroids[0].AngularVelocity.x, Asteroids[0].AngularVelocity.y, Asteroids[0].AngularVelocity.z);
-
 	EyeRender(PerFrame[Index].CommandBuffer, Index, 0, HeadPose);
 
-	if(IsVR)
+	if(isVR)
 	{
 		vkuTransitionLayout(PerFrame[Index].CommandBuffer, ColorResolve[1].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
@@ -1523,7 +1519,7 @@ void Render(void)
 	//////
 
 	// Other eye compositing
-	if(IsVR)
+	if(isVR)
 		CompositeDraw(Index, 1);
 
 	// Reset the font text collection for the next frame
@@ -1544,7 +1540,7 @@ void Render(void)
 		.pCommandBuffers=&PerFrame[Index].CommandBuffer,
 	};
 
-	if(IsVR)
+	if(isVR)
 	{
 		SubmitInfo.waitSemaphoreCount=0;
 		SubmitInfo.pWaitSemaphores=VK_NULL_HANDLE;
@@ -1554,7 +1550,7 @@ void Render(void)
 
 	vkQueueSubmit(Context.Queue, 1, &SubmitInfo, VK_NULL_HANDLE/*PerFrame[Index].FrameFence*/);
 
-	if(IsVR)
+	if(isVR)
 	{
 		VR_EndFrame(&xrContext);
 		Index=(Index+1)%xrContext.swapchain[0].numImages;
@@ -1597,7 +1593,7 @@ void Console_CmdQuit(Console_t *Console, char *Param)
 bool Init(void)
 {
 	// TODO: This is a hack, fix it proper.
-	if(IsVR)
+	if(isVR)
 		Swapchain.NumImages=xrContext.swapchain[0].numImages;
 
 	RandomSeed((uint32_t)GetClock()*UINT32_MAX);
@@ -1620,7 +1616,7 @@ bool Init(void)
 	}
 
 	CameraInit(&Camera, Vec3(0.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
-	ModelView=CameraUpdate(&Camera, 0.0f);
+	modelView=CameraUpdate(&Camera, 0.0f);
 
 	if(!Audio_Init())
 	{
@@ -1784,23 +1780,23 @@ bool Init(void)
 	CreateCompositeFramebuffers(0, renderWidth, renderHeight);
 
 	// Second eye framebuffer for VR
-	if(IsVR)
+	if(isVR)
 	{
 		CreateFramebuffers(1, renderWidth, renderHeight);
 		CreateCompositeFramebuffers(1, renderWidth, renderHeight);
 	}
 
 	// Set up particle system
-	if(!ParticleSystem_Init(&ParticleSystem))
+	if(!ParticleSystem_Init(&particleSystem))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: ParticleSystem_Init failed.\n");
 		return false;
 	}
 	
-	ParticleSystem_SetGravity(&ParticleSystem, 0.0f, 0.0f, 0.0f);
+	ParticleSystem_SetGravity(&particleSystem, 0.0f, 0.0f, 0.0f);
 
 	volatile vec3 Zero=Vec3(0.0f, 0.0f, 0.0f);
-	ParticleSystem_AddEmitter(&ParticleSystem, Zero, Zero, Zero, 0.0f, 1000, true, NULL);
+	ParticleSystem_AddEmitter(&particleSystem, Zero, Zero, Zero, 0.0f, 1000, true, NULL);
 
 	Font_Init(&Fnt);
 
@@ -1943,14 +1939,14 @@ bool Init(void)
 	Network_Init();
 
 	// Create a new socket
-	ClientSocket=Network_CreateSocket();
+	clientSocket=Network_CreateSocket();
 
-	if(ClientSocket==-1)
+	if(clientSocket==-1)
 		return false;
 
 	// Send connect magic to initiate connection
 	uint32_t Magic=CONNECT_PACKETMAGIC;
-	if(!Network_SocketSend(ClientSocket, (uint8_t *)&Magic, sizeof(uint32_t), ServerAddress, ServerPort))
+	if(!Network_SocketSend(clientSocket, (uint8_t *)&Magic, sizeof(uint32_t), serverAddress, serverPort))
 		return false;
 
 	double Timeout=GetClock()+5.0; // Current time +5 seconds
@@ -1964,7 +1960,7 @@ bool Init(void)
 
 		memset(&ResponsePacket, 0, sizeof(NetworkPacket_t));
 
-		if(Network_SocketReceive(ClientSocket, (uint8_t *)&ResponsePacket, sizeof(NetworkPacket_t), &Address, &Port)>0)
+		if(Network_SocketReceive(clientSocket, (uint8_t *)&ResponsePacket, sizeof(NetworkPacket_t), &Address, &Port)>0)
 		{
 			if(ResponsePacket.PacketMagic==CONNECT_PACKETMAGIC)
 			{
@@ -1976,7 +1972,7 @@ bool Init(void)
 						  Port);
 
 				RandomSeed(ResponsePacket.Connect.Seed);
-				ClientID=ResponsePacket.ClientID;
+				clientID=ResponsePacket.ClientID;
 				Response=true;
 			}
 		}
@@ -1984,8 +1980,8 @@ bool Init(void)
 		if(GetClock()>Timeout)
 		{
 			DBGPRINTF("Connection timed out...\n");
-			Network_SocketClose(ClientSocket);
-			ClientSocket=-1;
+			Network_SocketClose(clientSocket);
+			clientSocket=-1;
 			break;
 		}
 	}
@@ -2021,7 +2017,7 @@ void RecreateSwapchain(void)
 
 		vkDestroyFramebuffer(Context.Device, Framebuffer[0], VK_NULL_HANDLE);
 
-		if(IsVR)
+		if(isVR)
 		{
 			vkuDestroyImageBuffer(&Context, &ColorImage[1]);
 			vkuDestroyImageBuffer(&Context, &ColorResolve[1]);
@@ -2048,7 +2044,7 @@ void RecreateSwapchain(void)
 		CreateFramebuffers(0, renderWidth, renderHeight);
 		CreateCompositeFramebuffers(0, renderWidth, renderHeight);
 
-		if(IsVR)
+		if(isVR)
 		{
 			CreateFramebuffers(1, renderWidth, renderHeight);
 			CreateCompositeFramebuffers(1, renderWidth, renderHeight);
@@ -2066,13 +2062,13 @@ void Destroy(void)
 	Thread_Destroy(&ThreadNetUpdate);
 
 	// Send disconnect message to server and close/destroy network stuff
-	if(ClientSocket!=-1)
+	if(clientSocket!=-1)
 	{
-		Network_SocketSend(ClientSocket, (uint8_t *)&(NetworkPacket_t)
+		Network_SocketSend(clientSocket, (uint8_t *)&(NetworkPacket_t)
 		{
-			.PacketMagic=DISCONNECT_PACKETMAGIC, .ClientID=ClientID
-		}, sizeof(NetworkPacket_t), ServerAddress, ServerPort);
-		Network_SocketClose(ClientSocket);
+			.PacketMagic=DISCONNECT_PACKETMAGIC, .ClientID=clientID
+		}, sizeof(NetworkPacket_t), serverAddress, serverPort);
+		Network_SocketClose(clientSocket);
 	}
 
 	Network_Destroy();
@@ -2096,7 +2092,7 @@ void Destroy(void)
 	Zone_Free(Zone, Sounds[SOUND_EXPLODE3].Data);
 
 #ifndef ANDROID
-	if(IsVR)
+	if(isVR)
 		VR_Destroy(&xrContext);
 #endif
 
@@ -2137,7 +2133,7 @@ void Destroy(void)
 	//////////
 
 	// Particle system destruction
-	ParticleSystem_Destroy(&ParticleSystem);
+	ParticleSystem_Destroy(&particleSystem);
 	//////////
 
 	// Skybox destruction
@@ -2153,7 +2149,8 @@ void Destroy(void)
 	//////////
 
 	// Asteroid instance buffer destruction
-	vkuDestroyBuffer(&Context, &Asteroid_Instance);
+	vkUnmapMemory(Context.Device, asteroidInstance.DeviceMemory);
+	vkuDestroyBuffer(&Context, &asteroidInstance);
 	//////////
 
 	// Textures destruction
@@ -2208,7 +2205,7 @@ void Destroy(void)
 
 	vkDestroyFramebuffer(Context.Device, Framebuffer[0], VK_NULL_HANDLE);
 
-	if(IsVR)
+	if(isVR)
 	{
 		vkuDestroyImageBuffer(&Context, &ColorImage[1]);
 		vkuDestroyImageBuffer(&Context, &ColorResolve[1]);

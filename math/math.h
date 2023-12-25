@@ -177,8 +177,9 @@ float fact(const int32_t n);
 
 void RandomSeed(uint32_t Seed);
 uint32_t Random(void);
-float RandFloat(void);
 int32_t RandRange(int32_t min, int32_t max);
+float RandFloat(void);
+float RandFloatRange(float min, float max);
 uint32_t IsPower2(uint32_t value);
 uint32_t NextPower2(uint32_t value);
 int32_t ComputeLog(uint32_t value);

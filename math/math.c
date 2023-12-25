@@ -98,14 +98,19 @@ uint32_t Random(void)
 	return _Seed;
 }
 
+int32_t RandRange(int32_t min, int32_t max)
+{
+	return (Random()%(max-min+1))+min;
+}
+
 float RandFloat(void)
 {
 	return (float)Random()/(float)UINT32_MAX;
 }
 
-int32_t RandRange(int32_t min, int32_t max)
+float RandFloatRange(float min, float max)
 {
-	return (Random()%(max-min+1))+min;
+	return ((max-min)*RandFloat())+min;
 }
 
 uint32_t IsPower2(uint32_t value)

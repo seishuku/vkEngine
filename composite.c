@@ -13,7 +13,7 @@
 extern VkuContext_t Context;
 extern VkuSwapchain_t Swapchain;
 extern XruContext_t xrContext;
-extern bool IsVR;
+extern bool isVR;
 
 extern float fps, fTimeStep;
 extern double physicsTime;
@@ -241,7 +241,7 @@ void CreateCompositeFramebuffers(uint32_t Eye)
 	uint32_t targetWidth=0;
 	uint32_t targetHeight=0;
 
-	if(IsVR)
+	if(isVR)
 	{
 		targetWidth=xrContext.swapchainExtent.width;
 		targetHeight=xrContext.swapchainExtent.height;
@@ -296,7 +296,7 @@ void CreateCompositeFramebuffers(uint32_t Eye)
 		.layers=1,
 	}, 0, &GaussianFramebufferBlur[Eye]);
 
-	if(!IsVR)
+	if(!isVR)
 	{
 		// Compositing pipeline images, these are the actual swapchain framebuffers that will get presented
 		for(uint32_t i=0;i<Swapchain.NumImages;i++)
@@ -349,7 +349,7 @@ bool CreateCompositePipeline(void)
 	VkFormat surfaceFormat=VK_FORMAT_UNDEFINED;
 
 	// VR gets rendered directly to HMD, desktop needs to be presented
-	if(!IsVR)
+	if(!isVR)
 	{
 		attachementFinalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		surfaceFormat=Swapchain.SurfaceFormat.format;
@@ -453,7 +453,7 @@ void DestroyComposite(void)
 
 	vkDestroyFramebuffer(Context.Device, ThresholdFramebuffer[0], VK_NULL_HANDLE);
 
-	if(IsVR)
+	if(isVR)
 		vkDestroyFramebuffer(Context.Device, ThresholdFramebuffer[1], VK_NULL_HANDLE);
 
 	vkDestroyPipeline(Context.Device, ThresholdPipeline.Pipeline, VK_NULL_HANDLE);
@@ -467,7 +467,7 @@ void DestroyComposite(void)
 	vkDestroyFramebuffer(Context.Device, GaussianFramebufferTemp[0], VK_NULL_HANDLE);
 	vkDestroyFramebuffer(Context.Device, GaussianFramebufferBlur[0], VK_NULL_HANDLE);
 
-	if(IsVR)
+	if(isVR)
 	{
 		vkDestroyFramebuffer(Context.Device, GaussianFramebufferTemp[1], VK_NULL_HANDLE);
 		vkDestroyFramebuffer(Context.Device, GaussianFramebufferBlur[1], VK_NULL_HANDLE);
@@ -485,7 +485,7 @@ void DestroyComposite(void)
 	{
 		vkDestroyFramebuffer(Context.Device, PerFrame[i].CompositeFramebuffer[0], VK_NULL_HANDLE);
 
-		if(IsVR)
+		if(isVR)
 			vkDestroyFramebuffer(Context.Device, PerFrame[i].CompositeFramebuffer[1], VK_NULL_HANDLE);
 	}
 
@@ -499,7 +499,7 @@ void CompositeDraw(uint32_t Index, uint32_t Eye)
 {
 	uint32_t Width=0, Height=0;
 
-	if(IsVR)
+	if(isVR)
 	{
 		Width=xrContext.swapchainExtent.width;
 		Height=xrContext.swapchainExtent.height;

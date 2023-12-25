@@ -12,11 +12,11 @@ typedef struct
 
 extern Shadow_UBO_t Shadow_UBO;
 
-extern VkuImage_t ShadowDepth;
+extern VkuImage_t shadowDepth;
 
 void CreateShadowMap(void);
 bool CreateShadowPipeline(void);
-void ShadowUpdateMap(VkCommandBuffer CommandBuffer, uint32_t FrameIndex);
+void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex);
 void DestroyShadow(void);
 
 #endif
