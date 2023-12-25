@@ -94,17 +94,17 @@ VkRenderPass RenderPass;
 VkFramebuffer Framebuffer[2];
 
 // Primary rendering Vulkan stuff
-VkuDescriptorSet_t DescriptorSet;
-VkPipelineLayout PipelineLayout;
-VkuPipeline_t Pipeline;
+VkuDescriptorSet_t mainDescriptorSet;
+VkPipelineLayout mainPipelineLayout;
+VkuPipeline_t mainPipeline;
 //////
 
 // Debug rendering Vulkan stuff
-VkPipelineLayout SpherePipelineLayout;
-VkuPipeline_t SpherePipeline;
+VkPipelineLayout spherePipelineLayout;
+VkuPipeline_t spherePipeline;
 
-VkPipelineLayout LinePipelineLayout;
-VkuPipeline_t LinePipeline;
+VkPipelineLayout linePipelineLayout;
+VkuPipeline_t linePipeline;
 //////
 
 // Asteroid data
@@ -112,7 +112,7 @@ VkuBuffer_t asteroidInstance;
 matrix *asteroidInstanceData;
 
 #define NUM_ASTEROIDS 1000
-RigidBody_t Asteroids[NUM_ASTEROIDS];
+RigidBody_t asteroids[NUM_ASTEROIDS];
 //////
 
 // Thread stuff
@@ -194,9 +194,9 @@ Camera_t netCameras[MAX_CLIENTS];
 Font_t Fnt; // Fnt instead of Font, because Xlib is dumb and declares a type Font *rolley-eyes*
 UI_t UI;
 
-uint32_t VolumeID=UINT32_MAX;
-uint32_t FaceID=UINT32_MAX;
-uint32_t CursorID=UINT32_MAX;
+uint32_t volumeID=UINT32_MAX;
+uint32_t faceID=UINT32_MAX;
+uint32_t cursorID=UINT32_MAX;
 //////
 
 Console_t Console;
@@ -361,21 +361,21 @@ bool CreatePipeline(void)
 		vkMapMemory(Context.Device, perFrame[i].mainUBOBuffer[1].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].mainUBO[1]);
 	}
 
-	vkuInitDescriptorSet(&DescriptorSet, &Context);
+	vkuInitDescriptorSet(&mainDescriptorSet, &Context);
 
-	vkuDescriptorSet_AddBinding(&DescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&DescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&DescriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&DescriptorSet, 3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&DescriptorSet, 4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&mainDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&mainDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&mainDescriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&mainDescriptorSet, 3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&mainDescriptorSet, 4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
 
-	vkuAssembleDescriptorSetLayout(&DescriptorSet);
+	vkuAssembleDescriptorSetLayout(&mainDescriptorSet);
 
 	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
-		.pSetLayouts=&DescriptorSet.DescriptorSetLayout,
+		.pSetLayouts=&mainDescriptorSet.DescriptorSetLayout,
 		.pushConstantRangeCount=1,
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
@@ -383,36 +383,36 @@ bool CreatePipeline(void)
 			.size=sizeof(matrix),
 			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
-	}, 0, &PipelineLayout);
+	}, 0, &mainPipelineLayout);
 
-	vkuInitPipeline(&Pipeline, &Context);
+	vkuInitPipeline(&mainPipeline, &Context);
 
-	vkuPipeline_SetPipelineLayout(&Pipeline, PipelineLayout);
-	vkuPipeline_SetRenderPass(&Pipeline, RenderPass);
+	vkuPipeline_SetPipelineLayout(&mainPipeline, mainPipelineLayout);
+	vkuPipeline_SetRenderPass(&mainPipeline, RenderPass);
 
-	Pipeline.DepthTest=VK_TRUE;
-	Pipeline.CullMode=VK_CULL_MODE_BACK_BIT;
-	Pipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
-	Pipeline.RasterizationSamples=MSAA;
+	mainPipeline.DepthTest=VK_TRUE;
+	mainPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+	mainPipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
+	mainPipeline.RasterizationSamples=MSAA;
 
-	if(!vkuPipeline_AddStage(&Pipeline, "shaders/lighting.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&mainPipeline, "shaders/lighting.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
-	if(!vkuPipeline_AddStage(&Pipeline, "shaders/lighting.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	if(!vkuPipeline_AddStage(&mainPipeline, "shaders/lighting.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
-	vkuPipeline_AddVertexBinding(&Pipeline, 0, sizeof(vec4)*5, VK_VERTEX_INPUT_RATE_VERTEX);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*1);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*2);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*3);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 4, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*4);
+	vkuPipeline_AddVertexBinding(&mainPipeline, 0, sizeof(vec4)*5, VK_VERTEX_INPUT_RATE_VERTEX);
+	vkuPipeline_AddVertexAttribute(&mainPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
+	vkuPipeline_AddVertexAttribute(&mainPipeline, 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*1);
+	vkuPipeline_AddVertexAttribute(&mainPipeline, 2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*2);
+	vkuPipeline_AddVertexAttribute(&mainPipeline, 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*3);
+	vkuPipeline_AddVertexAttribute(&mainPipeline, 4, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*4);
 
-	vkuPipeline_AddVertexBinding(&Pipeline, 1, sizeof(matrix), VK_VERTEX_INPUT_RATE_INSTANCE);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 5, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 6, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*1);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 7, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*2);
-	vkuPipeline_AddVertexAttribute(&Pipeline, 8, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*3);
+	vkuPipeline_AddVertexBinding(&mainPipeline, 1, sizeof(matrix), VK_VERTEX_INPUT_RATE_INSTANCE);
+	vkuPipeline_AddVertexAttribute(&mainPipeline, 5, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
+	vkuPipeline_AddVertexAttribute(&mainPipeline, 6, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*1);
+	vkuPipeline_AddVertexAttribute(&mainPipeline, 7, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*2);
+	vkuPipeline_AddVertexAttribute(&mainPipeline, 8, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*3);
 
 	//VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo=
 	//{
@@ -422,7 +422,7 @@ bool CreatePipeline(void)
 	//	.depthAttachmentFormat=depthFormat,
 	//};
 
-	if(!vkuAssemblePipeline(&Pipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
+	if(!vkuAssemblePipeline(&mainPipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
 		return false;
 
 	return true;
@@ -481,7 +481,7 @@ void GenerateSkyParams(void)
 
 	uint32_t i=0, tries=0;
 
-	memset(Asteroids, 0, sizeof(RigidBody_t)*NUM_ASTEROIDS);
+	memset(asteroids, 0, sizeof(RigidBody_t)*NUM_ASTEROIDS);
 
 	while(i<NUM_ASTEROIDS)
 	{
@@ -501,12 +501,12 @@ void GenerateSkyParams(void)
 
 		for(uint32_t j=0;j<i;j++)
 		{
-			if(Vec3_Distance(asteroid.position, Asteroids[j].position)<asteroid.radius+Asteroids[j].radius)
+			if(Vec3_Distance(asteroid.position, asteroids[j].position)<asteroid.radius+asteroids[j].radius)
 				overlapping=true;
 		}
 
 		if(!overlapping)
-			Asteroids[i++]=asteroid;
+			asteroids[i++]=asteroid;
 
 		tries++;
 
@@ -528,17 +528,17 @@ void GenerateSkyParams(void)
 
 		const float radiusScale=1.5f;
 
-		Asteroids[i].velocity=Vec3_Muls(randomDirection, 10.0f);
-		Asteroids[i].force=Vec3b(0.0f);
+		asteroids[i].velocity=Vec3_Muls(randomDirection, 10.0f);
+		asteroids[i].force=Vec3b(0.0f);
 
-		Asteroids[i].orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-		Asteroids[i].angularVelocity=randomDirection;
+		asteroids[i].orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		asteroids[i].angularVelocity=randomDirection;
 
-		Asteroids[i].mass=(1.0f/3000.0f)*(1.33333333f*PI*Asteroids[i].radius);
-		Asteroids[i].invMass=1.0f/Asteroids[i].mass;
+		asteroids[i].mass=(1.0f/3000.0f)*(1.33333333f*PI*asteroids[i].radius);
+		asteroids[i].invMass=1.0f/asteroids[i].mass;
 
-		Asteroids[i].inertia=0.4f*Asteroids[i].mass*(Asteroids[i].radius*Asteroids[i].radius);
-		Asteroids[i].invInertia=1.0f/Asteroids[i].inertia;
+		asteroids[i].inertia=0.4f*asteroids[i].mass*(asteroids[i].radius*asteroids[i].radius);
+		asteroids[i].invInertia=1.0f/asteroids[i].inertia;
 	}
 	//////
 }
@@ -557,23 +557,23 @@ bool CreateSpherePipeline(void)
 			.size=sizeof(matrix)+sizeof(vec4),
 			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
-	}, 0, &SpherePipelineLayout);
+	}, 0, &spherePipelineLayout);
 
-	vkuInitPipeline(&SpherePipeline, &Context);
+	vkuInitPipeline(&spherePipeline, &Context);
 
-	vkuPipeline_SetPipelineLayout(&SpherePipeline, SpherePipelineLayout);
-	vkuPipeline_SetRenderPass(&SpherePipeline, RenderPass);
+	vkuPipeline_SetPipelineLayout(&spherePipeline, spherePipelineLayout);
+	vkuPipeline_SetRenderPass(&spherePipeline, RenderPass);
 
-	SpherePipeline.DepthTest=VK_TRUE;
-	SpherePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
-	SpherePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
-	SpherePipeline.RasterizationSamples=MSAA;
-	//SpherePipeline.PolygonMode=VK_POLYGON_MODE_LINE;
+	spherePipeline.DepthTest=VK_TRUE;
+	spherePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+	spherePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
+	spherePipeline.RasterizationSamples=MSAA;
+	//spherePipeline.PolygonMode=VK_POLYGON_MODE_LINE;
 
-	if(!vkuPipeline_AddStage(&SpherePipeline, "shaders/sphere.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&spherePipeline, "shaders/sphere.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
-	if(!vkuPipeline_AddStage(&SpherePipeline, "shaders/sphere.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	if(!vkuPipeline_AddStage(&spherePipeline, "shaders/sphere.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
 	//VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo=
@@ -584,7 +584,7 @@ bool CreateSpherePipeline(void)
 	//	.depthAttachmentFormat=depthFormat,
 	//};
 
-	if(!vkuAssemblePipeline(&SpherePipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
+	if(!vkuAssemblePipeline(&spherePipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
 		return false;
 
 	return true;
@@ -606,8 +606,8 @@ void DrawSphere(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, vec
 	spherePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
 	spherePC.color=color;
 
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, SpherePipeline.Pipeline);
-	vkCmdPushConstants(commandBuffer, SpherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline.Pipeline);
+	vkCmdPushConstants(commandBuffer, spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
 	vkCmdDraw(commandBuffer, 60, 1, 0, 0);
 }
 //////
@@ -625,23 +625,23 @@ bool CreateLinePipeline(void)
 			.size=sizeof(matrix)+(sizeof(vec4)*3),
 			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
-	}, 0, &LinePipelineLayout);
+	}, 0, &linePipelineLayout);
 
-	vkuInitPipeline(&LinePipeline, &Context);
+	vkuInitPipeline(&linePipeline, &Context);
 
-	vkuPipeline_SetPipelineLayout(&LinePipeline, LinePipelineLayout);
-	vkuPipeline_SetRenderPass(&LinePipeline, RenderPass);
+	vkuPipeline_SetPipelineLayout(&linePipeline, linePipelineLayout);
+	vkuPipeline_SetRenderPass(&linePipeline, RenderPass);
 
-	LinePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-	LinePipeline.DepthTest=VK_TRUE;
-	LinePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
-	LinePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
-	LinePipeline.RasterizationSamples=MSAA;
+	linePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+	linePipeline.DepthTest=VK_TRUE;
+	linePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
+	linePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
+	linePipeline.RasterizationSamples=MSAA;
 
-	if(!vkuPipeline_AddStage(&LinePipeline, "shaders/line.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(!vkuPipeline_AddStage(&linePipeline, "shaders/line.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
 
-	if(!vkuPipeline_AddStage(&LinePipeline, "shaders/line.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
+	if(!vkuPipeline_AddStage(&linePipeline, "shaders/line.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
 		return false;
 
 	//VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo=
@@ -652,7 +652,7 @@ bool CreateLinePipeline(void)
 	//	.depthAttachmentFormat=depthFormat,
 	//};
 
-	if(!vkuAssemblePipeline(&LinePipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
+	if(!vkuAssemblePipeline(&linePipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
 		return false;
 
 	return true;
@@ -673,8 +673,8 @@ void DrawLine(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, vec3 
 	linePC.verts[0]=Vec4_Vec3(start, 1.0f);
 	linePC.verts[1]=Vec4_Vec3(end, 1.0f);
 
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, LinePipeline.Pipeline);
-	vkCmdPushConstants(commandBuffer, LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(linePC), &linePC);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.Pipeline);
+	vkCmdPushConstants(commandBuffer, linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(linePC), &linePC);
 	vkCmdDraw(commandBuffer, 2, 1, 0, 0);
 }
 //////
@@ -695,21 +695,21 @@ void DrawPlayer(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, Cam
 	linePC.mvp=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->projection);
 	linePC.start=position;
 
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, LinePipeline.Pipeline);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.Pipeline);
 
 	linePC.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
 	linePC.end=Vec4_Addv(position, Vec4_Muls(forward, 15.0f));
-	vkCmdPushConstants(commandBuffer, LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(linePC), &linePC);
+	vkCmdPushConstants(commandBuffer, linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(linePC), &linePC);
 	vkCmdDraw(commandBuffer, 2, 1, 0, 0);
 
 	linePC.color=Vec4(0.0f, 1.0f, 0.0f, 1.0f);
 	linePC.end=Vec4_Addv(position, Vec4_Muls(up, 15.0f));
-	vkCmdPushConstants(commandBuffer, LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(linePC), &linePC);
+	vkCmdPushConstants(commandBuffer, linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(linePC), &linePC);
 	vkCmdDraw(commandBuffer, 2, 1, 0, 0);
 
 	linePC.color=Vec4(0.0f, 0.0f, 1.0f, 1.0f);
 	linePC.end=Vec4_Addv(position, Vec4_Muls(right, 15.0f));
-	vkCmdPushConstants(commandBuffer, LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(linePC), &linePC);
+	vkCmdPushConstants(commandBuffer, linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(linePC), &linePC);
 	vkCmdDraw(commandBuffer, 2, 1, 0, 0);
 
 	struct
@@ -727,8 +727,8 @@ void DrawPlayer(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, Cam
 
 	spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, SpherePipeline.Pipeline);
-	vkCmdPushConstants(commandBuffer, SpherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline.Pipeline);
+	vkCmdPushConstants(commandBuffer, spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
 	vkCmdDraw(commandBuffer, 60, 1, 0, 0);
 }
 
@@ -838,27 +838,27 @@ void Thread_Main(void *Arg)
 	vkCmdSetScissor(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
 
 	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
-	vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
+	vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.Pipeline);
 
 	// Draw the models
 	vkCmdBindVertexBuffers(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 1, 1, &asteroidInstance.Buffer, &(VkDeviceSize) { 0 });
 
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet, 0, &Textures[2*i+0]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet, 1, &Textures[2*i+1]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&DescriptorSet, 2, &shadowDepth);
-		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet, 3, perFrame[Data->Index].mainUBOBuffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
-		vkuDescriptorSet_UpdateBindingBufferInfo(&DescriptorSet, 4, perFrame[Data->Index].skyboxUBOBuffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
-		vkuAllocateUpdateDescriptorSet(&DescriptorSet, Data->PerFrame[Data->Index].DescriptorPool[Data->Eye]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 0, &Textures[2*i+0]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 1, &Textures[2*i+1]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 2, &shadowDepth);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&mainDescriptorSet, 3, perFrame[Data->Index].mainUBOBuffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&mainDescriptorSet, 4, perFrame[Data->Index].skyboxUBOBuffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
+		vkuAllocateUpdateDescriptorSet(&mainDescriptorSet, Data->PerFrame[Data->Index].DescriptorPool[Data->Eye]);
 
-		vkCmdBindDescriptorSets(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
+		vkCmdBindDescriptorSets(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipelineLayout, 0, 1, &mainDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
 		matrix local=MatrixIdentity();
 		//local=MatrixMult(local, MatrixRotate(fTime, 1.0f, 0.0f, 0.0f));
 		//local=MatrixMult(local, MatrixRotate(fTime, 0.0f, 1.0f, 0.0f));
 
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(matrix), &local);
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], mainPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(matrix), &local);
 
 		// Bind model data buffers and draw the triangles
 		vkCmdBindVertexBuffers(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &Models[i].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
@@ -881,7 +881,7 @@ void Thread_Main(void *Arg)
 
 		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
-		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, SpherePipeline.Pipeline);
+		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline.Pipeline);
 
 		vec3 leftPos=Vec3(leftHand.position.x, leftHand.position.y, leftHand.position.z);
 		vec4 leftRot=Vec4(leftHand.orientation.x, leftHand.orientation.y, leftHand.orientation.z, leftHand.orientation.w);
@@ -889,7 +889,7 @@ void Thread_Main(void *Arg)
 		local=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->HMD);
 		spherePC.mvp=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->projection);
 
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], SpherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
 		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 60, 1, 0, 0);
 
 		vec3 rightPos=Vec3(rightHand.position.x, rightHand.position.y, rightHand.position.z);
@@ -898,7 +898,7 @@ void Thread_Main(void *Arg)
 		local=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->HMD);
 		spherePC.mvp=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->projection);
 
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], SpherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
 		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 60, 1, 0, 0);
 
 		struct
@@ -911,7 +911,7 @@ void Thread_Main(void *Arg)
 		LinePC.Verts[0]=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
 		LinePC.Verts[1]=Vec4(0.0f, 0.0f, -1.0f, 1.0f);
 
-		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, LinePipeline.Pipeline);
+		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.Pipeline);
 
 		LinePC.Color=Vec4(leftTrigger*100.0f+1.0f, 1.0f, leftGrip*100.0f+1.0f, 1.0f);
 
@@ -919,7 +919,7 @@ void Thread_Main(void *Arg)
 		local=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->HMD);
 		LinePC.mvp=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->projection);
 
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(LinePC), &LinePC);
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(LinePC), &LinePC);
 		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
 
 		LinePC.Color=Vec4(rightTrigger*100.0f+1.0f, 1.0f, rightGrip*100.0f+1.0f, 1.0f);
@@ -928,7 +928,7 @@ void Thread_Main(void *Arg)
 		local=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->HMD);
 		LinePC.mvp=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->projection);
 
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(LinePC), &LinePC);
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(LinePC), &LinePC);
 		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
 	}
 
@@ -957,21 +957,21 @@ void Thread_Main(void *Arg)
 		line_ubo.mvp=MatrixMult(PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
 		line_ubo.start=position;
 
-		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, LinePipeline.Pipeline);
+		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.mainPipeline);
 
 		line_ubo.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
 		line_ubo.end=Vec4_Addv(position, Vec4_Muls(forward, 15.0f));
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
 		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
 
 		line_ubo.color=Vec4(0.0f, 1.0f, 0.0f, 1.0f);
 		line_ubo.end=Vec4_Addv(position, Vec4_Muls(up, 15.0f));
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
 		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
 
 		line_ubo.color=Vec4(0.0f, 0.0f, 1.0f, 1.0f);
 		line_ubo.end=Vec4_Addv(position, Vec4_Muls(right, 15.0f));
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], LinePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
 		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
 
 		struct
@@ -989,8 +989,8 @@ void Thread_Main(void *Arg)
 
 		sphere_ubo.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
-		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, SpherePipeline.Pipeline);
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], SpherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(sphere_ubo), &sphere_ubo);
+		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline.mainPipeline);
+		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(sphere_ubo), &sphere_ubo);
 		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 60, 1, 0, 0);
 	}
 	//////
@@ -1223,21 +1223,21 @@ void Thread_Physics(void *Arg)
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
 	{
 		// Run physics integration on the asteroids
-		PhysicsIntegrate(&Asteroids[i], fTimeStep);
+		PhysicsIntegrate(&asteroids[i], fTimeStep);
 
 		// Check asteroids against other asteroids
 		for(uint32_t j=i+1;j<NUM_ASTEROIDS;j++)
-			PhysicsSphereToSphereCollisionResponse(&Asteroids[i], &Asteroids[j]);
+			PhysicsSphereToSphereCollisionResponse(&asteroids[i], &asteroids[j]);
 
 		// Check asteroids against the camera
-		PhysicsCameraToSphereCollisionResponse(&Camera, &Asteroids[i]);
+		PhysicsCameraToSphereCollisionResponse(&Camera, &asteroids[i]);
 
 #if 0
 		for(uint32_t j=0;j<connectedClients;j++)
 		{
 			// Don't check for collision with our own net camera
 			if(j!=clientID)
-				PhysicsCameraToSphereCollisionResponse(&netCameras[j], &Asteroids[i]);
+				PhysicsCameraToSphereCollisionResponse(&netCameras[j], &asteroids[i]);
 		}
 #endif
 
@@ -1249,7 +1249,7 @@ void Thread_Physics(void *Arg)
 		{
 			// If the particle ID matches with the projectile ID, then check collision and respond
 			if(emitter->particles[j].ID!=emitter->ID)
-				PhysicsParticleToSphereCollisionResponse(&emitter->particles[j], &Asteroids[i]);
+				PhysicsParticleToSphereCollisionResponse(&emitter->particles[j], &asteroids[i]);
 		}
 	}
 
@@ -1274,9 +1274,9 @@ void Thread_Physics(void *Arg)
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
 	{
 		const float radiusScale=1.5f;
-		matrix local=MatrixScale(Asteroids[i].radius/radiusScale, Asteroids[i].radius/radiusScale, Asteroids[i].radius/radiusScale);
-		local=MatrixMult(local, QuatMatrix(Asteroids[i].orientation));
-		asteroidInstanceData[i]=MatrixMult(local, MatrixTranslatev(Asteroids[i].position));
+		matrix local=MatrixScale(asteroids[i].radius/radiusScale, asteroids[i].radius/radiusScale, asteroids[i].radius/radiusScale);
+		local=MatrixMult(local, QuatMatrix(asteroids[i].orientation));
+		asteroidInstanceData[i]=MatrixMult(local, MatrixTranslatev(asteroids[i].position));
 	}
 
 	//vkUnmapMemory(Context.Device, asteroidInstance.DeviceMemory);
@@ -1359,8 +1359,8 @@ void NetUpdate(void *Arg)
 
 			for(uint32_t i=0;i<asteroidCount;i++)
 			{
-				memcpy(&Asteroids[i].Position, pBuffer, sizeof(vec3));	pBuffer+=sizeof(vec3);
-				memcpy(&Asteroids[i].Velocity, pBuffer, sizeof(vec3));	pBuffer+=sizeof(vec3);
+				memcpy(&asteroids[i].Position, pBuffer, sizeof(vec3));	pBuffer+=sizeof(vec3);
+				memcpy(&asteroids[i].Velocity, pBuffer, sizeof(vec3));	pBuffer+=sizeof(vec3);
 			}
 		}
 	}
@@ -1468,7 +1468,7 @@ void Render(void)
 
 	Console_Draw(&Console);
 
-	Audio_SetStreamVolume(UI_GetBarGraphValue(&UI, VolumeID));
+	Audio_SetStreamVolume(UI_GetBarGraphValue(&UI, volumeID));
 
 #ifndef ANDROID
 	Font_Print(&Fnt, 16.0f, renderWidth-400.0f, renderHeight-50.0f-16.0f, "Current track: %s", MusicList[CurrentMusic].String);
@@ -1813,7 +1813,7 @@ bool Init(void)
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Next",								// Title text
 				 NextTrackCallback);					// Callback
-	VolumeID=UI_AddBarGraph(&UI,
+	volumeID=UI_AddBarGraph(&UI,
 							Vec2(renderWidth-400.0f, renderHeight-50.0f-16.0f-30.0f),// Position
 							Vec2(400.0f, 30.0f),		// Size
 							Vec3(0.25f, 0.25f, 0.25f),	// Color
@@ -1824,7 +1824,7 @@ bool Init(void)
 
 	UI_AddSprite(&UI, Vec2((float)renderWidth/2.0f, (float)renderHeight/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &Textures[TEXTURE_CROSSHAIR], 0.0f);
 
-	CursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3(1.0f, 1.0f, 1.0f));
+	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3(1.0f, 1.0f, 1.0f));
 
 	// Other per-frame data
 	for(uint32_t i=0;i<Swapchain.NumImages;i++)
@@ -2157,10 +2157,10 @@ void Destroy(void)
 		vkuDestroyBuffer(&Context, &perFrame[i].mainUBOBuffer[1]);
 	}
 
-	vkDestroyDescriptorSetLayout(Context.Device, DescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(Context.Device, mainDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
 	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);
-	vkDestroyPipeline(Context.Device, Pipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(Context.Device, PipelineLayout, VK_NULL_HANDLE);
+	vkDestroyPipeline(Context.Device, mainPipeline.Pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(Context.Device, mainPipelineLayout, VK_NULL_HANDLE);
 	//////////
 
 	// Swapchain, framebuffer, and depth buffer destruction

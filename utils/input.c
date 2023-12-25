@@ -24,10 +24,10 @@ extern Camera_t Camera;
 extern ParticleSystem_t particleSystem;
 
 #define NUM_ASTEROIDS 1000
-extern RigidBody_t Asteroids[NUM_ASTEROIDS];
+extern RigidBody_t asteroids[NUM_ASTEROIDS];
 
 extern UI_t UI;
-extern uint32_t CursorID;
+extern uint32_t cursorID;
 //////////////////////////////
 
 // Emitter callback for the launched emitter's particles
@@ -155,7 +155,7 @@ void Event_KeyDown(void *arg)
 		case KB_RSHIFT:	Camera.shift=true;		break;
 		case KB_Z:
 			for(int i=0;i<NUM_ASTEROIDS;i++)
-				PhysicsExplode(&Asteroids[i]);
+				PhysicsExplode(&asteroids[i]);
 			break;
 		default:		break;
 	}
@@ -215,7 +215,7 @@ void Event_Mouse(void *arg)
 	mousePosition.x=min(max(mousePosition.x, 0.0f), (float)renderWidth);
 	mousePosition.y=min(max(mousePosition.y, 0.0f), (float)renderHeight);
 
-	UI_UpdateCursorPosition(&UI, CursorID, mousePosition);
+	UI_UpdateCursorPosition(&UI, cursorID, mousePosition);
 
 	if(activeID!=UINT32_MAX&&mouseEvent->button&MOUSE_BUTTON_LEFT)
 		UI_ProcessControl(&UI, activeID, mousePosition);
