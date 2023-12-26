@@ -12,7 +12,7 @@
 #define DATA_MAGIC ('d'|('a'<<8)|('t'<<16)|('a'<<24))
 
 // Simple resampling function, based off of what id Software used in Quake, seems to work well enough.
-static void Resample(const void *in, const int inWidth, const int inRate, const int inChannel, const int inLength, int16_t *out, const int outRate)
+static void Resample(const void *in, const int inWidth, const int inRate, const int inChannel, const int inLength, int16_t *out)
 {
     const float stepScale=(float)inRate/AUDIO_SAMPLE_RATE;
     const uint32_t outCount=(uint32_t)(inLength/stepScale);
@@ -57,110 +57,110 @@ static void Resample(const void *in, const int inWidth, const int inRate, const 
 // This also will only accept PCM audio streams and stereo, ideally stereo isn't needed
 // because most sound effcts will be panned/spatialized into stereo for "3D" audio,
 // but stereo is needed for the HRTF samples.
-bool Audio_LoadStatic(const char *Filename, Sample_t *Sample)
+bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 {
-    FILE *Stream=NULL;
+    FILE *stream=NULL;
     uint32_t riffMagic, waveMagic, fmtMagic, dataMagic;
-    uint16_t Format;
-    uint16_t Channels;
+    uint16_t format;
+    uint16_t channels;
     uint32_t samplesPerSec;
     uint16_t bitPerSample;
-    uint32_t Length;
+    uint32_t length;
 
-    if((Stream=fopen(Filename, "rb"))==NULL)
+    if((stream=fopen(filename, "rb"))==NULL)
         return 0;
 
     // Header
-    fread(&riffMagic, sizeof(uint32_t), 1, Stream);    // RIFF magic marker ("RIFF")
-    fseek(Stream, sizeof(uint32_t), SEEK_CUR);          // File size
+    fread(&riffMagic, sizeof(uint32_t), 1, stream);    // RIFF magic marker ("RIFF")
+    fseek(stream, sizeof(uint32_t), SEEK_CUR);          // File size
 
     if(riffMagic!=RIFF_MAGIC)
     {
-        fclose(Stream);
+        fclose(stream);
         return 0;
     }
 
     // WAVE magic marker ("WAVE")
-    fread(&waveMagic, sizeof(uint32_t), 1, Stream);
+    fread(&waveMagic, sizeof(uint32_t), 1, stream);
 
     if(waveMagic!=WAVE_MAGIC)
     {
-        fclose(Stream);
+        fclose(stream);
         return 0;
     }
 
     // Wave format header magic marker ("fmt ")
-    fread(&fmtMagic, sizeof(uint32_t), 1, Stream);
+    fread(&fmtMagic, sizeof(uint32_t), 1, stream);
 
     if(fmtMagic!=FMT_MAGIC)
     {
-        fclose(Stream);
+        fclose(stream);
         return 0;
     }
 
-    fseek(Stream, sizeof(uint32_t), SEEK_CUR);          // Format header size?
+    fseek(stream, sizeof(uint32_t), SEEK_CUR);          // Format header size?
 
-    fread(&Format, sizeof(uint16_t), 1, Stream);        // wFormatTag
-    fread(&Channels, sizeof(uint16_t), 1, Stream);      // nChannels
-    fread(&samplesPerSec, sizeof(uint32_t), 1, Stream);     // nSamplesPerSec
-    fseek(Stream, sizeof(uint32_t), SEEK_CUR);          // nAvgBytesPerSec
-    fseek(Stream, sizeof(uint16_t), SEEK_CUR);          // nBlockAlign
-    fread(&bitPerSample, sizeof(uint16_t), 1, Stream);  // wBitsPerSample
+    fread(&format, sizeof(uint16_t), 1, stream);        // wFormatTag
+    fread(&channels, sizeof(uint16_t), 1, stream);      // nChannels
+    fread(&samplesPerSec, sizeof(uint32_t), 1, stream);     // nSamplesPerSec
+    fseek(stream, sizeof(uint32_t), SEEK_CUR);          // nAvgBytesPerSec
+    fseek(stream, sizeof(uint16_t), SEEK_CUR);          // nBlockAlign
+    fread(&bitPerSample, sizeof(uint16_t), 1, stream);  // wBitsPerSample
 
     // Only support PCM streams and stereo
-    if(Format!=1&&Channels>2)
+    if(format!=1&&channels>2)
     {
-        fclose(Stream);
+        fclose(stream);
         return 0;
     }
 
     // Data block magic marker ("data")
-    fread(&dataMagic, sizeof(uint32_t), 1, Stream);
+    fread(&dataMagic, sizeof(uint32_t), 1, stream);
 
     if(dataMagic!=DATA_MAGIC)
     {
-        fclose(Stream);
+        fclose(stream);
         return 0;
     }
 
     // Length of data block
-    fread(&Length, sizeof(uint32_t), 1, Stream);
+    fread(&length, sizeof(uint32_t), 1, stream);
 
-    int16_t *Buffer=(int16_t *)Zone_Malloc(Zone, Length);
+    int16_t *buffer=(int16_t *)Zone_Malloc(Zone, length);
 
-    if(Buffer==NULL)
+    if(buffer==NULL)
     {
-        fclose(Stream);
+        fclose(stream);
         return 0;
     }
 
-    fread(Buffer, 1, Length, Stream);
+    fread(buffer, 1, length, stream);
 
-    fclose(Stream);
+    fclose(stream);
 
-    Length/=bitPerSample>>3;
-    Length/=Channels;
+    length/=bitPerSample>>3;
+    length/=channels;
 
     // Covert to match primary buffer sampling rate
-    const uint32_t outputSize=(uint32_t)(Length/((float)samplesPerSec/AUDIO_SAMPLE_RATE));
+    const uint32_t outputSize=(uint32_t)(length/((float)samplesPerSec/AUDIO_SAMPLE_RATE));
 
-    int16_t *Resampled=(int16_t *)Zone_Malloc(Zone, sizeof(int16_t)*outputSize*Channels);
+    int16_t *resampled=(int16_t *)Zone_Malloc(Zone, sizeof(int16_t)*outputSize*channels);
 
-    if(Resampled==NULL)
+    if(resampled==NULL)
     {
-        Zone_Free(Zone, Buffer);
+        Zone_Free(Zone, buffer);
         return 0;
     }
 
-    Resample(Buffer, bitPerSample>>3, samplesPerSec, Channels, Length, Resampled, AUDIO_SAMPLE_RATE);
+    Resample(buffer, bitPerSample>>3, samplesPerSec, channels, length, resampled);
 
-    Zone_Free(Zone, Buffer);
+    Zone_Free(Zone, buffer);
 
-    Sample->Data=Resampled;
-    Sample->Length=outputSize;
-    Sample->Position=0;
-    Sample->Channels=(uint8_t)Channels;
-    Sample->xyz=Vec3b(0.0f);
+    sample->data=resampled;
+    sample->length=outputSize;
+    sample->position=0;
+    sample->channels=(uint8_t)channels;
+    sample->xyz=Vec3b(0.0f);
 
     return 1;
 }

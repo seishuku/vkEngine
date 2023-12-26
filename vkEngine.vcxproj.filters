@@ -135,9 +135,6 @@
     <ClInclude Include="utils\event.h">
       <Filter>Header Files\utils</Filter>
     </ClInclude>
-    <ClInclude Include="utils\genid.h">
-      <Filter>Header Files\utils</Filter>
-    </ClInclude>
     <ClInclude Include="utils\input.h">
       <Filter>Header Files\utils</Filter>
     </ClInclude>
@@ -270,9 +267,6 @@
       <Filter>Source Files\vr</Filter>
     </ClCompile>
     <ClCompile Include="utils\event.c">
-      <Filter>Source Files\utils</Filter>
-    </ClCompile>
-    <ClCompile Include="utils\genid.c">
       <Filter>Source Files\utils</Filter>
     </ClCompile>
     <ClCompile Include="utils\input.c">

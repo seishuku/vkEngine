@@ -8,17 +8,17 @@
 
 typedef struct
 {
-    int16_t *Data;
-    uint32_t Position, Length;
-    uint8_t Channels;
+    int16_t *data;
+    uint32_t position, length;
+    uint8_t channels;
     vec3 xyz;
 } Sample_t;
 
-bool Audio_LoadStatic(const char *Filename, Sample_t *Sample);
-void Audio_PlaySample(Sample_t *Sample, const bool Looping, const float Volume, vec3 *Position);
-void Audio_StopSample(Sample_t *Sample);
-void Audio_SetStreamCallback(void (*StreamCallback)(void *Buffer, size_t Length));
-void Audio_SetStreamVolume(const float Volume);
+bool Audio_LoadStatic(const char *filename, Sample_t *sample);
+void Audio_PlaySample(Sample_t *sample, const bool looping, const float volume, vec3 *position);
+void Audio_StopSample(Sample_t *sample);
+void Audio_SetStreamCallback(void (*streamCallback)(void *buffer, size_t length));
+void Audio_SetStreamVolume(const float volume);
 void Audio_StartStream(void);
 void Audio_StopStream(void);
 int Audio_Init(void);

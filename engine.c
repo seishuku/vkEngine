@@ -56,7 +56,7 @@ VkuContext_t Context;
 VkuMemZone_t *VkZone;
 
 // Camera data
-Camera_t Camera;
+Camera_t camera;
 matrix modelView, projection[2], headPose;
 
 // extern timing data from system main
@@ -199,7 +199,7 @@ uint32_t faceID=UINT32_MAX;
 uint32_t cursorID=UINT32_MAX;
 //////
 
-Console_t Console;
+Console_t console;
 
 XrPosef leftHand, rightHand;
 float leftTrigger, rightTrigger;
@@ -687,10 +687,10 @@ void DrawPlayer(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, Cam
 		vec4 color, start, end;
 	} linePC;
 
-	vec4 position=Vec4_Vec3(player.Position, 1.0f);
-	vec4 forward=Vec4_Vec3(player.Forward, 1.0f);
-	vec4 up=Vec4_Vec3(player.Up, 1.0f);
-	vec4 right=Vec4_Vec3(player.Right, 1.0f);
+	vec4 position=Vec4_Vec3(player.position, 1.0f);
+	vec4 forward=Vec4_Vec3(player.forward, 1.0f);
+	vec4 up=Vec4_Vec3(player.up, 1.0f);
+	vec4 right=Vec4_Vec3(player.right, 1.0f);
 
 	linePC.mvp=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->projection);
 	linePC.start=position;
@@ -720,7 +720,7 @@ void DrawPlayer(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, Cam
 
 	matrix local=MatrixIdentity();
 	local=MatrixMult(local, MatrixScale(5.0f, 5.0f, 5.0f));
-	local=MatrixMult(local, MatrixInverse(MatrixLookAt(player.Position, Vec3_Addv(player.Position, player.Forward), player.Up)));
+	local=MatrixMult(local, MatrixInverse(MatrixLookAt(player.position, Vec3_Addv(player.position, player.forward), player.up)));
 
 	local=MatrixMult(local, perFrame[index].mainUBO[eye]->modelView);
 	spherePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
@@ -1230,7 +1230,7 @@ void Thread_Physics(void *Arg)
 			PhysicsSphereToSphereCollisionResponse(&asteroids[i], &asteroids[j]);
 
 		// Check asteroids against the camera
-		PhysicsCameraToSphereCollisionResponse(&Camera, &asteroids[i]);
+		PhysicsCameraToSphereCollisionResponse(&camera, &asteroids[i]);
 
 #if 0
 		for(uint32_t j=0;j<connectedClients;j++)
@@ -1264,7 +1264,7 @@ void Thread_Physics(void *Arg)
 #endif
 
 	// Update camera and modelview matrix
-	modelView=CameraUpdate(&Camera, fTimeStep);
+	modelView=CameraUpdate(&camera, fTimeStep);
 	//////
 
 	// Update instance matrix data
@@ -1406,10 +1406,10 @@ void Render(void)
 		const float speed=400.0f;
 		const float rotation=0.1f;
 
-		Camera.Velocity.x-=leftThumbstick.x*speed*fTimeStep;
-		Camera.Velocity.z+=leftThumbstick.y*speed*fTimeStep;
-		Camera.Yaw-=rightThumbstick.x*rotation*fTimeStep;
-		Camera.Pitch+=rightThumbstick.y*rotation*fTimeStep;
+		camera.velocity.x-=leftThumbstick.x*speed*fTimeStep;
+		camera.velocity.z+=leftThumbstick.y*speed*fTimeStep;
+		camera.yaw-=rightThumbstick.x*rotation*fTimeStep;
+		camera.pitch+=rightThumbstick.y*rotation*fTimeStep;
 
 		if(leftTrigger>0.1f)
 		{
@@ -1439,10 +1439,10 @@ void Render(void)
 			rightTriggerOnce=false;
 
 			vec4 rightOrientation=Vec4(rightHand.orientation.x, rightHand.orientation.y, rightHand.orientation.z, rightHand.orientation.w);
-			vec3 Direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatMatrix(rightOrientation), MatrixInverse(modelView)));
+			vec3 direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatMatrix(rightOrientation), MatrixInverse(modelView)));
 
-			FireParticleEmitter(Vec3_Addv(Camera.Position, Vec3_Muls(Direction, Camera.Radius)), Direction);
-			Audio_PlaySample(&Sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &Camera.Position);
+			FireParticleEmitter(Vec3_Addv(camera.position, Vec3_Muls(direction, camera.radius)), direction);
+			Audio_PlaySample(&Sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &camera.position);
 		}
 
 		if(rightTrigger<0.25f&&!rightTriggerOnce)
@@ -1466,7 +1466,7 @@ void Render(void)
 
 	Thread_AddJob(&ThreadPhysics, Thread_Physics, NULL);
 
-	Console_Draw(&Console);
+	Console_Draw(&console);
 
 	Audio_SetStreamVolume(UI_GetBarGraphValue(&UI, volumeID));
 
@@ -1590,8 +1590,8 @@ bool Init(void)
 	Event_Add(EVENT_MOUSEUP, Event_MouseUp);
 	Event_Add(EVENT_MOUSEMOVE, Event_Mouse);
 
-	Console_Init(&Console, 80, 25);
-	Console_AddCommand(&Console, "quit", Console_CmdQuit);
+	Console_Init(&console, 80, 25);
+	Console_AddCommand(&console, "quit", Console_CmdQuit);
 
 	VkZone=vkuMem_Init(&Context, (size_t)(Context.DeviceProperties2.maxMemoryAllocationSize*0.8f));
 
@@ -1601,8 +1601,8 @@ bool Init(void)
 		return false;
 	}
 
-	CameraInit(&Camera, Vec3(0.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
-	modelView=CameraUpdate(&Camera, 0.0f);
+	CameraInit(&camera, Vec3(0.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
+	modelView=CameraUpdate(&camera, 0.0f);
 
 	if(!Audio_Init())
 	{
@@ -2047,16 +2047,16 @@ void Destroy(void)
 	Music_Destroy();
 #endif
 
-	Zone_Free(Zone, Sounds[SOUND_PEW1].Data);
-	Zone_Free(Zone, Sounds[SOUND_PEW2].Data);
-	Zone_Free(Zone, Sounds[SOUND_PEW3].Data);
-	Zone_Free(Zone, Sounds[SOUND_STONE1].Data);
-	Zone_Free(Zone, Sounds[SOUND_STONE2].Data);
-	Zone_Free(Zone, Sounds[SOUND_STONE3].Data);
-	Zone_Free(Zone, Sounds[SOUND_CRASH].Data);
-	Zone_Free(Zone, Sounds[SOUND_EXPLODE1].Data);
-	Zone_Free(Zone, Sounds[SOUND_EXPLODE2].Data);
-	Zone_Free(Zone, Sounds[SOUND_EXPLODE3].Data);
+	Zone_Free(Zone, Sounds[SOUND_PEW1].data);
+	Zone_Free(Zone, Sounds[SOUND_PEW2].data);
+	Zone_Free(Zone, Sounds[SOUND_PEW3].data);
+	Zone_Free(Zone, Sounds[SOUND_STONE1].data);
+	Zone_Free(Zone, Sounds[SOUND_STONE2].data);
+	Zone_Free(Zone, Sounds[SOUND_STONE3].data);
+	Zone_Free(Zone, Sounds[SOUND_CRASH].data);
+	Zone_Free(Zone, Sounds[SOUND_EXPLODE1].data);
+	Zone_Free(Zone, Sounds[SOUND_EXPLODE2].data);
+	Zone_Free(Zone, Sounds[SOUND_EXPLODE3].data);
 
 #ifndef ANDROID
 	if(isVR)

@@ -175,7 +175,7 @@ inline static float rad2deg(const float x)
 
 float fact(const int32_t n);
 
-void RandomSeed(uint32_t Seed);
+void RandomSeed(uint32_t seed);
 uint32_t Random(void);
 int32_t RandRange(int32_t min, int32_t max);
 float RandFloat(void);

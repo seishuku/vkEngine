@@ -74,28 +74,28 @@ float fact(const int32_t n)
 	return j;
 }
 
-static uint32_t _Seed=0;
+static uint32_t randomSeed=0;
 
-void RandomSeed(uint32_t Seed)
+void RandomSeed(uint32_t seed)
 {
-	_Seed=Seed;
+	randomSeed=seed;
 }
 
 uint32_t Random(void)
 {
 #if 0
 	// Wang
-	_Seed=((_Seed^61u)^(_Seed>>16u))*9u;
-	_Seed=(_Seed^(_Seed>>4u))*0x27d4EB2Du;
-	_Seed=_Seed^(_Seed>>15u);
+	randomSeed=((randomSeed^61u)^(randomSeed>>16u))*9u;
+	randomSeed=(randomSeed^(randomSeed>>4u))*0x27d4EB2Du;
+	randomSeed=randomSeed^(randomSeed>>15u);
 #else
 	// PCG
-	uint32_t State=_Seed*0x2C9277B5u+0xAC564B05u;
+	uint32_t State=randomSeed*0x2C9277B5u+0xAC564B05u;
 	uint32_t Word=((State>>((State>>28u)+4u))^State)*0x108EF2D9u;
-	_Seed=(Word>>22u)^Word;
+	randomSeed=(Word>>22u)^Word;
 #endif
 
-	return _Seed;
+	return randomSeed;
 }
 
 int32_t RandRange(int32_t min, int32_t max)

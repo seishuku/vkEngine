@@ -20,7 +20,9 @@
 extern uint32_t renderWidth, renderHeight;
 
 void GenerateSkyParams(void);
-extern Camera_t Camera;
+
+extern Camera_t camera;
+
 extern ParticleSystem_t particleSystem;
 
 #define NUM_ASTEROIDS 1000
@@ -28,6 +30,8 @@ extern RigidBody_t asteroids[NUM_ASTEROIDS];
 
 extern UI_t UI;
 extern uint32_t cursorID;
+
+extern Console_t console;
 //////////////////////////////
 
 // Emitter callback for the launched emitter's particles
@@ -80,47 +84,45 @@ void FireParticleEmitter(vec3 position, vec3 direction)
 	}
 }
 
-extern Console_t Console;
-
 void Event_KeyDown(void *arg)
 {
 	uint32_t *key=(uint32_t *)arg;
 
-	if(Console.Active)
+	if(console.active)
 	{
 		switch(*key)
 		{
 			// Toggle console
 			case KB_GRAVE_ACCENT:
-				Console.Active=!Console.Active;
+				console.active=!console.active;
 				break;
 
 			case KB_UP:
-				Console_History(&Console, true);
+				Console_History(&console, true);
 				break;
 
 			case KB_DOWN:
-				Console_History(&Console, false);
+				Console_History(&console, false);
 				break;
 
 			case KB_PAGE_UP:
-				Console_Scroll(&Console, true);
+				Console_Scroll(&console, true);
 				break;
 
 			case KB_PAGE_DOWN:
-				Console_Scroll(&Console, false);
+				Console_Scroll(&console, false);
 				break;
 
 			case KB_BACKSPACE:
-				Console_Backspace(&Console);
+				Console_Backspace(&console);
 				break;
 
 			case KB_ENTER:
-				Console_Process(&Console);
+				Console_Process(&console);
 				break;
 
 			default:
-				Console_KeyInput(&Console, *key);
+				Console_KeyInput(&console, *key);
 		}
 
 		// Ignore the rest of event while console is up
@@ -131,28 +133,28 @@ void Event_KeyDown(void *arg)
 	{
 		// Toggle console
 		case KB_GRAVE_ACCENT:
-			Console.Active=!Console.Active;
+			console.active=!console.active;
 			break;
 
 		case KB_SPACE:
-			Audio_PlaySample(&Sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &Camera.Position);
-			FireParticleEmitter(Vec3_Addv(Camera.Position, Vec3_Muls(Camera.Forward, Camera.Radius)), Camera.Forward);
+			Audio_PlaySample(&Sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &camera.position);
+			FireParticleEmitter(Vec3_Addv(camera.position, Vec3_Muls(camera.forward, camera.radius)), camera.forward);
 			break;
 		case KB_P:		GenerateSkyParams();	break;
-		case KB_W:		Camera.key_w=true;		break;
-		case KB_S:		Camera.key_s=true;		break;
-		case KB_A:		Camera.key_a=true;		break;
-		case KB_D:		Camera.key_d=true;		break;
-		case KB_V:		Camera.key_v=true;		break;
-		case KB_C:		Camera.key_c=true;		break;
-		case KB_Q:		Camera.key_q=true;		break;
-		case KB_E:		Camera.key_e=true;		break;
-		case KB_UP:		Camera.key_up=true;		break;
-		case KB_DOWN:	Camera.key_down=true;	break;
-		case KB_LEFT:	Camera.key_left=true;	break;
-		case KB_RIGHT:	Camera.key_right=true;	break;
+		case KB_W:		camera.key_w=true;		break;
+		case KB_S:		camera.key_s=true;		break;
+		case KB_A:		camera.key_a=true;		break;
+		case KB_D:		camera.key_d=true;		break;
+		case KB_V:		camera.key_v=true;		break;
+		case KB_C:		camera.key_c=true;		break;
+		case KB_Q:		camera.key_q=true;		break;
+		case KB_E:		camera.key_e=true;		break;
+		case KB_UP:		camera.key_up=true;		break;
+		case KB_DOWN:	camera.key_down=true;	break;
+		case KB_LEFT:	camera.key_left=true;	break;
+		case KB_RIGHT:	camera.key_right=true;	break;
 		case KB_LSHIFT:
-		case KB_RSHIFT:	Camera.shift=true;		break;
+		case KB_RSHIFT:	camera.shift=true;		break;
 		case KB_Z:
 			for(int i=0;i<NUM_ASTEROIDS;i++)
 				PhysicsExplode(&asteroids[i]);
@@ -167,20 +169,20 @@ void Event_KeyUp(void *arg)
 
 	switch(*key)
 	{
-		case KB_W:		Camera.key_w=false;		break;
-		case KB_S:		Camera.key_s=false;		break;
-		case KB_A:		Camera.key_a=false;		break;
-		case KB_D:		Camera.key_d=false;		break;
-		case KB_V:		Camera.key_v=false;		break;
-		case KB_C:		Camera.key_c=false;		break;
-		case KB_Q:		Camera.key_q=false;		break;
-		case KB_E:		Camera.key_e=false;		break;
-		case KB_UP:		Camera.key_up=false;	break;
-		case KB_DOWN:	Camera.key_down=false;	break;
-		case KB_LEFT:	Camera.key_left=false;	break;
-		case KB_RIGHT:	Camera.key_right=false;	break;
+		case KB_W:		camera.key_w=false;		break;
+		case KB_S:		camera.key_s=false;		break;
+		case KB_A:		camera.key_a=false;		break;
+		case KB_D:		camera.key_d=false;		break;
+		case KB_V:		camera.key_v=false;		break;
+		case KB_C:		camera.key_c=false;		break;
+		case KB_Q:		camera.key_q=false;		break;
+		case KB_E:		camera.key_e=false;		break;
+		case KB_UP:		camera.key_up=false;	break;
+		case KB_DOWN:	camera.key_down=false;	break;
+		case KB_LEFT:	camera.key_left=false;	break;
+		case KB_RIGHT:	camera.key_right=false;	break;
 		case KB_LSHIFT:
-		case KB_RSHIFT:	Camera.shift=false;		break;
+		case KB_RSHIFT:	camera.shift=false;		break;
 
 		default:		break;
 	}
@@ -221,7 +223,7 @@ void Event_Mouse(void *arg)
 		UI_ProcessControl(&UI, activeID, mousePosition);
 	else if(mouseEvent->button&MOUSE_BUTTON_LEFT)
 	{
-		Camera.Yaw-=(float)mouseEvent->dx/8000.0f;
-		Camera.Pitch+=(float)mouseEvent->dy/8000.0f;
+		camera.yaw-=(float)mouseEvent->dx/8000.0f;
+		camera.pitch+=(float)mouseEvent->dy/8000.0f;
 	}
 }

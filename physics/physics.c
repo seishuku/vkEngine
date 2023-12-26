@@ -193,12 +193,12 @@ void PhysicsCameraToSphereCollisionResponse(Camera_t *camera, RigidBody_t *body)
 	const float cameraInvMass=1.0f/cameraMass;
 
 	// Calculate the distance between the camera and the sphere's center
-	vec3 normal=Vec3_Subv(body->position, camera->Position);
+	vec3 normal=Vec3_Subv(body->position, camera->position);
 
 	const float distanceSq=Vec3_Dot(normal, normal);
 
 	// Sum of radii
-	const float radiusSum=camera->Radius+body->radius;
+	const float radiusSum=camera->radius+body->radius;
 
 	// Check if the distance is less than the sum of the radii
 	if(distanceSq<=radiusSum*radiusSum&&distanceSq)
@@ -211,17 +211,17 @@ void PhysicsCameraToSphereCollisionResponse(Camera_t *camera, RigidBody_t *body)
 		const float penetration=radiusSum-distance;
 		const vec3 positionImpulse=Vec3_Muls(normal, penetration*0.5f);
 
-		camera->Position=Vec3_Subv(camera->Position, positionImpulse);
+		camera->position=Vec3_Subv(camera->position, positionImpulse);
 		body->position=Vec3_Addv(body->position, positionImpulse);
 
-		const vec3 contactVelocity=Vec3_Subv(body->velocity, camera->Velocity);
+		const vec3 contactVelocity=Vec3_Subv(body->velocity, camera->velocity);
 
 		const float totalMass=cameraInvMass+body->invMass;
 		const float restitution=0.66f;
 		const float VdotN=Vec3_Dot(contactVelocity, normal);
 		const float j=(-(1.0f+restitution)*VdotN)/totalMass;
 
-		camera->Velocity=Vec3_Subv(camera->Velocity, Vec3_Muls(normal, j*cameraInvMass));
+		camera->velocity=Vec3_Subv(camera->velocity, Vec3_Muls(normal, j*cameraInvMass));
 		body->velocity=Vec3_Addv(body->velocity, Vec3_Muls(normal, j*body->invMass));
 
 		//Camera->AngularVelocity=Vec3_Subv(Camera->AngularVelocity, Vec3_Muls(Normal, j*Camera_invInertia));
@@ -241,12 +241,12 @@ void PhysicsCameraToCameraCollisionResponse(Camera_t *cameraA, Camera_t *cameraB
 	const float cameraInvMass=1.0f/cameraMass;
 
 	// Calculate the distance between the camera and the sphere's center
-	vec3 normal=Vec3_Subv(cameraB->Position, cameraA->Position);
+	vec3 normal=Vec3_Subv(cameraB->position, cameraA->position);
 
 	const float distanceSq=Vec3_Dot(normal, normal);
 
 	// Sum of radii
-	const float radiusSum=cameraA->Radius+cameraB->Radius;
+	const float radiusSum=cameraA->radius+cameraB->radius;
 
 	// Check if the distance is less than the sum of the radii
 	if(distanceSq<=radiusSum*radiusSum&&distanceSq)
@@ -259,23 +259,23 @@ void PhysicsCameraToCameraCollisionResponse(Camera_t *cameraA, Camera_t *cameraB
 		const float penetration=radiusSum-distance;
 		const vec3 positionImpulse=Vec3_Muls(normal, penetration*0.5f);
 
-		cameraA->Position=Vec3_Subv(cameraA->Position, positionImpulse);
-		cameraB->Position=Vec3_Addv(cameraB->Position, positionImpulse);
+		cameraA->position=Vec3_Subv(cameraA->position, positionImpulse);
+		cameraB->position=Vec3_Addv(cameraB->position, positionImpulse);
 
-		const vec3 contactVelocity=Vec3_Subv(cameraB->Velocity, cameraA->Velocity);
+		const vec3 contactVelocity=Vec3_Subv(cameraB->velocity, cameraA->velocity);
 
 		const float totalMass=cameraInvMass+cameraInvMass;
 		const float restitution=0.66f;
 		const float VdotN=Vec3_Dot(contactVelocity, normal);
 		const float j=(-(1.0f+restitution)*VdotN)/totalMass;
 
-		cameraA->Velocity=Vec3_Subv(cameraA->Velocity, Vec3_Muls(normal, j*cameraInvMass));
-		cameraB->Velocity=Vec3_Addv(cameraB->Velocity, Vec3_Muls(normal, j*cameraInvMass));
+		cameraA->velocity=Vec3_Subv(cameraA->velocity, Vec3_Muls(normal, j*cameraInvMass));
+		cameraB->velocity=Vec3_Addv(cameraB->velocity, Vec3_Muls(normal, j*cameraInvMass));
 
 		const float relVelMag=sqrtf(fabsf(VdotN));
 
 		if(relVelMag>1.0f)
-			Audio_PlaySample(&Sounds[SOUND_CRASH], false, relVelMag/50.0f, &cameraB->Position);
+			Audio_PlaySample(&Sounds[SOUND_CRASH], false, relVelMag/50.0f, &cameraB->position);
 	}
 }
 

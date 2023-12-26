@@ -7,7 +7,6 @@
 #include "../image/image.h"
 #include "../math/math.h"
 #include "../utils/list.h"
-#include "../utils/genid.h"
 #include "../camera/camera.h"
 #include "particle.h"
 
@@ -71,7 +70,7 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3
 		return UINT32_MAX;
 
 	// Pull the next ID from the global ID count
-	uint32_t ID=GenID();
+	uint32_t ID=system->baseID++;
 
 	// Increment emitter count and resize emitter memory
 
@@ -226,6 +225,8 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 {
 	if(system==NULL)
 		return false;
+
+	system->baseID=0;
 
 	List_Init(&system->emitters, sizeof(ParticleEmitter_t), 10, NULL);
 

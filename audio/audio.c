@@ -17,30 +17,30 @@
 #include "audio.h"
 
 #ifdef ANDROID
-static AAudioStream *AudioStream=NULL;
+static AAudioStream *audioStream=NULL;
 #else
-static PaStream *AudioStream=NULL;
+static PaStream *audioStream=NULL;
 #endif
 
 // HRIR sphere model and audio samples
 typedef struct
 {
-	vec3 Vertex, Normal;
-	float Left[MAX_HRIR_SAMPLES], Right[MAX_HRIR_SAMPLES];
+	vec3 vertex, normal;
+	float left[MAX_HRIR_SAMPLES], right[MAX_HRIR_SAMPLES];
 } HRIR_Vertex_t;
 
 typedef struct
 {
-	uint32_t Magic;
-	uint32_t SampleRate;
-	uint32_t SampleLength;
-	uint32_t NumVertex;
-	uint32_t NumIndex;
-	uint32_t *Indices;
-	HRIR_Vertex_t *Vertices;
+	uint32_t magic;
+	uint32_t sampleRate;
+	uint32_t sampleLength;
+	uint32_t numVertex;
+	uint32_t numIndex;
+	uint32_t *indices;
+	HRIR_Vertex_t *vertices;
 } HRIR_Sphere_t;
 
-static HRIR_Sphere_t Sphere;
+static HRIR_Sphere_t sphere;
 
 #define MAX_VOLUME 128
 
@@ -48,15 +48,15 @@ static HRIR_Sphere_t Sphere;
 
 typedef struct
 {
-	int16_t *Data;
-	uint32_t Position, Length;
-	bool Looping;
-	float Volume;
+	int16_t *data;
+	uint32_t position, length;
+	bool looping;
+	float volume;
 	vec3 *xyz;
-	int16_t Working[MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES];
+	int16_t working[MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES];
 } Channel_t;
 
-static Channel_t Channels[MAX_CHANNELS];
+static Channel_t channels[MAX_CHANNELS];
 
 // HRIR interpolation buffers
 static int16_t HRIRSamples[2*MAX_HRIR_SAMPLES];
@@ -68,16 +68,16 @@ static int16_t audioBuffer[2*(MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES)];
 
 typedef struct
 {
-	bool Playing;
-	float Volume;
-	uint32_t Position;
-	int16_t Buffer[MAX_STREAM_SAMPLES*2];
-	void (*StreamCallback)(void *Buffer, size_t Length);
+	bool playing;
+	float volume;
+	uint32_t position;
+	int16_t buffer[MAX_STREAM_SAMPLES*2];
+	void (*streamCallback)(void *buffer, size_t length);
 } AudioStream_t;
 
 static AudioStream_t streamBuffer;
 
-extern Camera_t Camera;
+extern Camera_t camera;
 
 static vec2 CalculateBarycentric(const vec3 p, const vec3 a, const vec3 b, const vec3 c)
 {
@@ -101,26 +101,26 @@ static void HRIRInterpolate(vec3 xyz)
 	const float invRadius=1.0f/1000.0f;
 
 	// Calculate relative position of the sound source to the camera
-	const vec3 relPosition=Vec3_Subv(xyz, Camera.Position);
-	vec3 Position=Vec3(
-		Vec3_Dot(relPosition, Camera.Right),
-		Vec3_Dot(relPosition, Camera.Up),
-		Vec3_Dot(relPosition, Camera.Forward)
+	const vec3 relPosition=Vec3_Subv(xyz, camera.position);
+	vec3 position=Vec3(
+		Vec3_Dot(relPosition, camera.right),
+		Vec3_Dot(relPosition, camera.up),
+		Vec3_Dot(relPosition, camera.forward)
 	);
 
 	// Calculate distance fall-off
-	float falloffDist=max(0.0f, 1.0f-Vec3_Length(Vec3_Muls(Position, invRadius)));
+	float falloffDist=max(0.0f, 1.0f-Vec3_Length(Vec3_Muls(position, invRadius)));
 
 	// Normalize also returns the length of the vector...
-	Vec3_Normalize(&Position);
+	Vec3_Normalize(&position);
 
 	// Find closest triangle to the sound direction
 	float maxDistanceSq=-1.0f;
 	int32_t triangleIndex=-1;
 
-	for(uint32_t i=0;i<Sphere.NumIndex;i+=3)
+	for(uint32_t i=0;i<sphere.numIndex;i+=3)
 	{
-		const float distanceSq=Vec3_Dot(Position, Sphere.Vertices[Sphere.Indices[i+0]].Normal);
+		const float distanceSq=Vec3_Dot(position, sphere.vertices[sphere.indices[i+0]].normal);
 
 		if(distanceSq>maxDistanceSq)
 		{
@@ -130,36 +130,36 @@ static void HRIRInterpolate(vec3 xyz)
 	}
 
 	// Calculate the barycentric coordinates and use them to interpolate the HRIR samples.
-	const HRIR_Vertex_t *v0=&Sphere.Vertices[Sphere.Indices[triangleIndex+0]];
-	const HRIR_Vertex_t *v1=&Sphere.Vertices[Sphere.Indices[triangleIndex+1]];
-	const HRIR_Vertex_t *v2=&Sphere.Vertices[Sphere.Indices[triangleIndex+2]];
-	const vec2 g=Vec2_Clamp(CalculateBarycentric(Position, v0->Vertex, v1->Vertex, v2->Vertex), 0.0f, 1.0f);
-	const vec3 Coords=Vec3(g.x, g.y, 1.0f-g.x-g.y);
+	const HRIR_Vertex_t *v0=&sphere.vertices[sphere.indices[triangleIndex+0]];
+	const HRIR_Vertex_t *v1=&sphere.vertices[sphere.indices[triangleIndex+1]];
+	const HRIR_Vertex_t *v2=&sphere.vertices[sphere.indices[triangleIndex+2]];
+	const vec2 g=Vec2_Clamp(CalculateBarycentric(position, v0->vertex, v1->vertex, v2->vertex), 0.0f, 1.0f);
+	const vec3 coords=Vec3(g.x, g.y, 1.0f-g.x-g.y);
 
-	if(Coords.x>=0.0f&&Coords.y>=0.0f&&Coords.z>=0.0f)
+	if(coords.x>=0.0f&&coords.y>=0.0f&&coords.z>=0.0f)
 	{
-		for(uint32_t j=0;j<Sphere.SampleLength;j++)
+		for(uint32_t j=0;j<sphere.sampleLength;j++)
 		{
-			const vec3 Left=Vec3(v0->Left[j], v1->Left[j], v2->Left[j]);
-			const vec3 Right=Vec3(v0->Right[j], v1->Right[j], v2->Right[j]);
+			const vec3 left=Vec3(v0->left[j], v1->left[j], v2->left[j]);
+			const vec3 right=Vec3(v0->right[j], v1->right[j], v2->right[j]);
 
-			HRIRSamples[2*j+0]=(int16_t)(falloffDist*Vec3_Dot(Left, Coords)*INT16_MAX);
-			HRIRSamples[2*j+1]=(int16_t)(falloffDist*Vec3_Dot(Right, Coords)*INT16_MAX);
+			HRIRSamples[2*j+0]=(int16_t)(falloffDist*Vec3_Dot(left, coords)*INT16_MAX);
+			HRIRSamples[2*j+1]=(int16_t)(falloffDist*Vec3_Dot(right, coords)*INT16_MAX);
 		}
 	}
 }
 
 // Integer audio convolution, this is a current chokepoint in the audio system at 25% CPU usage in the profiler.
 // I don't think I can optimize this any more without going to SIMD or multithreading.
-static void Convolve(const int16_t *Input, int16_t *Output, const size_t Length, const int16_t *Kernel, const size_t kernelLength)
+static void Convolve(const int16_t *input, int16_t *output, const size_t length, const int16_t *kernel, const size_t kernelLength)
 {
-	int16_t *outputPtr=Output;
+	int16_t *outputPtr=output;
 	int32_t sum[2];
 
-	for(size_t i=0;i<Length+kernelLength-1;i++)
+	for(size_t i=0;i<length+kernelLength-1;i++)
 	{
-		const int16_t *inputPtr=&Input[i+kernelLength];
-		const int16_t *kernelPtr=Kernel;
+		const int16_t *inputPtr=&input[i+kernelLength];
+		const int16_t *kernelPtr=kernel;
 
 		sum[0]=1<<14;
 		sum[1]=1<<14;
@@ -177,111 +177,111 @@ static void Convolve(const int16_t *Input, int16_t *Output, const size_t Length,
 }
 
 // Additively mix source into destination
-static void MixAudio(int16_t *Dst, const int16_t *Src, const size_t Length, const int8_t Volume)
+static void MixAudio(int16_t *dst, const int16_t *src, const size_t length, const int8_t volume)
 {
-	if(Volume==0)
+	if(volume==0)
 		return;
 
-	for(size_t i=0;i<Length*2;i+=2)
+	for(size_t i=0;i<length*2;i+=2)
 	{
-		Dst[i+0]=min(max(((Src[i+0]*Volume)/MAX_VOLUME)+Dst[i+0], INT16_MIN), INT16_MAX);
-		Dst[i+1]=min(max(((Src[i+1]*Volume)/MAX_VOLUME)+Dst[i+1], INT16_MIN), INT16_MAX);
+		dst[i+0]=min(max(((src[i+0]*volume)/MAX_VOLUME)+dst[i+0], INT16_MIN), INT16_MAX);
+		dst[i+1]=min(max(((src[i+1]*volume)/MAX_VOLUME)+dst[i+1], INT16_MIN), INT16_MAX);
 	}
 }
 
-static void Audio_FillBuffer(void *Buffer, uint32_t Length)
+static void Audio_FillBuffer(void *buffer, uint32_t length)
 {
 	// Get pointer to output buffer.
-	int16_t *out=(int16_t *)Buffer;
+	int16_t *out=(int16_t *)buffer;
 
 	// Clear the output buffer, so we don't get annoying repeating samples.
-	for(size_t dataIdx=0;dataIdx<Length*2;dataIdx++)
+	for(size_t dataIdx=0;dataIdx<length*2;dataIdx++)
 		out[dataIdx]=0;
 
 	for(uint32_t i=0;i<MAX_CHANNELS;i++)
 	{
 		// Quality of life pointer to current mixing channel.
-		Channel_t *Channel=&Channels[i];
+		Channel_t *channel=&channels[i];
 
 		// If the channel is empty, skip on the to next.
-		if(!Channel->Data)
+		if(!channel->data)
 			continue;
 
 		// If there's a position set, use it.
-		vec3 Position=Vec3b(0.0f);
-		if(Channel->xyz)
-			Position=*Channel->xyz;
+		vec3 position=Vec3b(0.0f);
+		if(channel->xyz)
+			position=*channel->xyz;
 
 		// Interpolate HRIR samples that are closest to the sound's position
-		HRIRInterpolate(Position);
+		HRIRInterpolate(position);
 
 		// Calculate the remaining amount of data to process.
-		size_t remainingData=Channel->Length-Channel->Position;
+		size_t remainingData=channel->length-channel->position;
 
 		// Remaining data runs off end of primary buffer.
 		// Clamp it to buffer size, we'll get the rest later.
-		if(remainingData>=Length)
-			remainingData=Length;
+		if(remainingData>=length)
+			remainingData=length;
 
 		// Calculate the amount to fill the convolution buffer.
 		// The convolve buffer needs to be at least NUM_SAMPLE+HRIR length,
 		//   but to stop annoying pops/clicks and other discontinuities, we need to copy ahead,
 		//   which is either the full input sample length OR the full buffer+HRIR sample length.
-		size_t toFill=(Channel->Length-Channel->Position);
+		size_t toFill=(channel->length-channel->position);
 
-		if(toFill>=(MAX_AUDIO_SAMPLES+Sphere.SampleLength))
-			toFill=(MAX_AUDIO_SAMPLES+Sphere.SampleLength);
-		else if(toFill>=Channel->Length)
-			toFill=Channel->Length;
+		if(toFill>=(MAX_AUDIO_SAMPLES+sphere.sampleLength))
+			toFill=(MAX_AUDIO_SAMPLES+sphere.sampleLength);
+		else if(toFill>=channel->length)
+			toFill=channel->length;
 
 		// Copy the samples.
 		for(size_t dataIdx=0;dataIdx<(MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES);dataIdx++)
 		{
 			if(dataIdx<=toFill)
-				Channel->Working[dataIdx]=Channel->Data[Channel->Position+dataIdx];
+				channel->working[dataIdx]=channel->data[channel->position+dataIdx];
 			else
 			{
 				// Zero out the remaining buffer size.
-				Channel->Working[dataIdx]=0;
+				channel->working[dataIdx]=0;
 			}
 		}
 
 		// Convolve the samples with the interpolated HRIR sample to produce a stereo sample to mix into the output buffer
-		Convolve(Channel->Working, audioBuffer, remainingData, HRIRSamples, Sphere.SampleLength);
+		Convolve(channel->working, audioBuffer, remainingData, HRIRSamples, sphere.sampleLength);
 
 		// Mix out the samples into the output buffer
-		MixAudio(out, audioBuffer, (uint32_t)remainingData, (int8_t)(Channel->Volume*MAX_VOLUME));
+		MixAudio(out, audioBuffer, (uint32_t)remainingData, (int8_t)(channel->volume*MAX_VOLUME));
 
 		// Advance the sample position by what we've used, next time around will take another chunk.
-		Channel->Position+=(uint32_t)remainingData;
+		channel->position+=(uint32_t)remainingData;
 
 		// Reached end of audio sample, either remove from channels list, or
 		//     if loop flag was set, reset position to 0.
-		if(Channel->Position>=Channel->Length)
+		if(channel->position>=channel->length)
 		{
-			if(Channel->Looping)
-				Channel->Position=0;
+			if(channel->looping)
+				channel->position=0;
 			else
 			{
 				// Remove from list
-				memset(Channel, 0, sizeof(Channel_t));
+				memset(channel, 0, sizeof(Channel_t));
 			}
 		}
 	}
 
-	if(streamBuffer.Playing)
+	if(streamBuffer.playing)
 	{
-		size_t remainingData=min(MAX_STREAM_SAMPLES-streamBuffer.Position, Length);
+		size_t remainingData=min(MAX_STREAM_SAMPLES-streamBuffer.position, length);
 
 		// If there's an assigned callback, call it to load more audio data
-		if(streamBuffer.StreamCallback)
+		if(streamBuffer.streamCallback)
 		{
-			streamBuffer.StreamCallback(&streamBuffer.Buffer[streamBuffer.Position], remainingData);
-			MixAudio(out, &streamBuffer.Buffer[streamBuffer.Position], remainingData, (int8_t)(streamBuffer.Volume*MAX_VOLUME));
-			streamBuffer.Position+=(uint32_t)remainingData;
+			streamBuffer.streamCallback(&streamBuffer.buffer[streamBuffer.position], remainingData);
+			MixAudio(out, &streamBuffer.buffer[streamBuffer.position], remainingData, (int8_t)(streamBuffer.volume*MAX_VOLUME));
+			streamBuffer.position+=(uint32_t)remainingData;
 
-			if(streamBuffer.Position>=MAX_STREAM_SAMPLES)
-				streamBuffer.Position=0;
+			if(streamBuffer.position>=MAX_STREAM_SAMPLES)
+				streamBuffer.position=0;
 		}
 	}
 }
@@ -304,7 +304,7 @@ static int Audio_Callback(const void *inputBuffer, void *outputBuffer, unsigned 
 #endif
 
 // Add a sound to first open channel.
-void Audio_PlaySample(Sample_t *Sample, const bool Looping, const float Volume, vec3 *Position)
+void Audio_PlaySample(Sample_t *sample, const bool looping, const float volume, vec3 *position)
 {
 	int32_t index;
 
@@ -312,7 +312,7 @@ void Audio_PlaySample(Sample_t *Sample, const bool Looping, const float Volume, 
 	for(index=0;index<MAX_CHANNELS;index++)
 	{
 		// If it's either done playing or is still the initial zero.
-		if(Channels[index].Position==Channels[index].Length)
+		if(channels[index].position==channels[index].length)
 			break;
 	}
 
@@ -322,27 +322,27 @@ void Audio_PlaySample(Sample_t *Sample, const bool Looping, const float Volume, 
 
 	// otherwise set the channel's data pointer to this sample's pointer
 	// and set the length, reset play position, and loop flag.
-	Channels[index].Data=Sample->Data;
-	Channels[index].Length=Sample->Length;
-	Channels[index].Position=0;
-	Channels[index].Looping=Looping;
+	channels[index].data=sample->data;
+	channels[index].length=sample->length;
+	channels[index].position=0;
+	channels[index].looping=looping;
 
-	if(Position)
-		Channels[index].xyz=Position;
+	if(position)
+		channels[index].xyz=position;
 	else
-		Channels[index].xyz=&Sample->xyz;
+		channels[index].xyz=&sample->xyz;
 
-	Channels[index].Volume=min(1.0f, max(0.0f, Volume));
+	channels[index].volume=min(1.0f, max(0.0f, volume));
 }
 
-void Audio_StopSample(Sample_t *Sample)
+void Audio_StopSample(Sample_t *sample)
 {
 	int32_t index;
 
 	// Search for the sample in the channels list
 	for(index=0;index<MAX_CHANNELS;index++)
 	{
-		if(Channels[index].Data==Sample->Data)
+		if(channels[index].data==sample->data)
 			break;
 	}
 
@@ -351,83 +351,83 @@ void Audio_StopSample(Sample_t *Sample)
 		return;
 
 	// Set the position to the end and allow the callback to resolve the removal
-	Channels[index].Position=Channels[index].Length-1;
-	Channels[index].Looping=false;
+	channels[index].position=channels[index].length-1;
+	channels[index].looping=false;
 }
 
-void Audio_SetStreamCallback(void (*StreamCallback)(void *Buffer, size_t Length))
+void Audio_SetStreamCallback(void (*streamCallback)(void *buffer, size_t length))
 {
-	streamBuffer.StreamCallback=StreamCallback;
+	streamBuffer.streamCallback=streamCallback;
 }
 
-void Audio_SetStreamVolume(const float Volume)
+void Audio_SetStreamVolume(const float volume)
 {
-	streamBuffer.Volume=min(1.0f, max(0.0f, Volume));
+	streamBuffer.volume=min(1.0f, max(0.0f, volume));
 }
 
 void Audio_StartStream(void)
 {
-	streamBuffer.Playing=true;
+	streamBuffer.playing=true;
 }
 
 void Audio_StopStream(void)
 {
-	streamBuffer.Playing=false;
+	streamBuffer.playing=false;
 }
 
 bool HRIR_Init(void)
 {
-	FILE *Stream=NULL;
+	FILE *stream=NULL;
 
-	Stream=fopen("assets/hrir_full.bin", "rb");
+	stream=fopen("assets/hrir_full.bin", "rb");
 
-	if(!Stream)
+	if(!stream)
 		return false;
 
-	fread(&Sphere, sizeof(uint32_t), 5, Stream);
+	fread(&sphere, sizeof(uint32_t), 5, stream);
 
-	if(Sphere.Magic!=('H'|('R'<<8)|('I'<<16)|('R'<<24)))
+	if(sphere.magic!=('H'|('R'<<8)|('I'<<16)|('R'<<24)))
 		return false;
 
-	if(Sphere.SampleLength>MAX_HRIR_SAMPLES)
+	if(sphere.sampleLength>MAX_HRIR_SAMPLES)
 		return false;
 
-	Sphere.Indices=(uint32_t *)Zone_Malloc(Zone, sizeof(uint32_t)*Sphere.NumIndex);
+	sphere.indices=(uint32_t *)Zone_Malloc(Zone, sizeof(uint32_t)*sphere.numIndex);
 
-	if(Sphere.Indices==NULL)
+	if(sphere.indices==NULL)
 		return false;
 
-	fread(Sphere.Indices, sizeof(uint32_t), Sphere.NumIndex, Stream);
+	fread(sphere.indices, sizeof(uint32_t), sphere.numIndex, stream);
 
-	Sphere.Vertices=(HRIR_Vertex_t *)Zone_Malloc(Zone, sizeof(HRIR_Vertex_t)*Sphere.NumVertex);
+	sphere.vertices=(HRIR_Vertex_t *)Zone_Malloc(Zone, sizeof(HRIR_Vertex_t)*sphere.numVertex);
 
-	if(Sphere.Vertices==NULL)
+	if(sphere.vertices==NULL)
 		return false;
 
-	memset(Sphere.Vertices, 0, sizeof(HRIR_Vertex_t)*Sphere.NumVertex);
+	memset(sphere.vertices, 0, sizeof(HRIR_Vertex_t)*sphere.numVertex);
 
-	for(uint32_t i=0;i<Sphere.NumVertex;i++)
+	for(uint32_t i=0;i<sphere.numVertex;i++)
 	{
-		fread(&Sphere.Vertices[i].Vertex, sizeof(vec3), 1, Stream);
+		fread(&sphere.vertices[i].vertex, sizeof(vec3), 1, stream);
 
-		fread(Sphere.Vertices[i].Left, sizeof(float), Sphere.SampleLength, Stream);
-		fread(Sphere.Vertices[i].Right, sizeof(float), Sphere.SampleLength, Stream);
+		fread(sphere.vertices[i].left, sizeof(float), sphere.sampleLength, stream);
+		fread(sphere.vertices[i].right, sizeof(float), sphere.sampleLength, stream);
 	}
 
-	fclose(Stream);
+	fclose(stream);
 
 	// Pre-calculate the normal vector of the HRIR sphere triangles
-	for(uint32_t i=0;i<Sphere.NumIndex;i+=3)
+	for(uint32_t i=0;i<sphere.numIndex;i+=3)
 	{
-		HRIR_Vertex_t *v0=&Sphere.Vertices[Sphere.Indices[i+0]];
-		HRIR_Vertex_t *v1=&Sphere.Vertices[Sphere.Indices[i+1]];
-		HRIR_Vertex_t *v2=&Sphere.Vertices[Sphere.Indices[i+2]];
-		vec3 Normal=Vec3_Cross(Vec3_Subv(v1->Vertex, v0->Vertex), Vec3_Subv(v2->Vertex, v0->Vertex));
-		Vec3_Normalize(&Normal);
+		HRIR_Vertex_t *v0=&sphere.vertices[sphere.indices[i+0]];
+		HRIR_Vertex_t *v1=&sphere.vertices[sphere.indices[i+1]];
+		HRIR_Vertex_t *v2=&sphere.vertices[sphere.indices[i+2]];
+		vec3 normal=Vec3_Cross(Vec3_Subv(v1->vertex, v0->vertex), Vec3_Subv(v2->vertex, v0->vertex));
+		Vec3_Normalize(&normal);
 
-		v0->Normal=Vec3_Addv(v0->Normal, Normal);
-		v1->Normal=Vec3_Addv(v1->Normal, Normal);
-		v2->Normal=Vec3_Addv(v2->Normal, Normal);
+		v0->normal=Vec3_Addv(v0->normal, normal);
+		v1->normal=Vec3_Addv(v1->normal, normal);
+		v2->normal=Vec3_Addv(v2->normal, normal);
 	}
 
 	return true;
@@ -436,7 +436,7 @@ bool HRIR_Init(void)
 int Audio_Init(void)
 {
 	// Clear out mixing channels
-	memset(Channels, 0, sizeof(Channel_t)*MAX_CHANNELS);
+	memset(channels, 0, sizeof(Channel_t)*MAX_CHANNELS);
 
 	// Clear out stream buffer
 	memset(&streamBuffer, 0, sizeof(AudioStream_t));
@@ -463,23 +463,23 @@ int Audio_Init(void)
 	AAudioStreamBuilder_setDataCallback(streamBuilder, Audio_Callback, NULL);
 
 	// Opens the stream.
-	if(AAudioStreamBuilder_openStream(streamBuilder, &AudioStream)!=AAUDIO_OK)
+	if(AAudioStreamBuilder_openStream(streamBuilder, &audioStream)!=AAUDIO_OK)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Audio: Error opening stream\n");
 		return false;
 	}
 
-	if(AAudioStream_getSampleRate(AudioStream)!=AUDIO_SAMPLE_RATE)
+	if(AAudioStream_getSampleRate(audioStream)!=AUDIO_SAMPLE_RATE)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Audio: Sample rate mismatch\n");
 		return false;
 	}
 
 	// Sets the buffer size. 
-	AAudioStream_setBufferSizeInFrames(AudioStream, AAudioStream_getFramesPerBurst(AudioStream)*MAX_AUDIO_SAMPLES);
+	AAudioStream_setBufferSizeInFrames(audioStream, AAudioStream_getFramesPerBurst(audioStream)*MAX_AUDIO_SAMPLES);
 
 	// Starts the stream.
-	if(AAudioStream_requestStart(AudioStream)!=AAUDIO_OK)
+	if(AAudioStream_requestStart(audioStream)!=AAUDIO_OK)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Audio: Error starting stream\n");
 		return false;
@@ -511,7 +511,7 @@ int Audio_Init(void)
 	outputParameters.hostApiSpecificStreamInfo=NULL;
 
 	// Open audio stream
-	if(Pa_OpenStream(&AudioStream, NULL, &outputParameters, AUDIO_SAMPLE_RATE, MAX_AUDIO_SAMPLES, paNoFlag, Audio_Callback, NULL)!=paNoError)
+	if(Pa_OpenStream(&audioStream, NULL, &outputParameters, AUDIO_SAMPLE_RATE, MAX_AUDIO_SAMPLES, paNoFlag, Audio_Callback, NULL)!=paNoError)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Audio: Unable to open PortAudio stream.\n");
 		Pa_Terminate();
@@ -519,7 +519,7 @@ int Audio_Init(void)
 	}
 
 	// Start audio stream
-	if(Pa_StartStream(AudioStream)!=paNoError)
+	if(Pa_StartStream(audioStream)!=paNoError)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Audio: Unable to start PortAudio Stream.\n");
 		Pa_Terminate();
@@ -533,17 +533,18 @@ int Audio_Init(void)
 void Audio_Destroy(void)
 {
 	// Clean up HRIR data
-	Zone_Free(Zone, Sphere.Indices);
-	Zone_Free(Zone, Sphere.Vertices);
+	Zone_Free(Zone, sphere.indices);
+	Zone_Free(Zone, sphere.vertices);
 
 #ifdef ANDROID
-	AAudioStream_requestStop(AudioStream);
-	AAudioStream_close(AudioStream);
+	// Shut down Android Audio
+	AAudioStream_requestStop(audioStream);
+	AAudioStream_close(audioStream);
 #else
 	// Shut down PortAudio
-	Pa_AbortStream(AudioStream);
-	Pa_StopStream(AudioStream);
-	Pa_CloseStream(AudioStream);
+	Pa_AbortStream(audioStream);
+	Pa_StopStream(audioStream);
+	Pa_CloseStream(audioStream);
 	Pa_Terminate();
 #endif
 }

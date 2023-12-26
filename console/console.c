@@ -14,170 +14,170 @@
 extern Font_t Fnt;
 
 // Standard/basic console commands
-void Console_CmdClear(Console_t *Console, char *Param)
+void Console_CmdClear(Console_t *console, char *param)
 {
-	Console_Clear(Console);
+	Console_Clear(console);
 }
 
-void Console_CmdEcho(Console_t *Console, char *Param)
+void Console_CmdEcho(Console_t *console, char *param)
 {
-	Console_Out(Console, Param);
+	Console_Out(console, param);
 }
 
-bool Console_ExecFile(Console_t *Console, char *Filename)
+bool Console_ExecFile(Console_t *console, char *filename)
 {
-	FILE *Stream=NULL;
-	char Buf[CONSOLE_MAX_COLUMN];
+	FILE *stream=NULL;
+	char buf[CONSOLE_MAX_COLUMN];
 
-	if(!Filename)
+	if(!filename)
 	{
-		Console_Out(Console, "No file specified");
+		Console_Out(console, "No file specified");
 		return false;
 	}
 
-	Stream=fopen(Filename, "r");
+	stream=fopen(filename, "r");
 
-	if(Stream==NULL)
+	if(stream==NULL)
 	{
-		sprintf(Buf, "Unable to open file: %s", Filename);
-		Console_Out(Console, Buf);
+		sprintf(buf, "Unable to open file: %s", filename);
+		Console_Out(console, buf);
 
 		return false;
 	}
 
-	while(fgets(Buf, CONSOLE_MAX_COLUMN, Stream))
+	while(fgets(buf, CONSOLE_MAX_COLUMN, stream))
 	{
-		strtok(Buf, " \n\f");
-		char *Param=Buf+strlen(Buf)+1;
+		strtok(buf, " \n\f");
+		char *param=buf+strlen(buf)+1;
 
-		if(Param[0]==0)
-			Param=NULL;
+		if(param[0]==0)
+			param=NULL;
 
-		if(!Console_ExecCommand(Console, Buf, Param))
-			Console_Out(Console, "Invalid command in file");
+		if(!Console_ExecCommand(console, buf, param))
+			Console_Out(console, "Invalid command in file");
 	}
 
-	fclose(Stream);
+	fclose(stream);
 
 	return true;
 }
 
-void Console_ClearCommandHistory(Console_t *Console)
+void Console_ClearCommandHistory(Console_t *console)
 {
-	memset(Console->CommandHistory, '\0', sizeof(char)*CONSOLE_MAX_COMMAND_HISTORY*CONSOLE_MAX_COMMAND_NAME);
-	Console->NumCommandHistory=0;
+	memset(console->commandHistory, '\0', sizeof(char)*CONSOLE_MAX_COMMAND_HISTORY*CONSOLE_MAX_COMMAND_NAME);
+	console->numCommandHistory=0;
 
-	Console->NewCommand=0;
-	Console->CurrentCommand=0;
+	console->newCommand=0;
+	console->currentCommand=0;
 }
 
-void Console_Clear(Console_t *Console)
+void Console_Clear(Console_t *console)
 {
-	memset(Console->Buffer, '\0', sizeof(char)*CONSOLE_MAX_ROW*CONSOLE_MAX_COLUMN);
+	memset(console->buffer, '\0', sizeof(char)*CONSOLE_MAX_ROW*CONSOLE_MAX_COLUMN);
 
-	Console->NewLine=0;
-	Console->ViewBottom=0;
+	console->newLine=0;
+	console->viewBottom=0;
 }
 
-void Console_Init(Console_t *Console, uint32_t Width, uint32_t Height)
+void Console_Init(Console_t *console, uint32_t width, uint32_t height)
 {
-	Console->Column=1;
+	console->column=1;
 
-	Console->Width=Width;
-	Console->Height=Height;
+	console->width=width;
+	console->height=height;
 
-	Console->NumCommand=0;
+	console->numCommand=0;
 
-	Console_AddCommand(Console, "echo", Console_CmdEcho);
-	Console_AddCommand(Console, "clear", Console_CmdClear);
-//	Console_AddCommand(Console, "exec", Console_ExecFile);
+	Console_AddCommand(console, "echo", Console_CmdEcho);
+	Console_AddCommand(console, "clear", Console_CmdClear);
+//	Console_AddCommand(console, "exec", Console_ExecFile);
 
-	Console_Clear(Console);
-	Console_ClearCommandHistory(Console);
-	Console_Advance(Console);
+	Console_Clear(console);
+	Console_ClearCommandHistory(console);
+	Console_Advance(console);
 
-	Console->Buffer[Console->NewLine].Text[0]=']';
-	Console->Buffer[Console->NewLine].Text[1]='_';
-	Console->Buffer[Console->NewLine].Text[2]='\0';
+	console->buffer[console->newLine].text[0]=']';
+	console->buffer[console->newLine].text[1]='_';
+	console->buffer[console->newLine].text[2]='\0';
 }
 
-void Console_Destroy(Console_t *Console)
+void Console_Destroy(Console_t *console)
 {
 }
 
-void Console_Advance(Console_t *Console)
+void Console_Advance(Console_t *console)
 {
-	Console->NewLine--;
+	console->newLine--;
 
-	if(Console->NewLine<0)
-		Console->NewLine+=CONSOLE_MAX_SCROLLBACK;
+	if(console->newLine<0)
+		console->newLine+=CONSOLE_MAX_SCROLLBACK;
 
-	Console->Buffer[Console->NewLine].Text[0]='\0';
-	Console->ViewBottom=Console->NewLine;
+	console->buffer[console->newLine].text[0]='\0';
+	console->viewBottom=console->newLine;
 }
 
-void Console_Scroll(Console_t *Console, bool Up)
+void Console_Scroll(Console_t *console, bool up)
 {
-	if(Up)
+	if(up)
 	{
-		Console->ViewBottom++;
+		console->viewBottom++;
 
-		if(Console->ViewBottom>=CONSOLE_MAX_SCROLLBACK+CONSOLE_MAX_SCROLLBACK)
-			Console->ViewBottom-=CONSOLE_MAX_SCROLLBACK+CONSOLE_MAX_SCROLLBACK;
+		if(console->viewBottom>=CONSOLE_MAX_SCROLLBACK+CONSOLE_MAX_SCROLLBACK)
+			console->viewBottom-=CONSOLE_MAX_SCROLLBACK+CONSOLE_MAX_SCROLLBACK;
 
-		if(Console->ViewBottom==Console->NewLine)
-			Console->ViewBottom--;
+		if(console->viewBottom==console->newLine)
+			console->viewBottom--;
 	}
 	else
 	{
-		Console->ViewBottom--;
+		console->viewBottom--;
 
-		if(Console->ViewBottom<0)
-			Console->ViewBottom+=CONSOLE_MAX_SCROLLBACK;
+		if(console->viewBottom<0)
+			console->viewBottom+=CONSOLE_MAX_SCROLLBACK;
 
-		if(Console->ViewBottom==Console->NewLine-1)
-			Console->ViewBottom=Console->NewLine;
+		if(console->viewBottom==console->newLine-1)
+			console->viewBottom=console->newLine;
 	}
 }
 
-void Console_Out(Console_t *Console, char *string)
+void Console_Out(Console_t *console, char *string)
 {
-	Console_Advance(Console);
+	Console_Advance(console);
 
 	if(string)
-		strcpy(Console->Buffer[Console->NewLine].Text, string);
+		strcpy(console->buffer[console->newLine].text, string);
 }
 
-bool Console_AddCommand(Console_t *Console, char *CommandName, void (*CommandFunction)(Console_t *, char *))
+bool Console_AddCommand(Console_t *console, char *commandName, void (*commandFunction)(Console_t *, char *))
 {
-	if(Console==NULL)
+	if(console==NULL)
 		return false;
 
-	if(Console->NumCommand>=CONSOLE_MAX_COMMANDS)
+	if(console->numCommand>=CONSOLE_MAX_COMMANDS)
 		return false;
 
-	strcpy(Console->Commands[Console->NumCommand].CommandName, CommandName);
-	Console->Commands[Console->NumCommand].CommandFunction=CommandFunction;
+	strcpy(console->commands[console->numCommand].commandName, commandName);
+	console->commands[console->numCommand].commandFunction=commandFunction;
 
-	Console->NumCommand++;
+	console->numCommand++;
 
 	return true;
 }
 
-bool Console_ExecCommand(Console_t *Console, char *Command, char *Param)
+bool Console_ExecCommand(Console_t *console, char *command, char *param)
 {
-	if(Console==NULL)
+	if(console==NULL)
 		return false;
 
-	if(Command==NULL)
+	if(command==NULL)
 		return false;
 
 	// Search through command list and run it
-	for(uint32_t i=0;i<Console->NumCommand;i++)
+	for(uint32_t i=0;i<console->numCommand;i++)
 	{
-		if(strcasecmp(Command, Console->Commands[i].CommandName)==0)
+		if(strcasecmp(command, console->commands[i].commandName)==0)
 		{
-			Console->Commands[i].CommandFunction(Console, Param);
+			console->commands[i].commandFunction(console, param);
 			return true;
 		}
 	}
@@ -185,121 +185,121 @@ bool Console_ExecCommand(Console_t *Console, char *Command, char *Param)
 	return false;
 }
 
-void Console_History(Console_t *Console, bool Up)
+void Console_History(Console_t *console, bool up)
 {
-	if(Up)
+	if(up)
 	{
-		Console->CurrentCommand++;
+		console->currentCommand++;
 
-		if(Console->CurrentCommand>Console->NumCommandHistory)
-			Console->CurrentCommand=Console->NumCommandHistory;
+		if(console->currentCommand>console->numCommandHistory)
+			console->currentCommand=console->numCommandHistory;
 	}
 	else
 	{
-		Console->CurrentCommand--;
+		console->currentCommand--;
 
-		if(Console->CurrentCommand<0)
-			Console->CurrentCommand=0;
+		if(console->currentCommand<0)
+			console->currentCommand=0;
 	}
 
-	if(Console->CurrentCommand!=-1)
+	if(console->currentCommand!=-1)
 	{
 		char buf[CONSOLE_MAX_COLUMN];
 
 		buf[0]=']';
 		buf[1]='\0';
 
-		int32_t CommandNumber=Console->NewCommand-Console->CurrentCommand;
+		int32_t commandNumber=console->newCommand-console->currentCommand;
 
-		if(CommandNumber<0)
-			CommandNumber+=Console->NumCommandHistory;
+		if(commandNumber<0)
+			commandNumber+=console->numCommandHistory;
 
-		strcat(buf, Console->CommandHistory[CommandNumber]);
+		strcat(buf, console->commandHistory[commandNumber]);
 		strcat(buf, "_");
-		strcpy(Console->Buffer[Console->NewLine].Text, buf);
+		strcpy(console->buffer[console->newLine].text, buf);
 
-		Console->Column=(int)strlen(buf)-1;
+		console->column=(int)strlen(buf)-1;
 	}
 }
 
-void Console_Backspace(Console_t *Console)
+void Console_Backspace(Console_t *console)
 {
 	// Backspace only up to the prompt character
-	if(Console->Column>1)
+	if(console->column>1)
 	{
-		Console->Buffer[Console->NewLine].Text[Console->Column]='\0';
-		Console->Buffer[Console->NewLine].Text[Console->Column-1]='_';
-		Console->Column--;
+		console->buffer[console->newLine].text[console->column]='\0';
+		console->buffer[console->newLine].text[console->column-1]='_';
+		console->column--;
 	}
 }
 
-void Console_Process(Console_t *Console)
+void Console_Process(Console_t *console)
 {
 	// Terminate the line and process it
-	Console->Buffer[Console->NewLine].Text[Console->Column]='\0';
+	console->buffer[console->newLine].text[console->column]='\0';
 
-	char Command[CONSOLE_MAX_COLUMN];
+	char command[CONSOLE_MAX_COLUMN];
 
 	// Copy the line out of the console buffer into a command buffer (not including the prompt character)
-	strcpy(Command, Console->Buffer[Console->NewLine].Text+1);
+	strcpy(command, console->buffer[console->newLine].text+1);
 
 	// Also place the command into the command history
-	strcpy(Console->CommandHistory[Console->NewCommand], Command);
+	strcpy(console->commandHistory[console->newCommand], command);
 
-	Console->NewCommand++;
-	Console->NewCommand%=CONSOLE_MAX_COMMAND_HISTORY;
-	Console->CurrentCommand=0;
+	console->newCommand++;
+	console->newCommand%=CONSOLE_MAX_COMMAND_HISTORY;
+	console->currentCommand=0;
 
-	Console->NumCommandHistory++;
+	console->numCommandHistory++;
 
-	if(Console->NumCommandHistory>CONSOLE_MAX_COMMAND_HISTORY)
-		Console->NumCommandHistory=CONSOLE_MAX_COMMAND_HISTORY;
+	if(console->numCommandHistory>CONSOLE_MAX_COMMAND_HISTORY)
+		console->numCommandHistory=CONSOLE_MAX_COMMAND_HISTORY;
 
 	// Find the parameter after the command
-	char *CommandParam=strrchr(Command, ' ');
+	char *commandParam=strrchr(command, ' ');
 
 	// If there was a parameter to the command
-	if(CommandParam!=NULL)
+	if(commandParam!=NULL)
 	{
 		// Replace the space with a null-terminator and advance to split the string
 		//     around the space and separate command and parameter.
-		*CommandParam='\0';
-		CommandParam++;
+		*commandParam='\0';
+		commandParam++;
 	}
 
-	if(!Console_ExecCommand(Console, Command, CommandParam))
-		Console_Out(Console, "Invalid command");
+	if(!Console_ExecCommand(console, command, commandParam))
+		Console_Out(console, "Invalid command");
 
 	// New line, prompt and cursor
-	Console_Advance(Console);
+	Console_Advance(console);
 
-	Console->Column=1;
-	Console->Buffer[Console->NewLine].Text[0]=']';
-	Console->Buffer[Console->NewLine].Text[1]='_';
-	Console->Buffer[Console->NewLine].Text[2]='\0';
+	console->column=1;
+	console->buffer[console->newLine].text[0]=']';
+	console->buffer[console->newLine].text[1]='_';
+	console->buffer[console->newLine].text[2]='\0';
 }
 
-void Console_KeyInput(Console_t *Console, uint32_t KeyCode)
+void Console_KeyInput(Console_t *console, uint32_t keyCode)
 {
 	// Don't type past edge of console
-	if(Console->Column>(signed)Console->Width-2)
+	if(console->column>(signed)console->width-2)
 		return;
 
-	Console->Buffer[Console->NewLine].Text[Console->Column++]=KeyCode;
-	Console->Buffer[Console->NewLine].Text[Console->Column]='_';
-	Console->Buffer[Console->NewLine].Text[Console->Column+1]='\0';
+	console->buffer[console->newLine].text[console->column++]=keyCode;
+	console->buffer[console->newLine].text[console->column]='_';
+	console->buffer[console->newLine].text[console->column+1]='\0';
 }
 
-void Console_Draw(Console_t *Console)
+void Console_Draw(Console_t *console)
 {
-	if(!Console->Active)
+	if(!console->active)
 		return;
 
-	uint32_t temp=Console->ViewBottom;
+	uint32_t temp=console->viewBottom;
 
-	for(uint32_t i=0;i<Console->Height;i++)
+	for(uint32_t i=0;i<console->height;i++)
 	{
-		Font_Print(&Fnt, 16.0f, 0.0f, (float)i*16.0f, "%s", Console->Buffer[temp].Text);
+		Font_Print(&Fnt, 16.0f, 0.0f, (float)i*16.0f, "%s", console->buffer[temp].text);
 		temp=(temp+1)%CONSOLE_MAX_ROW;
 	}
 }

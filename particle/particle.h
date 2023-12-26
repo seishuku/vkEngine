@@ -30,6 +30,8 @@ typedef struct
 
 typedef struct
 {
+	uint32_t baseID;
+
 	vec3 gravity;
 
 	List_t emitters;

@@ -15,8 +15,10 @@
 
 extern VkuContext_t Context;
 extern VkuBuffer_t asteroidInstance;
+
 extern float fTime;
-extern Camera_t Camera;
+
+extern Camera_t camera;
 
 Shadow_UBO_t shadowUBO;
 
@@ -183,7 +185,7 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 	), 3000.0f);
 
 	// Following the camera's position, so we don't have to composite multiple shadow maps or have super large maps.
-	matrix modelView=MatrixLookAt(Vec3_Addv(position, Camera.Position), Camera.Position, Vec3(0.0f, 1.0f, 0.0f));
+	matrix modelView=MatrixLookAt(Vec3_Addv(position, camera.position), camera.position, Vec3(0.0f, 1.0f, 0.0f));
 
 	// Multiply matrices together, so we can just send one matrix as a push constant.
 	shadowUBO.mvp=MatrixMult(modelView, projection);

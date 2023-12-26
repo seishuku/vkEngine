@@ -43,7 +43,6 @@
     <ClInclude Include="textures.h" />
     <ClInclude Include="ui\ui.h" />
     <ClInclude Include="utils\event.h" />
-    <ClInclude Include="utils\genid.h" />
     <ClInclude Include="utils\input.h" />
     <ClInclude Include="utils\list.h" />
     <ClInclude Include="vr\vr.h" />
@@ -85,7 +84,6 @@
     <ClCompile Include="ui\sprite.c" />
     <ClCompile Include="ui\ui.c" />
     <ClCompile Include="utils\event.c" />
-    <ClCompile Include="utils\genid.c" />
     <ClCompile Include="utils\input.c" />
     <ClCompile Include="utils\list.c" />
     <ClCompile Include="vr\vr.c" />
