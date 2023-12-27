@@ -7,32 +7,32 @@
 #include "../font/font.h"
 #include "ui.h"
 
-extern VkuContext_t Context;
+extern VkuContext_t vkContext;
 
 // Add a button to the UI.
 // Returns an ID, or UINT32_MAX on failure.
-uint32_t UI_AddSprite(UI_t *UI, vec2 Position, vec2 Size, vec3 Color, VkuImage_t *Image, float Rotation)
+uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, VkuImage_t *Image, float rotation)
 {
-	uint32_t ID=UI->IDBase++;
+	uint32_t ID=UI->baseID++;
 
 	if(ID==UINT32_MAX||ID>=UI_HASHTABLE_MAX)
 		return UINT32_MAX;
 
 	UI_Control_t Control=
 	{
-		.Type=UI_CONTROL_SPRITE,
+		.type=UI_CONTROL_SPRITE,
 		.ID=ID,
-		.Position=Position,
-		.Color=Color,
+		.position=position,
+		.color=color,
 		.Sprite.Image=Image,
-		.Sprite.Size=Size,
-		.Sprite.Rotation=Rotation
+		.Sprite.size=size,
+		.Sprite.rotation=rotation
 	};
 
-	if(!List_Add(&UI->Controls, &Control))
+	if(!List_Add(&UI->controls, &Control))
 		return UINT32_MAX;
 
-	UI->Controls_Hashtable[ID]=List_GetPointer(&UI->Controls, List_GetCount(&UI->Controls)-1);
+	UI->controlsHashtable[ID]=List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
 
 	return ID;
 }
@@ -40,7 +40,7 @@ uint32_t UI_AddSprite(UI_t *UI, vec2 Position, vec2 Size, vec3 Color, VkuImage_t
 // Update UI button parameters.
 // Returns true on success, false on failure.
 // Also individual parameter update function as well.
-bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 Position, vec2 Size, vec3 Color, VkuImage_t *Image, float Rotation)
+bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, VkuImage_t *Image, float rotation)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -48,14 +48,14 @@ bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 Position, vec2 Size, vec3 Color
 	// Search list
 	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->Type==UI_CONTROL_SPRITE)
+	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
 	{
-		Control->Position=Position;
-		Control->Color=Color;
+		Control->position=position;
+		Control->color=color;
 
 		Control->Sprite.Image=Image,
-		Control->Sprite.Rotation=Rotation;
-		Control->Sprite.Size=Size;
+		Control->Sprite.rotation=rotation;
+		Control->Sprite.size=size;
 
 		return true;
 	}
@@ -64,7 +64,7 @@ bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 Position, vec2 Size, vec3 Color
 	return false;
 }
 
-bool UI_UpdateSpritePosition(UI_t *UI, uint32_t ID, vec2 Position)
+bool UI_UpdateSpritePosition(UI_t *UI, uint32_t ID, vec2 position)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -72,9 +72,9 @@ bool UI_UpdateSpritePosition(UI_t *UI, uint32_t ID, vec2 Position)
 	// Search list
 	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->Type==UI_CONTROL_SPRITE)
+	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
 	{
-		Control->Position=Position;
+		Control->position=position;
 		return true;
 	}
 
@@ -82,7 +82,7 @@ bool UI_UpdateSpritePosition(UI_t *UI, uint32_t ID, vec2 Position)
 	return false;
 }
 
-bool UI_UpdateSpriteSize(UI_t *UI, uint32_t ID, vec2 Size)
+bool UI_UpdateSpriteSize(UI_t *UI, uint32_t ID, vec2 size)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -90,9 +90,9 @@ bool UI_UpdateSpriteSize(UI_t *UI, uint32_t ID, vec2 Size)
 	// Search list
 	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->Type==UI_CONTROL_SPRITE)
+	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
 	{
-		Control->Button.Size=Size;
+		Control->Button.size=size;
 		return true;
 	}
 
@@ -100,7 +100,7 @@ bool UI_UpdateSpriteSize(UI_t *UI, uint32_t ID, vec2 Size)
 	return false;
 }
 
-bool UI_UpdateSpriteColor(UI_t *UI, uint32_t ID, vec3 Color)
+bool UI_UpdateSpriteColor(UI_t *UI, uint32_t ID, vec3 color)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -108,9 +108,9 @@ bool UI_UpdateSpriteColor(UI_t *UI, uint32_t ID, vec3 Color)
 	// Search list
 	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->Type==UI_CONTROL_SPRITE)
+	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
 	{
-		Control->Color=Color;
+		Control->color=color;
 		return true;
 	}
 
@@ -126,7 +126,7 @@ bool UI_UpdateSpriteImage(UI_t *UI, uint32_t ID, VkuImage_t *Image)
 	// Search list
 	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->Type==UI_CONTROL_SPRITE)
+	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
 	{
 		Control->Sprite.Image=Image;
 		return true;
@@ -136,7 +136,7 @@ bool UI_UpdateSpriteImage(UI_t *UI, uint32_t ID, VkuImage_t *Image)
 	return false;
 }
 
-bool UI_UpdateSpriteRotation(UI_t *UI, uint32_t ID, float Rotation)
+bool UI_UpdateSpriteRotation(UI_t *UI, uint32_t ID, float rotation)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -144,9 +144,9 @@ bool UI_UpdateSpriteRotation(UI_t *UI, uint32_t ID, float Rotation)
 	// Search list
 	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->Type==UI_CONTROL_SPRITE)
+	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
 	{
-		Control->Sprite.Rotation=Rotation;
+		Control->Sprite.rotation=rotation;
 		return true;
 	}
 

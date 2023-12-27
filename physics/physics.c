@@ -131,7 +131,7 @@ void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 		const float relVelMag=sqrtf(fabsf(VdotN));
 
 		if(relVelMag>1.0f)
-			Audio_PlaySample(&Sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, relVelMag/50.0f, &a->position);
+			Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, relVelMag/50.0f, &a->position);
 	}
 }
 
@@ -230,7 +230,7 @@ void PhysicsCameraToSphereCollisionResponse(Camera_t *camera, RigidBody_t *body)
 		const float relVelMag=sqrtf(fabsf(VdotN));
 
 		if(relVelMag>1.0f)
-			Audio_PlaySample(&Sounds[SOUND_CRASH], false, relVelMag/50.0f, &body->position);
+			Audio_PlaySample(&sounds[SOUND_CRASH], false, relVelMag/50.0f, &body->position);
 	}
 }
 
@@ -275,7 +275,7 @@ void PhysicsCameraToCameraCollisionResponse(Camera_t *cameraA, Camera_t *cameraB
 		const float relVelMag=sqrtf(fabsf(VdotN));
 
 		if(relVelMag>1.0f)
-			Audio_PlaySample(&Sounds[SOUND_CRASH], false, relVelMag/50.0f, &cameraB->position);
+			Audio_PlaySample(&sounds[SOUND_CRASH], false, relVelMag/50.0f, &cameraB->position);
 	}
 }
 
@@ -339,7 +339,7 @@ void PhysicsParticleToSphereCollisionResponse(Particle_t *particle, RigidBody_t 
 
 		if(relVelMag>1.0f)
 		{
-			Audio_PlaySample(&Sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, relVelMag/50.0f, &particle->position);
+			Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, relVelMag/50.0f, &particle->position);
 
 			// FIXME: Is this causing derelict emitters that never go away?
 			//			I don't think it is, but need to check.

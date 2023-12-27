@@ -11,13 +11,13 @@
 #include "particle.h"
 
 // External data from engine.c
-extern VkuContext_t Context;
+extern VkuContext_t vkContext;
 extern VkSampleCountFlags MSAA;
 extern VkFormat ColorFormat, DepthFormat;
 
-extern VkRenderPass RenderPass;
+extern VkRenderPass renderPass;
 
-extern VkuMemZone_t *VkZone;
+extern VkuMemZone_t *vkZone;
 ////////////////////////////
 
 //static VkuDescriptorSet_t particleDescriptorSet;
@@ -48,17 +48,17 @@ bool ParticleSystem_ResizeBuffer(ParticleSystem_t *system)
 	}
 
 	// Resize vertex buffer
-	vkDeviceWaitIdle(Context.Device);
+	vkDeviceWaitIdle(vkContext.Device);
 
 	if(system->particleBuffer.Buffer)
 	{
-		vkUnmapMemory(Context.Device, system->particleBuffer.DeviceMemory);
-		vkDestroyBuffer(Context.Device, system->particleBuffer.Buffer, VK_NULL_HANDLE);
-		vkFreeMemory(Context.Device, system->particleBuffer.DeviceMemory, VK_NULL_HANDLE);
+		vkUnmapMemory(vkContext.Device, system->particleBuffer.DeviceMemory);
+		vkDestroyBuffer(vkContext.Device, system->particleBuffer.Buffer, VK_NULL_HANDLE);
+		vkFreeMemory(vkContext.Device, system->particleBuffer.DeviceMemory, VK_NULL_HANDLE);
 	}
 
-	vkuCreateHostBuffer(&Context, &system->particleBuffer, sizeof(vec4)*2*count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	vkMapMemory(Context.Device, system->particleBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&system->particleArray);
+	vkuCreateHostBuffer(&vkContext, &system->particleBuffer, sizeof(vec4)*2*count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	vkMapMemory(vkContext.Device, system->particleBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&system->particleArray);
 
 	return true;
 }
@@ -242,7 +242,7 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 	//vkuDescriptorSet_AddBinding(&ParticleDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	//vkuAssembleDescriptorSetLayout(&ParticleDescriptorSet);
 
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		//.setLayoutCount=1,
@@ -256,10 +256,10 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 		},
 	}, 0, &particlePipelineLayout);
 
-	vkuInitPipeline(&particlePipeline, &Context);
+	vkuInitPipeline(&particlePipeline, &vkContext);
 
 	vkuPipeline_SetPipelineLayout(&particlePipeline, particlePipelineLayout);
-	vkuPipeline_SetRenderPass(&particlePipeline, RenderPass);
+	vkuPipeline_SetRenderPass(&particlePipeline, renderPass);
 
 	particlePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
 	particlePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
@@ -410,12 +410,12 @@ void ParticleSystem_Destroy(ParticleSystem_t *system)
 	if(system==NULL)
 		return;
 
-	vkuDestroyBuffer(&Context, &system->particleBuffer);
+	vkuDestroyBuffer(&vkContext, &system->particleBuffer);
 
 	//vkuDestroyImageBuffer(&Context, &particleTexture);
 
-	vkDestroyPipeline(Context.Device, particlePipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(Context.Device, particlePipelineLayout, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.Device, particlePipeline.Pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.Device, particlePipelineLayout, VK_NULL_HANDLE);
 	//vkDestroyDescriptorSetLayout(Context.Device, particleDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
 
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)

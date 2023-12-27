@@ -16,47 +16,47 @@
 
 typedef struct
 {
-	char Name[256];
-	vec3 Ambient;
-	vec3 Diffuse;
-	vec3 Specular;
-	vec3 Emission;
-	float Shininess;
-	char Texture[256];
+	char name[256];
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+	vec3 emission;
+	float shininess;
+	char texture[256];
 } BModel_Material_t;
 
 typedef struct
 {
-	char Name[256];
-	char MaterialName[256];
-	uint32_t MaterialNumber;
+	char name[256];
+	char materialName[256];
+	uint32_t materialNumber;
 
-	uint32_t NumFace;
-	uint32_t *Face;
+	uint32_t numFace;
+	uint32_t *face;
 
-	VkuBuffer_t IndexBuffer;
+	VkuBuffer_t indexBuffer;
 } BModel_Mesh_t;
 
 typedef struct
 {
-	uint32_t NumMesh;
-	BModel_Mesh_t *Mesh;
+	uint32_t numMesh;
+	BModel_Mesh_t *mesh;
 
-	uint32_t NumMaterial;
-	BModel_Material_t *Material;
+	uint32_t numMaterial;
+	BModel_Material_t *material;
 
-	uint32_t NumVertex;
-	float *Vertex;
+	uint32_t numVertex;
+	float *vertex;
 	float *UV;
-	float *Tangent;
-	float *Binormal;
-	float *Normal;
+	float *tangent;
+	float *binormal;
+	float *normal;
 
-	VkuBuffer_t VertexBuffer;
+	VkuBuffer_t vertexBuffer;
 } BModel_t;
 
-bool LoadBModel(BModel_t *Model, const char *Filename);
-void FreeBModel(BModel_t *Model);
-void BuildMemoryBuffersBModel(VkuContext_t *Context, BModel_t *Model);
+bool LoadBModel(BModel_t *model, const char *filename);
+void FreeBModel(BModel_t *model);
+void BuildMemoryBuffersBModel(VkuContext_t *Context, BModel_t *model);
 
 #endif

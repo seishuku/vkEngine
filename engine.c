@@ -49,11 +49,11 @@ extern bool isVR;
 XruContext_t xrContext;
 
 // Vulkan instance handle and context structs
-VkInstance Instance;
-VkuContext_t Context;
+VkInstance vkInstance;
+VkuContext_t vkContext;
 
 // Vulkan memory allocator zone
-VkuMemZone_t *VkZone;
+VkuMemZone_t *vkZone;
 
 // Camera data
 Camera_t camera;
@@ -66,16 +66,16 @@ extern float fps, fTimeStep, fTime;
 ParticleSystem_t particleSystem;
 
 // 3D Model data
-BModel_t Models[NUM_MODELS];
+BModel_t models[NUM_MODELS];
 
 // Texture images
-VkuImage_t Textures[NUM_TEXTURES];
+VkuImage_t textures[NUM_TEXTURES];
 
 // Sound sample data
-Sample_t Sounds[NUM_SOUNDS];
+Sample_t sounds[NUM_SOUNDS];
 
 // Vulkan swapchain helper struct
-VkuSwapchain_t Swapchain;
+VkuSwapchain_t swapchain;
 
 // Multisample anti-alias sample count
 VkSampleCountFlags MSAA=VK_SAMPLE_COUNT_4_BIT;
@@ -89,9 +89,9 @@ VkFormat depthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
 VkuImage_t depthImage[2];		// left and right eye depth buffers
 
 // Renderpass for primary renderer
-VkRenderPass RenderPass;
+VkRenderPass renderPass;
 // Framebuffers, per-eye
-VkFramebuffer Framebuffer[2];
+VkFramebuffer framebuffer[2];
 
 // Primary rendering Vulkan stuff
 VkuDescriptorSet_t mainDescriptorSet;
@@ -118,19 +118,19 @@ RigidBody_t asteroids[NUM_ASTEROIDS];
 // Thread stuff
 typedef struct
 {
-	uint32_t Index, Eye;
+	uint32_t index, eye;
 	struct
 	{
-		VkDescriptorPool DescriptorPool[2];
-		VkCommandPool CommandPool[2];
-		VkCommandBuffer SecCommandBuffer[2];
-	} PerFrame[VKU_MAX_FRAME_COUNT];
+		VkDescriptorPool descriptorPool[2];
+		VkCommandPool commandPool[2];
+		VkCommandBuffer secCommandBuffer[2];
+	} perFrame[VKU_MAX_FRAME_COUNT];
 } ThreadData_t;
 
 #define NUM_THREADS 3
-ThreadData_t ThreadData[NUM_THREADS];
-ThreadWorker_t Thread[NUM_THREADS], ThreadPhysics, ThreadNetUpdate;
-pthread_barrier_t ThreadBarrier, ThreadBarrier_Physics;
+ThreadData_t threadData[NUM_THREADS];
+ThreadWorker_t thread[NUM_THREADS], threadPhysics, threadNetUpdate;
+pthread_barrier_t threadBarrier, physicsThreadBarrier;
 //////
 
 // Network stuff
@@ -215,7 +215,7 @@ bool CreateFramebuffers(uint32_t eye)
 	VkResult Result;
 
 	depthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
-	Result=vkGetPhysicalDeviceImageFormatProperties(Context.PhysicalDevice,
+	Result=vkGetPhysicalDeviceImageFormatProperties(vkContext.PhysicalDevice,
 													depthFormat,
 													VK_IMAGE_TYPE_2D,
 													VK_IMAGE_TILING_OPTIMAL,
@@ -226,7 +226,7 @@ bool CreateFramebuffers(uint32_t eye)
 	if(Result!=VK_SUCCESS)
 	{
 		depthFormat=VK_FORMAT_D24_UNORM_S8_UINT;
-		Result=vkGetPhysicalDeviceImageFormatProperties(Context.PhysicalDevice, depthFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT, 0, &imageFormatProps);
+		Result=vkGetPhysicalDeviceImageFormatProperties(vkContext.PhysicalDevice, depthFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT, 0, &imageFormatProps);
 
 		if(Result!=VK_SUCCESS)
 		{
@@ -235,33 +235,33 @@ bool CreateFramebuffers(uint32_t eye)
 		}
 	}
 
-	vkuCreateTexture2D(&Context, &colorImage[eye], renderWidth, renderHeight, colorFormat, MSAA);
-	vkuCreateTexture2D(&Context, &depthImage[eye], renderWidth, renderHeight, depthFormat, MSAA);
-	vkuCreateTexture2D(&Context, &colorResolve[eye], renderWidth, renderHeight, colorFormat, VK_SAMPLE_COUNT_1_BIT);
+	vkuCreateTexture2D(&vkContext, &colorImage[eye], renderWidth, renderHeight, colorFormat, MSAA);
+	vkuCreateTexture2D(&vkContext, &depthImage[eye], renderWidth, renderHeight, depthFormat, MSAA);
+	vkuCreateTexture2D(&vkContext, &colorResolve[eye], renderWidth, renderHeight, colorFormat, VK_SAMPLE_COUNT_1_BIT);
 
-	VkCommandBuffer commandBuffer=vkuOneShotCommandBufferBegin(&Context);
+	VkCommandBuffer commandBuffer=vkuOneShotCommandBufferBegin(&vkContext);
 	vkuTransitionLayout(commandBuffer, colorImage[eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	vkuTransitionLayout(commandBuffer, depthImage[eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 	vkuTransitionLayout(commandBuffer, colorResolve[eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuOneShotCommandBufferEnd(&Context, commandBuffer);
+	vkuOneShotCommandBufferEnd(&vkContext, commandBuffer);
 
-	vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
+	vkCreateFramebuffer(vkContext.Device, &(VkFramebufferCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-		.renderPass=RenderPass,
+		.renderPass=renderPass,
 		.attachmentCount=3,
 		.pAttachments=(VkImageView[]){ colorImage[eye].View, depthImage[eye].View, colorResolve[eye].View },
 		.width=renderWidth,
 		.height=renderHeight,
 		.layers=1,
-	}, 0, &Framebuffer[eye]);
+	}, 0, &framebuffer[eye]);
 
 	return true;
 }
 
 bool CreatePipeline(void)
 {
-	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
+	vkCreateRenderPass(vkContext.Device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.attachmentCount=3,
@@ -350,18 +350,18 @@ bool CreatePipeline(void)
 				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
 			},
 		},
-	}, 0, &RenderPass);
+	}, 0, &renderPass);
 
-	for(uint32_t i=0;i<Swapchain.NumImages;i++)
+	for(uint32_t i=0;i<swapchain.NumImages;i++)
 	{
-		vkuCreateHostBuffer(&Context, &perFrame[i].mainUBOBuffer[0], sizeof(Main_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		vkMapMemory(Context.Device, perFrame[i].mainUBOBuffer[0].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].mainUBO[0]);
+		vkuCreateHostBuffer(&vkContext, &perFrame[i].mainUBOBuffer[0], sizeof(Main_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+		vkMapMemory(vkContext.Device, perFrame[i].mainUBOBuffer[0].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].mainUBO[0]);
 
-		vkuCreateHostBuffer(&Context, &perFrame[i].mainUBOBuffer[1], sizeof(Main_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		vkMapMemory(Context.Device, perFrame[i].mainUBOBuffer[1].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].mainUBO[1]);
+		vkuCreateHostBuffer(&vkContext, &perFrame[i].mainUBOBuffer[1], sizeof(Main_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+		vkMapMemory(vkContext.Device, perFrame[i].mainUBOBuffer[1].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].mainUBO[1]);
 	}
 
-	vkuInitDescriptorSet(&mainDescriptorSet, &Context);
+	vkuInitDescriptorSet(&mainDescriptorSet, &vkContext);
 
 	vkuDescriptorSet_AddBinding(&mainDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&mainDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -371,7 +371,7 @@ bool CreatePipeline(void)
 
 	vkuAssembleDescriptorSetLayout(&mainDescriptorSet);
 
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
@@ -385,10 +385,10 @@ bool CreatePipeline(void)
 		},
 	}, 0, &mainPipelineLayout);
 
-	vkuInitPipeline(&mainPipeline, &Context);
+	vkuInitPipeline(&mainPipeline, &vkContext);
 
 	vkuPipeline_SetPipelineLayout(&mainPipeline, mainPipelineLayout);
-	vkuPipeline_SetRenderPass(&mainPipeline, RenderPass);
+	vkuPipeline_SetRenderPass(&mainPipeline, renderPass);
 
 	mainPipeline.DepthTest=VK_TRUE;
 	mainPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
@@ -467,7 +467,7 @@ void GenerateSkyParams(void)
 	Skybox_UBO.uStarDensity=8.0f;
 
 	// Copy it out to the other eyes and frames
-	for(uint32_t i=0;i<Swapchain.NumImages;i++)
+	for(uint32_t i=0;i<swapchain.NumImages;i++)
 	{
 		memcpy(perFrame[i].skyboxUBO[0], &Skybox_UBO, sizeof(Skybox_UBO_t));
 		memcpy(perFrame[i].skyboxUBO[1], &Skybox_UBO, sizeof(Skybox_UBO_t));
@@ -517,9 +517,9 @@ void GenerateSkyParams(void)
 
 	// Set up instance data for asteroid rendering
 	if(!asteroidInstance.Buffer)
-		vkuCreateHostBuffer(&Context, &asteroidInstance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+		vkuCreateHostBuffer(&vkContext, &asteroidInstance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-	vkMapMemory(Context.Device, asteroidInstance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&asteroidInstanceData);
+	vkMapMemory(vkContext.Device, asteroidInstance.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&asteroidInstanceData);
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
 	{
@@ -547,7 +547,7 @@ void GenerateSkyParams(void)
 // Debug sphere pipeline
 bool CreateSpherePipeline(void)
 {
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.pushConstantRangeCount=1,
@@ -559,10 +559,10 @@ bool CreateSpherePipeline(void)
 		},
 	}, 0, &spherePipelineLayout);
 
-	vkuInitPipeline(&spherePipeline, &Context);
+	vkuInitPipeline(&spherePipeline, &vkContext);
 
 	vkuPipeline_SetPipelineLayout(&spherePipeline, spherePipelineLayout);
-	vkuPipeline_SetRenderPass(&spherePipeline, RenderPass);
+	vkuPipeline_SetRenderPass(&spherePipeline, renderPass);
 
 	spherePipeline.DepthTest=VK_TRUE;
 	spherePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
@@ -615,7 +615,7 @@ void DrawSphere(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, vec
 // Debug line pipeline
 bool CreateLinePipeline(void)
 {
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.pushConstantRangeCount=1,
@@ -627,10 +627,10 @@ bool CreateLinePipeline(void)
 		},
 	}, 0, &linePipelineLayout);
 
-	vkuInitPipeline(&linePipeline, &Context);
+	vkuInitPipeline(&linePipeline, &vkContext);
 
 	vkuPipeline_SetPipelineLayout(&linePipeline, linePipelineLayout);
-	vkuPipeline_SetRenderPass(&linePipeline, RenderPass);
+	vkuPipeline_SetRenderPass(&linePipeline, renderPass);
 
 	linePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
 	linePipeline.DepthTest=VK_TRUE;
@@ -737,27 +737,27 @@ void Thread_Constructor(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
 
-	for(uint32_t Frame=0;Frame<Swapchain.NumImages;Frame++)
+	for(uint32_t Frame=0;Frame<swapchain.NumImages;Frame++)
 	{
-		for(uint32_t Eye=0;Eye<2;Eye++)
+		for(uint32_t eye=0;eye<2;eye++)
 		{
-			vkCreateCommandPool(Context.Device, &(VkCommandPoolCreateInfo)
+			vkCreateCommandPool(vkContext.Device, &(VkCommandPoolCreateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 				.flags=0,
-				.queueFamilyIndex=Context.QueueFamilyIndex,
-			}, VK_NULL_HANDLE, &Data->PerFrame[Frame].CommandPool[Eye]);
+				.queueFamilyIndex=vkContext.QueueFamilyIndex,
+			}, VK_NULL_HANDLE, &Data->perFrame[Frame].commandPool[eye]);
 
-			vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
+			vkAllocateCommandBuffers(vkContext.Device, &(VkCommandBufferAllocateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-				.commandPool=Data->PerFrame[Frame].CommandPool[Eye],
+				.commandPool=Data->perFrame[Frame].commandPool[eye],
 				.level=VK_COMMAND_BUFFER_LEVEL_SECONDARY,
 				.commandBufferCount=1,
-			}, &Data->PerFrame[Frame].SecCommandBuffer[Eye]);
+			}, &Data->perFrame[Frame].secCommandBuffer[eye]);
 
 			// Create a large descriptor pool, so I don't have to worry about readjusting for exactly what I have
-			vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
+			vkCreateDescriptorPool(vkContext.Device, &(VkDescriptorPoolCreateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 				.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
@@ -781,7 +781,7 @@ void Thread_Constructor(void *Arg)
 						.descriptorCount=1024,
 					},
 				},
-			}, VK_NULL_HANDLE, &Data->PerFrame[Frame].DescriptorPool[Eye]);
+			}, VK_NULL_HANDLE, &Data->perFrame[Frame].descriptorPool[eye]);
 		}
 	}
 }
@@ -791,12 +791,12 @@ void Thread_Destructor(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
 
-	for(uint32_t Frame=0;Frame<Swapchain.NumImages;Frame++)
+	for(uint32_t Frame=0;Frame<swapchain.NumImages;Frame++)
 	{
-		for(uint32_t Eye=0;Eye<2;Eye++)
+		for(uint32_t eye=0;eye<2;eye++)
 		{
-			vkDestroyCommandPool(Context.Device, Data->PerFrame[Frame].CommandPool[Eye], VK_NULL_HANDLE);
-			vkDestroyDescriptorPool(Context.Device, Data->PerFrame[Frame].DescriptorPool[Eye], VK_NULL_HANDLE);
+			vkDestroyCommandPool(vkContext.Device, Data->perFrame[Frame].commandPool[eye], VK_NULL_HANDLE);
+			vkDestroyDescriptorPool(vkContext.Device, Data->perFrame[Frame].descriptorPool[eye], VK_NULL_HANDLE);
 		}
 	}
 }
@@ -806,10 +806,10 @@ void Thread_Main(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
 
-	vkResetDescriptorPool(Context.Device, Data->PerFrame[Data->Index].DescriptorPool[Data->Eye], 0);
-	vkResetCommandPool(Context.Device, Data->PerFrame[Data->Index].CommandPool[Data->Eye], 0);
+	vkResetDescriptorPool(vkContext.Device, Data->perFrame[Data->index].descriptorPool[Data->eye], 0);
+	vkResetCommandPool(vkContext.Device, Data->perFrame[Data->index].commandPool[Data->eye], 0);
 
-	vkBeginCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], &(VkCommandBufferBeginInfo)
+	vkBeginCommandBuffer(Data->perFrame[Data->index].secCommandBuffer[Data->eye], &(VkCommandBufferBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
@@ -829,44 +829,44 @@ void Thread_Main(void *Arg)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
 			.pNext=NULL,
-			.renderPass=RenderPass,
-			.framebuffer=Framebuffer[Data->Eye]
+			.renderPass=renderPass,
+			.framebuffer=framebuffer[Data->eye]
 		}
 	});
 
-	vkCmdSetViewport(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
-	vkCmdSetScissor(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
+	vkCmdSetViewport(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
+	vkCmdSetScissor(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
 
 	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
-	vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.Pipeline);
+	vkCmdBindPipeline(Data->perFrame[Data->index].secCommandBuffer[Data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.Pipeline);
 
 	// Draw the models
-	vkCmdBindVertexBuffers(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 1, 1, &asteroidInstance.Buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 1, 1, &asteroidInstance.Buffer, &(VkDeviceSize) { 0 });
 
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 0, &Textures[2*i+0]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 1, &Textures[2*i+1]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 0, &textures[2*i+0]);
+		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 1, &textures[2*i+1]);
 		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 2, &shadowDepth);
-		vkuDescriptorSet_UpdateBindingBufferInfo(&mainDescriptorSet, 3, perFrame[Data->Index].mainUBOBuffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
-		vkuDescriptorSet_UpdateBindingBufferInfo(&mainDescriptorSet, 4, perFrame[Data->Index].skyboxUBOBuffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
-		vkuAllocateUpdateDescriptorSet(&mainDescriptorSet, Data->PerFrame[Data->Index].DescriptorPool[Data->Eye]);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&mainDescriptorSet, 3, perFrame[Data->index].mainUBOBuffer[Data->eye].Buffer, 0, VK_WHOLE_SIZE);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&mainDescriptorSet, 4, perFrame[Data->index].skyboxUBOBuffer[Data->eye].Buffer, 0, VK_WHOLE_SIZE);
+		vkuAllocateUpdateDescriptorSet(&mainDescriptorSet, Data->perFrame[Data->index].descriptorPool[Data->eye]);
 
-		vkCmdBindDescriptorSets(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipelineLayout, 0, 1, &mainDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
+		vkCmdBindDescriptorSets(Data->perFrame[Data->index].secCommandBuffer[Data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipelineLayout, 0, 1, &mainDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
 		matrix local=MatrixIdentity();
 		//local=MatrixMult(local, MatrixRotate(fTime, 1.0f, 0.0f, 0.0f));
 		//local=MatrixMult(local, MatrixRotate(fTime, 0.0f, 1.0f, 0.0f));
 
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], mainPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(matrix), &local);
+		vkCmdPushConstants(Data->perFrame[Data->index].secCommandBuffer[Data->eye], mainPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(matrix), &local);
 
 		// Bind model data buffers and draw the triangles
-		vkCmdBindVertexBuffers(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &Models[i].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
+		vkCmdBindVertexBuffers(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 0, 1, &models[i].vertexBuffer.Buffer, &(VkDeviceSize) { 0 });
 
-		for(uint32_t j=0;j<Models[i].NumMesh;j++)
+		for(uint32_t j=0;j<models[i].numMesh;j++)
 		{
-			vkCmdBindIndexBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Models[i].Mesh[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Models[i].Mesh[j].NumFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*i);
+			vkCmdBindIndexBuffer(Data->perFrame[Data->index].secCommandBuffer[Data->eye], models[i].mesh[j].indexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(Data->perFrame[Data->index].secCommandBuffer[Data->eye], models[i].mesh[j].numFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*i);
 		}
 	}
 
@@ -881,55 +881,55 @@ void Thread_Main(void *Arg)
 
 		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
-		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline.Pipeline);
+		vkCmdBindPipeline(Data->perFrame[Data->index].secCommandBuffer[Data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline.Pipeline);
 
 		vec3 leftPos=Vec3(leftHand.position.x, leftHand.position.y, leftHand.position.z);
 		vec4 leftRot=Vec4(leftHand.orientation.x, leftHand.orientation.y, leftHand.orientation.z, leftHand.orientation.w);
 		matrix local=MatrixMult(MatrixMult(QuatMatrix(leftRot), MatrixScale(0.1f, 0.1f, 0.1f)), MatrixTranslatev(leftPos));
-		local=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->HMD);
-		spherePC.mvp=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->projection);
+		local=MatrixMult(local, perFrame[Data->index].mainUBO[Data->eye]->HMD);
+		spherePC.mvp=MatrixMult(local, perFrame[Data->index].mainUBO[Data->eye]->projection);
 
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
-		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 60, 1, 0, 0);
+		vkCmdPushConstants(Data->perFrame[Data->index].secCommandBuffer[Data->eye], spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
+		vkCmdDraw(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 60, 1, 0, 0);
 
 		vec3 rightPos=Vec3(rightHand.position.x, rightHand.position.y, rightHand.position.z);
 		vec4 rightRot=Vec4(rightHand.orientation.x, rightHand.orientation.y, rightHand.orientation.z, rightHand.orientation.w);
 		local=MatrixMult(MatrixMult(QuatMatrix(rightRot), MatrixScale(0.1f, 0.1f, 0.1f)), MatrixTranslatev(rightPos));
-		local=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->HMD);
-		spherePC.mvp=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->projection);
+		local=MatrixMult(local, perFrame[Data->index].mainUBO[Data->eye]->HMD);
+		spherePC.mvp=MatrixMult(local, perFrame[Data->index].mainUBO[Data->eye]->projection);
 
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
-		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 60, 1, 0, 0);
+		vkCmdPushConstants(Data->perFrame[Data->index].secCommandBuffer[Data->eye], spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
+		vkCmdDraw(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 60, 1, 0, 0);
 
 		struct
 		{
 			matrix mvp;
-			vec4 Color;
+			vec4 color;
 			vec4 Verts[2];
 		} LinePC;
 
 		LinePC.Verts[0]=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
 		LinePC.Verts[1]=Vec4(0.0f, 0.0f, -1.0f, 1.0f);
 
-		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.Pipeline);
+		vkCmdBindPipeline(Data->perFrame[Data->index].secCommandBuffer[Data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.Pipeline);
 
-		LinePC.Color=Vec4(leftTrigger*100.0f+1.0f, 1.0f, leftGrip*100.0f+1.0f, 1.0f);
+		LinePC.color=Vec4(leftTrigger*100.0f+1.0f, 1.0f, leftGrip*100.0f+1.0f, 1.0f);
 
 		local=MatrixMult(QuatMatrix(leftRot), MatrixTranslatev(leftPos));
-		local=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->HMD);
-		LinePC.mvp=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->projection);
+		local=MatrixMult(local, perFrame[Data->index].mainUBO[Data->eye]->HMD);
+		LinePC.mvp=MatrixMult(local, perFrame[Data->index].mainUBO[Data->eye]->projection);
 
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(LinePC), &LinePC);
-		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
+		vkCmdPushConstants(Data->perFrame[Data->index].secCommandBuffer[Data->eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(LinePC), &LinePC);
+		vkCmdDraw(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 2, 1, 0, 0);
 
-		LinePC.Color=Vec4(rightTrigger*100.0f+1.0f, 1.0f, rightGrip*100.0f+1.0f, 1.0f);
+		LinePC.color=Vec4(rightTrigger*100.0f+1.0f, 1.0f, rightGrip*100.0f+1.0f, 1.0f);
 
 		local=MatrixMult(QuatMatrix(rightRot), MatrixTranslatev(rightPos));
-		local=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->HMD);
-		LinePC.mvp=MatrixMult(local, perFrame[Data->Index].mainUBO[Data->Eye]->projection);
+		local=MatrixMult(local, perFrame[Data->index].mainUBO[Data->eye]->HMD);
+		LinePC.mvp=MatrixMult(local, perFrame[Data->index].mainUBO[Data->eye]->projection);
 
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(LinePC), &LinePC);
-		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
+		vkCmdPushConstants(Data->perFrame[Data->index].secCommandBuffer[Data->eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(LinePC), &LinePC);
+		vkCmdDraw(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 2, 1, 0, 0);
 	}
 
 #if 0
@@ -954,25 +954,25 @@ void Thread_Main(void *Arg)
 		netCameras[i].Right=Vec3_Cross(netCameras[i].Forward, netCameras[i].Up);
 		vec4 right=Vec4(netCameras[i].Right.x, netCameras[i].Right.y, netCameras[i].Right.z, 1.0f);
 
-		line_ubo.mvp=MatrixMult(PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
+		line_ubo.mvp=MatrixMult(perFrame[Data->index].Main_UBO[Data->eye]->modelview, perFrame[Data->index].Main_UBO[Data->eye]->projection);
 		line_ubo.start=position;
 
-		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.mainPipeline);
+		vkCmdBindPipeline(Data->perFrame[Data->index].secCommandBuffer[Data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.mainPipeline);
 
 		line_ubo.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
 		line_ubo.end=Vec4_Addv(position, Vec4_Muls(forward, 15.0f));
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
-		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
+		vkCmdPushConstants(Data->perFrame[Data->index].secCommandBuffer[Data->eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
+		vkCmdDraw(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 2, 1, 0, 0);
 
 		line_ubo.color=Vec4(0.0f, 1.0f, 0.0f, 1.0f);
 		line_ubo.end=Vec4_Addv(position, Vec4_Muls(up, 15.0f));
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
-		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
+		vkCmdPushConstants(Data->perFrame[Data->index].secCommandBuffer[Data->eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
+		vkCmdDraw(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 2, 1, 0, 0);
 
 		line_ubo.color=Vec4(0.0f, 0.0f, 1.0f, 1.0f);
 		line_ubo.end=Vec4_Addv(position, Vec4_Muls(right, 15.0f));
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
-		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 2, 1, 0, 0);
+		vkCmdPushConstants(Data->perFrame[Data->index].secCommandBuffer[Data->eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
+		vkCmdDraw(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 2, 1, 0, 0);
 
 		struct
 		{
@@ -984,21 +984,21 @@ void Thread_Main(void *Arg)
 		local=MatrixMult(local, MatrixScale(10.0f, 10.0f, 10.0f));
 		local=MatrixMult(local, MatrixInverse(MatrixLookAt(netCameras[i].Position, Vec3_Addv(netCameras[i].Position, netCameras[i].Forward), netCameras[i].Up)));
 
-		local=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->modelview);
-		sphere_ubo.mvp=MatrixMult(local, PerFrame[Data->Index].Main_UBO[Data->Eye]->projection);
+		local=MatrixMult(local, perFrame[Data->index].Main_UBO[Data->eye]->modelview);
+		sphere_ubo.mvp=MatrixMult(local, perFrame[Data->index].Main_UBO[Data->eye]->projection);
 
 		sphere_ubo.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
-		vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline.mainPipeline);
-		vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(sphere_ubo), &sphere_ubo);
-		vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 60, 1, 0, 0);
+		vkCmdBindPipeline(Data->perFrame[Data->index].secCommandBuffer[Data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline.mainPipeline);
+		vkCmdPushConstants(Data->perFrame[Data->index].secCommandBuffer[Data->eye], spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(sphere_ubo), &sphere_ubo);
+		vkCmdDraw(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 60, 1, 0, 0);
 	}
 	//////
 #endif
 
-	vkEndCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye]);
+	vkEndCommandBuffer(Data->perFrame[Data->index].secCommandBuffer[Data->eye]);
 
-	pthread_barrier_wait(&ThreadBarrier);
+	pthread_barrier_wait(&threadBarrier);
 }
 
 // Skybox render pass thread
@@ -1006,10 +1006,10 @@ void Thread_Skybox(void *Arg)
 {
 	ThreadData_t *Data=(ThreadData_t *)Arg;
 
-	vkResetDescriptorPool(Context.Device, Data->PerFrame[Data->Index].DescriptorPool[Data->Eye], 0);
-	vkResetCommandPool(Context.Device, Data->PerFrame[Data->Index].CommandPool[Data->Eye], 0);
+	vkResetDescriptorPool(vkContext.Device, Data->perFrame[Data->index].descriptorPool[Data->eye], 0);
+	vkResetCommandPool(vkContext.Device, Data->perFrame[Data->index].commandPool[Data->eye], 0);
 
-	vkBeginCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], &(VkCommandBufferBeginInfo)
+	vkBeginCommandBuffer(Data->perFrame[Data->index].secCommandBuffer[Data->eye], &(VkCommandBufferBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
@@ -1029,28 +1029,28 @@ void Thread_Skybox(void *Arg)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
 			.pNext=NULL,
-			.renderPass=RenderPass,
-			.framebuffer=Framebuffer[Data->Eye]
+			.renderPass=renderPass,
+			.framebuffer=framebuffer[Data->eye]
 		}
 	});
 
-	vkCmdSetViewport(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
-	vkCmdSetScissor(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
+	vkCmdSetViewport(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
+	vkCmdSetScissor(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
 
-	vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipeline.Pipeline);
+	vkCmdBindPipeline(Data->perFrame[Data->index].secCommandBuffer[Data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipeline.Pipeline);
 
-	vkuDescriptorSet_UpdateBindingBufferInfo(&skyboxDescriptorSet, 0, perFrame[Data->Index].mainUBOBuffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
-	vkuDescriptorSet_UpdateBindingBufferInfo(&skyboxDescriptorSet, 1, perFrame[Data->Index].skyboxUBOBuffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
-	vkuAllocateUpdateDescriptorSet(&skyboxDescriptorSet, Data->PerFrame[Data->Index].DescriptorPool[Data->Eye]);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&skyboxDescriptorSet, 0, perFrame[Data->index].mainUBOBuffer[Data->eye].Buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&skyboxDescriptorSet, 1, perFrame[Data->index].skyboxUBOBuffer[Data->eye].Buffer, 0, VK_WHOLE_SIZE);
+	vkuAllocateUpdateDescriptorSet(&skyboxDescriptorSet, Data->perFrame[Data->index].descriptorPool[Data->eye]);
 
-	vkCmdBindDescriptorSets(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipelineLayout, 0, 1, &skyboxDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
+	vkCmdBindDescriptorSets(Data->perFrame[Data->index].secCommandBuffer[Data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipelineLayout, 0, 1, &skyboxDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
 	// No vertex data, it's baked into the vertex shader
-	vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 60, 1, 0, 0);
+	vkCmdDraw(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 60, 1, 0, 0);
 
-	vkEndCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye]);
+	vkEndCommandBuffer(Data->perFrame[Data->index].secCommandBuffer[Data->eye]);
 
-	pthread_barrier_wait(&ThreadBarrier);
+	pthread_barrier_wait(&threadBarrier);
 }
 
 // Particles render pass thread, also has volumetric rendering
@@ -1059,10 +1059,10 @@ void Thread_Particles(void *Arg)
 	ThreadData_t *Data=(ThreadData_t *)Arg;
 	static uint32_t uFrame=0;
 
-	vkResetDescriptorPool(Context.Device, Data->PerFrame[Data->Index].DescriptorPool[Data->Eye], 0);
-	vkResetCommandPool(Context.Device, Data->PerFrame[Data->Index].CommandPool[Data->Eye], 0);
+	vkResetDescriptorPool(vkContext.Device, Data->perFrame[Data->index].descriptorPool[Data->eye], 0);
+	vkResetCommandPool(vkContext.Device, Data->perFrame[Data->index].commandPool[Data->eye], 0);
 
-	vkBeginCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], &(VkCommandBufferBeginInfo)
+	vkBeginCommandBuffer(Data->perFrame[Data->index].secCommandBuffer[Data->eye], &(VkCommandBufferBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
@@ -1082,33 +1082,33 @@ void Thread_Particles(void *Arg)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
 			.pNext=NULL,
-			.renderPass=RenderPass,
-			.framebuffer=Framebuffer[Data->Eye]
+			.renderPass=renderPass,
+			.framebuffer=framebuffer[Data->eye]
 		}
 	});
 
-	vkCmdSetViewport(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
-	vkCmdSetScissor(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
+	vkCmdSetViewport(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
+	vkCmdSetScissor(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
 
-	matrix Modelview=MatrixMult(perFrame[Data->Index].mainUBO[Data->Eye]->modelView, perFrame[Data->Index].mainUBO[Data->Eye]->HMD);
-	ParticleSystem_Draw(&particleSystem, Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], Data->PerFrame[Data->Index].DescriptorPool[Data->Eye], Modelview, perFrame[Data->Index].mainUBO[Data->Eye]->projection);
+	matrix Modelview=MatrixMult(perFrame[Data->index].mainUBO[Data->eye]->modelView, perFrame[Data->index].mainUBO[Data->eye]->HMD);
+	ParticleSystem_Draw(&particleSystem, Data->perFrame[Data->index].secCommandBuffer[Data->eye], Data->perFrame[Data->index].descriptorPool[Data->eye], Modelview, perFrame[Data->index].mainUBO[Data->eye]->projection);
 
-	vkCmdBindPipeline(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipeline.Pipeline);
+	vkCmdBindPipeline(Data->perFrame[Data->index].secCommandBuffer[Data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipeline.Pipeline);
 
 	uFrame++;
-	vkCmdPushConstants(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], volumePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t), &uFrame);
+	vkCmdPushConstants(Data->perFrame[Data->index].secCommandBuffer[Data->eye], volumePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t), &uFrame);
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 0, &Textures[TEXTURE_VOLUME]);
-	vkuDescriptorSet_UpdateBindingBufferInfo(&volumeDescriptorSet, 1, perFrame[Data->Index].mainUBOBuffer[Data->Eye].Buffer, 0, VK_WHOLE_SIZE);
-	vkuAllocateUpdateDescriptorSet(&volumeDescriptorSet, Data->PerFrame[Data->Index].DescriptorPool[Data->Eye]);
-	vkCmdBindDescriptorSets(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipelineLayout, 0, 1, &volumeDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
+	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 0, &textures[TEXTURE_VOLUME]);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&volumeDescriptorSet, 1, perFrame[Data->index].mainUBOBuffer[Data->eye].Buffer, 0, VK_WHOLE_SIZE);
+	vkuAllocateUpdateDescriptorSet(&volumeDescriptorSet, Data->perFrame[Data->index].descriptorPool[Data->eye]);
+	vkCmdBindDescriptorSets(Data->perFrame[Data->index].secCommandBuffer[Data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipelineLayout, 0, 1, &volumeDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
 
 	// No vertex data, it's baked into the vertex shader
-	vkCmdDraw(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye], 36, 1, 0, 0);
+	vkCmdDraw(Data->perFrame[Data->index].secCommandBuffer[Data->eye], 36, 1, 0, 0);
 
-	vkEndCommandBuffer(Data->PerFrame[Data->Index].SecCommandBuffer[Data->Eye]);
+	vkEndCommandBuffer(Data->perFrame[Data->index].secCommandBuffer[Data->eye]);
 
-	pthread_barrier_wait(&ThreadBarrier);
+	pthread_barrier_wait(&threadBarrier);
 }
 
 // Render everything together, per-eye, per-frame index
@@ -1161,34 +1161,34 @@ void EyeRender(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, matr
 	vkCmdBeginRenderPass(commandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-		.renderPass=RenderPass,
-		.framebuffer=Framebuffer[eye],
+		.renderPass=renderPass,
+		.framebuffer=framebuffer[eye],
 		.clearValueCount=2,
 		.pClearValues=(VkClearValue[]){ {{{ 0.0f, 0.0f, 0.0f, 1.0f }}}, {{{ 0.0f, 0 }}} },
 		.renderArea=(VkRect2D){ { 0, 0 }, { renderWidth, renderHeight } },
 	}, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
 	// Set per thread data and add the job to that worker thread
-	ThreadData[0].Index=index;
-	ThreadData[0].Eye=eye;
-	Thread_AddJob(&Thread[0], Thread_Main, (void *)&ThreadData[0]);
+	threadData[0].index=index;
+	threadData[0].eye=eye;
+	Thread_AddJob(&thread[0], Thread_Main, (void *)&threadData[0]);
 
-	ThreadData[1].Index=index;
-	ThreadData[1].Eye=eye;
-	Thread_AddJob(&Thread[1], Thread_Skybox, (void *)&ThreadData[1]);
+	threadData[1].index=index;
+	threadData[1].eye=eye;
+	Thread_AddJob(&thread[1], Thread_Skybox, (void *)&threadData[1]);
 
-	ThreadData[2].Index=index;
-	ThreadData[2].Eye=eye;
-	Thread_AddJob(&Thread[2], Thread_Particles, (void *)&ThreadData[2]);
+	threadData[2].index=index;
+	threadData[2].eye=eye;
+	Thread_AddJob(&thread[2], Thread_Particles, (void *)&threadData[2]);
 
-	pthread_barrier_wait(&ThreadBarrier);
+	pthread_barrier_wait(&threadBarrier);
 
 	// Execute the secondary command buffers from the threads
 	vkCmdExecuteCommands(commandBuffer, 3, (VkCommandBuffer[])
 	{
-		ThreadData[0].PerFrame[index].SecCommandBuffer[eye],
-		ThreadData[1].PerFrame[index].SecCommandBuffer[eye],
-		ThreadData[2].PerFrame[index].SecCommandBuffer[eye]
+		threadData[0].perFrame[index].secCommandBuffer[eye],
+		threadData[1].perFrame[index].secCommandBuffer[eye],
+		threadData[2].perFrame[index].secCommandBuffer[eye]
 	});
 
 	//vkCmdEndRendering(commandBuffer);
@@ -1304,7 +1304,7 @@ void Thread_Physics(void *Arg)
 #endif
 
 	// Barrier now that we're done here
-	pthread_barrier_wait(&ThreadBarrier_Physics);
+	pthread_barrier_wait(&physicsThreadBarrier);
 }
 
 #if 0
@@ -1442,7 +1442,7 @@ void Render(void)
 			vec3 direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatMatrix(rightOrientation), MatrixInverse(modelView)));
 
 			FireParticleEmitter(Vec3_Addv(camera.position, Vec3_Muls(direction, camera.radius)), direction);
-			Audio_PlaySample(&Sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &camera.position);
+			Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &camera.position);
 		}
 
 		if(rightTrigger<0.25f&&!rightTriggerOnce)
@@ -1451,7 +1451,7 @@ void Render(void)
 	else
 	// Handle non-VR frame start
 	{
-		VkResult Result=vkAcquireNextImageKHR(Context.Device, Swapchain.Swapchain, UINT64_MAX, perFrame[index].presentCompleteSemaphore, VK_NULL_HANDLE, &imageIndex);
+		VkResult Result=vkAcquireNextImageKHR(vkContext.Device, swapchain.Swapchain, UINT64_MAX, perFrame[index].presentCompleteSemaphore, VK_NULL_HANDLE, &imageIndex);
 
 		if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
 		{
@@ -1464,7 +1464,7 @@ void Render(void)
 		headPose=MatrixIdentity();
 	}
 
-	Thread_AddJob(&ThreadPhysics, Thread_Physics, NULL);
+	Thread_AddJob(&threadPhysics, Thread_Physics, NULL);
 
 	Console_Draw(&console);
 
@@ -1474,12 +1474,12 @@ void Render(void)
 	Font_Print(&Fnt, 16.0f, renderWidth-400.0f, renderHeight-50.0f-16.0f, "Current track: %s", MusicList[CurrentMusic].String);
 #endif
 
-	vkWaitForFences(Context.Device, 1, &perFrame[index].frameFence, VK_TRUE, UINT64_MAX);
+	vkWaitForFences(vkContext.Device, 1, &perFrame[index].frameFence, VK_TRUE, UINT64_MAX);
 
 	// Reset the frame fence and command pool (and thus the command buffer)
-	vkResetFences(Context.Device, 1, &perFrame[index].frameFence);
-	vkResetDescriptorPool(Context.Device, perFrame[index].descriptorPool, 0);
-	vkResetCommandPool(Context.Device, perFrame[index].commandPool, 0);
+	vkResetFences(vkContext.Device, 1, &perFrame[index].frameFence);
+	vkResetDescriptorPool(vkContext.Device, perFrame[index].descriptorPool, 0);
+	vkResetCommandPool(vkContext.Device, perFrame[index].commandPool, 0);
 
 	// Start recording the commands
 	vkBeginCommandBuffer(perFrame[index].commandBuffer, &(VkCommandBufferBeginInfo)
@@ -1492,7 +1492,7 @@ void Render(void)
 	ShadowUpdateMap(perFrame[index].commandBuffer, index);
 
 	// Wait for physics to finish before rendering
-	pthread_barrier_wait(&ThreadBarrier_Physics);
+	pthread_barrier_wait(&physicsThreadBarrier);
 
 	vkuTransitionLayout(perFrame[index].commandBuffer, colorResolve[0].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	EyeRender(perFrame[index].commandBuffer, index, 0, headPose);
@@ -1537,7 +1537,7 @@ void Render(void)
 		SubmitInfo.pSignalSemaphores=VK_NULL_HANDLE;
 	}
 
-	vkQueueSubmit(Context.Queue, 1, &SubmitInfo, perFrame[index].frameFence);
+	vkQueueSubmit(vkContext.Queue, 1, &SubmitInfo, perFrame[index].frameFence);
 
 	// Handle VR frame end
 	if(isVR)
@@ -1549,13 +1549,13 @@ void Render(void)
 	// Handle non-VR frame end
 	{
 		// And present it to the screen
-		VkResult Result=vkQueuePresentKHR(Context.Queue, &(VkPresentInfoKHR)
+		VkResult Result=vkQueuePresentKHR(vkContext.Queue, &(VkPresentInfoKHR)
 		{
 			.sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 			.waitSemaphoreCount=1,
 			.pWaitSemaphores=&perFrame[index].renderCompleteSemaphore,
 			.swapchainCount=1,
-			.pSwapchains=&Swapchain.Swapchain,
+			.pSwapchains=&swapchain.Swapchain,
 			.pImageIndices=&imageIndex,
 		});
 
@@ -1566,7 +1566,7 @@ void Render(void)
 			return;
 		}
 
-		index=(index+1)%Swapchain.NumImages;
+		index=(index+1)%swapchain.NumImages;
 	}
 }
 
@@ -1580,7 +1580,7 @@ bool Init(void)
 {
 	// TODO: This is a hack, fix it proper.
 	if(isVR)
-		Swapchain.NumImages=xrContext.swapchain[0].numImages;
+		swapchain.NumImages=xrContext.swapchain[0].numImages;
 
 	RandomSeed((uint32_t)GetClock()*UINT32_MAX);
 
@@ -1593,9 +1593,9 @@ bool Init(void)
 	Console_Init(&console, 80, 25);
 	Console_AddCommand(&console, "quit", Console_CmdQuit);
 
-	VkZone=vkuMem_Init(&Context, (size_t)(Context.DeviceProperties2.maxMemoryAllocationSize*0.8f));
+	vkZone=vkuMem_Init(&vkContext, (size_t)(vkContext.DeviceProperties2.maxMemoryAllocationSize*0.8f));
 
-	if(VkZone==NULL)
+	if(vkZone==NULL)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: vkuMem_Init failed.\n");
 		return false;
@@ -1610,61 +1610,61 @@ bool Init(void)
 		return false;
 	}
 
-	if(!Audio_LoadStatic("assets/pew1.wav", &Sounds[SOUND_PEW1]))
+	if(!Audio_LoadStatic("assets/pew1.wav", &sounds[SOUND_PEW1]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/pew1.wav\n");
 		return false;
 	}
 
-	if(!Audio_LoadStatic("assets/pew2.wav", &Sounds[SOUND_PEW2]))
+	if(!Audio_LoadStatic("assets/pew2.wav", &sounds[SOUND_PEW2]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/pew2.wav\n");
 		return false;
 	}
 
-	if(!Audio_LoadStatic("assets/pew3.wav", &Sounds[SOUND_PEW3]))
+	if(!Audio_LoadStatic("assets/pew3.wav", &sounds[SOUND_PEW3]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/pew3.wav\n");
 		return false;
 	}
 
-	if(!Audio_LoadStatic("assets/stone1.wav", &Sounds[SOUND_STONE1]))
+	if(!Audio_LoadStatic("assets/stone1.wav", &sounds[SOUND_STONE1]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/stone1.wav\n");
 		return false;
 	}
 
-	if(!Audio_LoadStatic("assets/stone2.wav", &Sounds[SOUND_STONE2]))
+	if(!Audio_LoadStatic("assets/stone2.wav", &sounds[SOUND_STONE2]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/stone2.wav\n");
 		return false;
 	}
 
-	if(!Audio_LoadStatic("assets/stone3.wav", &Sounds[SOUND_STONE3]))
+	if(!Audio_LoadStatic("assets/stone3.wav", &sounds[SOUND_STONE3]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/stone3.wav\n");
 		return false;
 	}
 
-	if(!Audio_LoadStatic("assets/crash.wav", &Sounds[SOUND_CRASH]))
+	if(!Audio_LoadStatic("assets/crash.wav", &sounds[SOUND_CRASH]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/crash.wav\n");
 		return false;
 	}
 
-	if(!Audio_LoadStatic("assets/explode1.wav", &Sounds[SOUND_EXPLODE1]))
+	if(!Audio_LoadStatic("assets/explode1.wav", &sounds[SOUND_EXPLODE1]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode1.wav\n");
 		return false;
 	}
 
-	if(!Audio_LoadStatic("assets/explode2.wav", &Sounds[SOUND_EXPLODE2]))
+	if(!Audio_LoadStatic("assets/explode2.wav", &sounds[SOUND_EXPLODE2]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode2.wav\n");
 		return false;
 	}
 
-	if(!Audio_LoadStatic("assets/explode3.wav", &Sounds[SOUND_EXPLODE3]))
+	if(!Audio_LoadStatic("assets/explode3.wav", &sounds[SOUND_EXPLODE3]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode3.wav\n");
 		return false;
@@ -1676,32 +1676,32 @@ bool Init(void)
 #endif
 
 	// Load models
-	if(LoadBModel(&Models[MODEL_ASTEROID1], "assets/asteroid1.bmodel"))
-		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID1]);
+	if(LoadBModel(&models[MODEL_ASTEROID1], "assets/asteroid1.bmodel"))
+		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID1]);
 	else
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid1.bmodel\n");
 		return false;
 	}
 
-	if(LoadBModel(&Models[MODEL_ASTEROID2], "assets/asteroid2.bmodel"))
-		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID2]);
+	if(LoadBModel(&models[MODEL_ASTEROID2], "assets/asteroid2.bmodel"))
+		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID2]);
 	else
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid2.bmodel\n");
 		return false;
 	}
 
-	if(LoadBModel(&Models[MODEL_ASTEROID3], "assets/asteroid3.bmodel"))
-		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID3]);
+	if(LoadBModel(&models[MODEL_ASTEROID3], "assets/asteroid3.bmodel"))
+		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID3]);
 	else
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid3.bmodel\n");
 		return false;
 	}
 
-	if(LoadBModel(&Models[MODEL_ASTEROID4], "assets/asteroid4.bmodel"))
-		BuildMemoryBuffersBModel(&Context, &Models[MODEL_ASTEROID4]);
+	if(LoadBModel(&models[MODEL_ASTEROID4], "assets/asteroid4.bmodel"))
+		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID4]);
 	else
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid4.bmodel\n");
@@ -1712,8 +1712,8 @@ bool Init(void)
 
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		for(uint32_t j=0;j<Models[i].NumMesh;j++)
-			TriangleCount+=Models[i].Mesh[j].NumFace;
+		for(uint32_t j=0;j<models[i].numMesh;j++)
+			TriangleCount+=models[i].mesh[j].numFace;
 	}
 
 	TriangleCount*=NUM_ASTEROIDS;
@@ -1724,22 +1724,22 @@ bool Init(void)
 	
 	// TODO: For some reason on Linux/Android, the first loaded QOI here has corruption and I'm not sure why.
 	//			If I upload a temp image and delete it afterwards, it's all good.
-	VkuImage_t Temp;
-	Image_Upload(&Context, &Temp, "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	VkuImage_t temp;
+	Image_Upload(&vkContext, &temp, "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1], "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID1_NORMAL], "assets/asteroid1_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID2], "assets/asteroid2.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID2_NORMAL], "assets/asteroid2_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID3], "assets/asteroid3.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID3_NORMAL], "assets/asteroid3_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4], "assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	Image_Upload(&Context, &Textures[TEXTURE_ASTEROID4_NORMAL], "assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	Image_Upload(&Context, &Textures[TEXTURE_CROSSHAIR], "assets/crosshair.qoi", IMAGE_NONE);
+	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID1], "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID1_NORMAL], "assets/asteroid1_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID2], "assets/asteroid2.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID2_NORMAL], "assets/asteroid2_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID3], "assets/asteroid3.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID3_NORMAL], "assets/asteroid3_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID4], "assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID4_NORMAL], "assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&vkContext, &textures[TEXTURE_CROSSHAIR], "assets/crosshair.qoi", IMAGE_NONE);
 
-	vkuDestroyImageBuffer(&Context, &Temp);
+	vkuDestroyImageBuffer(&vkContext, &temp);
 
-	GenNebulaVolume(&Context, &Textures[TEXTURE_VOLUME]);
+	GenNebulaVolume(&vkContext, &textures[TEXTURE_VOLUME]);
 
 	// Create primary pipeline
 	CreatePipeline();
@@ -1822,25 +1822,25 @@ bool Init(void)
 							0.0f, 1.0f, 0.125f);		// min/max/initial value
 #endif
 
-	UI_AddSprite(&UI, Vec2((float)renderWidth/2.0f, (float)renderHeight/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &Textures[TEXTURE_CROSSHAIR], 0.0f);
+	UI_AddSprite(&UI, Vec2((float)renderWidth/2.0f, (float)renderHeight/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &textures[TEXTURE_CROSSHAIR], 0.0f);
 
 	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3(1.0f, 1.0f, 1.0f));
 
 	// Other per-frame data
-	for(uint32_t i=0;i<Swapchain.NumImages;i++)
+	for(uint32_t i=0;i<swapchain.NumImages;i++)
 	{
 		// Create needed fence and semaphores for rendering
 		// Wait fence for command queue, to signal when we can submit commands again
-		vkCreateFence(Context.Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=VK_FENCE_CREATE_SIGNALED_BIT }, VK_NULL_HANDLE, &perFrame[i].frameFence);
+		vkCreateFence(vkContext.Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=VK_FENCE_CREATE_SIGNALED_BIT }, VK_NULL_HANDLE, &perFrame[i].frameFence);
 
 		// Semaphore for image presentation, to signal when we can present again
-		vkCreateSemaphore(Context.Device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &perFrame[i].presentCompleteSemaphore);
+		vkCreateSemaphore(vkContext.Device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &perFrame[i].presentCompleteSemaphore);
 
 		// Semaphore for render complete, to signal when we can render again
-		vkCreateSemaphore(Context.Device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &perFrame[i].renderCompleteSemaphore);
+		vkCreateSemaphore(vkContext.Device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &perFrame[i].renderCompleteSemaphore);
 
 		// Per-frame descriptor pool for main thread
-		vkCreateDescriptorPool(Context.Device, &(VkDescriptorPoolCreateInfo)
+		vkCreateDescriptorPool(vkContext.Device, &(VkDescriptorPoolCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 			.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
@@ -1867,15 +1867,15 @@ bool Init(void)
 		}, VK_NULL_HANDLE, &perFrame[i].descriptorPool);
 
 		// Create per-frame command pools
-		vkCreateCommandPool(Context.Device, &(VkCommandPoolCreateInfo)
+		vkCreateCommandPool(vkContext.Device, &(VkCommandPoolCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 			.flags=0,
-			.queueFamilyIndex=Context.QueueFamilyIndex,
+			.queueFamilyIndex=vkContext.QueueFamilyIndex,
 		}, VK_NULL_HANDLE, &perFrame[i].commandPool);
 
 		// Allocate the command buffers we will be rendering into
-		vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
+		vkAllocateCommandBuffers(vkContext.Device, &(VkCommandBufferAllocateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 			.commandPool=perFrame[i].commandPool,
@@ -1887,19 +1887,19 @@ bool Init(void)
 	// Set up and initialize threads
 	for(uint32_t i=0;i<NUM_THREADS;i++)
 	{
-		Thread_Init(&Thread[i]);
-		Thread_AddConstructor(&Thread[i], Thread_Constructor, (void *)&ThreadData[i]);
-		Thread_AddDestructor(&Thread[i], Thread_Destructor, (void *)&ThreadData[i]);
-		Thread_Start(&Thread[i]);
+		Thread_Init(&thread[i]);
+		Thread_AddConstructor(&thread[i], Thread_Constructor, (void *)&threadData[i]);
+		Thread_AddDestructor(&thread[i], Thread_Destructor, (void *)&threadData[i]);
+		Thread_Start(&thread[i]);
 	}
 
 	// Synchronization barrier, count is number of threads+main thread
-	pthread_barrier_init(&ThreadBarrier, NULL, NUM_THREADS+1);
+	pthread_barrier_init(&threadBarrier, NULL, NUM_THREADS+1);
 
 	// Thread for physics, and sync barrier
-	Thread_Init(&ThreadPhysics);
-	Thread_Start(&ThreadPhysics);
-	pthread_barrier_init(&ThreadBarrier_Physics, NULL, 2);
+	Thread_Init(&threadPhysics);
+	Thread_Start(&threadPhysics);
+	pthread_barrier_init(&physicsThreadBarrier, NULL, 2);
 
 #if 0
 	// Initialize the network API (mainly for winsock)
@@ -1953,9 +1953,9 @@ bool Init(void)
 		}
 	}
 
-	Thread_Init(&ThreadNetUpdate);
-	Thread_Start(&ThreadNetUpdate);
-	Thread_AddJob(&ThreadNetUpdate, NetUpdate, NULL);
+	Thread_Init(&threadNetUpdate);
+	Thread_Start(&threadNetUpdate);
+	Thread_AddJob(&threadNetUpdate, NetUpdate, NULL);
 #endif
 
 	if(!Zone_VerifyHeap(Zone))
@@ -1967,45 +1967,45 @@ bool Init(void)
 // Rebuild Vulkan swapchain and related data
 void RecreateSwapchain(void)
 {
-	if(Context.Device!=VK_NULL_HANDLE) // Windows quirk, WM_SIZE is signaled on window creation, *before* Vulkan get initalized
+	if(vkContext.Device!=VK_NULL_HANDLE) // Windows quirk, WM_SIZE is signaled on window creation, *before* Vulkan get initalized
 	{
 		// Wait for the device to complete any pending work
-		vkDeviceWaitIdle(Context.Device);
+		vkDeviceWaitIdle(vkContext.Device);
 
 		// To resize a surface, we need to destroy and recreate anything that's tied to the surface.
 		// This is basically just the swapchain, framebuffers, and depth buffer.
 
 		// Swapchain, framebuffer, and depth buffer destruction
-		vkuDestroyImageBuffer(&Context, &colorImage[0]);
-		vkuDestroyImageBuffer(&Context, &colorResolve[0]);
-		vkuDestroyImageBuffer(&Context, &colorBlur[0]);
-		vkuDestroyImageBuffer(&Context, &colorTemp[0]);
-		vkuDestroyImageBuffer(&Context, &depthImage[0]);
+		vkuDestroyImageBuffer(&vkContext, &colorImage[0]);
+		vkuDestroyImageBuffer(&vkContext, &colorResolve[0]);
+		vkuDestroyImageBuffer(&vkContext, &colorBlur[0]);
+		vkuDestroyImageBuffer(&vkContext, &colorTemp[0]);
+		vkuDestroyImageBuffer(&vkContext, &depthImage[0]);
 
-		vkDestroyFramebuffer(Context.Device, Framebuffer[0], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(vkContext.Device, framebuffer[0], VK_NULL_HANDLE);
 
 		if(isVR)
 		{
-			vkuDestroyImageBuffer(&Context, &colorImage[1]);
-			vkuDestroyImageBuffer(&Context, &colorResolve[1]);
-			vkuDestroyImageBuffer(&Context, &colorBlur[1]);
-			vkuDestroyImageBuffer(&Context, &colorTemp[1]);
-			vkuDestroyImageBuffer(&Context, &depthImage[1]);
+			vkuDestroyImageBuffer(&vkContext, &colorImage[1]);
+			vkuDestroyImageBuffer(&vkContext, &colorResolve[1]);
+			vkuDestroyImageBuffer(&vkContext, &colorBlur[1]);
+			vkuDestroyImageBuffer(&vkContext, &colorTemp[1]);
+			vkuDestroyImageBuffer(&vkContext, &depthImage[1]);
 
-			vkDestroyFramebuffer(Context.Device, Framebuffer[1], VK_NULL_HANDLE);
+			vkDestroyFramebuffer(vkContext.Device, framebuffer[1], VK_NULL_HANDLE);
 		}
 
 		// Destroy the swapchain
-		vkuDestroySwapchain(&Context, &Swapchain);
+		vkuDestroySwapchain(&vkContext, &swapchain);
 
 		// Recreate the swapchain
-		vkuCreateSwapchain(&Context, &Swapchain, VK_TRUE);
+		vkuCreateSwapchain(&vkContext, &swapchain, VK_TRUE);
 
-		renderWidth=Swapchain.Extent.width;
-		renderHeight=Swapchain.Extent.height;
+		renderWidth=swapchain.Extent.width;
+		renderHeight=swapchain.Extent.height;
 
-		UI.Size.x=(float)Swapchain.Extent.width;
-		UI.Size.y=(float)Swapchain.Extent.height;
+		UI.size.x=(float)swapchain.Extent.width;
+		UI.size.y=(float)swapchain.Extent.height;
 
 		// Recreate the framebuffer
 		CreateFramebuffers(0);
@@ -2022,11 +2022,11 @@ void RecreateSwapchain(void)
 // Destroy call from system main
 void Destroy(void)
 {
-	vkDeviceWaitIdle(Context.Device);
+	vkDeviceWaitIdle(vkContext.Device);
 
 #if 0
 	NetUpdate_Run=false;
-	Thread_Destroy(&ThreadNetUpdate);
+	Thread_Destroy(&threadNetUpdate);
 
 	// Send disconnect message to server and close/destroy network stuff
 	if(clientSocket!=-1)
@@ -2047,16 +2047,16 @@ void Destroy(void)
 	Music_Destroy();
 #endif
 
-	Zone_Free(Zone, Sounds[SOUND_PEW1].data);
-	Zone_Free(Zone, Sounds[SOUND_PEW2].data);
-	Zone_Free(Zone, Sounds[SOUND_PEW3].data);
-	Zone_Free(Zone, Sounds[SOUND_STONE1].data);
-	Zone_Free(Zone, Sounds[SOUND_STONE2].data);
-	Zone_Free(Zone, Sounds[SOUND_STONE3].data);
-	Zone_Free(Zone, Sounds[SOUND_CRASH].data);
-	Zone_Free(Zone, Sounds[SOUND_EXPLODE1].data);
-	Zone_Free(Zone, Sounds[SOUND_EXPLODE2].data);
-	Zone_Free(Zone, Sounds[SOUND_EXPLODE3].data);
+	Zone_Free(Zone, sounds[SOUND_PEW1].data);
+	Zone_Free(Zone, sounds[SOUND_PEW2].data);
+	Zone_Free(Zone, sounds[SOUND_PEW3].data);
+	Zone_Free(Zone, sounds[SOUND_STONE1].data);
+	Zone_Free(Zone, sounds[SOUND_STONE2].data);
+	Zone_Free(Zone, sounds[SOUND_STONE3].data);
+	Zone_Free(Zone, sounds[SOUND_CRASH].data);
+	Zone_Free(Zone, sounds[SOUND_EXPLODE1].data);
+	Zone_Free(Zone, sounds[SOUND_EXPLODE2].data);
+	Zone_Free(Zone, sounds[SOUND_EXPLODE3].data);
 
 #ifndef ANDROID
 	if(isVR)
@@ -2064,16 +2064,16 @@ void Destroy(void)
 #endif
 
 	for(uint32_t i=0;i<NUM_THREADS;i++)
-		Thread_Destroy(&Thread[i]);
+		Thread_Destroy(&thread[i]);
 
-	Thread_Destroy(&ThreadPhysics);
+	Thread_Destroy(&threadPhysics);
 
-	if(Context.PipelineCache)
+	if(vkContext.PipelineCache)
 	{
 		DBGPRINTF(DEBUG_INFO, "\nWriting pipeline cache to disk...\n");
 
 		size_t PipelineCacheSize=0;
-		vkGetPipelineCacheData(Context.Device, Context.PipelineCache, &PipelineCacheSize, VK_NULL_HANDLE);
+		vkGetPipelineCacheData(vkContext.Device, vkContext.PipelineCache, &PipelineCacheSize, VK_NULL_HANDLE);
 
 		uint8_t *PipelineCacheData=(uint8_t *)Zone_Malloc(Zone, PipelineCacheSize);
 
@@ -2083,7 +2083,7 @@ void Destroy(void)
 
 			if(Stream)
 			{
-				vkGetPipelineCacheData(Context.Device, Context.PipelineCache, &PipelineCacheSize, PipelineCacheData);
+				vkGetPipelineCacheData(vkContext.Device, vkContext.PipelineCache, &PipelineCacheSize, PipelineCacheData);
 				fwrite(PipelineCacheData, 1, PipelineCacheSize, Stream);
 				fclose(Stream);
 				Zone_Free(Zone, PipelineCacheData);
@@ -2116,24 +2116,24 @@ void Destroy(void)
 	//////////
 
 	// Asteroid instance buffer destruction
-	vkUnmapMemory(Context.Device, asteroidInstance.DeviceMemory);
-	vkuDestroyBuffer(&Context, &asteroidInstance);
+	vkUnmapMemory(vkContext.Device, asteroidInstance.DeviceMemory);
+	vkuDestroyBuffer(&vkContext, &asteroidInstance);
 	//////////
 
 	// Textures destruction
 	for(uint32_t i=0;i<NUM_TEXTURES;i++)
-		vkuDestroyImageBuffer(&Context, &Textures[i]);
+		vkuDestroyImageBuffer(&vkContext, &textures[i]);
 	//////////
 
 	// 3D Model destruction
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		vkuDestroyBuffer(&Context, &Models[i].VertexBuffer);
+		vkuDestroyBuffer(&vkContext, &models[i].vertexBuffer);
 
-		for(uint32_t j=0;j<Models[i].NumMesh;j++)
-			vkuDestroyBuffer(&Context, &Models[i].Mesh[j].IndexBuffer);
+		for(uint32_t j=0;j<models[i].numMesh;j++)
+			vkuDestroyBuffer(&vkContext, &models[i].mesh[j].indexBuffer);
 
-		FreeBModel(&Models[i]);
+		FreeBModel(&models[i]);
 	}
 	//////////
 
@@ -2142,66 +2142,66 @@ void Destroy(void)
 	//////////
 
 	// Volume rendering
-	vkDestroyDescriptorSetLayout(Context.Device, volumeDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
-	vkDestroyPipeline(Context.Device, volumePipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(Context.Device, volumePipelineLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(vkContext.Device, volumeDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.Device, volumePipeline.Pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.Device, volumePipelineLayout, VK_NULL_HANDLE);
 	//////////
 
 	// Main render destruction
-	for(uint32_t i=0;i<Swapchain.NumImages;i++)
+	for(uint32_t i=0;i<swapchain.NumImages;i++)
 	{
-		vkUnmapMemory(Context.Device, perFrame[i].mainUBOBuffer[0].DeviceMemory);
-		vkuDestroyBuffer(&Context, &perFrame[i].mainUBOBuffer[0]);
+		vkUnmapMemory(vkContext.Device, perFrame[i].mainUBOBuffer[0].DeviceMemory);
+		vkuDestroyBuffer(&vkContext, &perFrame[i].mainUBOBuffer[0]);
 
-		vkUnmapMemory(Context.Device, perFrame[i].mainUBOBuffer[1].DeviceMemory);
-		vkuDestroyBuffer(&Context, &perFrame[i].mainUBOBuffer[1]);
+		vkUnmapMemory(vkContext.Device, perFrame[i].mainUBOBuffer[1].DeviceMemory);
+		vkuDestroyBuffer(&vkContext, &perFrame[i].mainUBOBuffer[1]);
 	}
 
-	vkDestroyDescriptorSetLayout(Context.Device, mainDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
-	vkDestroyRenderPass(Context.Device, RenderPass, VK_NULL_HANDLE);
-	vkDestroyPipeline(Context.Device, mainPipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(Context.Device, mainPipelineLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(vkContext.Device, mainDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyRenderPass(vkContext.Device, renderPass, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.Device, mainPipeline.Pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.Device, mainPipelineLayout, VK_NULL_HANDLE);
 	//////////
 
 	// Swapchain, framebuffer, and depth buffer destruction
-	vkuDestroyImageBuffer(&Context, &colorImage[0]);
-	vkuDestroyImageBuffer(&Context, &colorResolve[0]);
-	vkuDestroyImageBuffer(&Context, &colorBlur[0]);
-	vkuDestroyImageBuffer(&Context, &colorTemp[0]);
-	vkuDestroyImageBuffer(&Context, &depthImage[0]);
+	vkuDestroyImageBuffer(&vkContext, &colorImage[0]);
+	vkuDestroyImageBuffer(&vkContext, &colorResolve[0]);
+	vkuDestroyImageBuffer(&vkContext, &colorBlur[0]);
+	vkuDestroyImageBuffer(&vkContext, &colorTemp[0]);
+	vkuDestroyImageBuffer(&vkContext, &depthImage[0]);
 
-	vkDestroyFramebuffer(Context.Device, Framebuffer[0], VK_NULL_HANDLE);
+	vkDestroyFramebuffer(vkContext.Device, framebuffer[0], VK_NULL_HANDLE);
 
 	if(isVR)
 	{
-		vkuDestroyImageBuffer(&Context, &colorImage[1]);
-		vkuDestroyImageBuffer(&Context, &colorResolve[1]);
-		vkuDestroyImageBuffer(&Context, &colorBlur[1]);
-		vkuDestroyImageBuffer(&Context, &colorTemp[1]);
-		vkuDestroyImageBuffer(&Context, &depthImage[1]);
+		vkuDestroyImageBuffer(&vkContext, &colorImage[1]);
+		vkuDestroyImageBuffer(&vkContext, &colorResolve[1]);
+		vkuDestroyImageBuffer(&vkContext, &colorBlur[1]);
+		vkuDestroyImageBuffer(&vkContext, &colorTemp[1]);
+		vkuDestroyImageBuffer(&vkContext, &depthImage[1]);
 
-		vkDestroyFramebuffer(Context.Device, Framebuffer[1], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(vkContext.Device, framebuffer[1], VK_NULL_HANDLE);
 	}
 
-	for(uint32_t i=0;i<Swapchain.NumImages;i++)
+	for(uint32_t i=0;i<swapchain.NumImages;i++)
 	{
 		// Destroy sync objects
-		vkDestroyFence(Context.Device, perFrame[i].frameFence, VK_NULL_HANDLE);
+		vkDestroyFence(vkContext.Device, perFrame[i].frameFence, VK_NULL_HANDLE);
 
-		vkDestroySemaphore(Context.Device, perFrame[i].presentCompleteSemaphore, VK_NULL_HANDLE);
-		vkDestroySemaphore(Context.Device, perFrame[i].renderCompleteSemaphore, VK_NULL_HANDLE);
+		vkDestroySemaphore(vkContext.Device, perFrame[i].presentCompleteSemaphore, VK_NULL_HANDLE);
+		vkDestroySemaphore(vkContext.Device, perFrame[i].renderCompleteSemaphore, VK_NULL_HANDLE);
 
 		// Destroy main thread descriptor pools
-		vkDestroyDescriptorPool(Context.Device, perFrame[i].descriptorPool, VK_NULL_HANDLE);
+		vkDestroyDescriptorPool(vkContext.Device, perFrame[i].descriptorPool, VK_NULL_HANDLE);
 
 		// Destroy command pools
-		vkDestroyCommandPool(Context.Device, perFrame[i].commandPool, VK_NULL_HANDLE);
+		vkDestroyCommandPool(vkContext.Device, perFrame[i].commandPool, VK_NULL_HANDLE);
 	}
 
-	vkuDestroySwapchain(&Context, &Swapchain);
+	vkuDestroySwapchain(&vkContext, &swapchain);
 	//////////
 
 	DBGPRINTF(DEBUG_INFO, "Remaining Vulkan memory blocks:\n");
-	vkuMem_Print(VkZone);
-	vkuMem_Destroy(&Context, VkZone);
+	vkuMem_Print(vkZone);
+	vkuMem_Destroy(&vkContext, vkZone);
 }

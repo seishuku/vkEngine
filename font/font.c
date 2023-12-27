@@ -21,11 +21,11 @@
 #include "../vr/vr.h"
 
 // external Vulkan context data/functions for this module:
-extern VkuContext_t Context;
+extern VkuContext_t vkContext;
 extern VkSampleCountFlags MSAA;
-extern VkuSwapchain_t Swapchain;
+extern VkuSwapchain_t swapchain;
 
-extern VkuMemZone_t *VkZone;
+extern VkuMemZone_t *vkZone;
 
 extern VkRenderPass compositeRenderPass;
 
@@ -41,10 +41,10 @@ bool Font_Init(Font_t *font)
 	void *data=NULL;
 
 	// Create descriptors and pipeline
-	vkuInitDescriptorSet(&font->descriptorSet, &Context);
+	vkuInitDescriptorSet(&font->descriptorSet, &vkContext);
 	vkuAssembleDescriptorSetLayout(&font->descriptorSet);
 
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
@@ -58,7 +58,7 @@ bool Font_Init(Font_t *font)
 		},
 	}, 0, &font->pipelineLayout);
 
-	vkuInitPipeline(&font->pipeline, &Context);
+	vkuInitPipeline(&font->pipeline, &vkContext);
 
 	vkuPipeline_SetPipelineLayout(&font->pipeline, font->pipelineLayout);
 	vkuPipeline_SetRenderPass(&font->pipeline, compositeRenderPass);
@@ -100,13 +100,13 @@ bool Font_Init(Font_t *font)
 	// ---
 
 	// Create static vertex data buffer
-	vkuCreateGPUBuffer(&Context, &font->vertexBuffer, sizeof(float)*4*4, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+	vkuCreateGPUBuffer(&vkContext, &font->vertexBuffer, sizeof(float)*4*4, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
 	// Create staging buffer, map it, and copy vertex data to it
-	vkuCreateHostBuffer(&Context, &stagingBuffer, sizeof(float)*4*4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+	vkuCreateHostBuffer(&vkContext, &stagingBuffer, sizeof(float)*4*4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 	// Map it
-	vkMapMemory(Context.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
+	vkMapMemory(vkContext.Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
 
 	if(data==NULL)
 		return false;
@@ -118,18 +118,18 @@ bool Font_Init(Font_t *font)
 	*ptr++=Vec4(0.5f, 1.0f, 1.0f, 1.0f);
 	*ptr++=Vec4(0.5f, 0.0f, 1.0f, -1.0f);
 
-	vkUnmapMemory(Context.Device, stagingBuffer.DeviceMemory);
+	vkUnmapMemory(vkContext.Device, stagingBuffer.DeviceMemory);
 
-	copyCommand=vkuOneShotCommandBufferBegin(&Context);
+	copyCommand=vkuOneShotCommandBufferBegin(&vkContext);
 	vkCmdCopyBuffer(copyCommand, stagingBuffer.Buffer, font->vertexBuffer.Buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(vec4)*4 });
-	vkuOneShotCommandBufferEnd(&Context, copyCommand);
+	vkuOneShotCommandBufferEnd(&vkContext, copyCommand);
 
 	// Delete staging data
-	vkuDestroyBuffer(&Context, &stagingBuffer);
+	vkuDestroyBuffer(&vkContext, &stagingBuffer);
 
 	// Create instance buffer and map it
-	vkuCreateHostBuffer(&Context, &font->instanceBuffer, sizeof(vec4)*2*8192, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	vkMapMemory(Context.Device, font->instanceBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void *)&font->instanceBufferPtr);
+	vkuCreateHostBuffer(&vkContext, &font->instanceBuffer, sizeof(vec4)*2*8192, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	vkMapMemory(vkContext.Device, font->instanceBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void *)&font->instanceBufferPtr);
 
 	// Set initial instance data pointer
 	font->instance=(vec4 *)font->instanceBufferPtr;
@@ -372,7 +372,7 @@ void Font_Draw(Font_t *font, uint32_t index, uint32_t eye)
 		fontPC.extent=(VkExtent2D){ xrContext.swapchainExtent.width, xrContext.swapchainExtent.height };
 	}
 	else
-		fontPC.extent=Swapchain.Extent;
+		fontPC.extent=swapchain.Extent;
 
 	fontPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale((float)fontPC.extent.width/(float)fontPC.extent.height, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[eye]);
 
@@ -401,17 +401,17 @@ void Font_Destroy(Font_t *font)
 {
 	// Instance buffer handles
 	if(font->instanceBuffer.DeviceMemory)
-		vkUnmapMemory(Context.Device, font->instanceBuffer.DeviceMemory);
+		vkUnmapMemory(vkContext.Device, font->instanceBuffer.DeviceMemory);
 
-	vkuDestroyBuffer(&Context, &font->instanceBuffer);
+	vkuDestroyBuffer(&vkContext, &font->instanceBuffer);
 
 	// Vertex data handles
-	vkuDestroyBuffer(&Context, &font->vertexBuffer);
+	vkuDestroyBuffer(&vkContext, &font->vertexBuffer);
 
 	// Pipeline
-	vkDestroyPipelineLayout(Context.Device, font->pipelineLayout, VK_NULL_HANDLE);
-	vkDestroyPipeline(Context.Device, font->pipeline.Pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.Device, font->pipelineLayout, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.Device, font->pipeline.Pipeline, VK_NULL_HANDLE);
 
 	// Descriptors
-	vkDestroyDescriptorSetLayout(Context.Device, font->descriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(vkContext.Device, font->descriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
 }

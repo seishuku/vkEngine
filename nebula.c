@@ -1,11 +1,11 @@
 #include "vulkan/vulkan.h"
 #include "math/math.h"
 
-extern VkuContext_t Context;
+extern VkuContext_t vkContext;
 extern VkSampleCountFlags MSAA;
 extern VkFormat ColorFormat;
 extern VkFormat DepthFormat;
-extern VkRenderPass RenderPass;
+extern VkRenderPass renderPass;
 
 // Volume rendering vulkan stuff
 VkuDescriptorSet_t volumeDescriptorSet;
@@ -223,12 +223,12 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *Image)
 // Create functions for volume rendering
 bool CreateVolumePipeline(void)
 {
-	vkuInitDescriptorSet(&volumeDescriptorSet, &Context);
+	vkuInitDescriptorSet(&volumeDescriptorSet, &vkContext);
 	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&volumeDescriptorSet);
 
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
@@ -242,10 +242,10 @@ bool CreateVolumePipeline(void)
 		},
 	}, 0, &volumePipelineLayout);
 
-	vkuInitPipeline(&volumePipeline, &Context);
+	vkuInitPipeline(&volumePipeline, &vkContext);
 
 	vkuPipeline_SetPipelineLayout(&volumePipeline, volumePipelineLayout);
-	vkuPipeline_SetRenderPass(&volumePipeline, RenderPass);
+	vkuPipeline_SetRenderPass(&volumePipeline, renderPass);
 
 	volumePipeline.DepthTest=VK_TRUE;
 	volumePipeline.CullMode=VK_CULL_MODE_BACK_BIT;

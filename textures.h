@@ -18,6 +18,6 @@ enum
 	NUM_TEXTURES
 };
 
-extern VkuImage_t Textures[NUM_TEXTURES];
+extern VkuImage_t textures[NUM_TEXTURES];
 
 #endif

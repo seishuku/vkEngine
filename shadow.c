@@ -13,7 +13,7 @@
 
 #define NUM_ASTEROIDS 1000
 
-extern VkuContext_t Context;
+extern VkuContext_t vkContext;
 extern VkuBuffer_t asteroidInstance;
 
 extern float fTime;
@@ -35,11 +35,11 @@ static VkFormat shadowDepthFormat=VK_FORMAT_D32_SFLOAT;
 void CreateShadowMap(void)
 {
 	// Depth render target
-	vkuCreateTexture2D(&Context, &shadowDepth, shadowSize, shadowSize, shadowDepthFormat, VK_SAMPLE_COUNT_1_BIT);
+	vkuCreateTexture2D(&vkContext, &shadowDepth, shadowSize, shadowSize, shadowDepthFormat, VK_SAMPLE_COUNT_1_BIT);
 
 	// Need compare ops, so recreate the sampler
-	vkDestroySampler(Context.Device, shadowDepth.Sampler, VK_NULL_HANDLE);
-	vkCreateSampler(Context.Device, &(VkSamplerCreateInfo)
+	vkDestroySampler(vkContext.Device, shadowDepth.Sampler, VK_NULL_HANDLE);
+	vkCreateSampler(vkContext.Device, &(VkSamplerCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 		.magFilter=VK_FILTER_LINEAR,
@@ -58,7 +58,7 @@ void CreateShadowMap(void)
 		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
 	}, VK_NULL_HANDLE, &shadowDepth.Sampler);
 
-	vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
+	vkCreateFramebuffer(vkContext.Device, &(VkFramebufferCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 		.renderPass=shadowRenderPass,
@@ -72,7 +72,7 @@ void CreateShadowMap(void)
 
 bool CreateShadowPipeline(void)
 {
-	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
+	vkCreateRenderPass(vkContext.Device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.attachmentCount=1,
@@ -101,7 +101,7 @@ bool CreateShadowPipeline(void)
 		},
 	}, 0, &shadowRenderPass);
 
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=0,
@@ -114,7 +114,7 @@ bool CreateShadowPipeline(void)
 		},
 	}, 0, &shadowPipelineLayout);
 
-	vkuInitPipeline(&shadowPipeline, &Context);
+	vkuInitPipeline(&shadowPipeline, &vkContext);
 
 	vkuPipeline_SetPipelineLayout(&shadowPipeline, shadowPipelineLayout);
 	vkuPipeline_SetRenderPass(&shadowPipeline, shadowRenderPass);
@@ -198,12 +198,12 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 		vkCmdPushConstants(commandBuffer, shadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Shadow_UBO_t), &shadowUBO);
 
 		// Bind model data buffers and draw the triangles
-		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &Models[j].VertexBuffer.Buffer, &(VkDeviceSize) { 0 });
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &models[j].vertexBuffer.Buffer, &(VkDeviceSize) { 0 });
 
-		for(uint32_t k=0;k<Models[j].NumMesh;k++)
+		for(uint32_t k=0;k<models[j].numMesh;k++)
 		{
-			vkCmdBindIndexBuffer(commandBuffer, Models[j].Mesh[k].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(commandBuffer, Models[j].Mesh[k].NumFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*j);
+			vkCmdBindIndexBuffer(commandBuffer, models[j].mesh[k].indexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(commandBuffer, models[j].mesh[k].numFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*j);
 		}
 	}
 
@@ -212,11 +212,11 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 
 void DestroyShadow(void)
 {
-	vkuDestroyImageBuffer(&Context, &shadowDepth);
+	vkuDestroyImageBuffer(&vkContext, &shadowDepth);
 
-	vkDestroyPipeline(Context.Device, shadowPipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(Context.Device, shadowPipelineLayout, VK_NULL_HANDLE);
-	vkDestroyRenderPass(Context.Device, shadowRenderPass, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.Device, shadowPipeline.Pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.Device, shadowPipelineLayout, VK_NULL_HANDLE);
+	vkDestroyRenderPass(vkContext.Device, shadowRenderPass, VK_NULL_HANDLE);
 
-	vkDestroyFramebuffer(Context.Device, shadowFrameBuffer, VK_NULL_HANDLE);
+	vkDestroyFramebuffer(vkContext.Device, shadowFrameBuffer, VK_NULL_HANDLE);
 }

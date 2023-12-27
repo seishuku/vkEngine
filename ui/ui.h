@@ -25,10 +25,10 @@ typedef enum
 typedef struct
 {
 	// Common to all controls
-	UI_ControlType Type;
+	UI_ControlType type;
 	uint32_t ID;
-	vec2 Position;
-	vec3 Color;
+	vec2 position;
+	vec3 color;
 
 	// Specific to type
 	union
@@ -36,40 +36,40 @@ typedef struct
 		// Button type
 		struct
 		{
-			char TitleText[UI_CONTROL_TITLETEXT_MAX];
-			vec2 Size;
+			char titleText[UI_CONTROL_TITLETEXT_MAX];
+			vec2 size;
 			UIControlCallback Callback;
 		} Button;
 
 		// CheckBox type, should this also have a callback for flexibility?
 		struct
 		{
-			char TitleText[UI_CONTROL_TITLETEXT_MAX];
-			float Radius;
-			bool Value;
+			char titleText[UI_CONTROL_TITLETEXT_MAX];
+			float radius;
+			bool value;
 		} CheckBox;
 
 		// BarGraph type
 		struct
 		{
-			char TitleText[UI_CONTROL_TITLETEXT_MAX];
-			vec2 Size;
+			char titleText[UI_CONTROL_TITLETEXT_MAX];
+			vec2 size;
 			bool Readonly;
-			float Min, Max, Value;
+			float Min, Max, value;
 		} BarGraph;
 
 		// Sprite type
 		struct
 		{
 			VkuImage_t *Image;
-			vec2 Size;
-			float Rotation;
+			vec2 size;
+			float rotation;
 		} Sprite;
 
 		// Cursur type
 		struct
 		{
-			float Radius;
+			float radius;
 		} Cursor;
 	};
 } UI_Control_t;
@@ -77,92 +77,92 @@ typedef struct
 typedef struct
 {
 	// Position and size of whole UI system
-	vec2 Position, Size;
+	vec2 position, size;
 
 	// Unique Vulkan data
-	VkPipelineLayout PipelineLayout;
-	VkuPipeline_t Pipeline;
+	VkPipelineLayout pipelineLayout;
+	VkuPipeline_t pipeline;
 
-	VkuImage_t BlankImage;
+	VkuImage_t blankImage;
 
-	VkuBuffer_t VertexBuffer;
+	VkuBuffer_t vertexBuffer;
 
-	VkuBuffer_t InstanceBuffer;
-	void *InstanceBufferPtr;
+	VkuBuffer_t instanceBuffer;
+	void *instanceBufferPtr;
 
-	VkuDescriptorSet_t DescriptorSet;
+	VkuDescriptorSet_t descriptorSet;
 
 	// Base ID for generating IDs
-	uint32_t IDBase;
+	uint32_t baseID;
 
 	// List of controls in UI
-	List_t Controls;
+	List_t controls;
 
 	// Hashtable for quick lookup by ID
-	UI_Control_t *Controls_Hashtable[UI_HASHTABLE_MAX];
+	UI_Control_t *controlsHashtable[UI_HASHTABLE_MAX];
 } UI_t;
 
-bool UI_Init(UI_t *UI, vec2 Position, vec2 Size);
+bool UI_Init(UI_t *UI, vec2 position, vec2 size);
 void UI_Destroy(UI_t *UI);
 
 UI_Control_t *UI_FindControlByID(UI_t *UI, uint32_t ID);
 
 // Buttons
-uint32_t UI_AddButton(UI_t *UI, vec2 Position, vec2 Size, vec3 Color, const char *TitleText, UIControlCallback Callback);
+uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, const char *titleText, UIControlCallback Callback);
 
-bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 Position, vec2 Size, vec3 Color, const char *TitleText, UIControlCallback Callback);
-bool UI_UpdateButtonPosition(UI_t *UI, uint32_t ID, vec2 Position);
-bool UI_UpdateButtonSize(UI_t *UI, uint32_t ID, vec2 Size);
-bool UI_UpdateButtonColor(UI_t *UI, uint32_t ID, vec3 Color);
-bool UI_UpdateButtonTitleText(UI_t *UI, uint32_t ID, const char *TitleText);
+bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, const char *titleText, UIControlCallback Callback);
+bool UI_UpdateButtonPosition(UI_t *UI, uint32_t ID, vec2 position);
+bool UI_UpdateButtonSize(UI_t *UI, uint32_t ID, vec2 size);
+bool UI_UpdateButtonColor(UI_t *UI, uint32_t ID, vec3 color);
+bool UI_UpdateButtonTitleText(UI_t *UI, uint32_t ID, const char *titleText);
 bool UI_UpdateButtonCallback(UI_t *UI, uint32_t ID, UIControlCallback Callback);
 
 // Check boxes
-uint32_t UI_AddCheckBox(UI_t *UI, vec2 Position, float Radius, vec3 Color, const char *TitleText, bool Value);
+uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, const char *titleText, bool value);
 
-bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 Position, float Radius, vec3 Color, const char *TitleText, bool Value);
-bool UI_UpdateCheckBoxPosition(UI_t *UI, uint32_t ID, vec2 Position);
-bool UI_UpdateCheckBoxRadius(UI_t *UI, uint32_t ID, float Radius);
-bool UI_UpdateCheckBoxColor(UI_t *UI, uint32_t ID, vec3 Color);
-bool UI_UpdateCheckBoxTitleText(UI_t *UI, uint32_t ID, const char *TitleText);
-bool UI_UpdateCheckBoxValue(UI_t *UI, uint32_t ID, bool Value);
+bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, const char *titleText, bool value);
+bool UI_UpdateCheckBoxPosition(UI_t *UI, uint32_t ID, vec2 position);
+bool UI_UpdateCheckBoxRadius(UI_t *UI, uint32_t ID, float radius);
+bool UI_UpdateCheckBoxColor(UI_t *UI, uint32_t ID, vec3 color);
+bool UI_UpdateCheckBoxTitleText(UI_t *UI, uint32_t ID, const char *titleText);
+bool UI_UpdateCheckBoxValue(UI_t *UI, uint32_t ID, bool value);
 
 bool UI_GetCheckBoxValue(UI_t *UI, uint32_t ID);
 
 // Bar graphs
-uint32_t UI_AddBarGraph(UI_t *UI, vec2 Position, vec2 Size, vec3 Color, const char *TitleText, bool Readonly, float Min, float Max, float Value);
+uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, const char *titleText, bool Readonly, float Min, float Max, float value);
 
-bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 Position, vec2 Size, vec3 Color, const char *TitleText, bool Readonly, float Min, float Max, float Value);
-bool UI_UpdateBarGraphPosition(UI_t *UI, uint32_t ID, vec2 Position);
-bool UI_UpdateBarGraphSize(UI_t *UI, uint32_t ID, vec2 Size);
-bool UI_UpdateBarGraphColor(UI_t *UI, uint32_t ID, vec3 Color);
-bool UI_UpdateBarGraphTitleText(UI_t *UI, uint32_t ID, const char *TitleText);
+bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, const char *titleText, bool Readonly, float Min, float Max, float value);
+bool UI_UpdateBarGraphPosition(UI_t *UI, uint32_t ID, vec2 position);
+bool UI_UpdateBarGraphSize(UI_t *UI, uint32_t ID, vec2 size);
+bool UI_UpdateBarGraphColor(UI_t *UI, uint32_t ID, vec3 color);
+bool UI_UpdateBarGraphTitleText(UI_t *UI, uint32_t ID, const char *titleText);
 bool UI_UpdateBarGraphReadonly(UI_t *UI, uint32_t ID, bool Readonly);
 bool UI_UpdateBarGraphMin(UI_t *UI, uint32_t ID, float Min);
 bool UI_UpdateBarGraphMax(UI_t *UI, uint32_t ID, float Max);
-bool UI_UpdateBarGraphValue(UI_t *UI, uint32_t ID, float Value);
+bool UI_UpdateBarGraphValue(UI_t *UI, uint32_t ID, float value);
 
 float UI_GetBarGraphMin(UI_t *UI, uint32_t ID);
 float UI_GetBarGraphMax(UI_t *UI, uint32_t ID);
 float UI_GetBarGraphValue(UI_t *UI, uint32_t ID);
 float *UI_GetBarGraphValuePointer(UI_t *UI, uint32_t ID);
 
-uint32_t UI_AddSprite(UI_t *UI, vec2 Position, vec2 Size, vec3 Color, VkuImage_t *Image, float Rotation);
-bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 Position, vec2 Size, vec3 Color, VkuImage_t *Image, float Rotation);
-bool UI_UpdateSpritePosition(UI_t *UI, uint32_t ID, vec2 Position);
-bool UI_UpdateSpriteSize(UI_t *UI, uint32_t ID, vec2 Size);
-bool UI_UpdateSpriteColor(UI_t *UI, uint32_t ID, vec3 Color);
+uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, VkuImage_t *Image, float rotation);
+bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, VkuImage_t *Image, float rotation);
+bool UI_UpdateSpritePosition(UI_t *UI, uint32_t ID, vec2 position);
+bool UI_UpdateSpriteSize(UI_t *UI, uint32_t ID, vec2 size);
+bool UI_UpdateSpriteColor(UI_t *UI, uint32_t ID, vec3 color);
 bool UI_UpdateSpriteImage(UI_t *UI, uint32_t ID, VkuImage_t *Image);
-bool UI_UpdateSpriteRotation(UI_t *UI, uint32_t ID, float Rotation);
+bool UI_UpdateSpriteRotation(UI_t *UI, uint32_t ID, float rotation);
 
-uint32_t UI_AddCursor(UI_t *UI, vec2 Position, float Radius, vec3 Color);
-bool UI_UpdateCursor(UI_t *UI, uint32_t ID, vec2 Position, float Radius, vec3 Color);
-bool UI_UpdateCursorPosition(UI_t *UI, uint32_t ID, vec2 Position);
-bool UI_UpdateCursorRadius(UI_t *UI, uint32_t ID, float Radius);
-bool UI_UpdateCursorColor(UI_t *UI, uint32_t ID, vec3 Color);
+uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color);
+bool UI_UpdateCursor(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color);
+bool UI_UpdateCursorPosition(UI_t *UI, uint32_t ID, vec2 position);
+bool UI_UpdateCursorRadius(UI_t *UI, uint32_t ID, float radius);
+bool UI_UpdateCursorColor(UI_t *UI, uint32_t ID, vec3 color);
 
-uint32_t UI_TestHit(UI_t *UI, vec2 Position);
-bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 Position);
+uint32_t UI_TestHit(UI_t *UI, vec2 position);
+bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_Draw(UI_t *UI, uint32_t Index, uint32_t Eye);
 
 #endif

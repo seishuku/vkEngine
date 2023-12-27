@@ -18,6 +18,6 @@ enum
 	NUM_SOUNDS
 };
 
-extern Sample_t Sounds[NUM_SOUNDS];
+extern Sample_t sounds[NUM_SOUNDS];
 
 #endif

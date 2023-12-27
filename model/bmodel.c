@@ -8,56 +8,56 @@
 #include "../vulkan/vulkan.h"
 #include "bmodel.h"
 
-static void CalculateTangent(BModel_t *Model)
+static void CalculateTangent(BModel_t *model)
 {
-	if(Model->UV)
+	if(model->UV)
 	{
 		vec3 v0, v1, s, t, n;
 		vec2 uv0, uv1;
 		float r;
 
-		Model->Tangent=(float *)Zone_Malloc(Zone, sizeof(float)*3*Model->NumVertex);
+		model->tangent=(float *)Zone_Malloc(Zone, sizeof(float)*3*model->numVertex);
 
-		if(Model->Tangent==NULL)
+		if(model->tangent==NULL)
 			return;
 
-		memset(Model->Tangent, 0, sizeof(float)*3*Model->NumVertex);
+		memset(model->tangent, 0, sizeof(float)*3*model->numVertex);
 
-		Model->Binormal=(float *)Zone_Malloc(Zone, sizeof(float)*3*Model->NumVertex);
+		model->binormal=(float *)Zone_Malloc(Zone, sizeof(float)*3*model->numVertex);
 
-		if(Model->Binormal==NULL)
+		if(model->binormal==NULL)
 			return;
 
-		memset(Model->Binormal, 0, sizeof(float)*3*Model->NumVertex);
+		memset(model->binormal, 0, sizeof(float)*3*model->numVertex);
 
-		Model->Normal=(float *)Zone_Malloc(Zone, sizeof(float)*3*Model->NumVertex);
+		model->normal=(float *)Zone_Malloc(Zone, sizeof(float)*3*model->numVertex);
 
-		if(Model->Normal==NULL)
+		if(model->normal==NULL)
 			return;
 
-		memset(Model->Normal, 0, sizeof(float)*3*Model->NumVertex);
+		memset(model->normal, 0, sizeof(float)*3*model->numVertex);
 
-		for(uint32_t j=0;j<Model->NumMesh;j++)
+		for(uint32_t j=0;j<model->numMesh;j++)
 		{
-			for(uint32_t i=0;i<Model->Mesh[j].NumFace;i++)
+			for(uint32_t i=0;i<model->mesh[j].numFace;i++)
 			{
-				uint32_t i1=Model->Mesh[j].Face[3*i+0];
-				uint32_t i2=Model->Mesh[j].Face[3*i+1];
-				uint32_t i3=Model->Mesh[j].Face[3*i+2];
+				uint32_t i1=model->mesh[j].face[3*i+0];
+				uint32_t i2=model->mesh[j].face[3*i+1];
+				uint32_t i3=model->mesh[j].face[3*i+2];
 
-				v0.x=Model->Vertex[3*i2+0]-Model->Vertex[3*i1+0];
-				v0.y=Model->Vertex[3*i2+1]-Model->Vertex[3*i1+1];
-				v0.z=Model->Vertex[3*i2+2]-Model->Vertex[3*i1+2];
+				v0.x=model->vertex[3*i2+0]-model->vertex[3*i1+0];
+				v0.y=model->vertex[3*i2+1]-model->vertex[3*i1+1];
+				v0.z=model->vertex[3*i2+2]-model->vertex[3*i1+2];
 
-				uv0.x=Model->UV[2*i2+0]-Model->UV[2*i1+0];
-				uv0.y=Model->UV[2*i2+1]-Model->UV[2*i1+1];
+				uv0.x=model->UV[2*i2+0]-model->UV[2*i1+0];
+				uv0.y=model->UV[2*i2+1]-model->UV[2*i1+1];
 
-				v1.x=Model->Vertex[3*i3+0]-Model->Vertex[3*i1+0];
-				v1.y=Model->Vertex[3*i3+1]-Model->Vertex[3*i1+1];
-				v1.z=Model->Vertex[3*i3+2]-Model->Vertex[3*i1+2];
+				v1.x=model->vertex[3*i3+0]-model->vertex[3*i1+0];
+				v1.y=model->vertex[3*i3+1]-model->vertex[3*i1+1];
+				v1.z=model->vertex[3*i3+2]-model->vertex[3*i1+2];
 
-				uv1.x=Model->UV[2*i3+0]-Model->UV[2*i1+0];
-				uv1.y=Model->UV[2*i3+1]-Model->UV[2*i1+1];
+				uv1.x=model->UV[2*i3+0]-model->UV[2*i1+0];
+				uv1.y=model->UV[2*i3+1]-model->UV[2*i1+1];
 
 				r=1.0f/(uv0.x*uv1.y-uv1.x*uv0.y);
 
@@ -66,35 +66,35 @@ static void CalculateTangent(BModel_t *Model)
 				s.z=(uv1.y*v0.z-uv0.y*v1.z)*r;
 				Vec3_Normalize(&s);
 
-				Model->Tangent[3*i1+0]+=s.x;	Model->Tangent[3*i1+1]+=s.y;	Model->Tangent[3*i1+2]+=s.z;
-				Model->Tangent[3*i2+0]+=s.x;	Model->Tangent[3*i2+1]+=s.y;	Model->Tangent[3*i2+2]+=s.z;
-				Model->Tangent[3*i3+0]+=s.x;	Model->Tangent[3*i3+1]+=s.y;	Model->Tangent[3*i3+2]+=s.z;
+				model->tangent[3*i1+0]+=s.x;	model->tangent[3*i1+1]+=s.y;	model->tangent[3*i1+2]+=s.z;
+				model->tangent[3*i2+0]+=s.x;	model->tangent[3*i2+1]+=s.y;	model->tangent[3*i2+2]+=s.z;
+				model->tangent[3*i3+0]+=s.x;	model->tangent[3*i3+1]+=s.y;	model->tangent[3*i3+2]+=s.z;
 
 				t.x=(uv0.x*v1.x-uv1.x*v0.x)*r;
 				t.y=(uv0.x*v1.y-uv1.x*v0.y)*r;
 				t.z=(uv0.x*v1.z-uv1.x*v0.z)*r;
 				Vec3_Normalize(&t);
 
-				Model->Binormal[3*i1+0]+=t.x;	Model->Binormal[3*i1+1]+=t.y;	Model->Binormal[3*i1+2]+=t.z;
-				Model->Binormal[3*i2+0]+=t.x;	Model->Binormal[3*i2+1]+=t.y;	Model->Binormal[3*i2+2]+=t.z;
-				Model->Binormal[3*i3+0]+=t.x;	Model->Binormal[3*i3+1]+=t.y;	Model->Binormal[3*i3+2]+=t.z;
+				model->binormal[3*i1+0]+=t.x;	model->binormal[3*i1+1]+=t.y;	model->binormal[3*i1+2]+=t.z;
+				model->binormal[3*i2+0]+=t.x;	model->binormal[3*i2+1]+=t.y;	model->binormal[3*i2+2]+=t.z;
+				model->binormal[3*i3+0]+=t.x;	model->binormal[3*i3+1]+=t.y;	model->binormal[3*i3+2]+=t.z;
 
 				n=Vec3_Cross(v0, v1);
 				Vec3_Normalize(&n);
 
-				Model->Normal[3*i1+0]+=n.x;	Model->Normal[3*i1+1]+=n.y;	Model->Normal[3*i1+2]+=n.z;
-				Model->Normal[3*i2+0]+=n.x;	Model->Normal[3*i2+1]+=n.y;	Model->Normal[3*i2+2]+=n.z;
-				Model->Normal[3*i3+0]+=n.x;	Model->Normal[3*i3+1]+=n.y;	Model->Normal[3*i3+2]+=n.z;
+				model->normal[3*i1+0]+=n.x;	model->normal[3*i1+1]+=n.y;	model->normal[3*i1+2]+=n.z;
+				model->normal[3*i2+0]+=n.x;	model->normal[3*i2+1]+=n.y;	model->normal[3*i2+2]+=n.z;
+				model->normal[3*i3+0]+=n.x;	model->normal[3*i3+1]+=n.y;	model->normal[3*i3+2]+=n.z;
 			}
 		}
 
-		for(uint32_t i=0;i<Model->NumVertex;i++)
+		for(uint32_t i=0;i<model->numVertex;i++)
 		{
 			vec3 t, b, n;
 
-			t=Vec3(Model->Tangent[3*i+0], Model->Tangent[3*i+1], Model->Tangent[3*i+2]);
-			b=Vec3(Model->Binormal[3*i+0], Model->Binormal[3*i+1], Model->Binormal[3*i+2]);
-			n=Vec3(Model->Normal[3*i+0], Model->Normal[3*i+1], Model->Normal[3*i+2]);
+			t=Vec3(model->tangent[3*i+0], model->tangent[3*i+1], model->tangent[3*i+2]);
+			b=Vec3(model->binormal[3*i+0], model->binormal[3*i+1], model->binormal[3*i+2]);
+			n=Vec3(model->normal[3*i+0], model->normal[3*i+1], model->normal[3*i+2]);
 
 			t=Vec3_Subv(t, Vec3_Muls(n, Vec3_Dot(n, t)));
 
@@ -109,56 +109,56 @@ static void CalculateTangent(BModel_t *Model)
 
 			b=NxT;
 
-			memcpy(&Model->Tangent[3*i], &t, sizeof(float)*3);
-			memcpy(&Model->Binormal[3*i], &b, sizeof(float)*3);
-			memcpy(&Model->Normal[3*i], &n, sizeof(float)*3);
+			memcpy(&model->tangent[3*i], &t, sizeof(float)*3);
+			memcpy(&model->binormal[3*i], &b, sizeof(float)*3);
+			memcpy(&model->normal[3*i], &n, sizeof(float)*3);
 		}
 	}
 }
 
-static void ReadString(char *String, size_t StringLength, FILE *fp)
+static void ReadString(char *string, size_t stringLength, FILE *fp)
 {
 	uint32_t i=0;
 	char ch=127;
 
-	while(ch!='\0'&&i<StringLength)
+	while(ch!='\0'&&i<stringLength)
 	{
 		ch=fgetc(fp);
-		String[i++]=ch;
+		string[i++]=ch;
 	}
 }
 
-bool LoadBModel(BModel_t *Model, const char *Filename)
+bool LoadBModel(BModel_t *model, const char *filename)
 {
 	FILE *fp;
 
-	if(!(fp=fopen(Filename, "rb")))
+	if(!(fp=fopen(filename, "rb")))
 		return false;
 
-	uint32_t Magic=0;
-	fread(&Magic, sizeof(uint32_t), 1, fp);
+	uint32_t magic=0;
+	fread(&magic, sizeof(uint32_t), 1, fp);
 
-	if(Magic!=BMDL_MAGIC)
+	if(magic!=BMDL_MAGIC)
 		return false;
 
-	memset(Model, 0, sizeof(BModel_t));
+	memset(model, 0, sizeof(BModel_t));
 
 	/////// Read in materials
 
 	// Get number of materials
-	fread(&Model->NumMaterial, sizeof(uint32_t), 1, fp);
+	fread(&model->numMaterial, sizeof(uint32_t), 1, fp);
 
 	// If there materials, allocate memory for them
-	if(Model->NumMaterial)
+	if(model->numMaterial)
 	{
-		Model->Material=(BModel_Material_t *)Zone_Malloc(Zone, sizeof(BModel_Material_t)*Model->NumMaterial);
+		model->material=(BModel_Material_t *)Zone_Malloc(Zone, sizeof(BModel_Material_t)*model->numMaterial);
 
-		if(Model->Material==NULL)
+		if(model->material==NULL)
 			return false;
 	}
 
 	// Read them in
-	for(uint32_t i=0;i<Model->NumMaterial;i++)
+	for(uint32_t i=0;i<model->numMaterial;i++)
 	{
 		uint32_t Magic=0;
 		fread(&Magic, sizeof(uint32_t), 1, fp);
@@ -166,134 +166,134 @@ bool LoadBModel(BModel_t *Model, const char *Filename)
 		if(Magic!=MATL_MAGIC)
 			return false;
 
-		ReadString(Model->Material[i].Name, 256, fp);
-		fread(&Model->Material[i].Ambient, sizeof(float), 3, fp);
-		fread(&Model->Material[i].Diffuse, sizeof(float), 3, fp);
-		fread(&Model->Material[i].Specular, sizeof(float), 3, fp);
-		fread(&Model->Material[i].Emission, sizeof(float), 3, fp);
-		fread(&Model->Material[i].Shininess, sizeof(float), 1, fp);
-		ReadString(Model->Material[i].Texture, 256, fp);
+		ReadString(model->material[i].name, 256, fp);
+		fread(&model->material[i].ambient, sizeof(float), 3, fp);
+		fread(&model->material[i].diffuse, sizeof(float), 3, fp);
+		fread(&model->material[i].specular, sizeof(float), 3, fp);
+		fread(&model->material[i].emission, sizeof(float), 3, fp);
+		fread(&model->material[i].shininess, sizeof(float), 1, fp);
+		ReadString(model->material[i].texture, 256, fp);
 	}
 	///////
 
 	/////// Read in meshes
 
 	// Get number of meshes
-	fread(&Model->NumMesh, sizeof(uint32_t), 1, fp);
+	fread(&model->numMesh, sizeof(uint32_t), 1, fp);
 
 	// If there meshes, allocate memory for them
-	if(Model->NumMesh)
+	if(model->numMesh)
 	{
-		Model->Mesh=(BModel_Mesh_t *)Zone_Malloc(Zone, sizeof(BModel_Mesh_t)*Model->NumMesh);
+		model->mesh=(BModel_Mesh_t *)Zone_Malloc(Zone, sizeof(BModel_Mesh_t)*model->numMesh);
 
-		if(Model->Mesh==NULL)
+		if(model->mesh==NULL)
 			return false;
 	}
 
 	// Read them in
-	for(uint32_t i=0;i<Model->NumMesh;i++)
+	for(uint32_t i=0;i<model->numMesh;i++)
 	{
-		uint32_t Magic=0;
-		fread(&Magic, sizeof(uint32_t), 1, fp);
+		uint32_t magic=0;
+		fread(&magic, sizeof(uint32_t), 1, fp);
 
-		if(Magic!=MESH_MAGIC)
+		if(magic!=MESH_MAGIC)
 			return false;
 
-		ReadString(Model->Mesh[i].Name, 256, fp);
-		ReadString(Model->Mesh[i].MaterialName, 256, fp);
+		ReadString(model->mesh[i].name, 256, fp);
+		ReadString(model->mesh[i].materialName, 256, fp);
 
-		fread(&Model->Mesh[i].NumFace, sizeof(uint32_t), 1, fp);
+		fread(&model->mesh[i].numFace, sizeof(uint32_t), 1, fp);
 
-		if(Model->Mesh[i].NumFace)
+		if(model->mesh[i].numFace)
 		{
-			Model->Mesh[i].Face=(uint32_t *)Zone_Malloc(Zone, sizeof(uint32_t)*Model->Mesh[i].NumFace*3);
+			model->mesh[i].face=(uint32_t *)Zone_Malloc(Zone, sizeof(uint32_t)*model->mesh[i].numFace*3);
 
-			if(Model->Mesh[i].Face==NULL)
+			if(model->mesh[i].face==NULL)
 				return false;
 
-			fread(Model->Mesh[i].Face, sizeof(uint32_t), Model->Mesh[i].NumFace*3, fp);
+			fread(model->mesh[i].face, sizeof(uint32_t), model->mesh[i].numFace*3, fp);
 		}
 	}
 
 	// Read in number of vertices
-	fread(&Model->NumVertex, sizeof(uint32_t), 1, fp);
+	fread(&model->numVertex, sizeof(uint32_t), 1, fp);
 
 	// If there are vertices
-	if(Model->NumVertex)
+	if(model->numVertex)
 	{
 		// Read out until end of file
 		while(!feof(fp))
 		{
-			uint32_t Magic=0;
+			uint32_t magic=0;
 
 			// Read magic ID for chunk
-			if(!fread(&Magic, sizeof(uint32_t), 1, fp))
+			if(!fread(&magic, sizeof(uint32_t), 1, fp))
 				break;
 
-			switch(Magic)
+			switch(magic)
 			{
 				case VERT_MAGIC:
-					Model->Vertex=(float *)Zone_Malloc(Zone, sizeof(float)*Model->NumVertex*3);
+					model->vertex=(float *)Zone_Malloc(Zone, sizeof(float)*model->numVertex*3);
 
-					if(Model->Vertex==NULL)
+					if(model->vertex==NULL)
 						return false;
 
-					if(fread(Model->Vertex, sizeof(float)*3, Model->NumVertex, fp)!=Model->NumVertex)
+					if(fread(model->vertex, sizeof(float)*3, model->numVertex, fp)!=model->numVertex)
 					{
-						Zone_Free(Zone, Model->Vertex);
-						Model->Vertex=NULL;
+						Zone_Free(Zone, model->vertex);
+						model->vertex=NULL;
 					}
 					break;
 
 				case TEXC_MAGIC:
-					Model->UV=(float *)Zone_Malloc(Zone, sizeof(float)*Model->NumVertex*2);
+					model->UV=(float *)Zone_Malloc(Zone, sizeof(float)*model->numVertex*2);
 
-					if(Model->UV==NULL)
+					if(model->UV==NULL)
 						return false;
 
-					if(fread(Model->UV, sizeof(float)*2, Model->NumVertex, fp)!=Model->NumVertex)
+					if(fread(model->UV, sizeof(float)*2, model->numVertex, fp)!=model->numVertex)
 					{
-						Zone_Free(Zone, Model->UV);
-						Model->UV=NULL;
+						Zone_Free(Zone, model->UV);
+						model->UV=NULL;
 					}
 					break;
 
 				case TANG_MAGIC:
-					Model->Tangent=(float *)Zone_Malloc(Zone, sizeof(float)*Model->NumVertex*3);
+					model->tangent=(float *)Zone_Malloc(Zone, sizeof(float)*model->numVertex*3);
 
-					if(Model->Tangent==NULL)
+					if(model->tangent==NULL)
 						return false;
 
-					if(fread(Model->Tangent, sizeof(float)*3, Model->NumVertex, fp)!=Model->NumVertex)
+					if(fread(model->tangent, sizeof(float)*3, model->numVertex, fp)!=model->numVertex)
 					{
-						Zone_Free(Zone, Model->Tangent);
-						Model->Tangent=NULL;
+						Zone_Free(Zone, model->tangent);
+						model->tangent=NULL;
 					}
 					break;
 
 				case BNRM_MAGIC:
-					Model->Binormal=(float *)Zone_Malloc(Zone, sizeof(float)*Model->NumVertex*3);
+					model->binormal=(float *)Zone_Malloc(Zone, sizeof(float)*model->numVertex*3);
 
-					if(Model->Binormal==NULL)
+					if(model->binormal==NULL)
 						return false;
 
-					if(fread(Model->Binormal, sizeof(float)*3, Model->NumVertex, fp)!=Model->NumVertex)
+					if(fread(model->binormal, sizeof(float)*3, model->numVertex, fp)!=model->numVertex)
 					{
-						Zone_Free(Zone, Model->Binormal);
-						Model->Binormal=NULL;
+						Zone_Free(Zone, model->binormal);
+						model->binormal=NULL;
 					}
 					break;
 
 				case NORM_MAGIC:
-					Model->Normal=(float *)Zone_Malloc(Zone, sizeof(float)*Model->NumVertex*3);
+					model->normal=(float *)Zone_Malloc(Zone, sizeof(float)*model->numVertex*3);
 
-					if(Model->Normal==NULL)
+					if(model->normal==NULL)
 						return false;
 
-					if(fread(Model->Normal, sizeof(float)*3, Model->NumVertex, fp)!=Model->NumVertex)
+					if(fread(model->normal, sizeof(float)*3, model->numVertex, fp)!=model->numVertex)
 					{
-						Zone_Free(Zone, Model->Normal);
-						Model->Normal=NULL;
+						Zone_Free(Zone, model->normal);
+						model->normal=NULL;
 					}
 					break;
 
@@ -303,18 +303,18 @@ bool LoadBModel(BModel_t *Model, const char *Filename)
 		}
 	}
 
-	if(!Model->Tangent&&!Model->Binormal&&!Model->Normal&&Model->UV)
-		CalculateTangent(Model);
+	if(!model->tangent&&!model->binormal&&!model->normal&&model->UV)
+		CalculateTangent(model);
 
 	// Match up material names with their meshes with an index number
-	if(Model->NumMaterial)
+	if(model->numMaterial)
 	{
-		for(uint32_t i=0;i<Model->NumMesh;i++)
+		for(uint32_t i=0;i<model->numMesh;i++)
 		{
-			for(uint32_t j=0;j<Model->NumMaterial;j++)
+			for(uint32_t j=0;j<model->numMaterial;j++)
 			{
-				if(strcmp(Model->Mesh[i].MaterialName, Model->Material[j].Name)==0)
-					Model->Mesh[i].MaterialNumber=j;
+				if(strcmp(model->mesh[i].materialName, model->material[j].name)==0)
+					model->mesh[i].materialNumber=j;
 			}
 		}
 	}
@@ -323,114 +323,114 @@ bool LoadBModel(BModel_t *Model, const char *Filename)
 }
 
 // Free memory allocated for the model
-void FreeBModel(BModel_t *Model)
+void FreeBModel(BModel_t *model)
 {
-	Zone_Free(Zone, Model->Vertex);
-	Zone_Free(Zone, Model->UV);
-	Zone_Free(Zone, Model->Normal);
-	Zone_Free(Zone, Model->Tangent);
-	Zone_Free(Zone, Model->Binormal);
+	Zone_Free(Zone, model->vertex);
+	Zone_Free(Zone, model->UV);
+	Zone_Free(Zone, model->normal);
+	Zone_Free(Zone, model->tangent);
+	Zone_Free(Zone, model->binormal);
 
-	if(Model->NumMesh)
+	if(model->numMesh)
 	{
 		/* Free mesh data */
-		for(uint32_t i=0;i<Model->NumMesh;i++)
-			Zone_Free(Zone, Model->Mesh[i].Face);
+		for(uint32_t i=0;i<model->numMesh;i++)
+			Zone_Free(Zone, model->mesh[i].face);
 
-		Zone_Free(Zone, Model->Mesh);
+		Zone_Free(Zone, model->mesh);
 	}
 
-	Zone_Free(Zone, Model->Material);
+	Zone_Free(Zone, model->material);
 }
 
-void BuildMemoryBuffersBModel(VkuContext_t *Context, BModel_t *Model)
+void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 {
-	VkCommandBuffer CopyCommand=VK_NULL_HANDLE;
+	VkCommandBuffer copyCommand=VK_NULL_HANDLE;
 	VkuBuffer_t stagingBuffer;
-	void *Data=NULL;
+	void *data=NULL;
 
 	// Vertex data on device memory
-	vkuCreateGPUBuffer(Context, &Model->VertexBuffer, sizeof(float)*20*Model->NumVertex, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+	vkuCreateGPUBuffer(context, &model->vertexBuffer, sizeof(float)*20*model->numVertex, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
 	// Create staging buffer to transfer from host memory to device memory
-	vkuCreateHostBuffer(Context, &stagingBuffer, sizeof(float)*20*Model->NumVertex, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+	vkuCreateHostBuffer(context, &stagingBuffer, sizeof(float)*20*model->numVertex, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
-	vkMapMemory(Context->Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+	vkMapMemory(context->Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
 
-	if(!Data)
+	if(!data)
 		return;
 
-	float *fPtr=Data;
+	float *fPtr=data;
 
-	for(uint32_t j=0;j<Model->NumVertex;j++)
+	for(uint32_t j=0;j<model->numVertex;j++)
 	{
-		*fPtr++=Model->Vertex[3*j+0];
-		*fPtr++=Model->Vertex[3*j+1];
-		*fPtr++=Model->Vertex[3*j+2];
+		*fPtr++=model->vertex[3*j+0];
+		*fPtr++=model->vertex[3*j+1];
+		*fPtr++=model->vertex[3*j+2];
 		*fPtr++=1.0f;
 
-		*fPtr++=Model->UV[2*j+0];
-		*fPtr++=1.0f-Model->UV[2*j+1];
+		*fPtr++=model->UV[2*j+0];
+		*fPtr++=1.0f-model->UV[2*j+1];
 		*fPtr++=0.0f;
 		*fPtr++=0.0f;
 
-		*fPtr++=Model->Tangent[3*j+0];
-		*fPtr++=Model->Tangent[3*j+1];
-		*fPtr++=Model->Tangent[3*j+2];
+		*fPtr++=model->tangent[3*j+0];
+		*fPtr++=model->tangent[3*j+1];
+		*fPtr++=model->tangent[3*j+2];
 		*fPtr++=0.0f;
 
-		*fPtr++=Model->Binormal[3*j+0];
-		*fPtr++=Model->Binormal[3*j+1];
-		*fPtr++=Model->Binormal[3*j+2];
+		*fPtr++=model->binormal[3*j+0];
+		*fPtr++=model->binormal[3*j+1];
+		*fPtr++=model->binormal[3*j+2];
 		*fPtr++=0.0f;
 
-		*fPtr++=Model->Normal[3*j+0];
-		*fPtr++=Model->Normal[3*j+1];
-		*fPtr++=Model->Normal[3*j+2];
+		*fPtr++=model->normal[3*j+0];
+		*fPtr++=model->normal[3*j+1];
+		*fPtr++=model->normal[3*j+2];
 		*fPtr++=0.0f;
 	}
 
-	vkUnmapMemory(Context->Device, stagingBuffer.DeviceMemory);
+	vkUnmapMemory(context->Device, stagingBuffer.DeviceMemory);
 
 	// Copy to device memory
-	CopyCommand=vkuOneShotCommandBufferBegin(Context);
-	vkCmdCopyBuffer(CopyCommand, stagingBuffer.Buffer, Model->VertexBuffer.Buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(float)*20*Model->NumVertex });
-	vkuOneShotCommandBufferEnd(Context, CopyCommand);
+	copyCommand=vkuOneShotCommandBufferBegin(context);
+	vkCmdCopyBuffer(copyCommand, stagingBuffer.Buffer, model->vertexBuffer.Buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(float)*20*model->numVertex });
+	vkuOneShotCommandBufferEnd(context, copyCommand);
 
 	// Delete staging data
-	vkDestroyBuffer(Context->Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
-	vkFreeMemory(Context->Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(context->Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
+	vkFreeMemory(context->Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
 
-	for(uint32_t i=0;i<Model->NumMesh;i++)
+	for(uint32_t i=0;i<model->numMesh;i++)
 	{
 		// Index data
-		vkuCreateGPUBuffer(Context, &Model->Mesh[i].IndexBuffer, sizeof(uint32_t)*Model->Mesh[i].NumFace*3, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+		vkuCreateGPUBuffer(context, &model->mesh[i].indexBuffer, sizeof(uint32_t)*model->mesh[i].numFace*3, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
 		// Staging buffer
-		vkuCreateHostBuffer(Context, &stagingBuffer, sizeof(uint32_t)*Model->Mesh[i].NumFace*3, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+		vkuCreateHostBuffer(context, &stagingBuffer, sizeof(uint32_t)*model->mesh[i].numFace*3, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
-		vkMapMemory(Context->Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+		vkMapMemory(context->Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
 
-		if(!Data)
+		if(!data)
 			return;
 
-		uint32_t *iPtr=Data;
+		uint32_t *iPtr=data;
 
-		for(uint32_t j=0;j<Model->Mesh[i].NumFace;j++)
+		for(uint32_t j=0;j<model->mesh[i].numFace;j++)
 		{
-			*iPtr++=Model->Mesh[i].Face[3*j+0];
-			*iPtr++=Model->Mesh[i].Face[3*j+1];
-			*iPtr++=Model->Mesh[i].Face[3*j+2];
+			*iPtr++=model->mesh[i].face[3*j+0];
+			*iPtr++=model->mesh[i].face[3*j+1];
+			*iPtr++=model->mesh[i].face[3*j+2];
 		}
 
-		vkUnmapMemory(Context->Device, stagingBuffer.DeviceMemory);
+		vkUnmapMemory(context->Device, stagingBuffer.DeviceMemory);
 
-		CopyCommand=vkuOneShotCommandBufferBegin(Context);
-		vkCmdCopyBuffer(CopyCommand, stagingBuffer.Buffer, Model->Mesh[i].IndexBuffer.Buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(uint32_t)*Model->Mesh[i].NumFace*3 });
-		vkuOneShotCommandBufferEnd(Context, CopyCommand);
+		copyCommand=vkuOneShotCommandBufferBegin(context);
+		vkCmdCopyBuffer(copyCommand, stagingBuffer.Buffer, model->mesh[i].indexBuffer.Buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(uint32_t)*model->mesh[i].numFace*3 });
+		vkuOneShotCommandBufferEnd(context, copyCommand);
 
 		// Delete staging data
-		vkDestroyBuffer(Context->Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
-		vkFreeMemory(Context->Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+		vkDestroyBuffer(context->Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
+		vkFreeMemory(context->Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
 	}
 }

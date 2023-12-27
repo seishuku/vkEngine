@@ -9,7 +9,7 @@
 #include "../image/image.h"
 #include "../math/math.h"
 
-extern VkuMemZone_t *VkZone;
+extern VkuMemZone_t *vkZone;
 
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask)
 {
@@ -62,12 +62,12 @@ VkBool32 vkuCreateImageBuffer(VkuContext_t *Context, VkuImage_t *Image,
 	vkGetImageMemoryRequirements(Context->Device, Image->Image, &memoryRequirements);
 
 	// Quick hack: getting it to use the vulkan memory allocator
-	Image->DeviceMemory=vkuMem_Malloc(VkZone, memoryRequirements);
+	Image->DeviceMemory=vkuMem_Malloc(vkZone, memoryRequirements);
 
 	if(Image->DeviceMemory==NULL)
 		return VK_FALSE;
 
-	if(vkBindImageMemory(Context->Device, Image->Image, VkZone->DeviceMemory, Image->DeviceMemory->Offset)!=VK_SUCCESS)
+	if(vkBindImageMemory(Context->Device, Image->Image, vkZone->DeviceMemory, Image->DeviceMemory->Offset)!=VK_SUCCESS)
 		return VK_FALSE;
 
 	return VK_TRUE;
@@ -150,7 +150,7 @@ void vkuDestroyImageBuffer(VkuContext_t *Context, VkuImage_t *Image)
 		vkDestroyImage(Context->Device, Image->Image, VK_NULL_HANDLE);
 
 	if(Image->DeviceMemory)
-		vkuMem_Free(VkZone, Image->DeviceMemory);
+		vkuMem_Free(vkZone, Image->DeviceMemory);
 }
 
 VkBool32 vkuCreateHostBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags)
@@ -217,12 +217,12 @@ VkBool32 vkuCreateGPUBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t
 
 	vkGetBufferMemoryRequirements(Context->Device, Buffer->Buffer, &memoryRequirements);
 
-	Buffer->Memory=vkuMem_Malloc(VkZone, memoryRequirements);
+	Buffer->Memory=vkuMem_Malloc(vkZone, memoryRequirements);
 
 	if(Buffer->Memory==NULL)
 		return VK_FALSE;
 
-	if(vkBindBufferMemory(Context->Device, Buffer->Buffer, VkZone->DeviceMemory, Buffer->Memory->Offset)!=VK_SUCCESS)
+	if(vkBindBufferMemory(Context->Device, Buffer->Buffer, vkZone->DeviceMemory, Buffer->Memory->Offset)!=VK_SUCCESS)
 		return VK_FALSE;
 
 	return VK_TRUE;
@@ -240,7 +240,7 @@ void vkuDestroyBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer)
 		vkFreeMemory(Context->Device, Buffer->DeviceMemory, VK_NULL_HANDLE);
 
 	if(Buffer->Memory)
-		vkuMem_Free(VkZone, Buffer->Memory);
+		vkuMem_Free(vkZone, Buffer->Memory);
 }
 
 void vkuTransitionLayout(VkCommandBuffer CommandBuffer, VkImage Image, uint32_t levelCount, uint32_t baseLevel, uint32_t layerCount, uint32_t baseLayer, VkImageLayout oldLayout, VkImageLayout newLayout)

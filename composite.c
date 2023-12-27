@@ -10,8 +10,8 @@
 #include "vr/vr.h"
 #include "perframe.h"
 
-extern VkuContext_t Context;
-extern VkuSwapchain_t Swapchain;
+extern VkuContext_t vkContext;
+extern VkuSwapchain_t swapchain;
 extern XruContext_t xrContext;
 extern bool isVR;
 
@@ -48,7 +48,7 @@ VkFramebuffer gaussianFramebufferBlur[2];
 
 bool CreateThresholdPipeline(void)
 {
-	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
+	vkCreateRenderPass(vkContext.Device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.attachmentCount=1,
@@ -100,18 +100,18 @@ bool CreateThresholdPipeline(void)
 		},
 	}, 0, &thresholdRenderPass);
 
-	vkuInitDescriptorSet(&thresholdDescriptorSet, &Context);
+	vkuInitDescriptorSet(&thresholdDescriptorSet, &vkContext);
 	vkuDescriptorSet_AddBinding(&thresholdDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&thresholdDescriptorSet);
 
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
 		.pSetLayouts=&thresholdDescriptorSet.DescriptorSetLayout,
 	}, 0, &thresholdPipelineLayout);
 
-	vkuInitPipeline(&thresholdPipeline, &Context);
+	vkuInitPipeline(&thresholdPipeline, &vkContext);
 
 	vkuPipeline_SetPipelineLayout(&thresholdPipeline, thresholdPipelineLayout);
 	vkuPipeline_SetRenderPass(&thresholdPipeline, thresholdRenderPass);
@@ -140,7 +140,7 @@ bool CreateThresholdPipeline(void)
 
 bool CreateGaussianPipeline(void)
 {
-	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
+	vkCreateRenderPass(vkContext.Device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.attachmentCount=1,
@@ -192,11 +192,11 @@ bool CreateGaussianPipeline(void)
 		},
 	}, 0, &gaussianRenderPass);
 
-	vkuInitDescriptorSet(&gaussianDescriptorSet, &Context);
+	vkuInitDescriptorSet(&gaussianDescriptorSet, &vkContext);
 	vkuDescriptorSet_AddBinding(&gaussianDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&gaussianDescriptorSet);
 
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
@@ -209,7 +209,7 @@ bool CreateGaussianPipeline(void)
 		},
 	}, 0, &gaussianPipelineLayout);
 
-	vkuInitPipeline(&gaussianPipeline, &Context);
+	vkuInitPipeline(&gaussianPipeline, &vkContext);
 
 	vkuPipeline_SetPipelineLayout(&gaussianPipeline, gaussianPipelineLayout);
 	vkuPipeline_SetRenderPass(&gaussianPipeline, gaussianRenderPass);
@@ -248,20 +248,20 @@ void CreateCompositeFramebuffers(uint32_t eye)
 	}
 	else
 	{
-		targetWidth=Swapchain.Extent.width;
-		targetHeight=Swapchain.Extent.height;
+		targetWidth=swapchain.Extent.width;
+		targetHeight=swapchain.Extent.height;
 	}
 
-	vkuCreateTexture2D(&Context, &colorTemp[eye], targetWidth>>2, targetHeight>>2, colorFormat, VK_SAMPLE_COUNT_1_BIT);
-	vkuCreateTexture2D(&Context, &colorBlur[eye], targetWidth>>2, targetHeight>>2, colorFormat, VK_SAMPLE_COUNT_1_BIT);
+	vkuCreateTexture2D(&vkContext, &colorTemp[eye], targetWidth>>2, targetHeight>>2, colorFormat, VK_SAMPLE_COUNT_1_BIT);
+	vkuCreateTexture2D(&vkContext, &colorBlur[eye], targetWidth>>2, targetHeight>>2, colorFormat, VK_SAMPLE_COUNT_1_BIT);
 
-	VkCommandBuffer commandBuffer=vkuOneShotCommandBufferBegin(&Context);
+	VkCommandBuffer commandBuffer=vkuOneShotCommandBufferBegin(&vkContext);
 	vkuTransitionLayout(commandBuffer, colorTemp[eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuTransitionLayout(commandBuffer, colorBlur[eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuOneShotCommandBufferEnd(&Context, commandBuffer);
+	vkuOneShotCommandBufferEnd(&vkContext, commandBuffer);
 
 	// Threshold framebuffer contains 1/4 sized final main render frame, outputs to ColorBlur image
-	vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
+	vkCreateFramebuffer(vkContext.Device, &(VkFramebufferCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 		.renderPass=thresholdRenderPass,
@@ -273,7 +273,7 @@ void CreateCompositeFramebuffers(uint32_t eye)
 	}, 0, &thresholdFramebuffer[eye]);
 
 	// Gussian temp frame buffer takes output of thresholding pipeline and does the first gaussian blur pass, outputs to ColorTemp
-	vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
+	vkCreateFramebuffer(vkContext.Device, &(VkFramebufferCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 		.renderPass=gaussianRenderPass,
@@ -285,7 +285,7 @@ void CreateCompositeFramebuffers(uint32_t eye)
 	}, 0, &gaussianFramebufferTemp[eye]);
 
 	// Gussian blur frame buffer takes output of first pass gaussian blur and does the second gaussian blur pass, outputs to ColorBlur
-	vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
+	vkCreateFramebuffer(vkContext.Device, &(VkFramebufferCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 		.renderPass=gaussianRenderPass,
@@ -299,14 +299,14 @@ void CreateCompositeFramebuffers(uint32_t eye)
 	if(!isVR)
 	{
 		// Compositing pipeline images, these are the actual swapchain framebuffers that will get presented
-		for(uint32_t i=0;i<Swapchain.NumImages;i++)
+		for(uint32_t i=0;i<swapchain.NumImages;i++)
 		{
-			vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
+			vkCreateFramebuffer(vkContext.Device, &(VkFramebufferCreateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 				.renderPass=compositeRenderPass,
 				.attachmentCount=1,
-				.pAttachments=(VkImageView[]){ Swapchain.ImageView[i] },
+				.pAttachments=(VkImageView[]){ swapchain.ImageView[i] },
 				.width=targetWidth,
 				.height=targetHeight,
 				.layers=1,
@@ -318,7 +318,7 @@ void CreateCompositeFramebuffers(uint32_t eye)
 		// Compositing pipeline images, these are the actual swapchain framebuffers that will get presented
 		for(uint32_t i=0;i<xrContext.swapchain[0].numImages;i++)
 		{
-			vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
+			vkCreateFramebuffer(vkContext.Device, &(VkFramebufferCreateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 				.renderPass=compositeRenderPass,
@@ -329,7 +329,7 @@ void CreateCompositeFramebuffers(uint32_t eye)
 				.layers=1,
 			}, 0, &perFrame[i].compositeFramebuffer[0]);
 
-			vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
+			vkCreateFramebuffer(vkContext.Device, &(VkFramebufferCreateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 				.renderPass=compositeRenderPass,
@@ -352,7 +352,7 @@ bool CreateCompositePipeline(void)
 	if(!isVR)
 	{
 		attachementFinalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		surfaceFormat=Swapchain.SurfaceFormat.format;
+		surfaceFormat=swapchain.SurfaceFormat.format;
 	}
 	else
 	{
@@ -360,7 +360,7 @@ bool CreateCompositePipeline(void)
 		surfaceFormat=xrContext.swapchainFormat;
 	}
 
-	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
+	vkCreateRenderPass(vkContext.Device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.attachmentCount=1,
@@ -403,20 +403,20 @@ bool CreateCompositePipeline(void)
 		}
 		}, 0, &compositeRenderPass);
 
-	vkuInitDescriptorSet(&compositeDescriptorSet, &Context);
+	vkuInitDescriptorSet(&compositeDescriptorSet, &vkContext);
 	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 
 	vkuAssembleDescriptorSetLayout(&compositeDescriptorSet);
 
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
 		.pSetLayouts=&compositeDescriptorSet.DescriptorSetLayout,
 	}, 0, &compositePipelineLayout);
 
-	vkuInitPipeline(&compositePipeline, &Context);
+	vkuInitPipeline(&compositePipeline, &vkContext);
 
 	vkuPipeline_SetPipelineLayout(&compositePipeline, compositePipelineLayout);
 	vkuPipeline_SetRenderPass(&compositePipeline, compositeRenderPass);
@@ -449,49 +449,49 @@ bool CreateCompositePipeline(void)
 void DestroyComposite(void)
 {
 	// Thresholding pipeline
-	vkDestroyDescriptorSetLayout(Context.Device, thresholdDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(vkContext.Device, thresholdDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
 
-	vkDestroyFramebuffer(Context.Device, thresholdFramebuffer[0], VK_NULL_HANDLE);
+	vkDestroyFramebuffer(vkContext.Device, thresholdFramebuffer[0], VK_NULL_HANDLE);
 
 	if(isVR)
-		vkDestroyFramebuffer(Context.Device, thresholdFramebuffer[1], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(vkContext.Device, thresholdFramebuffer[1], VK_NULL_HANDLE);
 
-	vkDestroyPipeline(Context.Device, thresholdPipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(Context.Device, thresholdPipelineLayout, VK_NULL_HANDLE);
-	vkDestroyRenderPass(Context.Device, thresholdRenderPass, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.Device, thresholdPipeline.Pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.Device, thresholdPipelineLayout, VK_NULL_HANDLE);
+	vkDestroyRenderPass(vkContext.Device, thresholdRenderPass, VK_NULL_HANDLE);
 	//////
 
 	// Gaussian blur pipeline
-	vkDestroyDescriptorSetLayout(Context.Device, gaussianDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(vkContext.Device, gaussianDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
 
-	vkDestroyFramebuffer(Context.Device, gaussianFramebufferTemp[0], VK_NULL_HANDLE);
-	vkDestroyFramebuffer(Context.Device, gaussianFramebufferBlur[0], VK_NULL_HANDLE);
+	vkDestroyFramebuffer(vkContext.Device, gaussianFramebufferTemp[0], VK_NULL_HANDLE);
+	vkDestroyFramebuffer(vkContext.Device, gaussianFramebufferBlur[0], VK_NULL_HANDLE);
 
 	if(isVR)
 	{
-		vkDestroyFramebuffer(Context.Device, gaussianFramebufferTemp[1], VK_NULL_HANDLE);
-		vkDestroyFramebuffer(Context.Device, gaussianFramebufferBlur[1], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(vkContext.Device, gaussianFramebufferTemp[1], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(vkContext.Device, gaussianFramebufferBlur[1], VK_NULL_HANDLE);
 	}
 
-	vkDestroyPipeline(Context.Device, gaussianPipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(Context.Device, gaussianPipelineLayout, VK_NULL_HANDLE);
-	vkDestroyRenderPass(Context.Device, gaussianRenderPass, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.Device, gaussianPipeline.Pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.Device, gaussianPipelineLayout, VK_NULL_HANDLE);
+	vkDestroyRenderPass(vkContext.Device, gaussianRenderPass, VK_NULL_HANDLE);
 	//////
 
 	// Compositing pipeline
-	vkDestroyDescriptorSetLayout(Context.Device, compositeDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(vkContext.Device, compositeDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
 
-	for(uint32_t i=0;i<Swapchain.NumImages;i++)
+	for(uint32_t i=0;i<swapchain.NumImages;i++)
 	{
-		vkDestroyFramebuffer(Context.Device, perFrame[i].compositeFramebuffer[0], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(vkContext.Device, perFrame[i].compositeFramebuffer[0], VK_NULL_HANDLE);
 
 		if(isVR)
-			vkDestroyFramebuffer(Context.Device, perFrame[i].compositeFramebuffer[1], VK_NULL_HANDLE);
+			vkDestroyFramebuffer(vkContext.Device, perFrame[i].compositeFramebuffer[1], VK_NULL_HANDLE);
 	}
 
-	vkDestroyPipeline(Context.Device, compositePipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(Context.Device, compositePipelineLayout, VK_NULL_HANDLE);
-	vkDestroyRenderPass(Context.Device, compositeRenderPass, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.Device, compositePipeline.Pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.Device, compositePipelineLayout, VK_NULL_HANDLE);
+	vkDestroyRenderPass(vkContext.Device, compositeRenderPass, VK_NULL_HANDLE);
 	//////
 }
 
@@ -506,8 +506,8 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	}
 	else
 	{
-		width=Swapchain.Extent.width;
-		height=Swapchain.Extent.height;
+		width=swapchain.Extent.width;
+		height=swapchain.Extent.height;
 	}
 
 	// Threshold and down sample to 1/4 original image size
@@ -652,7 +652,7 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 
 	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
 
-	//vkCmdEndRendering(PerFrame[index].CommandBuffer);
+	//vkCmdEndRendering(perFrame[index].CommandBuffer);
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 	//////
 

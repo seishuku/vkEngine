@@ -10,10 +10,10 @@
 #include "models.h"
 #include "perframe.h"
 
-extern VkuContext_t Context;
-extern VkRenderPass RenderPass;
+extern VkuContext_t vkContext;
+extern VkRenderPass renderPass;
 extern VkSampleCountFlags MSAA;
-extern VkuSwapchain_t Swapchain;
+extern VkuSwapchain_t swapchain;
 extern VkFormat colorFormat, depthFormat;
 
 VkuDescriptorSet_t skyboxDescriptorSet;
@@ -22,21 +22,21 @@ VkuPipeline_t skyboxPipeline;
 
 bool CreateSkyboxPipeline(void)
 {
-	for(uint32_t i=0;i<Swapchain.NumImages;i++)
+	for(uint32_t i=0;i<swapchain.NumImages;i++)
 	{
-		vkuCreateHostBuffer(&Context, &perFrame[i].skyboxUBOBuffer[0], sizeof(Skybox_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		vkMapMemory(Context.Device, perFrame[i].skyboxUBOBuffer[0].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].skyboxUBO[0]);
+		vkuCreateHostBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[0], sizeof(Skybox_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+		vkMapMemory(vkContext.Device, perFrame[i].skyboxUBOBuffer[0].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].skyboxUBO[0]);
 
-		vkuCreateHostBuffer(&Context, &perFrame[i].skyboxUBOBuffer[1], sizeof(Skybox_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		vkMapMemory(Context.Device, perFrame[i].skyboxUBOBuffer[1].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].skyboxUBO[1]);
+		vkuCreateHostBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[1], sizeof(Skybox_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+		vkMapMemory(vkContext.Device, perFrame[i].skyboxUBOBuffer[1].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].skyboxUBO[1]);
 	}
 
-	vkuInitDescriptorSet(&skyboxDescriptorSet, &Context);
+	vkuInitDescriptorSet(&skyboxDescriptorSet, &vkContext);
 	vkuDescriptorSet_AddBinding(&skyboxDescriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&skyboxDescriptorSet, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&skyboxDescriptorSet);
 
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
@@ -44,10 +44,10 @@ bool CreateSkyboxPipeline(void)
 		.pushConstantRangeCount=0,
 	}, 0, &skyboxPipelineLayout);
 
-	vkuInitPipeline(&skyboxPipeline, &Context);
+	vkuInitPipeline(&skyboxPipeline, &vkContext);
 
 	vkuPipeline_SetPipelineLayout(&skyboxPipeline, skyboxPipelineLayout);
-	vkuPipeline_SetRenderPass(&skyboxPipeline, RenderPass);
+	vkuPipeline_SetRenderPass(&skyboxPipeline, renderPass);
 
 	skyboxPipeline.DepthTest=VK_TRUE;
 	skyboxPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
@@ -76,16 +76,16 @@ bool CreateSkyboxPipeline(void)
 
 void DestroySkybox(void)
 {
-	for(uint32_t i=0;i<Swapchain.NumImages;i++)
+	for(uint32_t i=0;i<swapchain.NumImages;i++)
 	{
-		vkUnmapMemory(Context.Device, perFrame[i].skyboxUBOBuffer[0].DeviceMemory);
-		vkuDestroyBuffer(&Context, &perFrame[i].skyboxUBOBuffer[0]);
+		vkUnmapMemory(vkContext.Device, perFrame[i].skyboxUBOBuffer[0].DeviceMemory);
+		vkuDestroyBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[0]);
 
-		vkUnmapMemory(Context.Device, perFrame[i].skyboxUBOBuffer[1].DeviceMemory);
-		vkuDestroyBuffer(&Context, &perFrame[i].skyboxUBOBuffer[1]);
+		vkUnmapMemory(vkContext.Device, perFrame[i].skyboxUBOBuffer[1].DeviceMemory);
+		vkuDestroyBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[1]);
 	}
 
-	vkDestroyDescriptorSetLayout(Context.Device, skyboxDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
-	vkDestroyPipeline(Context.Device, skyboxPipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(Context.Device, skyboxPipelineLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(vkContext.Device, skyboxDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.Device, skyboxPipeline.Pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.Device, skyboxPipelineLayout, VK_NULL_HANDLE);
 }

@@ -12,6 +12,6 @@ enum
 	NUM_MODELS
 };
 
-extern BModel_t Models[NUM_MODELS];
+extern BModel_t models[NUM_MODELS];
 
 #endif

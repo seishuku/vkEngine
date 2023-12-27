@@ -23,12 +23,12 @@ bool ToggleFullscreen=true;
 bool isVR=true;
 extern XruContext_t xrContext;
 
-extern VkInstance Instance;
-extern VkuContext_t Context;
+extern VkInstance vkInstance;
+extern VkuContext_t vkContext;
 
-extern VkuMemZone_t *VkZone;
+extern VkuMemZone_t *vkZone;
 
-extern VkuSwapchain_t Swapchain;
+extern VkuSwapchain_t swapchain;
 
 uint32_t windowWidth=1920, windowHeight=1080;
 extern uint32_t renderWidth, renderHeight;
@@ -166,7 +166,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 					windowWidth=GetSystemMetrics(SM_CXSCREEN);
 					windowHeight=GetSystemMetrics(SM_CYSCREEN);
-					SetWindowPos(Context.hWnd, HWND_TOPMOST, 0, 0, windowWidth, windowHeight, 0);
+					SetWindowPos(vkContext.hWnd, HWND_TOPMOST, 0, 0, windowWidth, windowHeight, 0);
 				}
 				else
 				{
@@ -175,7 +175,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 					windowWidth=OldWidth;
 					windowHeight=OldHeight;
-					SetWindowPos(Context.hWnd, HWND_TOPMOST, 0, 0, windowWidth, windowHeight, 0);
+					SetWindowPos(vkContext.hWnd, HWND_TOPMOST, 0, 0, windowWidth, windowHeight, 0);
 				}
 			}
 			break;
@@ -441,39 +441,39 @@ int main(int argc, char **argv)
 	SetRect(&Rect, 0, 0, windowWidth, windowHeight);
 	AdjustWindowRect(&Rect, WS_POPUP, FALSE);
 
-	Context.hWnd=CreateWindow(szAppName, szAppName, WS_POPUP|WS_CLIPSIBLINGS, 0, 0, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
+	vkContext.hWnd=CreateWindow(szAppName, szAppName, WS_POPUP|WS_CLIPSIBLINGS, 0, 0, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
 
-	ShowWindow(Context.hWnd, SW_SHOW);
-	SetForegroundWindow(Context.hWnd);
+	ShowWindow(vkContext.hWnd, SW_SHOW);
+	SetForegroundWindow(vkContext.hWnd);
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan instance...\n");
-	if(!CreateVulkanInstance(&Instance))
+	if(!CreateVulkanInstance(&vkInstance))
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
 		return -1;
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan context...\n");
-	if(!CreateVulkanContext(Instance, &Context))
+	if(!CreateVulkanContext(vkInstance, &vkContext))
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
 		return -1;
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Creating swapchain...\n");
-	if(!vkuCreateSwapchain(&Context, &Swapchain, VK_TRUE))
+	if(!vkuCreateSwapchain(&vkContext, &swapchain, VK_TRUE))
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
 		return -1;
 	}
 	else
 	{
-		renderWidth=Swapchain.Extent.width;
-		renderHeight=Swapchain.Extent.height;
+		renderWidth=swapchain.Extent.width;
+		renderHeight=swapchain.Extent.height;
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Initializing VR...\n");
-	if(!VR_Init(&xrContext, Instance, &Context))
+	if(!VR_Init(&xrContext, vkInstance, &vkContext))
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
 		isVR=false;
@@ -484,7 +484,7 @@ int main(int argc, char **argv)
 		renderHeight=xrContext.swapchainExtent.height;
 		windowWidth=renderWidth;
 		windowHeight=renderHeight;
-		MoveWindow(Context.hWnd, 0, 0, windowWidth/2, windowHeight/2, TRUE);
+		MoveWindow(vkContext.hWnd, 0, 0, windowWidth/2, windowHeight/2, TRUE);
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Initializing Vulkan resources...\n");
@@ -498,7 +498,7 @@ int main(int argc, char **argv)
 	Zone_Print(Zone);
 
 	DBGPRINTF(DEBUG_INFO, "\nCurrent vulkan zone memory allocations:\n");
-	vkuMem_Print(VkZone);
+	vkuMem_Print(vkZone);
 
 #if 0
 	// RenderDoc frame capture for VR mode
@@ -572,10 +572,10 @@ int main(int argc, char **argv)
 
 	DBGPRINTF(DEBUG_INFO, "Shutting down...\n");
 	Destroy();
-	DestroyVulkan(Instance, &Context);
-	vkDestroyInstance(Instance, VK_NULL_HANDLE);
+	DestroyVulkan(vkInstance, &vkContext);
+	vkDestroyInstance(vkInstance, VK_NULL_HANDLE);
 
-	DestroyWindow(Context.hWnd);
+	DestroyWindow(vkContext.hWnd);
 
 	DBGPRINTF(DEBUG_INFO, "Zone remaining block list:\n");
 	Zone_Print(Zone);
