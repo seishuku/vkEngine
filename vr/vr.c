@@ -359,7 +359,7 @@ static bool VR_InitSystem(XruContext_t *xrContext, const XrFormFactor formFactor
 		return false;
 	}
 
-	char *instanceExtensionNames=Zone_Malloc(Zone, instanceExtensionNamesSize);
+	char *instanceExtensionNames=Zone_Malloc(zone, instanceExtensionNamesSize);
 
 	if(instanceExtensionNames==NULL)
 	{
@@ -374,7 +374,7 @@ static bool VR_InitSystem(XruContext_t *xrContext, const XrFormFactor formFactor
 	}
 
 	DBGPRINTF(DEBUG_INFO, "VR: Instance extension requirements: %s\n", instanceExtensionNames);
-	Zone_Free(Zone, instanceExtensionNames);
+	Zone_Free(zone, instanceExtensionNames);
 
 	uint32_t extensionNamesSize=0;
 	if(!xruCheck(xrContext->instance, xrGetVulkanDeviceExtensionsKHR(xrContext->instance, xrContext->systemID, 0, &extensionNamesSize, XR_NULL_HANDLE)))
@@ -383,7 +383,7 @@ static bool VR_InitSystem(XruContext_t *xrContext, const XrFormFactor formFactor
 		return false;
 	}
 
-	char *extensionNames=Zone_Malloc(Zone, extensionNamesSize);
+	char *extensionNames=Zone_Malloc(zone, extensionNamesSize);
 
 	if(extensionNames==NULL)
 	{
@@ -398,7 +398,7 @@ static bool VR_InitSystem(XruContext_t *xrContext, const XrFormFactor formFactor
 	}
 
 	DBGPRINTF(DEBUG_INFO, "VR: Extension requirements: %s\n", extensionNames);
-	Zone_Free(Zone, extensionNames);
+	Zone_Free(zone, extensionNames);
 
 	XrSystemProperties systemProps={ .type=XR_TYPE_SYSTEM_PROPERTIES };
 
@@ -479,9 +479,9 @@ static bool VR_InitSession(XruContext_t *xrContext, VkInstance Instance, VkuCont
 		.type=XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR,
 		.next=XR_NULL_HANDLE,
 		.instance=Instance,
-		.physicalDevice=Context->PhysicalDevice,
-		.device=Context->Device,
-		.queueFamilyIndex=Context->QueueFamilyIndex,
+		.physicalDevice=Context->physicalDevice,
+		.device=Context->device,
+		.queueFamilyIndex=Context->queueFamilyIndex,
 		.queueIndex=0
 	};
 
@@ -534,7 +534,7 @@ static bool VR_InitSwapchain(XruContext_t *xrContext, VkuContext_t *Context)
 
 	DBGPRINTF(DEBUG_INFO, "VR: Runtime supports %d swapchain formats.\n", swapchainFormatCount);
 
-	int64_t *swapchainFormats=Zone_Malloc(Zone, sizeof(int64_t)*swapchainFormatCount);
+	int64_t *swapchainFormats=Zone_Malloc(zone, sizeof(int64_t)*swapchainFormatCount);
 
 	if(swapchainFormats==NULL)
 	{
@@ -573,7 +573,7 @@ static bool VR_InitSwapchain(XruContext_t *xrContext, VkuContext_t *Context)
 			break;
 	}
 
-	Zone_Free(Zone, swapchainFormats);
+	Zone_Free(zone, swapchainFormats);
 
 	// Create swapchain images, imageviews, and transition to correct image layout
 	VkCommandBuffer CommandBuffer=vkuOneShotCommandBufferBegin(Context);
@@ -621,7 +621,7 @@ static bool VR_InitSwapchain(XruContext_t *xrContext, VkuContext_t *Context)
 		{
 			vkuTransitionLayout(CommandBuffer, xrContext->swapchain[i].images[j].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-			vkCreateImageView(Context->Device, &(VkImageViewCreateInfo)
+			vkCreateImageView(Context->device, &(VkImageViewCreateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 				.pNext=VK_NULL_HANDLE,

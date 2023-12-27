@@ -22,13 +22,13 @@ VkuPipeline_t skyboxPipeline;
 
 bool CreateSkyboxPipeline(void)
 {
-	for(uint32_t i=0;i<swapchain.NumImages;i++)
+	for(uint32_t i=0;i<swapchain.numImages;i++)
 	{
 		vkuCreateHostBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[0], sizeof(Skybox_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		vkMapMemory(vkContext.Device, perFrame[i].skyboxUBOBuffer[0].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].skyboxUBO[0]);
+		vkMapMemory(vkContext.device, perFrame[i].skyboxUBOBuffer[0].deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].skyboxUBO[0]);
 
 		vkuCreateHostBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[1], sizeof(Skybox_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		vkMapMemory(vkContext.Device, perFrame[i].skyboxUBOBuffer[1].DeviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].skyboxUBO[1]);
+		vkMapMemory(vkContext.device, perFrame[i].skyboxUBOBuffer[1].deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].skyboxUBO[1]);
 	}
 
 	vkuInitDescriptorSet(&skyboxDescriptorSet, &vkContext);
@@ -36,11 +36,11 @@ bool CreateSkyboxPipeline(void)
 	vkuDescriptorSet_AddBinding(&skyboxDescriptorSet, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&skyboxDescriptorSet);
 
-	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
-		.pSetLayouts=&skyboxDescriptorSet.DescriptorSetLayout,
+		.pSetLayouts=&skyboxDescriptorSet.descriptorSetLayout,
 		.pushConstantRangeCount=0,
 	}, 0, &skyboxPipelineLayout);
 
@@ -49,10 +49,10 @@ bool CreateSkyboxPipeline(void)
 	vkuPipeline_SetPipelineLayout(&skyboxPipeline, skyboxPipelineLayout);
 	vkuPipeline_SetRenderPass(&skyboxPipeline, renderPass);
 
-	skyboxPipeline.DepthTest=VK_TRUE;
-	skyboxPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
-	skyboxPipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
-	skyboxPipeline.RasterizationSamples=MSAA;
+	skyboxPipeline.depthTest=VK_TRUE;
+	skyboxPipeline.cullMode=VK_CULL_MODE_BACK_BIT;
+	skyboxPipeline.depthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
+	skyboxPipeline.rasterizationSamples=MSAA;
 
 	if(!vkuPipeline_AddStage(&skyboxPipeline, "shaders/skybox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
@@ -76,16 +76,16 @@ bool CreateSkyboxPipeline(void)
 
 void DestroySkybox(void)
 {
-	for(uint32_t i=0;i<swapchain.NumImages;i++)
+	for(uint32_t i=0;i<swapchain.numImages;i++)
 	{
-		vkUnmapMemory(vkContext.Device, perFrame[i].skyboxUBOBuffer[0].DeviceMemory);
+		vkUnmapMemory(vkContext.device, perFrame[i].skyboxUBOBuffer[0].deviceMemory);
 		vkuDestroyBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[0]);
 
-		vkUnmapMemory(vkContext.Device, perFrame[i].skyboxUBOBuffer[1].DeviceMemory);
+		vkUnmapMemory(vkContext.device, perFrame[i].skyboxUBOBuffer[1].deviceMemory);
 		vkuDestroyBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[1]);
 	}
 
-	vkDestroyDescriptorSetLayout(vkContext.Device, skyboxDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
-	vkDestroyPipeline(vkContext.Device, skyboxPipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.Device, skyboxPipelineLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(vkContext.device, skyboxDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.device, skyboxPipeline.pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.device, skyboxPipelineLayout, VK_NULL_HANDLE);
 }

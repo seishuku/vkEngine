@@ -392,14 +392,14 @@ bool HRIR_Init(void)
 	if(sphere.sampleLength>MAX_HRIR_SAMPLES)
 		return false;
 
-	sphere.indices=(uint32_t *)Zone_Malloc(Zone, sizeof(uint32_t)*sphere.numIndex);
+	sphere.indices=(uint32_t *)Zone_Malloc(zone, sizeof(uint32_t)*sphere.numIndex);
 
 	if(sphere.indices==NULL)
 		return false;
 
 	fread(sphere.indices, sizeof(uint32_t), sphere.numIndex, stream);
 
-	sphere.vertices=(HRIR_Vertex_t *)Zone_Malloc(Zone, sizeof(HRIR_Vertex_t)*sphere.numVertex);
+	sphere.vertices=(HRIR_Vertex_t *)Zone_Malloc(zone, sizeof(HRIR_Vertex_t)*sphere.numVertex);
 
 	if(sphere.vertices==NULL)
 		return false;
@@ -533,8 +533,8 @@ int Audio_Init(void)
 void Audio_Destroy(void)
 {
 	// Clean up HRIR data
-	Zone_Free(Zone, sphere.indices);
-	Zone_Free(Zone, sphere.vertices);
+	Zone_Free(zone, sphere.indices);
+	Zone_Free(zone, sphere.vertices);
 
 #ifdef ANDROID
 	// Shut down Android Audio

@@ -6,76 +6,76 @@
 #include "../system/system.h"
 #include "vulkan.h"
 
-VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, VkBool32 VSync)
+VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, VkBool32 vSync)
 {
 	VkResult result=VK_SUCCESS;
-	VkFormat PreferredFormats[]=
+	VkFormat preferredFormats[]=
 	{
 		VK_FORMAT_B8G8R8A8_SRGB,
 		VK_FORMAT_B8G8R8A8_UNORM,
 		VK_FORMAT_R8G8B8A8_SRGB,
 		VK_FORMAT_R8G8B8A8_UNORM
 	};
-	bool FoundFormat=false;
+	bool foundFormat=false;
 
-	if(!Swapchain)
+	if(!swapchain)
 		return VK_FALSE;
 
-	uint32_t FormatCount=0;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &FormatCount, VK_NULL_HANDLE);
+	uint32_t formatCount=0;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(context->physicalDevice, context->surface, &formatCount, VK_NULL_HANDLE);
 
-	VkSurfaceFormatKHR *SurfaceFormats=(VkSurfaceFormatKHR *)Zone_Malloc(Zone, sizeof(VkSurfaceFormatKHR)*FormatCount);
+	VkSurfaceFormatKHR *surfaceFormats=(VkSurfaceFormatKHR *)Zone_Malloc(zone, sizeof(VkSurfaceFormatKHR)*formatCount);
 
-	if(SurfaceFormats==NULL)
+	if(surfaceFormats==NULL)
 		return VK_FALSE;
 
-	vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &FormatCount, SurfaceFormats);
+	vkGetPhysicalDeviceSurfaceFormatsKHR(context->physicalDevice, context->surface, &formatCount, surfaceFormats);
 
 	// Find a suitable format, best match to top preferred format
-	for(uint32_t i=0;i<sizeof(PreferredFormats);i++)
+	for(uint32_t i=0;i<sizeof(preferredFormats);i++)
 	{
-		for(uint32_t j=0;j<FormatCount;j++)
+		for(uint32_t j=0;j<formatCount;j++)
 		{
-			if(SurfaceFormats[j].format==PreferredFormats[i])
+			if(surfaceFormats[j].format==preferredFormats[i])
 			{
-				Swapchain->SurfaceFormat=SurfaceFormats[j];
-				FoundFormat=true;
+				swapchain->surfaceFormat=surfaceFormats[j];
+				foundFormat=true;
 				break;
 			}
 		}
 
-		if(FoundFormat)
+		if(foundFormat)
 			break;
 	}
 
-	Zone_Free(Zone, SurfaceFormats);
+	Zone_Free(zone, surfaceFormats);
 
 	// Get physical device surface properties and formats
-	VkSurfaceCapabilitiesKHR SurfCaps;
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Context->PhysicalDevice, Context->Surface, &SurfCaps);
+	VkSurfaceCapabilitiesKHR surfaceCaps;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context->physicalDevice, context->surface, &surfaceCaps);
 
-	if(SurfCaps.currentTransform&VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR||SurfCaps.currentTransform&VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR)
+	if(surfaceCaps.currentTransform&VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR||surfaceCaps.currentTransform&VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR)
 	{
 		// Swap to get identity width and height
-		uint32_t width=SurfCaps.currentExtent.width;
-		uint32_t height=SurfCaps.currentExtent.height;
-		SurfCaps.currentExtent.height=width;
-		SurfCaps.currentExtent.width=height;
+		uint32_t width=surfaceCaps.currentExtent.width;
+		uint32_t height=surfaceCaps.currentExtent.height;
+		surfaceCaps.currentExtent.height=width;
+		surfaceCaps.currentExtent.width=height;
 	}
 
 	// Set swapchain extents to the surface width/height
-	Swapchain->Extent=SurfCaps.currentExtent;
+	swapchain->extent=surfaceCaps.currentExtent;
 
 	// Get available present modes
-	uint32_t PresentModeCount=0;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(Context->PhysicalDevice, Context->Surface, &PresentModeCount, NULL);
+	uint32_t presentModeCount=0;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(context->physicalDevice, context->surface, &presentModeCount, NULL);
 
-	VkPresentModeKHR *PresentModes=(VkPresentModeKHR *)Zone_Malloc(Zone, sizeof(VkPresentModeKHR)*PresentModeCount);
+	VkPresentModeKHR *presentModes=(VkPresentModeKHR *)Zone_Malloc(zone, sizeof(VkPresentModeKHR)*presentModeCount);
 
-	if(PresentModes==NULL)
+	if(presentModes==NULL)
 		return VK_FALSE;
 
-	vkGetPhysicalDeviceSurfacePresentModesKHR(Context->PhysicalDevice, Context->Surface, &PresentModeCount, PresentModes);
+	vkGetPhysicalDeviceSurfacePresentModesKHR(context->physicalDevice, context->surface, &presentModeCount, presentModes);
 
 	// Select a present mode for the swapchain
 
@@ -84,29 +84,29 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, Vk
 
 	// If v-sync is not requested, try to find a mailbox mode
 	// It's the lowest latency non-tearing present mode available
-	VkPresentModeKHR SwapchainPresentMode=VK_PRESENT_MODE_FIFO_KHR;
+	VkPresentModeKHR swapchainPresentMode=VK_PRESENT_MODE_FIFO_KHR;
 
-	if(!VSync)
+	if(!vSync)
 	{
-		for(uint32_t i=0;i<PresentModeCount;i++)
+		for(uint32_t i=0;i<presentModeCount;i++)
 		{
-			if(PresentModes[i]==VK_PRESENT_MODE_MAILBOX_KHR)
+			if(presentModes[i]==VK_PRESENT_MODE_MAILBOX_KHR)
 			{
-				SwapchainPresentMode=VK_PRESENT_MODE_MAILBOX_KHR;
+				swapchainPresentMode=VK_PRESENT_MODE_MAILBOX_KHR;
 				break;
 			}
 
-			if((SwapchainPresentMode!=VK_PRESENT_MODE_MAILBOX_KHR)&&(PresentModes[i]==VK_PRESENT_MODE_IMMEDIATE_KHR))
-				SwapchainPresentMode=VK_PRESENT_MODE_IMMEDIATE_KHR;
+			if((swapchainPresentMode!=VK_PRESENT_MODE_MAILBOX_KHR)&&(presentModes[i]==VK_PRESENT_MODE_IMMEDIATE_KHR))
+				swapchainPresentMode=VK_PRESENT_MODE_IMMEDIATE_KHR;
 		}
 	}
 
-	Zone_Free(Zone, PresentModes);
+	Zone_Free(zone, presentModes);
 
 	// Find a supported composite alpha format (not all devices support alpha opaque)
 	// Simply select the first composite alpha format available
-	VkCompositeAlphaFlagBitsKHR CompositeAlpha=VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	VkCompositeAlphaFlagBitsKHR CompositeAlphaFlags[]=
+	VkCompositeAlphaFlagBitsKHR compositeAlpha=VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	VkCompositeAlphaFlagBitsKHR compositeAlphaFlags[]=
 	{
 		VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
 		VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
@@ -114,47 +114,47 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, Vk
 		VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR
 	};
 
-	for(uint32_t i=0;i<sizeof(CompositeAlphaFlags);i++)
+	for(uint32_t i=0;i<sizeof(compositeAlphaFlags);i++)
 	{
-		if(SurfCaps.supportedCompositeAlpha&CompositeAlphaFlags[i])
+		if(surfaceCaps.supportedCompositeAlpha&compositeAlphaFlags[i])
 		{
-			CompositeAlpha=CompositeAlphaFlags[i];
+			compositeAlpha=compositeAlphaFlags[i];
 			break;
 		}
 	}
 
-	VkImageUsageFlags ImageUsage=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	VkImageUsageFlags imageUsage=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
 	// Enable transfer source on swap chain images if supported
-	if(SurfCaps.supportedUsageFlags&VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
-		ImageUsage|=VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	if(surfaceCaps.supportedUsageFlags&VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
+		imageUsage|=VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
 	// Enable transfer destination on swap chain images if supported
-	if(SurfCaps.supportedUsageFlags&VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-		ImageUsage|=VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	if(surfaceCaps.supportedUsageFlags&VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+		imageUsage|=VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-	result=vkCreateSwapchainKHR(Context->Device, &(VkSwapchainCreateInfoKHR)
+	result=vkCreateSwapchainKHR(context->device, &(VkSwapchainCreateInfoKHR)
 	{
 		.sType=VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
 		.pNext=VK_NULL_HANDLE,
 		.flags=0,
-		.surface=Context->Surface,
-		.minImageCount=SurfCaps.minImageCount,
-		.imageFormat=Swapchain->SurfaceFormat.format,
-		.imageColorSpace=Swapchain->SurfaceFormat.colorSpace,
-		.imageExtent=Swapchain->Extent,
+		.surface=context->surface,
+		.minImageCount=surfaceCaps.minImageCount,
+		.imageFormat=swapchain->surfaceFormat.format,
+		.imageColorSpace=swapchain->surfaceFormat.colorSpace,
+		.imageExtent=swapchain->extent,
 		.imageArrayLayers=1,
-		.imageUsage=ImageUsage,
+		.imageUsage=imageUsage,
 		.imageSharingMode=VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount=0,
 		.pQueueFamilyIndices=VK_NULL_HANDLE,
-		.preTransform=SurfCaps.currentTransform,
-		.compositeAlpha=CompositeAlpha,
-		.presentMode=SwapchainPresentMode,
+		.preTransform=surfaceCaps.currentTransform,
+		.compositeAlpha=compositeAlpha,
+		.presentMode=swapchainPresentMode,
 		// Setting clipped to VK_TRUE allows the implementation to discard rendering outside of the surface area
 		.clipped=VK_TRUE,
 		.oldSwapchain=VK_NULL_HANDLE,
-	}, VK_NULL_HANDLE, &Swapchain->Swapchain);
+	}, VK_NULL_HANDLE, &swapchain->swapchain);
 
 	if(result!=VK_SUCCESS)
 	{
@@ -163,32 +163,32 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, Vk
 	}
 
 	// Get swap chain image count
-	Swapchain->NumImages=0;
-	vkGetSwapchainImagesKHR(Context->Device, Swapchain->Swapchain, &Swapchain->NumImages, VK_NULL_HANDLE);
+	swapchain->numImages=0;
+	vkGetSwapchainImagesKHR(context->device, swapchain->swapchain, &swapchain->numImages, VK_NULL_HANDLE);
 
 	// Check to make sure the driver doesn't want more than what we can support
-	if(Swapchain->NumImages==0||Swapchain->NumImages>VKU_MAX_FRAME_COUNT)
+	if(swapchain->numImages==0||swapchain->numImages>VKU_MAX_FRAME_COUNT)
 	{
-		DBGPRINTF(DEBUG_ERROR, "Swapchain minimum image count is greater than supported number of images. (requested: %d, minimum: %d)", VKU_MAX_FRAME_COUNT, SurfCaps.minImageCount);
+		DBGPRINTF(DEBUG_ERROR, "Swapchain minimum image count is greater than supported number of images. (requested: %d, minimum: %d)", VKU_MAX_FRAME_COUNT, surfaceCaps.minImageCount);
 		return VK_FALSE;
 	}
 
 	// Get the swap chain images
-	vkGetSwapchainImagesKHR(Context->Device, Swapchain->Swapchain, &Swapchain->NumImages, Swapchain->Image);
+	vkGetSwapchainImagesKHR(context->device, swapchain->swapchain, &swapchain->numImages, swapchain->image);
 
 	// Create imageviews and transition to correct image layout
-	VkCommandBuffer CommandBuffer=vkuOneShotCommandBufferBegin(Context);
+	VkCommandBuffer commandBuffer=vkuOneShotCommandBufferBegin(context);
 
-	for(uint32_t i=0;i<Swapchain->NumImages;i++)
+	for(uint32_t i=0;i<swapchain->numImages;i++)
 	{
-		vkuTransitionLayout(CommandBuffer, Swapchain->Image[i], 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+		vkuTransitionLayout(commandBuffer, swapchain->image[i], 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
-		vkCreateImageView(Context->Device, &(VkImageViewCreateInfo)
+		vkCreateImageView(context->device, &(VkImageViewCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 			.pNext=VK_NULL_HANDLE,
-			.image=Swapchain->Image[i],
-			.format=Swapchain->SurfaceFormat.format,
+			.image=swapchain->image[i],
+			.format=swapchain->surfaceFormat.format,
 			.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
 			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.subresourceRange.baseMipLevel=0,
@@ -197,21 +197,21 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, Vk
 			.subresourceRange.layerCount=1,
 			.viewType=VK_IMAGE_VIEW_TYPE_2D,
 			.flags=0,
-		}, VK_NULL_HANDLE, &Swapchain->ImageView[i]);
+		}, VK_NULL_HANDLE, &swapchain->imageView[i]);
 	}
 
-	vkuOneShotCommandBufferEnd(Context, CommandBuffer);
+	vkuOneShotCommandBufferEnd(context, commandBuffer);
 
 	return VK_TRUE;
 }
 
-void vkuDestroySwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain)
+void vkuDestroySwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain)
 {
-	if(!Context||!Swapchain)
+	if(!context||!swapchain)
 		return;
 
-	for(uint32_t i=0;i<Swapchain->NumImages;i++)
-		vkDestroyImageView(Context->Device, Swapchain->ImageView[i], VK_NULL_HANDLE);
+	for(uint32_t i=0;i<swapchain->numImages;i++)
+		vkDestroyImageView(context->device, swapchain->imageView[i], VK_NULL_HANDLE);
 
-	vkDestroySwapchainKHR(Context->Device, Swapchain->Swapchain, VK_NULL_HANDLE);
+	vkDestroySwapchainKHR(context->device, swapchain->swapchain, VK_NULL_HANDLE);
 }

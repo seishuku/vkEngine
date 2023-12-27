@@ -21,11 +21,11 @@ uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, const
 		.ID=ID,
 		.position=position,
 		.color=color,
-		.CheckBox.radius=radius,
-		.CheckBox.value=value
+		.checkBox.radius=radius,
+		.checkBox.value=value
 	};
 
-	snprintf(Control.CheckBox.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
+	snprintf(Control.checkBox.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
 
 	if(!List_Add(&UI->controls, &Control))
 		return UINT32_MAX;
@@ -51,9 +51,9 @@ bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 
 		Control->position=position;
 		Control->color=color;
 
-		snprintf(Control->CheckBox.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
-		Control->CheckBox.radius=radius;
-		Control->CheckBox.value=value;
+		snprintf(Control->checkBox.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
+		Control->checkBox.radius=radius;
+		Control->checkBox.value=value;
 
 		return true;
 	}
@@ -90,7 +90,7 @@ bool UI_UpdateCheckBoxRadius(UI_t *UI, uint32_t ID, float radius)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_CHECKBOX)
 	{
-		Control->CheckBox.radius=radius;
+		Control->checkBox.radius=radius;
 		return true;
 	}
 
@@ -126,7 +126,7 @@ bool UI_UpdateCheckBoxTitleText(UI_t *UI, uint32_t ID, const char *titleText)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_CHECKBOX)
 	{
-		snprintf(Control->CheckBox.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
+		snprintf(Control->checkBox.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
 		return true;
 	}
 
@@ -144,7 +144,7 @@ bool UI_UpdateCheckBoxValue(UI_t *UI, uint32_t ID, bool value)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_CHECKBOX)
 	{
-		Control->CheckBox.value=value;
+		Control->checkBox.value=value;
 		return true;
 	}
 
@@ -166,7 +166,7 @@ bool UI_GetCheckBoxValue(UI_t *UI, uint32_t ID)
 
 		// Check for matching ID and type
 		if(Control->ID==ID&&Control->type==UI_CONTROL_CHECKBOX)
-			return Control->CheckBox.value;
+			return Control->checkBox.value;
 	}
 
 	// Not found

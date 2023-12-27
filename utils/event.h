@@ -11,8 +11,8 @@ typedef enum
 	NUM_EVENTS
 } EventID;
 
-bool Event_Add(EventID ID, void (*Callback)(void *Arg));
+bool Event_Add(EventID ID, void (*Callback)(void *arg));
 bool Event_Delete(EventID ID);
-bool Event_Trigger(EventID ID, void *Arg);
+bool Event_Trigger(EventID ID, void *arg);
 
 #endif

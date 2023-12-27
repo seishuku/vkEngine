@@ -38,8 +38,8 @@ typedef struct
 		{
 			char titleText[UI_CONTROL_TITLETEXT_MAX];
 			vec2 size;
-			UIControlCallback Callback;
-		} Button;
+			UIControlCallback callback;
+		} button;
 
 		// CheckBox type, should this also have a callback for flexibility?
 		struct
@@ -47,7 +47,7 @@ typedef struct
 			char titleText[UI_CONTROL_TITLETEXT_MAX];
 			float radius;
 			bool value;
-		} CheckBox;
+		} checkBox;
 
 		// BarGraph type
 		struct
@@ -56,21 +56,21 @@ typedef struct
 			vec2 size;
 			bool Readonly;
 			float Min, Max, value;
-		} BarGraph;
+		} barGraph;
 
 		// Sprite type
 		struct
 		{
-			VkuImage_t *Image;
+			VkuImage_t *image;
 			vec2 size;
 			float rotation;
-		} Sprite;
+		} sprite;
 
 		// Cursur type
 		struct
 		{
 			float radius;
-		} Cursor;
+		} cursor;
 	};
 } UI_Control_t;
 
@@ -108,14 +108,14 @@ void UI_Destroy(UI_t *UI);
 UI_Control_t *UI_FindControlByID(UI_t *UI, uint32_t ID);
 
 // Buttons
-uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, const char *titleText, UIControlCallback Callback);
+uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, const char *titleText, UIControlCallback callback);
 
-bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, const char *titleText, UIControlCallback Callback);
+bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, const char *titleText, UIControlCallback callback);
 bool UI_UpdateButtonPosition(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_UpdateButtonSize(UI_t *UI, uint32_t ID, vec2 size);
 bool UI_UpdateButtonColor(UI_t *UI, uint32_t ID, vec3 color);
 bool UI_UpdateButtonTitleText(UI_t *UI, uint32_t ID, const char *titleText);
-bool UI_UpdateButtonCallback(UI_t *UI, uint32_t ID, UIControlCallback Callback);
+bool UI_UpdateButtonCallback(UI_t *UI, uint32_t ID, UIControlCallback callback);
 
 // Check boxes
 uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, const char *titleText, bool value);
@@ -147,12 +147,12 @@ float UI_GetBarGraphMax(UI_t *UI, uint32_t ID);
 float UI_GetBarGraphValue(UI_t *UI, uint32_t ID);
 float *UI_GetBarGraphValuePointer(UI_t *UI, uint32_t ID);
 
-uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, VkuImage_t *Image, float rotation);
-bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, VkuImage_t *Image, float rotation);
+uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, VkuImage_t *image, float rotation);
+bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, VkuImage_t *image, float rotation);
 bool UI_UpdateSpritePosition(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_UpdateSpriteSize(UI_t *UI, uint32_t ID, vec2 size);
 bool UI_UpdateSpriteColor(UI_t *UI, uint32_t ID, vec3 color);
-bool UI_UpdateSpriteImage(UI_t *UI, uint32_t ID, VkuImage_t *Image);
+bool UI_UpdateSpriteImage(UI_t *UI, uint32_t ID, VkuImage_t *image);
 bool UI_UpdateSpriteRotation(UI_t *UI, uint32_t ID, float rotation);
 
 uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color);

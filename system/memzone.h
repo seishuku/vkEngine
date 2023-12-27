@@ -6,20 +6,20 @@
 
 typedef struct
 {
-	pthread_mutex_t Mutex;
+	pthread_mutex_t mutex;
 
-	size_t Allocations;
-	size_t Size;
-	void *Memory;
+	size_t allocations;
+	size_t size;
+	void *memory;
 } MemZone_t;
 
-MemZone_t *Zone_Init(size_t Size);
-void Zone_Destroy(MemZone_t *Zone);
-void Zone_Free(MemZone_t *Zone, void *Ptr);
-void *Zone_Malloc(MemZone_t *Zone, size_t Size);
-void *Zone_Calloc(MemZone_t *Zone, size_t Size, size_t Count);
-void *Zone_Realloc(MemZone_t *Zone, void *Ptr, size_t Size);
-bool Zone_VerifyHeap(MemZone_t *Zone);
-void Zone_Print(MemZone_t *Zone);
+MemZone_t *Zone_Init(size_t size);
+void Zone_Destroy(MemZone_t *zone);
+void Zone_Free(MemZone_t *zone, void *ptr);
+void *Zone_Malloc(MemZone_t *zone, size_t size);
+void *Zone_Calloc(MemZone_t *zone, size_t size, size_t count);
+void *Zone_Realloc(MemZone_t *zone, void *ptr, size_t size);
+bool Zone_VerifyHeap(MemZone_t *zone);
+void Zone_Print(MemZone_t *zone);
 
 #endif

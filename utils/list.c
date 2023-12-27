@@ -30,7 +30,7 @@ bool List_Init(List_t *List, const size_t Stride, const size_t Count, const void
 		// Actual buffer size is 1.5x list size to help avoid reallocation stalls at the cost of more memory usage
 		List->bufSize=List->Size*2;
 
-		List->Buffer=(uint8_t *)Zone_Malloc(Zone, List->bufSize);
+		List->Buffer=(uint8_t *)Zone_Malloc(zone, List->bufSize);
 
 		if(List->Buffer==NULL)
 			return false;
@@ -47,7 +47,7 @@ bool List_Init(List_t *List, const size_t Stride, const size_t Count, const void
 		else
 			List->bufSize=Stride*Count*2;
 
-		List->Buffer=(uint8_t *)Zone_Malloc(Zone, List->bufSize);
+		List->Buffer=(uint8_t *)Zone_Malloc(zone, List->bufSize);
 
 		if(List->Buffer==NULL)
 			return false;
@@ -77,7 +77,7 @@ bool List_Add(List_t *List, void *Data)
 		List->bufSize=List->Size*2;
 
 		// Reallocate the buffer
-		uint8_t *Ptr=(uint8_t *)Zone_Realloc(Zone, List->Buffer, List->bufSize);
+		uint8_t *Ptr=(uint8_t *)Zone_Realloc(zone, List->Buffer, List->bufSize);
 
 		if(Ptr==NULL)
 			return false;
@@ -157,7 +157,7 @@ bool List_ShrinkFit(List_t *List)
 	if(List==NULL)
 		return false;
 
-	void *temp=Zone_Realloc(Zone, List->Buffer, List->Size);
+	void *temp=Zone_Realloc(zone, List->Buffer, List->Size);
 
 	if(temp==NULL)
 		return false;
@@ -183,6 +183,6 @@ void List_Destroy(List_t *List)
 		return;
 
 	// Free memory and zero list structure
-	Zone_Free(Zone, List->Buffer);
+	Zone_Free(zone, List->Buffer);
     memset(List, 0, sizeof(List_t));
 }

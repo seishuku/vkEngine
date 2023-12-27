@@ -19,14 +19,14 @@ uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, const ch
 		.ID=ID,
 		.position=position,
 		.color=color,
-		.BarGraph.size=size,
-		.BarGraph.Readonly=Readonly,
-		.BarGraph.Min=Min,
-		.BarGraph.Max=Max,
-		.BarGraph.value=value
+		.barGraph.size=size,
+		.barGraph.Readonly=Readonly,
+		.barGraph.Min=Min,
+		.barGraph.Max=Max,
+		.barGraph.value=value
 	};
 
-	snprintf(Control.BarGraph.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
+	snprintf(Control.barGraph.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
 
 	if(!List_Add(&UI->controls, &Control))
 		return UINT32_MAX;
@@ -49,12 +49,12 @@ bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 col
 		Control->position=position;
 		Control->color=color;
 
-		snprintf(Control->BarGraph.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
-		Control->BarGraph.size=size;
-		Control->BarGraph.Readonly=Readonly;
-		Control->BarGraph.Min=Min;
-		Control->BarGraph.Max=Max;
-		Control->BarGraph.value=value;
+		snprintf(Control->barGraph.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
+		Control->barGraph.size=size;
+		Control->barGraph.Readonly=Readonly;
+		Control->barGraph.Min=Min;
+		Control->barGraph.Max=Max;
+		Control->barGraph.value=value;
 
 		return true;
 	}
@@ -91,7 +91,7 @@ bool UI_UpdateBarGraphSize(UI_t *UI, uint32_t ID, vec2 size)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
 	{
-		Control->Button.size=size;
+		Control->barGraph.size=size;
 		return true;
 	}
 
@@ -127,7 +127,7 @@ bool UI_UpdateBarGraphTitleText(UI_t *UI, uint32_t ID, const char *titleText)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
 	{
-		snprintf(Control->BarGraph.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
+		snprintf(Control->barGraph.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
 		return true;
 	}
 
@@ -145,7 +145,7 @@ bool UI_UpdateBarGraphReadonly(UI_t *UI, uint32_t ID, bool Readonly)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
 	{
-		Control->BarGraph.Readonly=Readonly;
+		Control->barGraph.Readonly=Readonly;
 		return true;
 	}
 
@@ -163,7 +163,7 @@ bool UI_UpdateBarGraphMin(UI_t *UI, uint32_t ID, float Min)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
 	{
-		Control->BarGraph.Min=Min;
+		Control->barGraph.Min=Min;
 		return true;
 	}
 
@@ -181,7 +181,7 @@ bool UI_UpdateBarGraphMax(UI_t *UI, uint32_t ID, float Max)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
 	{
-		Control->BarGraph.Max=Max;
+		Control->barGraph.Max=Max;
 		return true;
 	}
 
@@ -199,7 +199,7 @@ bool UI_UpdateBarGraphValue(UI_t *UI, uint32_t ID, float value)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
 	{
-		Control->BarGraph.value=value;
+		Control->barGraph.value=value;
 		return true;
 	}
 
@@ -216,7 +216,7 @@ float UI_GetBarGraphMin(UI_t *UI, uint32_t ID)
 	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
-		return Control->BarGraph.Min;
+		return Control->barGraph.Min;
 
 	// Not found
 	return NAN;
@@ -231,7 +231,7 @@ float UI_GetBarGraphMax(UI_t *UI, uint32_t ID)
 	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
-		return Control->BarGraph.Max;
+		return Control->barGraph.Max;
 
 	// Not found
 	return NAN;
@@ -246,7 +246,7 @@ float UI_GetBarGraphValue(UI_t *UI, uint32_t ID)
 	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
-		return Control->BarGraph.value;
+		return Control->barGraph.value;
 
 	// Not found
 	return NAN;
@@ -261,7 +261,7 @@ float *UI_GetBarGraphValuePointer(UI_t *UI, uint32_t ID)
 	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
-		return &Control->BarGraph.value;
+		return &Control->barGraph.value;
 
 	// Not found
 	return NULL;

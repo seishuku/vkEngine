@@ -257,7 +257,7 @@ matrix CameraUpdate(Camera_t *camera, float dt)
 }
 
 // Camera path track stuff
-static float Blend(int32_t k, int32_t t, int32_t *knots, float v)
+static float blend(int32_t k, int32_t t, int32_t *knots, float v)
 {
 	float b;
 
@@ -275,13 +275,13 @@ static float Blend(int32_t k, int32_t t, int32_t *knots, float v)
 		else
 		{
 			if(knots[k+t-1]==knots[k])
-				b=(knots[k+t]-v)/(knots[k+t]-knots[k+1])*Blend(k+1, t-1, knots, v);
+				b=(knots[k+t]-v)/(knots[k+t]-knots[k+1])*blend(k+1, t-1, knots, v);
 			else
 			{
 				if(knots[k+t]==knots[k+1])
-					b=(v-knots[k])/(knots[k+t-1]-knots[k])*Blend(k, t-1, knots, v);
+					b=(v-knots[k])/(knots[k+t-1]-knots[k])*blend(k, t-1, knots, v);
 				else
-					b=(v-knots[k])/(knots[k+t-1]-knots[k])*Blend(k, t-1, knots, v)+(knots[k+t]-v)/(knots[k+t]-knots[k+1])*Blend(k+1, t-1, knots, v);
+					b=(v-knots[k])/(knots[k+t-1]-knots[k])*blend(k, t-1, knots, v)+(knots[k+t]-v)/(knots[k+t]-knots[k+1])*blend(k+1, t-1, knots, v);
 			}
 		}
 	}
@@ -319,7 +319,7 @@ static vec3 CalculatePoint(int32_t *knots, int32_t n, int32_t t, float v, float 
 
 	for(k=0;k<=n;k++)
 	{
-		b=Blend(k, t, knots, v);
+		b=blend(k, t, knots, v);
 
 		output.x+=control[3*k]*b;
 		output.y+=control[3*k+1]*b;
@@ -345,7 +345,7 @@ int32_t CameraLoadPath(char *filename, CameraPath_t *path)
 		return 0;
 	}
 
-	path->position=(float *)Zone_Malloc(Zone, sizeof(float)*path->numPoints*3);
+	path->position=(float *)Zone_Malloc(zone, sizeof(float)*path->numPoints*3);
 
 	if(path->position==NULL)
 	{
@@ -353,11 +353,11 @@ int32_t CameraLoadPath(char *filename, CameraPath_t *path)
 		return 0;
 	}
 
-	path->view=(float *)Zone_Malloc(Zone, sizeof(float)*path->numPoints*3);
+	path->view=(float *)Zone_Malloc(zone, sizeof(float)*path->numPoints*3);
 
 	if(path->view==NULL)
 	{
-		Zone_Free(Zone, path->position);
+		Zone_Free(zone, path->position);
 		fclose(stream);
 
 		return 0;
@@ -367,8 +367,8 @@ int32_t CameraLoadPath(char *filename, CameraPath_t *path)
 	{
 		if(fscanf(stream, "%f %f %f %f %f %f", &path->position[3*i], &path->position[3*i+1], &path->position[3*i+2], &path->view[3*i], &path->view[3*i+1], &path->view[3*i+2])!=6)
 		{
-			Zone_Free(Zone, path->position);
-			Zone_Free(Zone, path->view);
+			Zone_Free(zone, path->position);
+			Zone_Free(zone, path->view);
 			fclose(stream);
 
 			return 0;
@@ -380,12 +380,12 @@ int32_t CameraLoadPath(char *filename, CameraPath_t *path)
 	path->time=0.0f;
 	path->endTime=(float)(path->numPoints-2);
 
-	path->knots=(int32_t *)Zone_Malloc(Zone, sizeof(int32_t)*path->numPoints*3);
+	path->knots=(int32_t *)Zone_Malloc(zone, sizeof(int32_t)*path->numPoints*3);
 
 	if(path->knots==NULL)
 	{
-		Zone_Free(Zone, path->position);
-		Zone_Free(Zone, path->view);
+		Zone_Free(zone, path->position);
+		Zone_Free(zone, path->view);
 
 		return 0;
 	}
@@ -410,7 +410,7 @@ matrix CameraInterpolatePath(CameraPath_t *path, float dt)
 
 void CameraDeletePath(CameraPath_t *path)
 {
-	Zone_Free(Zone, path->position);
-	Zone_Free(Zone, path->view);
-	Zone_Free(Zone, path->knots);
+	Zone_Free(zone, path->position);
+	Zone_Free(zone, path->view);
+	Zone_Free(zone, path->knots);
 }

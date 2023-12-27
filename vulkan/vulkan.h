@@ -52,186 +52,186 @@ typedef struct
 	ANativeWindow *Win;
 #endif
 
-	VkSurfaceKHR Surface;
+	VkSurfaceKHR surface;
 
-	uint32_t QueueFamilyIndex;
-	VkPhysicalDevice PhysicalDevice;
+	uint32_t queueFamilyIndex;
+	VkPhysicalDevice physicalDevice;
 
-	VkBool32 SwapchainExtension;
-	VkBool32 PushDescriptorExtension;
-	VkBool32 DynamicRenderingExtension;
-	VkBool32 GetPhysicalDeviceProperties2Extension;
-	VkBool32 DepthStencilResolveExtension;
-	VkBool32 CreateRenderPass2Extension;
+	VkBool32 swapchainExtension;
+	VkBool32 pushDescriptorExtension;
+	VkBool32 dynamicRenderingExtension;
+	VkBool32 getPhysicalDeviceProperties2Extension;
+	VkBool32 depthStencilResolveExtension;
+	VkBool32 createRenderPass2Extension;
 
-	VkPhysicalDeviceProperties2 DeviceProperties;
-	VkPhysicalDeviceMaintenance3Properties DeviceProperties2;
-	VkPhysicalDeviceMemoryProperties DeviceMemProperties;
+	VkPhysicalDeviceProperties2 deviceProperties;
+	VkPhysicalDeviceMaintenance3Properties deviceProperties2;
+	VkPhysicalDeviceMemoryProperties deviceMemProperties;
 
-	VkDevice Device;
-	VkQueue Queue;
-	VkPipelineCache PipelineCache;
-	VkCommandPool CommandPool;
+	VkDevice device;
+	VkQueue queue;
+	VkPipelineCache pipelineCache;
+	VkCommandPool commandPool;
 } VkuContext_t;
 
 typedef struct
 {
 	// Handles to dependencies
-	VkDevice Device;
-	VkPipelineCache PipelineCache;
-	VkPipelineLayout PipelineLayout;
-	VkRenderPass RenderPass;
+	VkDevice device;
+	VkPipelineCache pipelineCache;
+	VkPipelineLayout pipelineLayout;
+	VkRenderPass renderPass;
 
 	// Pipeline to be created
-	VkPipeline Pipeline;
+	VkPipeline pipeline;
 
 	// Settable states:
 
 	// Vertex bindings
-	uint32_t NumVertexBindings;
-	VkVertexInputBindingDescription VertexBindings[VKU_MAX_PIPELINE_VERTEX_BINDINGS];
+	uint32_t numVertexBindings;
+	VkVertexInputBindingDescription vertexBindings[VKU_MAX_PIPELINE_VERTEX_BINDINGS];
 
 	// Vertex attributes
-	uint32_t NumVertexAttribs;
-	VkVertexInputAttributeDescription VertexAttribs[VKU_MAX_PIPELINE_VERTEX_ATTRIBUTES];
+	uint32_t numVertexAttribs;
+	VkVertexInputAttributeDescription vertexAttribs[VKU_MAX_PIPELINE_VERTEX_ATTRIBUTES];
 
 	// Shader Stages
-	uint32_t NumStages;
-	VkPipelineShaderStageCreateInfo Stages[VKU_MAX_PIPELINE_SHADER_STAGES];
+	uint32_t numStages;
+	VkPipelineShaderStageCreateInfo stages[VKU_MAX_PIPELINE_SHADER_STAGES];
 
 	// Input assembly state
-	VkPrimitiveTopology Topology;
-	VkBool32 PrimitiveRestart;
+	VkPrimitiveTopology topology;
+	VkBool32 primitiveRestart;
 
 	// Rasterization state
-	VkBool32 DepthClamp;
-	VkBool32 RasterizerDiscard;
-	VkPolygonMode PolygonMode;
-	VkCullModeFlags CullMode;
-	VkFrontFace FrontFace;
-	VkBool32 DepthBias;
-	float DepthBiasConstantFactor;
-	float DepthBiasClamp;
-	float DepthBiasSlopeFactor;
-	float LineWidth;
+	VkBool32 depthClamp;
+	VkBool32 rasterizerDiscard;
+	VkPolygonMode polygonMode;
+	VkCullModeFlags cullMode;
+	VkFrontFace frontFace;
+	VkBool32 depthBias;
+	float depthBiasConstantFactor;
+	float depthBiasClamp;
+	float depthBiasSlopeFactor;
+	float lineWidth;
 
 	// Depth/stencil state
-	VkBool32 DepthTest;
-	VkBool32 DepthWrite;
-	VkCompareOp DepthCompareOp;
-	VkBool32 DepthBoundsTest;
-	VkBool32 StencilTest;
-	float MinDepthBounds;
-	float MaxDepthBounds;
+	VkBool32 depthTest;
+	VkBool32 depthWrite;
+	VkCompareOp depthCompareOp;
+	VkBool32 depthBoundsTest;
+	VkBool32 stencilTest;
+	float minDepthBounds;
+	float maxDepthBounds;
 
 	// Front face stencil functions
-	VkStencilOp FrontStencilFailOp;
-	VkStencilOp FrontStencilPassOp;
-	VkStencilOp FrontStencilDepthFailOp;
-	VkCompareOp FrontStencilCompareOp;
-	uint32_t FrontStencilCompareMask;
-	uint32_t FrontStencilWriteMask;
-	uint32_t FrontStencilReference;
+	VkStencilOp frontStencilFailOp;
+	VkStencilOp frontStencilPassOp;
+	VkStencilOp frontStencilDepthFailOp;
+	VkCompareOp frontStencilCompareOp;
+	uint32_t frontStencilCompareMask;
+	uint32_t frontStencilWriteMask;
+	uint32_t frontStencilReference;
 
 	// Back face stencil functions
-	VkStencilOp BackStencilFailOp;
-	VkStencilOp BackStencilPassOp;
-	VkStencilOp BackStencilDepthFailOp;
-	VkCompareOp BackStencilCompareOp;
-	uint32_t BackStencilCompareMask;
-	uint32_t BackStencilWriteMask;
-	uint32_t BackStencilReference;
+	VkStencilOp backStencilFailOp;
+	VkStencilOp backStencilPassOp;
+	VkStencilOp backStencilDepthFailOp;
+	VkCompareOp backStencilCompareOp;
+	uint32_t backStencilCompareMask;
+	uint32_t backStencilWriteMask;
+	uint32_t backStencilReference;
 
 	// Multisample state
-	VkSampleCountFlagBits RasterizationSamples;
-	VkBool32 SampleShading;
-	float MinSampleShading;
-	const VkSampleMask *SampleMask;
-	VkBool32 AlphaToCoverage;
-	VkBool32 AlphaToOne;
+	VkSampleCountFlagBits rasterizationSamples;
+	VkBool32 sampleShading;
+	float minSampleShading;
+	const VkSampleMask *sampleMask;
+	VkBool32 alphaToCoverage;
+	VkBool32 alphaToOne;
 
-	// Blend state
-	VkBool32 BlendLogicOp;
-	VkLogicOp BlendLogicOpState;
-	VkBool32 Blend;
-	VkBlendFactor SrcColorBlendFactor;
-	VkBlendFactor DstColorBlendFactor;
-	VkBlendOp ColorBlendOp;
-	VkBlendFactor SrcAlphaBlendFactor;
-	VkBlendFactor DstAlphaBlendFactor;
-	VkBlendOp AlphaBlendOp;
-	VkColorComponentFlags ColorWriteMask;
+	// blend state
+	VkBool32 blendLogicOp;
+	VkLogicOp blendLogicOpState;
+	VkBool32 blend;
+	VkBlendFactor srcColorBlendFactor;
+	VkBlendFactor dstColorBlendFactor;
+	VkBlendOp colorBlendOp;
+	VkBlendFactor srcAlphaBlendFactor;
+	VkBlendFactor dstAlphaBlendFactor;
+	VkBlendOp alphaBlendOp;
+	VkColorComponentFlags colorWriteMask;
 } VkuPipeline_t;
 
 typedef struct
 {
-	VkDevice Device;
+	VkDevice device;
 
-	VkDescriptorSetLayout DescriptorSetLayout;
-	VkDescriptorSet DescriptorSet;
+	VkDescriptorSetLayout descriptorSetLayout;
+	VkDescriptorSet descriptorSet;
 
-	uint32_t NumBindings;
-	VkDescriptorSetLayoutBinding Bindings[VKU_MAX_DESCRIPTORSET_BINDINGS];
-	VkWriteDescriptorSet WriteDescriptorSet[VKU_MAX_DESCRIPTORSET_BINDINGS];
-	VkDescriptorImageInfo ImageInfo[VKU_MAX_DESCRIPTORSET_BINDINGS];
-	VkDescriptorBufferInfo BufferInfo[VKU_MAX_DESCRIPTORSET_BINDINGS];
+	uint32_t numBindings;
+	VkDescriptorSetLayoutBinding bindings[VKU_MAX_DESCRIPTORSET_BINDINGS];
+	VkWriteDescriptorSet writeDescriptorSet[VKU_MAX_DESCRIPTORSET_BINDINGS];
+	VkDescriptorImageInfo imageInfo[VKU_MAX_DESCRIPTORSET_BINDINGS];
+	VkDescriptorBufferInfo bufferInfo[VKU_MAX_DESCRIPTORSET_BINDINGS];
 } VkuDescriptorSet_t;
 
 typedef struct VkuMemBlock_s
 {
-	size_t Offset;
-	size_t Size;
-	bool Free;
-	struct VkuMemBlock_s *Next, *Prev;
+	size_t offset;
+	size_t size;
+	bool free;
+	struct VkuMemBlock_s *next, *prev;
 } VkuMemBlock_t;
 
 typedef struct
 {
-	size_t Size;
-	VkuMemBlock_t *Blocks;
-	VkDeviceMemory DeviceMemory;
+	size_t size;
+	VkuMemBlock_t *blocks;
+	VkDeviceMemory deviceMemory;
 } VkuMemZone_t;
 
 typedef struct
 {
-	size_t Size;
-	VkBuffer Buffer;
-	VkDeviceMemory DeviceMemory;
-	VkuMemBlock_t *Memory;
+	size_t size;
+	VkBuffer buffer;
+	VkDeviceMemory deviceMemory;
+	VkuMemBlock_t *memory;
 } VkuBuffer_t;
 
 typedef struct
 {
-	uint32_t Width, Height, Depth;
-	uint8_t *Data;
+	uint32_t width, height, depth;
+	uint8_t *data;
 
-	VkSampler Sampler;
-	VkImage Image;
-	VkuMemBlock_t *DeviceMemory;
-	VkImageView View;
+	VkSampler sampler;
+	VkImage image;
+	VkuMemBlock_t *deviceMemory;
+	VkImageView imageView;
 } VkuImage_t;
 
 typedef struct
 {
-	VkSwapchainKHR Swapchain;
+	VkSwapchainKHR swapchain;
 
-	VkExtent2D Extent;
-	VkSurfaceFormatKHR SurfaceFormat;
+	VkExtent2D extent;
+	VkSurfaceFormatKHR surfaceFormat;
 
-	uint32_t NumImages;
-	VkImage Image[VKU_MAX_FRAME_COUNT];
-	VkImageView ImageView[VKU_MAX_FRAME_COUNT];
+	uint32_t numImages;
+	VkImage image[VKU_MAX_FRAME_COUNT];
+	VkImageView imageView[VKU_MAX_FRAME_COUNT];
 } VkuSwapchain_t;
 
 typedef struct
 {
-	VkDevice Device;
-	VkRenderPass RenderPass;
+	VkDevice device;
+	VkRenderPass renderPass;
 
-	VkFramebuffer Framebuffer;
+	VkFramebuffer framebuffer;
 
-	uint32_t NumAttachments;
-	VkImageView Attachments[VKU_MAX_FRAMEBUFFER_ATTACHMENTS];
+	uint32_t numAttachments;
+	VkImageView attachments[VKU_MAX_FRAMEBUFFER_ATTACHMENTS];
 } VkuFramebuffer_t;
 
 typedef enum
@@ -244,81 +244,81 @@ typedef enum
 
 typedef struct
 {
-	VkuRenderPassAttachmentType Type;
-	VkFormat Format;
-	VkSampleCountFlagBits Samples;
-	VkAttachmentLoadOp LoadOp;
-	VkAttachmentStoreOp StoreOp;
-	VkImageLayout SubpassLayout;
-	VkImageLayout FinalLayout;
+	VkuRenderPassAttachmentType type;
+	VkFormat format;
+	VkSampleCountFlagBits samples;
+	VkAttachmentLoadOp loadOp;
+	VkAttachmentStoreOp storeOp;
+	VkImageLayout subpassLayout;
+	VkImageLayout finalLayout;
 } VkuRenderPassAttachments_t;
 
 typedef struct
 {
-	VkDevice Device;
+	VkDevice device;
 
-	VkRenderPass RenderPass;
+	VkRenderPass renderPass;
 
-	uint32_t NumAttachments;
-	VkuRenderPassAttachments_t Attachments[VKU_MAX_RENDERPASS_ATTACHMENTS];
+	uint32_t numAttachments;
+	VkuRenderPassAttachments_t attachments[VKU_MAX_RENDERPASS_ATTACHMENTS];
 
-	uint32_t NumSubpassDependencies;
-	VkSubpassDependency SubpassDependencies[VKU_MAX_RENDERPASS_SUBPASS_DEPENDENCIES];
+	uint32_t numSubpassDependencies;
+	VkSubpassDependency subpassDependencies[VKU_MAX_RENDERPASS_SUBPASS_DEPENDENCIES];
 } VkuRenderPass_t;
 
-VkShaderModule vkuCreateShaderModule(VkDevice Device, const char *shaderFile);
+VkShaderModule vkuCreateShaderModule(VkDevice device, const char *shaderFile);
 
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask);
 
-VkBool32 vkuCreateImageBuffer(VkuContext_t* Context, VkuImage_t* Image, VkImageType ImageType, VkFormat Format, uint32_t MipLevels, uint32_t Layers, uint32_t Width, uint32_t Height, uint32_t Depth, VkSampleCountFlagBits Samples, VkImageTiling Tiling, VkBufferUsageFlags Flags, VkFlags RequirementsMask, VkImageCreateFlags CreateFlags);
-void vkuCreateTexture2D(VkuContext_t *Context, VkuImage_t *Image, uint32_t Width, uint32_t Height, VkFormat Format, VkSampleCountFlagBits Samples);
-void vkuDestroyImageBuffer(VkuContext_t *Context, VkuImage_t *Image);
+VkBool32 vkuCreateImageBuffer(VkuContext_t* Context, VkuImage_t* image, VkImageType imageType, VkFormat format, uint32_t mipLevels, uint32_t layers, uint32_t width, uint32_t height, uint32_t depth, VkSampleCountFlagBits samples, VkImageTiling tiling, VkBufferUsageFlags flags, VkFlags requirementsMask, VkImageCreateFlags createFlags);
+void vkuCreateTexture2D(VkuContext_t *context, VkuImage_t *image, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits samples);
+void vkuDestroyImageBuffer(VkuContext_t *context, VkuImage_t *image);
 
-VkBool32 vkuCreateHostBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags);
-VkBool32 vkuCreateGPUBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer, uint32_t Size, VkBufferUsageFlags Flags);
-void vkuDestroyBuffer(VkuContext_t *Context, VkuBuffer_t *Buffer);
+VkBool32 vkuCreateHostBuffer(VkuContext_t *context, VkuBuffer_t *buffer, uint32_t size, VkBufferUsageFlags flags);
+VkBool32 vkuCreateGPUBuffer(VkuContext_t *context, VkuBuffer_t *buffer, uint32_t size, VkBufferUsageFlags flags);
+void vkuDestroyBuffer(VkuContext_t *context, VkuBuffer_t *buffer);
 
-void vkuTransitionLayout(VkCommandBuffer CommandBuffer, VkImage Image, uint32_t levelCount, uint32_t baseLevel, uint32_t layerCount, uint32_t baseLayer, VkImageLayout oldLayout, VkImageLayout newLayout);
+void vkuTransitionLayout(VkCommandBuffer commandBuffer, VkImage image, uint32_t levelCount, uint32_t baseLevel, uint32_t layerCount, uint32_t baseLayer, VkImageLayout oldLayout, VkImageLayout newLayout);
 
-VkCommandBuffer vkuOneShotCommandBufferBegin(VkuContext_t *Context);
-VkBool32 vkuOneShotCommandBufferFlush(VkuContext_t *Context, VkCommandBuffer CommandBuffer);
-VkBool32 vkuOneShotCommandBufferEnd(VkuContext_t *Context, VkCommandBuffer CommandBuffer);
+VkCommandBuffer vkuOneShotCommandBufferBegin(VkuContext_t *context);
+VkBool32 vkuOneShotCommandBufferFlush(VkuContext_t *context, VkCommandBuffer commandBuffer);
+VkBool32 vkuOneShotCommandBufferEnd(VkuContext_t *context, VkCommandBuffer commandBuffer);
 
-VkBool32 vkuPipeline_AddVertexBinding(VkuPipeline_t *Pipeline, uint32_t Binding, uint32_t Stride, VkVertexInputRate InputRate);
-VkBool32 vkuPipeline_AddVertexAttribute(VkuPipeline_t *Pipeline, uint32_t Location, uint32_t Binding, VkFormat Format, uint32_t Offset);
-VkBool32 vkuPipeline_AddStage(VkuPipeline_t *Pipeline, const char *ShaderFilename, VkShaderStageFlagBits Stage);
-VkBool32 vkuPipeline_SetRenderPass(VkuPipeline_t *Pipeline, VkRenderPass RenderPass);
-VkBool32 vkuPipeline_SetPipelineLayout(VkuPipeline_t *Pipeline, VkPipelineLayout PipelineLayout);
-VkBool32 vkuInitPipeline(VkuPipeline_t *Pipeline, VkuContext_t *Context);
-VkBool32 vkuAssemblePipeline(VkuPipeline_t *Pipeline, void *pNext);
+VkBool32 vkuPipeline_AddVertexBinding(VkuPipeline_t *pipeline, uint32_t binding, uint32_t stride, VkVertexInputRate inputRate);
+VkBool32 vkuPipeline_AddVertexAttribute(VkuPipeline_t *pipeline, uint32_t location, uint32_t binding, VkFormat format, uint32_t offset);
+VkBool32 vkuPipeline_AddStage(VkuPipeline_t *pipeline, const char *shaderFilename, VkShaderStageFlagBits stage);
+VkBool32 vkuPipeline_SetRenderPass(VkuPipeline_t *pipeline, VkRenderPass renderPass);
+VkBool32 vkuPipeline_SetPipelineLayout(VkuPipeline_t *pipeline, VkPipelineLayout pipelineLayout);
+VkBool32 vkuInitPipeline(VkuPipeline_t *pipeline, VkuContext_t *context);
+VkBool32 vkuAssemblePipeline(VkuPipeline_t *pipeline, void *pNext);
 
-VkBool32 vkuDescriptorSet_AddBinding(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorType Type, VkShaderStageFlags Stage);
-VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkuImage_t *Image);
-VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Range);
-VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *DescriptorSet, VkuContext_t *Context);
-VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSet_t *DescriptorSet);
-VkBool32 vkuAllocateUpdateDescriptorSet(VkuDescriptorSet_t *DescriptorSet, VkDescriptorPool DescriptorPool);
+VkBool32 vkuDescriptorSet_AddBinding(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkDescriptorType type, VkShaderStageFlags stage);
+VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkuImage_t *image);
+VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range);
+VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *descriptorSet, VkuContext_t *context);
+VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSet_t *descriptorSet);
+VkBool32 vkuAllocateUpdateDescriptorSet(VkuDescriptorSet_t *descriptorSet, VkDescriptorPool descriptorPool);
 
-VkuMemZone_t *vkuMem_Init(VkuContext_t *Context, size_t Size);
-void vkuMem_Destroy(VkuContext_t *Context, VkuMemZone_t *VkZone);
-void vkuMem_Free(VkuMemZone_t *VkZone, VkuMemBlock_t *Ptr);
-VkuMemBlock_t *vkuMem_Malloc(VkuMemZone_t *VkZone, VkMemoryRequirements Requirements);
-void vkuMem_Print(VkuMemZone_t *VkZone);
+VkuMemZone_t *vkuMem_Init(VkuContext_t *context, size_t size);
+void vkuMem_Destroy(VkuContext_t *context, VkuMemZone_t *vkZone);
+void vkuMem_Free(VkuMemZone_t *vkZone, VkuMemBlock_t *ptr);
+VkuMemBlock_t *vkuMem_Malloc(VkuMemZone_t *vkZone, VkMemoryRequirements requirements);
+void vkuMem_Print(VkuMemZone_t *vkZone);
 
-VkBool32 CreateVulkanInstance(VkInstance *Instance);
-VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context);
-void DestroyVulkan(VkInstance Instance, VkuContext_t *Context);
+VkBool32 CreateVulkanInstance(VkInstance *instance);
+VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context);
+void DestroyVulkan(VkInstance instance, VkuContext_t *context);
 
-VkBool32 vkuCreateSwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain, VkBool32 VSync);
-void vkuDestroySwapchain(VkuContext_t *Context, VkuSwapchain_t *Swapchain);
+VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, VkBool32 vSync);
+void vkuDestroySwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain);
 
-VkBool32 vkuFramebufferAddAttachment(VkuFramebuffer_t *Framebuffer, VkImageView Attachment);
-VkBool32 vkuInitFramebuffer(VkuFramebuffer_t *Framebuffer, VkuContext_t *Context, VkRenderPass RenderPass);
-VkBool32 vkuFramebufferCreate(VkuFramebuffer_t *Framebuffer, VkExtent2D Size);
+VkBool32 vkuFramebufferAddAttachment(VkuFramebuffer_t *framebuffer, VkImageView attachment);
+VkBool32 vkuInitFramebuffer(VkuFramebuffer_t *framebuffer, VkuContext_t *context, VkRenderPass renderPass);
+VkBool32 vkuFramebufferCreate(VkuFramebuffer_t *framebuffer, VkExtent2D size);
 
-VkBool32 vkuRenderPass_AddAttachment(VkuRenderPass_t *RenderPass, VkuRenderPassAttachmentType Type, VkFormat Format, VkSampleCountFlagBits Samples, VkAttachmentLoadOp LoadOp, VkAttachmentStoreOp StoreOp, VkImageLayout SubpassLayout, VkImageLayout FinalLayout);
-VkBool32 vkuRenderPass_AddSubpassDependency(VkuRenderPass_t *RenderPass, uint32_t SourceSubpass, uint32_t DestinationSubpass, VkPipelineStageFlags SourceStageMask, VkPipelineStageFlags DestinationStageMask, VkAccessFlags SourceAccessMask, VkAccessFlags DestinationAccessMask, VkDependencyFlags DependencyFlags);
-VkBool32 vkuInitRenderPass(VkuContext_t *Context, VkuRenderPass_t *RenderPass);
-VkBool32 vkuCreateRenderPass(VkuRenderPass_t *RenderPass);
+VkBool32 vkuRenderPass_AddAttachment(VkuRenderPass_t *renderPass, VkuRenderPassAttachmentType type, VkFormat format, VkSampleCountFlagBits samples, VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp, VkImageLayout subpassLayout, VkImageLayout finalLayout);
+VkBool32 vkuRenderPass_AddSubpassDependency(VkuRenderPass_t *renderPass, uint32_t sourceSubpass, uint32_t destinationSubpass, VkPipelineStageFlags sourceStageMask, VkPipelineStageFlags destinationStageMask, VkAccessFlags sourceAccessMask, VkAccessFlags destinationAccessMask, VkDependencyFlags dependencyFlags);
+VkBool32 vkuInitRenderPass(VkuContext_t *context, VkuRenderPass_t *renderPass);
+VkBool32 vkuCreateRenderPass(VkuRenderPass_t *renderPass);
 
 #endif

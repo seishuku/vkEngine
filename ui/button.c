@@ -8,7 +8,7 @@
 
 // Add a button to the UI.
 // Returns an ID, or UINT32_MAX on failure.
-uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, const char *titleText, UIControlCallback Callback)
+uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, const char *titleText, UIControlCallback callback)
 {
 	uint32_t ID=UI->baseID++;
 
@@ -21,11 +21,11 @@ uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, const char
 		.ID=ID,
 		.position=position,
 		.color=color,
-		.Button.size=size,
-		.Button.Callback=Callback
+		.button.size=size,
+		.button.callback=callback
 	};
 
-	snprintf(Control.Button.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
+	snprintf(Control.button.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
 
 	if(!List_Add(&UI->controls, &Control))
 		return UINT32_MAX;
@@ -38,7 +38,7 @@ uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, const char
 // Update UI button parameters.
 // Returns true on success, false on failure.
 // Also individual parameter update function as well.
-bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, const char *titleText, UIControlCallback Callback)
+bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, const char *titleText, UIControlCallback callback)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -51,9 +51,9 @@ bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color
 		Control->position=position;
 		Control->color=color;
 
-		snprintf(Control->Button.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
-		Control->Button.size=size;
-		Control->Button.Callback=Callback;
+		snprintf(Control->button.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
+		Control->button.size=size;
+		Control->button.callback=callback;
 
 		return true;
 	}
@@ -90,7 +90,7 @@ bool UI_UpdateButtonSize(UI_t *UI, uint32_t ID, vec2 size)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_BUTTON)
 	{
-		Control->Button.size=size;
+		Control->button.size=size;
 		return true;
 	}
 
@@ -126,7 +126,7 @@ bool UI_UpdateButtonTitleText(UI_t *UI, uint32_t ID, const char *titleText)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_BUTTON)
 	{
-		snprintf(Control->Button.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
+		snprintf(Control->button.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
 		return true;
 	}
 
@@ -134,7 +134,7 @@ bool UI_UpdateButtonTitleText(UI_t *UI, uint32_t ID, const char *titleText)
 	return false;
 }
 
-bool UI_UpdateButtonCallback(UI_t *UI, uint32_t ID, UIControlCallback Callback)
+bool UI_UpdateButtonCallback(UI_t *UI, uint32_t ID, UIControlCallback callback)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -144,7 +144,7 @@ bool UI_UpdateButtonCallback(UI_t *UI, uint32_t ID, UIControlCallback Callback)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_BUTTON)
 	{
-		Control->Button.Callback=Callback;
+		Control->button.callback=callback;
 		return true;
 	}
 

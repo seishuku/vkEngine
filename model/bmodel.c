@@ -16,21 +16,21 @@ static void CalculateTangent(BModel_t *model)
 		vec2 uv0, uv1;
 		float r;
 
-		model->tangent=(float *)Zone_Malloc(Zone, sizeof(float)*3*model->numVertex);
+		model->tangent=(float *)Zone_Malloc(zone, sizeof(float)*3*model->numVertex);
 
 		if(model->tangent==NULL)
 			return;
 
 		memset(model->tangent, 0, sizeof(float)*3*model->numVertex);
 
-		model->binormal=(float *)Zone_Malloc(Zone, sizeof(float)*3*model->numVertex);
+		model->binormal=(float *)Zone_Malloc(zone, sizeof(float)*3*model->numVertex);
 
 		if(model->binormal==NULL)
 			return;
 
 		memset(model->binormal, 0, sizeof(float)*3*model->numVertex);
 
-		model->normal=(float *)Zone_Malloc(Zone, sizeof(float)*3*model->numVertex);
+		model->normal=(float *)Zone_Malloc(zone, sizeof(float)*3*model->numVertex);
 
 		if(model->normal==NULL)
 			return;
@@ -151,7 +151,7 @@ bool LoadBModel(BModel_t *model, const char *filename)
 	// If there materials, allocate memory for them
 	if(model->numMaterial)
 	{
-		model->material=(BModel_Material_t *)Zone_Malloc(Zone, sizeof(BModel_Material_t)*model->numMaterial);
+		model->material=(BModel_Material_t *)Zone_Malloc(zone, sizeof(BModel_Material_t)*model->numMaterial);
 
 		if(model->material==NULL)
 			return false;
@@ -184,7 +184,7 @@ bool LoadBModel(BModel_t *model, const char *filename)
 	// If there meshes, allocate memory for them
 	if(model->numMesh)
 	{
-		model->mesh=(BModel_Mesh_t *)Zone_Malloc(Zone, sizeof(BModel_Mesh_t)*model->numMesh);
+		model->mesh=(BModel_Mesh_t *)Zone_Malloc(zone, sizeof(BModel_Mesh_t)*model->numMesh);
 
 		if(model->mesh==NULL)
 			return false;
@@ -206,7 +206,7 @@ bool LoadBModel(BModel_t *model, const char *filename)
 
 		if(model->mesh[i].numFace)
 		{
-			model->mesh[i].face=(uint32_t *)Zone_Malloc(Zone, sizeof(uint32_t)*model->mesh[i].numFace*3);
+			model->mesh[i].face=(uint32_t *)Zone_Malloc(zone, sizeof(uint32_t)*model->mesh[i].numFace*3);
 
 			if(model->mesh[i].face==NULL)
 				return false;
@@ -233,66 +233,66 @@ bool LoadBModel(BModel_t *model, const char *filename)
 			switch(magic)
 			{
 				case VERT_MAGIC:
-					model->vertex=(float *)Zone_Malloc(Zone, sizeof(float)*model->numVertex*3);
+					model->vertex=(float *)Zone_Malloc(zone, sizeof(float)*model->numVertex*3);
 
 					if(model->vertex==NULL)
 						return false;
 
 					if(fread(model->vertex, sizeof(float)*3, model->numVertex, fp)!=model->numVertex)
 					{
-						Zone_Free(Zone, model->vertex);
+						Zone_Free(zone, model->vertex);
 						model->vertex=NULL;
 					}
 					break;
 
 				case TEXC_MAGIC:
-					model->UV=(float *)Zone_Malloc(Zone, sizeof(float)*model->numVertex*2);
+					model->UV=(float *)Zone_Malloc(zone, sizeof(float)*model->numVertex*2);
 
 					if(model->UV==NULL)
 						return false;
 
 					if(fread(model->UV, sizeof(float)*2, model->numVertex, fp)!=model->numVertex)
 					{
-						Zone_Free(Zone, model->UV);
+						Zone_Free(zone, model->UV);
 						model->UV=NULL;
 					}
 					break;
 
 				case TANG_MAGIC:
-					model->tangent=(float *)Zone_Malloc(Zone, sizeof(float)*model->numVertex*3);
+					model->tangent=(float *)Zone_Malloc(zone, sizeof(float)*model->numVertex*3);
 
 					if(model->tangent==NULL)
 						return false;
 
 					if(fread(model->tangent, sizeof(float)*3, model->numVertex, fp)!=model->numVertex)
 					{
-						Zone_Free(Zone, model->tangent);
+						Zone_Free(zone, model->tangent);
 						model->tangent=NULL;
 					}
 					break;
 
 				case BNRM_MAGIC:
-					model->binormal=(float *)Zone_Malloc(Zone, sizeof(float)*model->numVertex*3);
+					model->binormal=(float *)Zone_Malloc(zone, sizeof(float)*model->numVertex*3);
 
 					if(model->binormal==NULL)
 						return false;
 
 					if(fread(model->binormal, sizeof(float)*3, model->numVertex, fp)!=model->numVertex)
 					{
-						Zone_Free(Zone, model->binormal);
+						Zone_Free(zone, model->binormal);
 						model->binormal=NULL;
 					}
 					break;
 
 				case NORM_MAGIC:
-					model->normal=(float *)Zone_Malloc(Zone, sizeof(float)*model->numVertex*3);
+					model->normal=(float *)Zone_Malloc(zone, sizeof(float)*model->numVertex*3);
 
 					if(model->normal==NULL)
 						return false;
 
 					if(fread(model->normal, sizeof(float)*3, model->numVertex, fp)!=model->numVertex)
 					{
-						Zone_Free(Zone, model->normal);
+						Zone_Free(zone, model->normal);
 						model->normal=NULL;
 					}
 					break;
@@ -325,22 +325,22 @@ bool LoadBModel(BModel_t *model, const char *filename)
 // Free memory allocated for the model
 void FreeBModel(BModel_t *model)
 {
-	Zone_Free(Zone, model->vertex);
-	Zone_Free(Zone, model->UV);
-	Zone_Free(Zone, model->normal);
-	Zone_Free(Zone, model->tangent);
-	Zone_Free(Zone, model->binormal);
+	Zone_Free(zone, model->vertex);
+	Zone_Free(zone, model->UV);
+	Zone_Free(zone, model->normal);
+	Zone_Free(zone, model->tangent);
+	Zone_Free(zone, model->binormal);
 
 	if(model->numMesh)
 	{
 		/* Free mesh data */
 		for(uint32_t i=0;i<model->numMesh;i++)
-			Zone_Free(Zone, model->mesh[i].face);
+			Zone_Free(zone, model->mesh[i].face);
 
-		Zone_Free(Zone, model->mesh);
+		Zone_Free(zone, model->mesh);
 	}
 
-	Zone_Free(Zone, model->material);
+	Zone_Free(zone, model->material);
 }
 
 void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
@@ -355,7 +355,7 @@ void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 	// Create staging buffer to transfer from host memory to device memory
 	vkuCreateHostBuffer(context, &stagingBuffer, sizeof(float)*20*model->numVertex, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
-	vkMapMemory(context->Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
+	vkMapMemory(context->device, stagingBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
 
 	if(!data)
 		return;
@@ -390,16 +390,16 @@ void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 		*fPtr++=0.0f;
 	}
 
-	vkUnmapMemory(context->Device, stagingBuffer.DeviceMemory);
+	vkUnmapMemory(context->device, stagingBuffer.deviceMemory);
 
 	// Copy to device memory
 	copyCommand=vkuOneShotCommandBufferBegin(context);
-	vkCmdCopyBuffer(copyCommand, stagingBuffer.Buffer, model->vertexBuffer.Buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(float)*20*model->numVertex });
+	vkCmdCopyBuffer(copyCommand, stagingBuffer.buffer, model->vertexBuffer.buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(float)*20*model->numVertex });
 	vkuOneShotCommandBufferEnd(context, copyCommand);
 
 	// Delete staging data
-	vkDestroyBuffer(context->Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
-	vkFreeMemory(context->Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+	vkDestroyBuffer(context->device, stagingBuffer.buffer, VK_NULL_HANDLE);
+	vkFreeMemory(context->device, stagingBuffer.deviceMemory, VK_NULL_HANDLE);
 
 	for(uint32_t i=0;i<model->numMesh;i++)
 	{
@@ -409,7 +409,7 @@ void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 		// Staging buffer
 		vkuCreateHostBuffer(context, &stagingBuffer, sizeof(uint32_t)*model->mesh[i].numFace*3, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
-		vkMapMemory(context->Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
+		vkMapMemory(context->device, stagingBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
 
 		if(!data)
 			return;
@@ -423,14 +423,14 @@ void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 			*iPtr++=model->mesh[i].face[3*j+2];
 		}
 
-		vkUnmapMemory(context->Device, stagingBuffer.DeviceMemory);
+		vkUnmapMemory(context->device, stagingBuffer.deviceMemory);
 
 		copyCommand=vkuOneShotCommandBufferBegin(context);
-		vkCmdCopyBuffer(copyCommand, stagingBuffer.Buffer, model->mesh[i].indexBuffer.Buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(uint32_t)*model->mesh[i].numFace*3 });
+		vkCmdCopyBuffer(copyCommand, stagingBuffer.buffer, model->mesh[i].indexBuffer.buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(uint32_t)*model->mesh[i].numFace*3 });
 		vkuOneShotCommandBufferEnd(context, copyCommand);
 
 		// Delete staging data
-		vkDestroyBuffer(context->Device, stagingBuffer.Buffer, VK_NULL_HANDLE);
-		vkFreeMemory(context->Device, stagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+		vkDestroyBuffer(context->device, stagingBuffer.buffer, VK_NULL_HANDLE);
+		vkFreeMemory(context->device, stagingBuffer.deviceMemory, VK_NULL_HANDLE);
 	}
 }

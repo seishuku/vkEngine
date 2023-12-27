@@ -38,7 +38,7 @@ String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFi
 			{
 				if(!strcmp(ptr, Filter))
 				{
-					Ret=(String_t *)Zone_Realloc(Zone, Ret, sizeof(String_t)*(*NumFiles+1));
+					Ret=(String_t *)Zone_Realloc(zone, Ret, sizeof(String_t)*(*NumFiles+1));
 					sprintf(Ret[(*NumFiles)++].String, "%s", dir_entry->d_name);
 				}
 			}
@@ -77,7 +77,7 @@ String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFi
 			{
 				if(!strcmp(ptr, Filter))
 				{
-					Ret=(String_t *)Zone_Realloc(Zone, Ret, sizeof(String_t)*(*NumFiles+1));
+					Ret=(String_t *)Zone_Realloc(zone, Ret, sizeof(String_t)*(*NumFiles+1));
 
 					if(Ret==NULL)
 						return NULL;
@@ -100,7 +100,7 @@ String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFi
 }
 #endif
 
-void StreamData(void *Buffer, size_t Length)
+void StreamData(void *buffer, size_t Length)
 {
 	if(oggFile==NULL)
 		return;
@@ -111,7 +111,7 @@ void StreamData(void *Buffer, size_t Length)
 	Length*=2;					// Channels
 	Length*=sizeof(int16_t);	// Sample size
 
-	char *bufferPtr=Buffer;
+	char *bufferPtr=buffer;
 
 	do {
 		size=ov_read(&oggStream, bufferPtr, (int)Length, 0, 2, 1, NULL);
@@ -216,5 +216,5 @@ void Music_Destroy(void)
 	ov_clear(&oggStream);
 
 	if(MusicList)
-		Zone_Free(Zone, MusicList);
+		Zone_Free(zone, MusicList);
 }

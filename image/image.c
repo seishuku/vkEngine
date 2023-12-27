@@ -21,9 +21,9 @@
 // Make a normal map from a greyscale height map (or the first channel of an RGB/RGBA image).
 // 
 // This is done by applying a Sobel kernel filter in the X and Y directions, Z=1.0, then normalizing that.
-static bool _MakeNormalMap(VkuImage_t *Image)
+static bool _MakeNormalMap(VkuImage_t *image)
 {
-	const uint32_t Channels=Image->Depth>>3;
+	const uint32_t Channels=image->depth>>3;
 	const float OneOver255=1.0f/255.0f;
 	const float KernelX[9]=
 	{
@@ -39,32 +39,32 @@ static bool _MakeNormalMap(VkuImage_t *Image)
 	};
 
 	// Check if input image is a valid bit depth.
-	if(Image->Depth!=32&&Image->Depth!=8)
+	if(image->depth!=32&&image->depth!=8)
 		return false;
 
 	// Allocate memory for output data.
-	uint16_t *Buffer=(uint16_t *)Zone_Malloc(Zone, sizeof(uint16_t)*Image->Width*Image->Height*4);
+	uint16_t *buffer=(uint16_t *)Zone_Malloc(zone, sizeof(uint16_t)*image->width*image->height*4);
 
 	// Check that memory allocated.
-	if(Buffer==NULL)
+	if(buffer==NULL)
 		return false;
 
 	// Loop over all pixels of input image.
-	for(uint32_t y=0;y<Image->Height;y++)
+	for(uint32_t y=0;y<image->height;y++)
 	{
-		for(uint32_t x=0;x<Image->Width;x++)
+		for(uint32_t x=0;x<image->width;x++)
 		{
 			vec3 n={ 0.0f, 0.0f, 1.0f };
 
 			// Loop over the kernel(s) to convolve the image.
 			for(uint32_t yy=0;yy<3;yy++)
 			{
-				const int oy=min(Image->Height-1, y+yy);
+				const int oy=min(image->height-1, y+yy);
 
 				for(uint32_t xx=0;xx<3;xx++)
 				{
-					const int ox=min(Image->Width-1, x+xx);
-					const float Pixel=(float)Image->Data[Channels*(oy*Image->Width+ox)]*OneOver255;
+					const int ox=min(image->width-1, x+xx);
+					const float Pixel=(float)image->data[Channels*(oy*image->width+ox)]*OneOver255;
 
 					n.x+=KernelX[yy*3+xx]*Pixel;
 					n.y+=KernelY[yy*3+xx]*Pixel;
@@ -75,53 +75,53 @@ static bool _MakeNormalMap(VkuImage_t *Image)
 			Vec3_Normalize(&n);
 
 			// Precalculate destination image index
-			const uint32_t Index=4*(y*Image->Width+x);
+			const uint32_t Index=4*(y*image->width+x);
 
 			// Set destination image RGB to the normal value,
 			//   scaled and biased to fit the 16bit/channel unsigned integer image format
-			Buffer[Index+0]=(uint16_t)(65535.0f*(0.5f*n.x+0.5f));
-			Buffer[Index+1]=(uint16_t)(65535.0f*(0.5f*n.y+0.5f));
-			Buffer[Index+2]=(uint16_t)(65535.0f*(0.5f*n.z+0.5f));
+			buffer[Index+0]=(uint16_t)(65535.0f*(0.5f*n.x+0.5f));
+			buffer[Index+1]=(uint16_t)(65535.0f*(0.5f*n.y+0.5f));
+			buffer[Index+2]=(uint16_t)(65535.0f*(0.5f*n.z+0.5f));
 
 			// If the input image was an RGBA image, copy over the alpha channel from that, otherwise alpha=1.0.
 			if(Channels==4)
-				Buffer[Index+3]=(uint16_t)(Image->Data[Index+3]<<8);
+				buffer[Index+3]=(uint16_t)(image->data[Index+3]<<8);
 			else
-				Buffer[Index+3]=65535;
+				buffer[Index+3]=65535;
 		}
 	}
 
 	// Reset input color depth to the new format
-	Image->Depth=64;
+	image->depth=64;
 
 	// Free input image data and set it's pointer to the new data.
-	Zone_Free(Zone, Image->Data);
-	Image->Data=(unsigned char *)Buffer;
+	Zone_Free(zone, image->data);
+	image->data=(unsigned char *)buffer;
 
 	return true;
 }
 
 // _Normalize, internal function used by Image_Upload.
 // Takes an 8bit/channel RGB(A) image and re-normalizes it into a 16bit/channel image.
-static bool _Normalize(VkuImage_t *Image)
+static bool _Normalize(VkuImage_t *image)
 {
-	uint32_t Channels=Image->Depth>>3;
-	const float OneOver255=1.0f/255.0f;
+	uint32_t channels=image->depth>>3;
+	const float oneOver255=1.0f/255.0f;
 
-	if(Image->Depth!=32)
+	if(image->depth!=32)
 		return false;
 
-	uint16_t *Buffer=(uint16_t *)Zone_Malloc(Zone, sizeof(uint16_t)*Image->Width*Image->Height*4);
+	uint16_t *buffer=(uint16_t *)Zone_Malloc(zone, sizeof(uint16_t)*image->width*image->height*4);
 
-	if(Buffer==NULL)
+	if(buffer==NULL)
 		return false;
 
-	for(uint32_t i=0;i<Image->Width*Image->Height;i++)
+	for(uint32_t i=0;i<image->width*image->height;i++)
 	{
 		// Initialize the normal vector with the image data
-		vec3 n=Vec3((float)Image->Data[Channels*i+2]*OneOver255,
-					(float)Image->Data[Channels*i+1]*OneOver255,
-					(float)Image->Data[Channels*i+0]*OneOver255);
+		vec3 n=Vec3((float)image->data[channels*i+2]*oneOver255,
+					(float)image->data[channels*i+1]*oneOver255,
+					(float)image->data[channels*i+0]*oneOver255);
 
 		// scale/bias BGR unorm -> Normal float, and normalize it
 		n=Vec3_Subs(Vec3_Muls(n, 2.0f), 1.0f);
@@ -129,23 +129,23 @@ static bool _Normalize(VkuImage_t *Image)
 
 		// scale/bias normal back into a 16bit/channel unorm image
 		n=Vec3_Adds(Vec3_Muls(n, 0.5f), 0.5f);
-		Buffer[4*i+0]=(uint16_t)(65535.0f*n.x);
-		Buffer[4*i+1]=(uint16_t)(65535.0f*n.y);
-		Buffer[4*i+2]=(uint16_t)(65535.0f*n.z);
+		buffer[4*i+0]=(uint16_t)(65535.0f*n.x);
+		buffer[4*i+1]=(uint16_t)(65535.0f*n.y);
+		buffer[4*i+2]=(uint16_t)(65535.0f*n.z);
 
 		// Pass along alpha channel if original image was RGBA
-		if(Channels==4)
-			Buffer[4*i+3]=(uint16_t)(Image->Data[4*i+3]<<8);
+		if(channels==4)
+			buffer[4*i+3]=(uint16_t)(image->data[4*i+3]<<8);
 		else
-			Buffer[4*i+3]=65535;
+			buffer[4*i+3]=65535;
 	}
 
 	// Reset new color depth
-	Image->Depth=64;
+	image->depth=64;
 
 	// Free original image and reset the buffer pointer
-	Zone_Free(Zone, Image->Data);
-	Image->Data=(uint8_t *)Buffer;
+	Zone_Free(zone, image->data);
+	image->data=(uint8_t *)buffer;
 
 	return true;
 }
@@ -153,17 +153,17 @@ static bool _Normalize(VkuImage_t *Image)
 // _RGBE2Float, internal function used by Image_Upload
 // Takes in an 8bit/channel RGBE encoded image and outputs a
 //   32bit float/channel RGB image, mainly used for HDR images.
-static bool _RGBE2Float(VkuImage_t *Image)
+static bool _RGBE2Float(VkuImage_t *image)
 {
-	float *Buffer=(float *)Zone_Malloc(Zone, sizeof(float)*Image->Width*Image->Height*4);
+	float *buffer=(float *)Zone_Malloc(zone, sizeof(float)*image->width*image->height*4);
 
-	if(Buffer==NULL)
+	if(buffer==NULL)
 		return false;
 
-	for(uint32_t i=0;i<Image->Width*Image->Height;i++)
+	for(uint32_t i=0;i<image->width*image->height;i++)
 	{
-		unsigned char *rgbe=&Image->Data[4*i];
-		float *rgb=&Buffer[4*i];
+		unsigned char *rgbe=&image->data[4*i];
+		float *rgb=&buffer[4*i];
 
 		// This is basically rgb*exponent to reconstruct floating point pixels from 8bit/channel image.
 		if(rgbe[3])
@@ -197,11 +197,11 @@ static bool _RGBE2Float(VkuImage_t *Image)
 	}
 
 	// Reset color depth to new format
-	Image->Depth=128;
+	image->depth=128;
 
 	// Free and reset data pointer
-	Zone_Free(Zone, Image->Data);
-	Image->Data=(uint8_t *)Buffer;
+	Zone_Free(zone, image->data);
+	image->data=(uint8_t *)buffer;
 
 	return true;
 }
@@ -211,28 +211,28 @@ static bool _RGBE2Float(VkuImage_t *Image)
 //
 // TODO: Source/destination color depths *could* be different,
 //         maybe make this do a format conversion as well?
-static bool _Resize(VkuImage_t *Src, VkuImage_t *Dst)
+static bool _Resize(VkuImage_t *src, VkuImage_t *dst)
 {
 	float fx, fy, hx, hy, lx, ly;
 	float xPercent, yPercent;
-	float Total[4], Sum;
+	float total[4], Sum;
 	uint32_t iy, ix;
 
 	// Destination format must match source format.
-	if(Dst->Depth!=Src->Depth)
+	if(dst->depth!=src->depth)
 		return false;
 
-	Dst->Data=(uint8_t *)Zone_Malloc(Zone, (size_t)Dst->Width*Dst->Height*(Dst->Depth>>3));
+	dst->data=(uint8_t *)Zone_Malloc(zone, (size_t)dst->width*dst->height*(dst->depth>>3));
 
-	if(Dst->Data==NULL)
+	if(dst->data==NULL)
 		return false;
 
-	float sx=(float)Src->Width/Dst->Width;
-	float sy=(float)Src->Height/Dst->Height;
+	float sx=(float)src->width/dst->width;
+	float sy=(float)src->height/dst->height;
 
-	for(uint32_t y=0;y<Dst->Height;y++)
+	for(uint32_t y=0;y<dst->height;y++)
 	{
-		if(Src->Height>Dst->Height)
+		if(src->height>dst->height)
 		{
 			fy=((float)y+0.5f)*sy;
 			hy=fy+(sy*0.5f);
@@ -245,9 +245,9 @@ static bool _Resize(VkuImage_t *Src, VkuImage_t *Dst)
 			ly=fy-0.5f;
 		}
 
-		for(uint32_t x=0;x<Dst->Width;x++)
+		for(uint32_t x=0;x<dst->width;x++)
 		{
-			if(Src->Width>Dst->Width)
+			if(src->width>dst->width)
 			{
 				fx=((float)x+0.5f)*sx;
 				hx=fx+(sx*0.5f);
@@ -260,7 +260,7 @@ static bool _Resize(VkuImage_t *Src, VkuImage_t *Dst)
 				lx=fx-0.5f;
 			}
 
-			Total[0]=Total[1]=Total[2]=Total[3]=Sum=0.0f;
+			total[0]=total[1]=total[2]=total[3]=Sum=0.0f;
 
 			fy=ly;
 			iy=(int)fy;
@@ -285,39 +285,39 @@ static bool _Resize(VkuImage_t *Src, VkuImage_t *Dst)
 					float Percent=xPercent*yPercent;
 					Sum+=Percent;
 
-					uint32_t Index=min(Src->Height-1, iy)*Src->Width+min(Src->Width-1, ix);
+					uint32_t Index=min(src->height-1, iy)*src->width+min(src->width-1, ix);
 
-					switch(Src->Depth)
+					switch(src->depth)
 					{
 						case 128:
-							Total[0]+=((float *)Src->Data)[4*Index+0]*Percent;
-							Total[1]+=((float *)Src->Data)[4*Index+1]*Percent;
-							Total[2]+=((float *)Src->Data)[4*Index+2]*Percent;
-							Total[3]+=((float *)Src->Data)[4*Index+3]*Percent;
+							total[0]+=((float *)src->data)[4*Index+0]*Percent;
+							total[1]+=((float *)src->data)[4*Index+1]*Percent;
+							total[2]+=((float *)src->data)[4*Index+2]*Percent;
+							total[3]+=((float *)src->data)[4*Index+3]*Percent;
 							break;
 
 						case 64:
-							Total[0]+=((uint16_t *)Src->Data)[4*Index+0]*Percent;
-							Total[1]+=((uint16_t *)Src->Data)[4*Index+1]*Percent;
-							Total[2]+=((uint16_t *)Src->Data)[4*Index+2]*Percent;
-							Total[3]+=((uint16_t *)Src->Data)[4*Index+3]*Percent;
+							total[0]+=((uint16_t *)src->data)[4*Index+0]*Percent;
+							total[1]+=((uint16_t *)src->data)[4*Index+1]*Percent;
+							total[2]+=((uint16_t *)src->data)[4*Index+2]*Percent;
+							total[3]+=((uint16_t *)src->data)[4*Index+3]*Percent;
 							break;
 
 						case 32:
-							Total[0]+=(float)Src->Data[4*Index+0]*Percent;
-							Total[1]+=(float)Src->Data[4*Index+1]*Percent;
-							Total[2]+=(float)Src->Data[4*Index+2]*Percent;
-							Total[3]+=(float)Src->Data[4*Index+3]*Percent;
+							total[0]+=(float)src->data[4*Index+0]*Percent;
+							total[1]+=(float)src->data[4*Index+1]*Percent;
+							total[2]+=(float)src->data[4*Index+2]*Percent;
+							total[3]+=(float)src->data[4*Index+3]*Percent;
 							break;
 
 						case 16:
-							Total[0]+=((((uint16_t *)Src->Data)[Index]>>0x0)&0x1F)*Percent;
-							Total[1]+=((((uint16_t *)Src->Data)[Index]>>0x5)&0x1F)*Percent;
-							Total[2]+=((((uint16_t *)Src->Data)[Index]>>0xA)&0x1F)*Percent;
+							total[0]+=((((uint16_t *)src->data)[Index]>>0x0)&0x1F)*Percent;
+							total[1]+=((((uint16_t *)src->data)[Index]>>0x5)&0x1F)*Percent;
+							total[2]+=((((uint16_t *)src->data)[Index]>>0xA)&0x1F)*Percent;
 							break;
 
 						case 8:
-							Total[0]+=Src->Data[Index]*Percent;
+							total[0]+=src->data[Index]*Percent;
 					}
 
 					ix++;
@@ -328,38 +328,38 @@ static bool _Resize(VkuImage_t *Src, VkuImage_t *Dst)
 				fy=(float)iy;
 			}
 
-			uint32_t Index=y*Dst->Width+x;
+			uint32_t Index=y*dst->width+x;
 			Sum=1.0f/Sum;
 
-			switch(Dst->Depth)
+			switch(dst->depth)
 			{
 				case 128:
-					((float *)Dst->Data)[4*Index+0]=(float)(Total[0]*Sum);
-					((float *)Dst->Data)[4*Index+1]=(float)(Total[1]*Sum);
-					((float *)Dst->Data)[4*Index+2]=(float)(Total[2]*Sum);
-					((float *)Dst->Data)[4*Index+3]=(float)(Total[3]*Sum);
+					((float *)dst->data)[4*Index+0]=(float)(total[0]*Sum);
+					((float *)dst->data)[4*Index+1]=(float)(total[1]*Sum);
+					((float *)dst->data)[4*Index+2]=(float)(total[2]*Sum);
+					((float *)dst->data)[4*Index+3]=(float)(total[3]*Sum);
 					break;
 
 				case 64:
-					((uint16_t *)Dst->Data)[4*Index+0]=(uint16_t)(Total[0]*Sum);
-					((uint16_t *)Dst->Data)[4*Index+1]=(uint16_t)(Total[1]*Sum);
-					((uint16_t *)Dst->Data)[4*Index+2]=(uint16_t)(Total[2]*Sum);
-					((uint16_t *)Dst->Data)[4*Index+3]=(uint16_t)(Total[3]*Sum);
+					((uint16_t *)dst->data)[4*Index+0]=(uint16_t)(total[0]*Sum);
+					((uint16_t *)dst->data)[4*Index+1]=(uint16_t)(total[1]*Sum);
+					((uint16_t *)dst->data)[4*Index+2]=(uint16_t)(total[2]*Sum);
+					((uint16_t *)dst->data)[4*Index+3]=(uint16_t)(total[3]*Sum);
 					break;
 
 				case 32:
-					((uint8_t *)Dst->Data)[4*Index+0]=(uint8_t)(Total[0]*Sum);
-					((uint8_t *)Dst->Data)[4*Index+1]=(uint8_t)(Total[1]*Sum);
-					((uint8_t *)Dst->Data)[4*Index+2]=(uint8_t)(Total[2]*Sum);
-					((uint8_t *)Dst->Data)[4*Index+3]=(uint8_t)(Total[3]*Sum);
+					((uint8_t *)dst->data)[4*Index+0]=(uint8_t)(total[0]*Sum);
+					((uint8_t *)dst->data)[4*Index+1]=(uint8_t)(total[1]*Sum);
+					((uint8_t *)dst->data)[4*Index+2]=(uint8_t)(total[2]*Sum);
+					((uint8_t *)dst->data)[4*Index+3]=(uint8_t)(total[3]*Sum);
 					break;
 
 				case 16:
-					((uint16_t *)Dst->Data)[Index]=((uint16_t)((Total[0]*Sum))&0x1F)<<0x0|((uint16_t)(Total[1]*Sum)&0x1F)<<0x5|((uint16_t)(Total[2]*Sum)&0x1F)<<0xA;
+					((uint16_t *)dst->data)[Index]=((uint16_t)((total[0]*Sum))&0x1F)<<0x0|((uint16_t)(total[1]*Sum)&0x1F)<<0x5|((uint16_t)(total[2]*Sum)&0x1F)<<0xA;
 					break;
 
 				case 8:
-					((uint8_t *)Dst->Data)[Index]=(uint8_t)(Total[0]*Sum);
+					((uint8_t *)dst->data)[Index]=(uint8_t)(total[0]*Sum);
 					break;
 			}
 		}
@@ -370,107 +370,107 @@ static bool _Resize(VkuImage_t *Src, VkuImage_t *Dst)
 
 // _HalfImage, internal function not currently used.
 // Simple 4->1 pixel average downscale to only half the image size.
-static bool _HalfImage(VkuImage_t *Src, VkuImage_t *Dst)
+static bool _HalfImage(VkuImage_t *src, VkuImage_t *dst)
 {
-	Dst->Width=Src->Width>>1;
-	Dst->Height=Src->Height>>1;
-	Dst->Depth=Src->Depth;
-	Dst->Data=(uint8_t *)Zone_Malloc(Zone, (size_t)Dst->Width*Dst->Height*(Dst->Depth>>3));
+	dst->width=src->width>>1;
+	dst->height=src->height>>1;
+	dst->depth=src->depth;
+	dst->data=(uint8_t *)Zone_Malloc(zone, (size_t)dst->width*dst->height*(dst->depth>>3));
 
-	if(Dst->Data==NULL)
+	if(dst->data==NULL)
 		return false;
 
-	for(uint32_t y=0;y<Dst->Height;y++)
+	for(uint32_t y=0;y<dst->height;y++)
 	{
 		uint32_t sy=y<<1;
 
-		for(uint32_t x=0;x<Dst->Width;x++)
+		for(uint32_t x=0;x<dst->width;x++)
 		{
 			uint32_t sx=x<<1;
 
-			uint32_t indexDst=y*Dst->Width+x;
-			uint32_t indexSrc00=(sy+0)*Src->Width+(sx+0);
-			uint32_t indexSrc10=(sy+0)*Src->Width+(sx+1);
-			uint32_t indexSrc01=(sy+1)*Src->Width+(sx+0);
-			uint32_t indexSrc11=(sy+1)*Src->Width+(sx+1);
+			uint32_t indexDst=y*dst->width+x;
+			uint32_t indexSrc00=(sy+0)*src->width+(sx+0);
+			uint32_t indexSrc10=(sy+0)*src->width+(sx+1);
+			uint32_t indexSrc01=(sy+1)*src->width+(sx+0);
+			uint32_t indexSrc11=(sy+1)*src->width+(sx+1);
 
-			switch(Src->Depth)
+			switch(src->depth)
 			{
 				case 128:
-					((float *)Dst->Data)[4*indexDst+0]=(((float *)Src->Data)[4*indexSrc00+0]+
-														((float *)Src->Data)[4*indexSrc10+0]+
-														((float *)Src->Data)[4*indexSrc01+0]+
-														((float *)Src->Data)[4*indexSrc11+0])*0.25f;
-					((float *)Dst->Data)[4*indexDst+1]=(((float *)Src->Data)[4*indexSrc00+1]+
-														((float *)Src->Data)[4*indexSrc10+1]+
-														((float *)Src->Data)[4*indexSrc01+1]+
-														((float *)Src->Data)[4*indexSrc11+1])*0.25f;
-					((float *)Dst->Data)[4*indexDst+2]=(((float *)Src->Data)[4*indexSrc00+2]+
-														((float *)Src->Data)[4*indexSrc10+2]+
-														((float *)Src->Data)[4*indexSrc01+2]+
-														((float *)Src->Data)[4*indexSrc11+2])*0.25f;
-					((float *)Dst->Data)[4*indexDst+3]=(((float *)Src->Data)[4*indexSrc00+3]+
-														((float *)Src->Data)[4*indexSrc10+3]+
-														((float *)Src->Data)[4*indexSrc01+3]+
-														((float *)Src->Data)[4*indexSrc11+3])*0.25f;
+					((float *)dst->data)[4*indexDst+0]=(((float *)src->data)[4*indexSrc00+0]+
+														((float *)src->data)[4*indexSrc10+0]+
+														((float *)src->data)[4*indexSrc01+0]+
+														((float *)src->data)[4*indexSrc11+0])*0.25f;
+					((float *)dst->data)[4*indexDst+1]=(((float *)src->data)[4*indexSrc00+1]+
+														((float *)src->data)[4*indexSrc10+1]+
+														((float *)src->data)[4*indexSrc01+1]+
+														((float *)src->data)[4*indexSrc11+1])*0.25f;
+					((float *)dst->data)[4*indexDst+2]=(((float *)src->data)[4*indexSrc00+2]+
+														((float *)src->data)[4*indexSrc10+2]+
+														((float *)src->data)[4*indexSrc01+2]+
+														((float *)src->data)[4*indexSrc11+2])*0.25f;
+					((float *)dst->data)[4*indexDst+3]=(((float *)src->data)[4*indexSrc00+3]+
+														((float *)src->data)[4*indexSrc10+3]+
+														((float *)src->data)[4*indexSrc01+3]+
+														((float *)src->data)[4*indexSrc11+3])*0.25f;
 					break;
 
 				case 64:
-					((uint16_t *)Dst->Data)[4*indexDst+0]=(((uint16_t *)Src->Data)[4*indexSrc00+0]+
-														   ((uint16_t *)Src->Data)[4*indexSrc10+0]+
-														   ((uint16_t *)Src->Data)[4*indexSrc01+0]+
-														   ((uint16_t *)Src->Data)[4*indexSrc11+0])>>2;
-					((uint16_t *)Dst->Data)[4*indexDst+1]=(((uint16_t *)Src->Data)[4*indexSrc00+1]+
-														   ((uint16_t *)Src->Data)[4*indexSrc10+1]+
-														   ((uint16_t *)Src->Data)[4*indexSrc01+1]+
-														   ((uint16_t *)Src->Data)[4*indexSrc11+1])>>2;
-					((uint16_t *)Dst->Data)[4*indexDst+2]=(((uint16_t *)Src->Data)[4*indexSrc00+2]+
-														   ((uint16_t *)Src->Data)[4*indexSrc10+2]+
-														   ((uint16_t *)Src->Data)[4*indexSrc01+2]+
-														   ((uint16_t *)Src->Data)[4*indexSrc11+2])>>2;
-					((uint16_t *)Dst->Data)[4*indexDst+3]=(((uint16_t *)Src->Data)[4*indexSrc00+3]+
-														   ((uint16_t *)Src->Data)[4*indexSrc10+3]+
-														   ((uint16_t *)Src->Data)[4*indexSrc01+3]+
-														   ((uint16_t *)Src->Data)[4*indexSrc11+3])>>2;
+					((uint16_t *)dst->data)[4*indexDst+0]=(((uint16_t *)src->data)[4*indexSrc00+0]+
+														   ((uint16_t *)src->data)[4*indexSrc10+0]+
+														   ((uint16_t *)src->data)[4*indexSrc01+0]+
+														   ((uint16_t *)src->data)[4*indexSrc11+0])>>2;
+					((uint16_t *)dst->data)[4*indexDst+1]=(((uint16_t *)src->data)[4*indexSrc00+1]+
+														   ((uint16_t *)src->data)[4*indexSrc10+1]+
+														   ((uint16_t *)src->data)[4*indexSrc01+1]+
+														   ((uint16_t *)src->data)[4*indexSrc11+1])>>2;
+					((uint16_t *)dst->data)[4*indexDst+2]=(((uint16_t *)src->data)[4*indexSrc00+2]+
+														   ((uint16_t *)src->data)[4*indexSrc10+2]+
+														   ((uint16_t *)src->data)[4*indexSrc01+2]+
+														   ((uint16_t *)src->data)[4*indexSrc11+2])>>2;
+					((uint16_t *)dst->data)[4*indexDst+3]=(((uint16_t *)src->data)[4*indexSrc00+3]+
+														   ((uint16_t *)src->data)[4*indexSrc10+3]+
+														   ((uint16_t *)src->data)[4*indexSrc01+3]+
+														   ((uint16_t *)src->data)[4*indexSrc11+3])>>2;
 					break;
 
 				case 32:
-					Dst->Data[4*indexDst+0]=(Src->Data[4*indexSrc00+0]+
-											 Src->Data[4*indexSrc10+0]+
-											 Src->Data[4*indexSrc01+0]+
-											 Src->Data[4*indexSrc11+0])>>2;
-					Dst->Data[4*indexDst+1]=(Src->Data[4*indexSrc00+1]+
-											 Src->Data[4*indexSrc10+1]+
-											 Src->Data[4*indexSrc01+1]+
-											 Src->Data[4*indexSrc11+1])>>2;
-					Dst->Data[4*indexDst+2]=(Src->Data[4*indexSrc00+2]+
-											 Src->Data[4*indexSrc10+2]+
-											 Src->Data[4*indexSrc01+2]+
-											 Src->Data[4*indexSrc11+2])>>2;
-					Dst->Data[4*indexDst+3]=(Src->Data[4*indexSrc00+3]+
-											 Src->Data[4*indexSrc10+3]+
-											 Src->Data[4*indexSrc01+3]+
-											 Src->Data[4*indexSrc11+3])>>2;
+					dst->data[4*indexDst+0]=(src->data[4*indexSrc00+0]+
+											 src->data[4*indexSrc10+0]+
+											 src->data[4*indexSrc01+0]+
+											 src->data[4*indexSrc11+0])>>2;
+					dst->data[4*indexDst+1]=(src->data[4*indexSrc00+1]+
+											 src->data[4*indexSrc10+1]+
+											 src->data[4*indexSrc01+1]+
+											 src->data[4*indexSrc11+1])>>2;
+					dst->data[4*indexDst+2]=(src->data[4*indexSrc00+2]+
+											 src->data[4*indexSrc10+2]+
+											 src->data[4*indexSrc01+2]+
+											 src->data[4*indexSrc11+2])>>2;
+					dst->data[4*indexDst+3]=(src->data[4*indexSrc00+3]+
+											 src->data[4*indexSrc10+3]+
+											 src->data[4*indexSrc01+3]+
+											 src->data[4*indexSrc11+3])>>2;
 					break;
 
 				case 16:
 				{
-					uint16_t p0=((uint16_t *)Src->Data)[indexSrc00];
-					uint16_t p1=((uint16_t *)Src->Data)[indexSrc10];
-					uint16_t p2=((uint16_t *)Src->Data)[indexSrc01];
-					uint16_t p3=((uint16_t *)Src->Data)[indexSrc11];
+					uint16_t p0=((uint16_t *)src->data)[indexSrc00];
+					uint16_t p1=((uint16_t *)src->data)[indexSrc10];
+					uint16_t p2=((uint16_t *)src->data)[indexSrc01];
+					uint16_t p3=((uint16_t *)src->data)[indexSrc11];
 
-					((uint16_t *)Dst->Data)[indexDst] =(uint16_t)((((p0>>0x0)&0x1F)+((p1>>0x0)&0x1F)+((p2>>0x0)&0x1F)+((p3>>0x0)&0x1F))>>2)<<0x0;
-					((uint16_t *)Dst->Data)[indexDst]|=(uint16_t)((((p0>>0x5)&0x1F)+((p1>>0x5)&0x1F)+((p2>>0x5)&0x1F)+((p3>>0x5)&0x1F))>>2)<<0x5;
-					((uint16_t *)Dst->Data)[indexDst]|=(uint16_t)((((p0>>0xA)&0x1F)+((p1>>0xA)&0x1F)+((p2>>0xA)&0x1F)+((p3>>0xA)&0x1F))>>2)<<0xA;
+					((uint16_t *)dst->data)[indexDst] =(uint16_t)((((p0>>0x0)&0x1F)+((p1>>0x0)&0x1F)+((p2>>0x0)&0x1F)+((p3>>0x0)&0x1F))>>2)<<0x0;
+					((uint16_t *)dst->data)[indexDst]|=(uint16_t)((((p0>>0x5)&0x1F)+((p1>>0x5)&0x1F)+((p2>>0x5)&0x1F)+((p3>>0x5)&0x1F))>>2)<<0x5;
+					((uint16_t *)dst->data)[indexDst]|=(uint16_t)((((p0>>0xA)&0x1F)+((p1>>0xA)&0x1F)+((p2>>0xA)&0x1F)+((p3>>0xA)&0x1F))>>2)<<0xA;
 					break;
 				}
 
 				case 8:
-					Dst->Data[indexDst]=(Src->Data[indexSrc00]+
-										 Src->Data[indexSrc10]+
-										 Src->Data[indexSrc01]+
-										 Src->Data[indexSrc11])>>2;
+					dst->data[indexDst]=(src->data[indexSrc00]+
+										 src->data[indexSrc10]+
+										 src->data[indexSrc01]+
+										 src->data[indexSrc11])>>2;
 					break;
 			}
 		}
@@ -484,20 +484,20 @@ static bool _HalfImage(VkuImage_t *Src, VkuImage_t *Dst)
 // 
 // TODO: This doesn't obviously work, the data must persist until the command buffer is complete and submitted
 // 
-//static void _BuildMipmaps(VkDevice Device, VkCommandBuffer CommandBuffer, VkuBuffer_t *StagingBuffer, VkuImage_t *Image, uint32_t mipLevels, uint32_t layerCount, uint32_t baseLayer)
+//static void _BuildMipmaps(VkDevice device, VkCommandBuffer CommandBuffer, VkuBuffer_t *StagingBuffer, VkuImage_t *image, uint32_t mipLevels, uint32_t layerCount, uint32_t baseLayer)
 //{
 //	VkuImage_t Stage, Temp;
 //
 //	// Create a temporary image
-//	Temp.Width=Image->Width;
-//	Temp.Height=Image->Height;
-//	Temp.Depth=Image->Depth;
+//	Temp.width=image->width;
+//	Temp.height=image->height;
+//	Temp.depth=image->depth;
 //
 //	// Create and map memory for the already existing staging buffer (this contains the original image)
-//	Stage.Width=Image->Width;
-//	Stage.Height=Image->Height;
-//	Stage.Depth=Image->Depth;
-//	vkMapMemory(Device, StagingBuffer->DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Stage.Data);
+//	Stage.width=image->width;
+//	Stage.height=image->height;
+//	Stage.depth=image->depth;
+//	vkMapMemory(device, StagingBuffer->deviceMemory, 0, VK_WHOLE_SIZE, 0, &Stage.data);
 //
 //	for(uint32_t i=1;i<mipLevels;i++)
 //	{
@@ -505,27 +505,27 @@ static bool _HalfImage(VkuImage_t *Src, VkuImage_t *Dst)
 //		_HalfImage(&Stage, &Temp);
 //
 //		// Copy the halved image from the temporary image into the staging buffer
-//		memcpy(Stage.Data, Temp.Data, Temp.Width*Temp.Height*(Temp.Depth>>3));
+//		memcpy(Stage.data, Temp.data, Temp.width*Temp.height*(Temp.depth>>3));
 //
 //		// Copy from staging buffer to the texture buffer
-//		vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer->Buffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, (VkBufferImageCopy[1])
+//		vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer->buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, (VkBufferImageCopy[1])
 //		{
-//			{ 0, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, i, baseLayer, layerCount }, { 0, 0, 0 }, { Temp.Width, Temp.Height, 1 } }
+//			{ 0, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, i, baseLayer, layerCount }, { 0, 0, 0 }, { Temp.width, Temp.height, 1 } }
 //		});
 //
 //		// The staging buffer now contains the halved image, so update the width/height for the next round
-//		Stage.Width=Temp.Width;
-//		Stage.Height=Temp.Height;
+//		Stage.width=Temp.width;
+//		Stage.height=Temp.height;
 //
 //		// Free the temp data allocated by _HalfImage
-//		Zone_Free(Zone, Temp.Data);
+//		Zone_Free(zone, Temp.data);
 //	}
 //
 //	// Unmap the staging buffer
-//	vkUnmapMemory(Device, StagingBuffer->DeviceMemory);
+//	vkUnmapMemory(device, StagingBuffer->deviceMemory);
 //
 //	// Final image layout transition to shader read-only
-//	vkuTransitionLayout(CommandBuffer, Image->Image, 1, mipLevels-1, 1, baseLayer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+//	vkuTransitionLayout(CommandBuffer, image->image, 1, mipLevels-1, 1, baseLayer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 //}
 
 // _GetPixelBilinear, internal function used by functions that need to sample pixels out of image data.
@@ -534,17 +534,17 @@ static bool _HalfImage(VkuImage_t *Src, VkuImage_t *Dst)
 // Output must be sized correctly for sampled image bit depth and format.
 // TODO: Source/destination color depths *could* be different,
 //         maybe make this do a format conversion as well?
-static void _GetPixelBilinear(VkuImage_t *Image, float x, float y, void *Out)
+static void _GetPixelBilinear(VkuImage_t *image, float x, float y, void *out)
 {
 	uint32_t ix=(int)x, iy=(int)y;
 	uint32_t ox=ix+1, oy=iy+1;
 	float fx=x-ix, fy=y-iy;
 
-	if(ox>=Image->Width)
-		ox=Image->Width-1;
+	if(ox>=image->width)
+		ox=image->width-1;
 
-	if(oy>=Image->Height)
-		oy=Image->Height-1;
+	if(oy>=image->height)
+		oy=image->height-1;
 
 	if(fx<0.0f)
 		ix=ox=0;
@@ -557,49 +557,49 @@ static void _GetPixelBilinear(VkuImage_t *Image, float x, float y, void *Out)
 	float w10=fx-w11;
 	float w01=fy-w11;
 
-	uint32_t i00=iy*Image->Width+ix;
-	uint32_t i10=iy*Image->Width+ox;
-	uint32_t i01=oy*Image->Width+ix;
-	uint32_t i11=oy*Image->Width+ox;
+	uint32_t i00=iy*image->width+ix;
+	uint32_t i10=iy*image->width+ox;
+	uint32_t i01=oy*image->width+ix;
+	uint32_t i11=oy*image->width+ox;
 
-	switch(Image->Depth)
+	switch(image->depth)
 	{
 		case 128:
-			((float *)Out)[0]=((float *)Image->Data)[4*i00+0]*w00+((float *)Image->Data)[4*i10+0]*w10+((float *)Image->Data)[4*i01+0]*w01+((float *)Image->Data)[4*i11+0]*w11;
-			((float *)Out)[1]=((float *)Image->Data)[4*i00+1]*w00+((float *)Image->Data)[4*i10+1]*w10+((float *)Image->Data)[4*i01+1]*w01+((float *)Image->Data)[4*i11+1]*w11;
-			((float *)Out)[2]=((float *)Image->Data)[4*i00+2]*w00+((float *)Image->Data)[4*i10+2]*w10+((float *)Image->Data)[4*i01+2]*w01+((float *)Image->Data)[4*i11+2]*w11;
-			((float *)Out)[3]=((float *)Image->Data)[4*i00+3]*w00+((float *)Image->Data)[4*i10+3]*w10+((float *)Image->Data)[4*i01+3]*w01+((float *)Image->Data)[4*i11+3]*w11;
+			((float *)out)[0]=((float *)image->data)[4*i00+0]*w00+((float *)image->data)[4*i10+0]*w10+((float *)image->data)[4*i01+0]*w01+((float *)image->data)[4*i11+0]*w11;
+			((float *)out)[1]=((float *)image->data)[4*i00+1]*w00+((float *)image->data)[4*i10+1]*w10+((float *)image->data)[4*i01+1]*w01+((float *)image->data)[4*i11+1]*w11;
+			((float *)out)[2]=((float *)image->data)[4*i00+2]*w00+((float *)image->data)[4*i10+2]*w10+((float *)image->data)[4*i01+2]*w01+((float *)image->data)[4*i11+2]*w11;
+			((float *)out)[3]=((float *)image->data)[4*i00+3]*w00+((float *)image->data)[4*i10+3]*w10+((float *)image->data)[4*i01+3]*w01+((float *)image->data)[4*i11+3]*w11;
 			break;
 
 		case 64:
-			((uint16_t *)Out)[0]=(uint16_t)(((uint16_t *)Image->Data)[4*i00+0]*w00+((uint16_t *)Image->Data)[4*i10+0]*w10+((uint16_t *)Image->Data)[4*i01+0]*w01+((uint16_t *)Image->Data)[4*i11+0]*w11);
-			((uint16_t *)Out)[1]=(uint16_t)(((uint16_t *)Image->Data)[4*i00+1]*w00+((uint16_t *)Image->Data)[4*i10+1]*w10+((uint16_t *)Image->Data)[4*i01+1]*w01+((uint16_t *)Image->Data)[4*i11+1]*w11);
-			((uint16_t *)Out)[2]=(uint16_t)(((uint16_t *)Image->Data)[4*i00+2]*w00+((uint16_t *)Image->Data)[4*i10+2]*w10+((uint16_t *)Image->Data)[4*i01+2]*w01+((uint16_t *)Image->Data)[4*i11+2]*w11);
-			((uint16_t *)Out)[3]=(uint16_t)(((uint16_t *)Image->Data)[4*i00+3]*w00+((uint16_t *)Image->Data)[4*i10+3]*w10+((uint16_t *)Image->Data)[4*i01+3]*w01+((uint16_t *)Image->Data)[4*i11+3]*w11);
+			((uint16_t *)out)[0]=(uint16_t)(((uint16_t *)image->data)[4*i00+0]*w00+((uint16_t *)image->data)[4*i10+0]*w10+((uint16_t *)image->data)[4*i01+0]*w01+((uint16_t *)image->data)[4*i11+0]*w11);
+			((uint16_t *)out)[1]=(uint16_t)(((uint16_t *)image->data)[4*i00+1]*w00+((uint16_t *)image->data)[4*i10+1]*w10+((uint16_t *)image->data)[4*i01+1]*w01+((uint16_t *)image->data)[4*i11+1]*w11);
+			((uint16_t *)out)[2]=(uint16_t)(((uint16_t *)image->data)[4*i00+2]*w00+((uint16_t *)image->data)[4*i10+2]*w10+((uint16_t *)image->data)[4*i01+2]*w01+((uint16_t *)image->data)[4*i11+2]*w11);
+			((uint16_t *)out)[3]=(uint16_t)(((uint16_t *)image->data)[4*i00+3]*w00+((uint16_t *)image->data)[4*i10+3]*w10+((uint16_t *)image->data)[4*i01+3]*w01+((uint16_t *)image->data)[4*i11+3]*w11);
 			break;
 
 		case 32:
-			((uint8_t *)Out)[0]=(uint8_t)(Image->Data[4*i00+0]*w00+Image->Data[4*i10+0]*w10+Image->Data[4*i01+0]*w01+Image->Data[4*i11+0]*w11);
-			((uint8_t *)Out)[1]=(uint8_t)(Image->Data[4*i00+1]*w00+Image->Data[4*i10+1]*w10+Image->Data[4*i01+1]*w01+Image->Data[4*i11+1]*w11);
-			((uint8_t *)Out)[2]=(uint8_t)(Image->Data[4*i00+2]*w00+Image->Data[4*i10+2]*w10+Image->Data[4*i01+2]*w01+Image->Data[4*i11+2]*w11);
-			((uint8_t *)Out)[3]=(uint8_t)(Image->Data[4*i00+3]*w00+Image->Data[4*i10+3]*w10+Image->Data[4*i01+3]*w01+Image->Data[4*i11+3]*w11);
+			((uint8_t *)out)[0]=(uint8_t)(image->data[4*i00+0]*w00+image->data[4*i10+0]*w10+image->data[4*i01+0]*w01+image->data[4*i11+0]*w11);
+			((uint8_t *)out)[1]=(uint8_t)(image->data[4*i00+1]*w00+image->data[4*i10+1]*w10+image->data[4*i01+1]*w01+image->data[4*i11+1]*w11);
+			((uint8_t *)out)[2]=(uint8_t)(image->data[4*i00+2]*w00+image->data[4*i10+2]*w10+image->data[4*i01+2]*w01+image->data[4*i11+2]*w11);
+			((uint8_t *)out)[3]=(uint8_t)(image->data[4*i00+3]*w00+image->data[4*i10+3]*w10+image->data[4*i01+3]*w01+image->data[4*i11+3]*w11);
 			break;
 
 		case 16:
 		{
-			uint16_t p0=((uint16_t *)Image->Data)[i00];
-			uint16_t p1=((uint16_t *)Image->Data)[i10];
-			uint16_t p2=((uint16_t *)Image->Data)[i01];
-			uint16_t p3=((uint16_t *)Image->Data)[i11];
+			uint16_t p0=((uint16_t *)image->data)[i00];
+			uint16_t p1=((uint16_t *)image->data)[i10];
+			uint16_t p2=((uint16_t *)image->data)[i01];
+			uint16_t p3=((uint16_t *)image->data)[i11];
 
-			*((uint16_t *)Out) =(uint16_t)(((p0>>0x0)&0x1F)*w00+((p1>>0x0)&0x1F)*w10+((p2>>0x0)&0x1F)*w01+((p3>>0x0)&0x1F)*w11)<<0x0;
-			*((uint16_t *)Out)|=(uint16_t)(((p0>>0x5)&0x1F)*w00+((p1>>0x5)&0x1F)*w10+((p2>>0x5)&0x1F)*w01+((p3>>0x5)&0x1F)*w11)<<0x5;
-			*((uint16_t *)Out)|=(uint16_t)(((p0>>0xA)&0x1F)*w00+((p1>>0xA)&0x1F)*w10+((p2>>0xA)&0x1F)*w01+((p3>>0xA)&0x1F)*w11)<<0xA;
+			*((uint16_t *)out) =(uint16_t)(((p0>>0x0)&0x1F)*w00+((p1>>0x0)&0x1F)*w10+((p2>>0x0)&0x1F)*w01+((p3>>0x0)&0x1F)*w11)<<0x0;
+			*((uint16_t *)out)|=(uint16_t)(((p0>>0x5)&0x1F)*w00+((p1>>0x5)&0x1F)*w10+((p2>>0x5)&0x1F)*w01+((p3>>0x5)&0x1F)*w11)<<0x5;
+			*((uint16_t *)out)|=(uint16_t)(((p0>>0xA)&0x1F)*w00+((p1>>0xA)&0x1F)*w10+((p2>>0xA)&0x1F)*w01+((p3>>0xA)&0x1F)*w11)<<0xA;
 			break;
 		}
 
 		case 8:
-			*((uint8_t *)Out)=(uint8_t)(Image->Data[i00]*w00+Image->Data[i10]*w10+Image->Data[i01]*w01+Image->Data[i11]*w11);
+			*((uint8_t *)out)=(uint8_t)(image->data[i00]*w00+image->data[i10]*w10+image->data[i01]*w01+image->data[i11]*w11);
 			break;
 	}
 }
@@ -638,28 +638,28 @@ static vec3 _GetXYZFace(vec2 uv, int face)
 
 // _AngularMapFace, internal function used by Image_Upload.
 // Gets a selected 2D cubemap face from an angular lightmap probe image
-static bool _AngularMapFace(VkuImage_t *In, int Face, VkuImage_t *Out)
+static bool _AngularMapFace(VkuImage_t *in, int face, VkuImage_t *out)
 {
 	// Allocate memory for output
-	Out->Data=(uint8_t *)Zone_Malloc(Zone, (size_t)Out->Width*Out->Height*(Out->Depth>>3));
+	out->data=(uint8_t *)Zone_Malloc(zone, (size_t)out->width*out->height*(out->depth>>3));
 
-	if(Out->Data==NULL)
+	if(out->data==NULL)
 		return false;
 
-	for(uint32_t y=0;y<Out->Height;y++)
+	for(uint32_t y=0;y<out->height;y++)
 	{
-		float fy=(float)y/(Out->Height-1);
+		float fy=(float)y/(out->height-1);
 
-		for(uint32_t x=0;x<Out->Width;x++)
+		for(uint32_t x=0;x<out->width;x++)
 		{
-			float fx=(float)x/(Out->Width-1);
+			float fx=(float)x/(out->width-1);
 			vec3 xyz;
 
 			// UV coordinate into the image we're producing
 			vec2 uv={ fx, fy };
 
 			// Get a 3D cubemap coordinate for the given UV and selected cube face
-			xyz=_GetXYZFace(uv, Face);
+			xyz=_GetXYZFace(uv, face);
 
 			// Use that 3D coordinate and this function to transform it into a UV coord into an angular map lightprobe
 			// TODO: This function can also be substituted for other image formats (lat/lon,  vertical cross, mirror ball),
@@ -667,7 +667,7 @@ static bool _AngularMapFace(VkuImage_t *In, int Face, VkuImage_t *Out)
 			uv=_GetUVAngularMap(xyz);
 
 			// Bilinearly sample the pixel from the source image and set it into the output data (destination cubemap face)
-			_GetPixelBilinear(In, uv.x*In->Width, uv.y*In->Height, (void *)&Out->Data[(Out->Depth>>3)*(y*Out->Width+x)]);
+			_GetPixelBilinear(in, uv.x*in->width, uv.y*in->height, (void *)&out->data[(out->depth>>3)*(y*out->width+x)]);
 		}
 	}
 
@@ -679,104 +679,104 @@ static bool _AngularMapFace(VkuImage_t *In, int Face, VkuImage_t *Out)
 //
 // This is needed for Vulkan, most GPUs do not have RGB image format support.
 // Also allows any helper functions here to be simplified by not needing to support as many bit depths.
-static void _RGBtoRGBA(VkuImage_t *Image)
+static void _RGBtoRGBA(VkuImage_t *image)
 {
-	if(Image->Depth==96)
+	if(image->depth==96)
 	{
-		float *Dst=(float *)Zone_Malloc(Zone, sizeof(float)*Image->Width*Image->Height*4);
+		float *dst=(float *)Zone_Malloc(zone, sizeof(float)*image->width*image->height*4);
 
-		if(Dst==NULL)
+		if(dst==NULL)
 			return;
 
-		for(uint32_t i=0;i<Image->Width*Image->Height;i++)
+		for(uint32_t i=0;i<image->width*image->height;i++)
 		{
-			uint32_t SrcIdx=3*i;
-			uint32_t DstIdx=4*i;
+			uint32_t srcIdx=3*i;
+			uint32_t dstIdx=4*i;
 
-			Dst[DstIdx+0]=((float *)Image->Data)[SrcIdx+0];
-			Dst[DstIdx+1]=((float *)Image->Data)[SrcIdx+1];
-			Dst[DstIdx+2]=((float *)Image->Data)[SrcIdx+2];
-			Dst[DstIdx+3]=1.0f;
+			dst[dstIdx+0]=((float *)image->data)[srcIdx+0];
+			dst[dstIdx+1]=((float *)image->data)[srcIdx+1];
+			dst[dstIdx+2]=((float *)image->data)[srcIdx+2];
+			dst[dstIdx+3]=1.0f;
 		}
 
-		Zone_Free(Zone, Image->Data);
-		Image->Data=(uint8_t *)Dst;
-		Image->Depth=128;
+		Zone_Free(zone, image->data);
+		image->data=(uint8_t *)dst;
+		image->depth=128;
 	}
-	else if(Image->Depth==48)
+	else if(image->depth==48)
 	{
-		uint16_t *Dst=(uint16_t *)Zone_Malloc(Zone, sizeof(uint16_t)*Image->Width*Image->Height*4);
+		uint16_t *dst=(uint16_t *)Zone_Malloc(zone, sizeof(uint16_t)*image->width*image->height*4);
 
-		if(Dst==NULL)
+		if(dst==NULL)
 			return;
 
-		for(uint32_t i=0;i<Image->Width*Image->Height;i++)
+		for(uint32_t i=0;i<image->width*image->height;i++)
 		{
-			uint32_t SrcIdx=3*i;
-			uint32_t DstIdx=4*i;
+			uint32_t srcIdx=3*i;
+			uint32_t dstIdx=4*i;
 
-			Dst[DstIdx+0]=((uint16_t *)Image->Data)[SrcIdx+0];
-			Dst[DstIdx+1]=((uint16_t *)Image->Data)[SrcIdx+1];
-			Dst[DstIdx+2]=((uint16_t *)Image->Data)[SrcIdx+2];
-			Dst[DstIdx+3]=UINT16_MAX;
+			dst[dstIdx+0]=((uint16_t *)image->data)[srcIdx+0];
+			dst[dstIdx+1]=((uint16_t *)image->data)[srcIdx+1];
+			dst[dstIdx+2]=((uint16_t *)image->data)[srcIdx+2];
+			dst[dstIdx+3]=UINT16_MAX;
 		}
 
-		Zone_Free(Zone, Image->Data);
-		Image->Data=(uint8_t *)Dst;
-		Image->Depth=64;
+		Zone_Free(zone, image->data);
+		image->data=(uint8_t *)dst;
+		image->depth=64;
 	}
-	else if(Image->Depth==24)
+	else if(image->depth==24)
 	{
-		uint8_t *Dst=(uint8_t *)Zone_Malloc(Zone, sizeof(uint8_t)*Image->Width*Image->Height*4);
+		uint8_t *dst=(uint8_t *)Zone_Malloc(zone, sizeof(uint8_t)*image->width*image->height*4);
 
-		if(Dst==NULL)
+		if(dst==NULL)
 			return;
 
-		for(uint32_t i=0;i<Image->Width*Image->Height;i++)
+		for(uint32_t i=0;i<image->width*image->height;i++)
 		{
-			uint32_t SrcIdx=3*i;
-			uint32_t DstIdx=4*i;
+			uint32_t srcIdx=3*i;
+			uint32_t dstIdx=4*i;
 
-			Dst[DstIdx+0]=Image->Data[SrcIdx+0];
-			Dst[DstIdx+1]=Image->Data[SrcIdx+1];
-			Dst[DstIdx+2]=Image->Data[SrcIdx+2];
-			Dst[DstIdx+3]=UINT8_MAX;
+			dst[dstIdx+0]=image->data[srcIdx+0];
+			dst[dstIdx+1]=image->data[srcIdx+1];
+			dst[dstIdx+2]=image->data[srcIdx+2];
+			dst[dstIdx+3]=UINT8_MAX;
 		}
 
-		Zone_Free(Zone, Image->Data);
-		Image->Data=Dst;
-		Image->Depth=32;
+		Zone_Free(zone, image->data);
+		image->data=dst;
+		image->depth=32;
 	}
 }
 
 // _GenerateMipmaps, internal function used by Image_Upload.
 // Builds a Vulkan mipmap chain by using the GPU image blitter to resize the images.
-static void _GenerateMipmaps(VkCommandBuffer CommandBuffer, VkuImage_t *Image, uint32_t MipLevels, uint32_t LayerCount, uint32_t BaseLayer)
+static void _GenerateMipmaps(VkCommandBuffer commandBuffer, VkuImage_t *image, uint32_t mipLevels, uint32_t layerCount, uint32_t baseLayer)
 {
-	for(uint32_t i=1;i<MipLevels;i++)
+	for(uint32_t i=1;i<mipLevels;i++)
 	{
-		vkuTransitionLayout(CommandBuffer, Image->Image, 1, i-1, 1, BaseLayer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+		vkuTransitionLayout(commandBuffer, image->image, 1, i-1, 1, baseLayer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-		vkCmdBlitImage(CommandBuffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
+		vkCmdBlitImage(commandBuffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
 		{
 			.srcOffsets[0]={ 0, 0, 0 },
-			.srcOffsets[1]={ Image->Width>>(i-1), Image->Height>>(i-1), 1 },
+			.srcOffsets[1]={ image->width>>(i-1), image->height>>(i-1), 1 },
 			.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.srcSubresource.mipLevel=i-1,
-			.srcSubresource.baseArrayLayer=BaseLayer,
-			.srcSubresource.layerCount=1,
+			.srcSubresource.baseArrayLayer=baseLayer,
+			.srcSubresource.layerCount=layerCount,
 			.dstOffsets[0]={ 0, 0, 0 },
-			.dstOffsets[1]={ Image->Width>>i, Image->Height>>i, 1 },
+			.dstOffsets[1]={ image->width>>i, image->height>>i, 1 },
 			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
 			.dstSubresource.mipLevel=i,
-			.dstSubresource.baseArrayLayer=BaseLayer,
-			.dstSubresource.layerCount=1,
+			.dstSubresource.baseArrayLayer=baseLayer,
+			.dstSubresource.layerCount=layerCount,
 		}, VK_FILTER_LINEAR);
 
-		vkuTransitionLayout(CommandBuffer, Image->Image, 1, i-1, 1, BaseLayer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		vkuTransitionLayout(commandBuffer, image->image, 1, i-1, layerCount, baseLayer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	}
 
-	vkuTransitionLayout(CommandBuffer, Image->Image, 1, MipLevels-1, 1, BaseLayer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, image->image, 1, mipLevels-1, layerCount, baseLayer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 // Image_Upload, external function.
@@ -784,270 +784,270 @@ static void _GenerateMipmaps(VkCommandBuffer CommandBuffer, VkuImage_t *Image, u
 //   and other processes based on the set flags.
 //
 // Flags also set Vulkan texture sampler properties.
-VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *Filename, uint32_t Flags)
+VkBool32 Image_Upload(VkuContext_t *context, VkuImage_t *image, const char *filename, uint32_t flags)
 {
-	char *Extension=strrchr(Filename, '.');
-	VkFilter MinFilter=VK_FILTER_LINEAR;
-	VkFilter MagFilter=VK_FILTER_LINEAR;
-	VkSamplerMipmapMode MipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
-	VkSamplerAddressMode WrapModeU=VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	VkSamplerAddressMode WrapModeV=VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	VkSamplerAddressMode WrapModeW=VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	VkFormat Format=VK_FORMAT_UNDEFINED;
-	VkCommandBuffer CommandBuffer;
-	VkuBuffer_t StagingBuffer;
-	uint32_t MipLevels=1;
-	void *Data=NULL;
+	char *extension=strrchr(filename, '.');
+	VkFilter minFilter=VK_FILTER_LINEAR;
+	VkFilter magFilter=VK_FILTER_LINEAR;
+	VkSamplerMipmapMode mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
+	VkSamplerAddressMode wrapModeU=VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	VkSamplerAddressMode wrapModeV=VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	VkSamplerAddressMode wrapModeW=VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	VkFormat format=VK_FORMAT_UNDEFINED;
+	VkCommandBuffer commandBuffer;
+	VkuBuffer_t stagingBuffer;
+	uint32_t mipLevels=1;
+	void *data=NULL;
 
-	if(Extension!=NULL)
+	if(extension!=NULL)
 	{
-		if(!strcmp(Extension, ".tga"))
+		if(!strcmp(extension, ".tga"))
 		{
-			if(!TGA_Load(Filename, Image))
+			if(!TGA_Load(filename, image))
 				return VK_FALSE;
 		}
 		else
-			if(!strcmp(Extension, ".qoi"))
+			if(!strcmp(extension, ".qoi"))
 			{
-				if(!QOI_Load(Filename, Image))
+				if(!QOI_Load(filename, image))
 					return VK_FALSE;
 			}
 			else
 				return VK_FALSE;
 	}
 
-	if(Flags&IMAGE_NEAREST)
+	if(flags&IMAGE_NEAREST)
 	{
-		MagFilter=VK_FILTER_NEAREST;
-		MipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		MinFilter=VK_FILTER_NEAREST;
+		magFilter=VK_FILTER_NEAREST;
+		mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		minFilter=VK_FILTER_NEAREST;
 	}
 
-	if(Flags&IMAGE_BILINEAR)
+	if(flags&IMAGE_BILINEAR)
 	{
-		MagFilter=VK_FILTER_LINEAR;
-		MipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		MinFilter=VK_FILTER_LINEAR;
+		magFilter=VK_FILTER_LINEAR;
+		mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		minFilter=VK_FILTER_LINEAR;
 	}
 
-	if(Flags&IMAGE_TRILINEAR)
+	if(flags&IMAGE_TRILINEAR)
 	{
-		MagFilter=VK_FILTER_LINEAR;
-		MipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		MinFilter=VK_FILTER_LINEAR;
+		magFilter=VK_FILTER_LINEAR;
+		mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		minFilter=VK_FILTER_LINEAR;
 	}
 
-	if(Flags&IMAGE_CLAMP_U)
-		WrapModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	if(flags&IMAGE_CLAMP_U)
+		wrapModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 
-	if(Flags&IMAGE_CLAMP_V)
-		WrapModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	if(flags&IMAGE_CLAMP_V)
+		wrapModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 
-	if(Flags&IMAGE_CLAMP_W)
-		WrapModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	if(flags&IMAGE_CLAMP_W)
+		wrapModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 
-	if(Flags&IMAGE_REPEAT_U)
-		WrapModeU=VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	if(flags&IMAGE_REPEAT_U)
+		wrapModeU=VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
-	if(Flags&IMAGE_REPEAT_V)
-		WrapModeV=VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	if(flags&IMAGE_REPEAT_V)
+		wrapModeV=VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
-	if(Flags&IMAGE_REPEAT_W)
-		WrapModeW=VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	if(flags&IMAGE_REPEAT_W)
+		wrapModeW=VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
 	// Convert from RGB to RGBA if needed.
-	_RGBtoRGBA(Image);
+	_RGBtoRGBA(image);
 
-	if(Flags&IMAGE_RGBE)
-		_RGBE2Float(Image);
+	if(flags&IMAGE_RGBE)
+		_RGBE2Float(image);
 
-	if(Flags&IMAGE_NORMALMAP)
-		_MakeNormalMap(Image);
+	if(flags&IMAGE_NORMALMAP)
+		_MakeNormalMap(image);
 
-	if(Flags&IMAGE_NORMALIZE)
-		_Normalize(Image);
+	if(flags&IMAGE_NORMALIZE)
+		_Normalize(image);
 
-	switch(Image->Depth)
+	switch(image->depth)
 	{
 		case 128:
-			Format=VK_FORMAT_R32G32B32A32_SFLOAT;
+			format=VK_FORMAT_R32G32B32A32_SFLOAT;
 			break;
 
 		case 64:
-			Format=VK_FORMAT_R16G16B16A16_UNORM;
+			format=VK_FORMAT_R16G16B16A16_UNORM;
 			break;
 
 		case 32:
-			Format=VK_FORMAT_B8G8R8A8_SRGB;
+			format=VK_FORMAT_B8G8R8A8_SRGB;
 			break;
 
 		case 16:
-			Format=VK_FORMAT_R5G6B5_UNORM_PACK16;
+			format=VK_FORMAT_R5G6B5_UNORM_PACK16;
 			break;
 
 		case 8:
-			Format=VK_FORMAT_R8_UNORM;
+			format=VK_FORMAT_R8_UNORM;
 			break;
 
 		default:
-			Zone_Free(Zone, Image->Data);
+			Zone_Free(zone, image->data);
 			return VK_FALSE;
 	}
 
 	// Upload as cubemap if that flag was set
-	if(Flags&IMAGE_CUBEMAP_ANGULAR)
+	if(flags&IMAGE_CUBEMAP_ANGULAR)
 	{
 		VkuImage_t Out;
-		void *Data=NULL;
+		void *data=NULL;
 
 		// Calculate the cubemap face size from the angular map size (half the size of the original seems to be good)
-		Out.Width=NextPower2(Image->Width>>1);
-		Out.Height=NextPower2(Image->Height>>1);
-		Out.Depth=Image->Depth;
+		Out.width=NextPower2(image->width>>1);
+		Out.height=NextPower2(image->height>>1);
+		Out.depth=image->depth;
 
 		// Precalculate each cube face iamge size in bytes
-		uint32_t Size=Out.Width*Out.Height*(Image->Depth>>3);
+		uint32_t size=Out.width*Out.height*(image->depth>>3);
 
 		// Create staging buffer
-		vkuCreateHostBuffer(Context, &StagingBuffer, Size*6, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+		vkuCreateHostBuffer(context, &stagingBuffer, size*6, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 		// Map image memory and copy data for each cube face
-		vkMapMemory(Context->Device, StagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
+		vkMapMemory(context->device, stagingBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
 		for(uint32_t i=0;i<6;i++)
 		{
 			// Extract the cubemap face from the angular map lightprobe
-			if(!_AngularMapFace(Image, i, &Out))
+			if(!_AngularMapFace(image, i, &Out))
 				return VK_FALSE;
 
 			// Copy the image into the staging buffer
-			memcpy((uint8_t *)Data+((size_t)Size*i), Out.Data, Size);
+			memcpy((uint8_t *)data+((size_t)size*i), Out.data, size);
 
 			// Free the output data for the next face
-			Zone_Free(Zone, Out.Data);
+			Zone_Free(zone, Out.data);
 		}
-		vkUnmapMemory(Context->Device, StagingBuffer.DeviceMemory);
+		vkUnmapMemory(context->device, stagingBuffer.deviceMemory);
 
 		// All faces are copied, free the original image data
-		Zone_Free(Zone, Image->Data);
+		Zone_Free(zone, image->data);
 
 		// Going from an angular map to 6 faces, the faces are a different size than the original image,
 		//	so change the width/height of the working image we're loading.
-		Image->Width=Out.Width;
-		Image->Height=Out.Height;
+		image->width=Out.width;
+		image->height=Out.height;
 
 		// If mipmaps are requested, calculate how many levels there are
-		if(Flags&IMAGE_MIPMAP)
-			MipLevels=ComputeLog(max(Image->Width, Image->Height))+1;
+		if(flags&IMAGE_MIPMAP)
+			mipLevels=ComputeLog(max(image->width, image->height))+1;
 
 		// Create the GPU side image memory buffer
-		vkuCreateImageBuffer(Context, Image,
-							 VK_IMAGE_TYPE_2D, Format, MipLevels, 6, Out.Width, Out.Height, 1, VK_SAMPLE_COUNT_1_BIT,
-							 Format==VK_FORMAT_R32G32B32A32_SFLOAT?VK_IMAGE_TILING_LINEAR:VK_IMAGE_TILING_OPTIMAL,
+		vkuCreateImageBuffer(context, image,
+							 VK_IMAGE_TYPE_2D, format, mipLevels, 6, Out.width, Out.height, 1, VK_SAMPLE_COUNT_1_BIT,
+							 format==VK_FORMAT_R32G32B32A32_SFLOAT?VK_IMAGE_TILING_LINEAR:VK_IMAGE_TILING_OPTIMAL,
 							 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							 VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
 
 		// Start a one shot command buffer
-		CommandBuffer=vkuOneShotCommandBufferBegin(Context);
+		commandBuffer=vkuOneShotCommandBufferBegin(context);
 
 		// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
-		vkuTransitionLayout(CommandBuffer, Image->Image, MipLevels, 0, 6, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		vkuTransitionLayout(commandBuffer, image->image, mipLevels, 0, 6, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 		// Copy all faces from staging buffer to the texture image buffer.
-		vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer.Buffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, (VkBufferImageCopy[6])
+		vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, (VkBufferImageCopy[6])
 		{
-			{ (VkDeviceSize)Size*0, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } },
-			{ (VkDeviceSize)Size*1, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } },
-			{ (VkDeviceSize)Size*2, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 2, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } },
-			{ (VkDeviceSize)Size*3, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 3, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } },
-			{ (VkDeviceSize)Size*4, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 4, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } },
-			{ (VkDeviceSize)Size*5, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 5, 1 }, { 0, 0, 0 }, { Out.Width, Out.Height, 1 } }
+			{ (VkDeviceSize)size*0, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }, { 0, 0, 0 }, { Out.width, Out.height, 1 } },
+			{ (VkDeviceSize)size*1, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 1 }, { 0, 0, 0 }, { Out.width, Out.height, 1 } },
+			{ (VkDeviceSize)size*2, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 2, 1 }, { 0, 0, 0 }, { Out.width, Out.height, 1 } },
+			{ (VkDeviceSize)size*3, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 3, 1 }, { 0, 0, 0 }, { Out.width, Out.height, 1 } },
+			{ (VkDeviceSize)size*4, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 4, 1 }, { 0, 0, 0 }, { Out.width, Out.height, 1 } },
+			{ (VkDeviceSize)size*5, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 5, 1 }, { 0, 0, 0 }, { Out.width, Out.height, 1 } }
 		});
 
 		// Final change to image layout from destination optimal to be optimal reading only by shader.
 		// This is also done by generating mipmaps, if requested.
-		if(Flags&IMAGE_MIPMAP)
+		if(flags&IMAGE_MIPMAP)
 		{
-			_GenerateMipmaps(CommandBuffer, Image, MipLevels, 6, 0);
-			_GenerateMipmaps(CommandBuffer, Image, MipLevels, 6, 1);
-			_GenerateMipmaps(CommandBuffer, Image, MipLevels, 6, 2);
-			_GenerateMipmaps(CommandBuffer, Image, MipLevels, 6, 3);
-			_GenerateMipmaps(CommandBuffer, Image, MipLevels, 6, 4);
-			_GenerateMipmaps(CommandBuffer, Image, MipLevels, 6, 5);
+			_GenerateMipmaps(commandBuffer, image, mipLevels, 6, 0);
+			_GenerateMipmaps(commandBuffer, image, mipLevels, 6, 1);
+			_GenerateMipmaps(commandBuffer, image, mipLevels, 6, 2);
+			_GenerateMipmaps(commandBuffer, image, mipLevels, 6, 3);
+			_GenerateMipmaps(commandBuffer, image, mipLevels, 6, 4);
+			_GenerateMipmaps(commandBuffer, image, mipLevels, 6, 5);
 		}
 		else
-			vkuTransitionLayout(CommandBuffer, Image->Image, MipLevels, 0, 6, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			vkuTransitionLayout(commandBuffer, image->image, mipLevels, 0, 6, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 		// End one shot command buffer and submit
-		vkuOneShotCommandBufferEnd(Context, CommandBuffer);
+		vkuOneShotCommandBufferEnd(context, commandBuffer);
 
 		// Delete staging buffers
-		vkDestroyBuffer(Context->Device, StagingBuffer.Buffer, VK_NULL_HANDLE);
-		vkFreeMemory(Context->Device, StagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+		vkDestroyBuffer(context->device, stagingBuffer.buffer, VK_NULL_HANDLE);
+		vkFreeMemory(context->device, stagingBuffer.deviceMemory, VK_NULL_HANDLE);
 	}
 	else // Otherwise it's a 2D texture
 	{
 		// Byte size of image data
-		uint32_t Size=Image->Width*Image->Height*(Image->Depth>>3);
+		uint32_t size=image->width*image->height*(image->depth>>3);
 
 		// Create staging buffer
-		vkuCreateHostBuffer(Context, &StagingBuffer, Size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+		vkuCreateHostBuffer(context, &stagingBuffer, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 		// Map image memory and copy data
-		vkMapMemory(Context->Device, StagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &Data);
-		memcpy(Data, Image->Data, Size);
-		vkUnmapMemory(Context->Device, StagingBuffer.DeviceMemory);
+		vkMapMemory(context->device, stagingBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
+		memcpy(data, image->data, size);
+		vkUnmapMemory(context->device, stagingBuffer.deviceMemory);
 
 		// Original image data is now in a Vulkan memory object, so no longer need the original data.
-		Zone_Free(Zone, Image->Data);
+		Zone_Free(zone, image->data);
 
-		if(Flags&IMAGE_MIPMAP)
-			MipLevels=ComputeLog(max(Image->Width, Image->Height))+1;
+		if(flags&IMAGE_MIPMAP)
+			mipLevels=ComputeLog(max(image->width, image->height))+1;
 
-		if(!vkuCreateImageBuffer(Context, Image,
-		   VK_IMAGE_TYPE_2D, Format, MipLevels, 1, Image->Width, Image->Height, 1,
+		if(!vkuCreateImageBuffer(context, image,
+		   VK_IMAGE_TYPE_2D, format, mipLevels, 1, image->width, image->height, 1,
 		   VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
 		   VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
 			return VK_FALSE;
 
 		// Start a one shot command buffer
-		CommandBuffer=vkuOneShotCommandBufferBegin(Context);
+		commandBuffer=vkuOneShotCommandBufferBegin(context);
 
 		// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
-		vkuTransitionLayout(CommandBuffer, Image->Image, MipLevels, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		vkuTransitionLayout(commandBuffer, image->image, mipLevels, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 		// Copy from staging buffer to the texture buffer.
-		vkCmdCopyBufferToImage(CommandBuffer, StagingBuffer.Buffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, (VkBufferImageCopy[1])
+		vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, (VkBufferImageCopy[1])
 		{
-			{ 0, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }, { 0, 0, 0 }, { Image->Width, Image->Height, 1 } }
+			{ 0, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }, { 0, 0, 0 }, { image->width, image->height, 1 } }
 		});
 
 		// Final change to image layout from destination optimal to be optimal reading only by shader.
 		// This is also done by generating mipmaps, if requested.
-		if(Flags&IMAGE_MIPMAP)
-			_GenerateMipmaps(CommandBuffer, Image, MipLevels, 1, 0);
+		if(flags&IMAGE_MIPMAP)
+			_GenerateMipmaps(commandBuffer, image, mipLevels, 1, 0);
 		else
-			vkuTransitionLayout(CommandBuffer, Image->Image, MipLevels, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			vkuTransitionLayout(commandBuffer, image->image, mipLevels, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 		// End one shot command buffer and submit
-		vkuOneShotCommandBufferEnd(Context, CommandBuffer);
+		vkuOneShotCommandBufferEnd(context, commandBuffer);
 
 		// Delete staging buffers
-		vkDestroyBuffer(Context->Device, StagingBuffer.Buffer, VK_NULL_HANDLE);
-		vkFreeMemory(Context->Device, StagingBuffer.DeviceMemory, VK_NULL_HANDLE);
+		vkDestroyBuffer(context->device, stagingBuffer.buffer, VK_NULL_HANDLE);
+		vkFreeMemory(context->device, stagingBuffer.deviceMemory, VK_NULL_HANDLE);
 	}
 
 	// Create texture sampler object
-	vkCreateSampler(Context->Device, &(VkSamplerCreateInfo)
+	vkCreateSampler(context->device, &(VkSamplerCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-		.magFilter=MagFilter,
-		.minFilter=MinFilter,
-		.mipmapMode=MipmapMode,
-		.addressModeU=WrapModeU,
-		.addressModeV=WrapModeV,
-		.addressModeW=WrapModeW,
+		.magFilter=magFilter,
+		.minFilter=minFilter,
+		.mipmapMode=mipmapMode,
+		.addressModeU=wrapModeU,
+		.addressModeV=wrapModeV,
+		.addressModeW=wrapModeW,
 		.mipLodBias=0.0f,
 		.compareOp=VK_COMPARE_OP_NEVER,
 		.minLod=0.0f,
@@ -1055,18 +1055,18 @@ VkBool32 Image_Upload(VkuContext_t *Context, VkuImage_t *Image, const char *File
 		.maxAnisotropy=1.0f,
 		.anisotropyEnable=VK_FALSE,
 		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-	}, VK_NULL_HANDLE, &Image->Sampler);
+	}, VK_NULL_HANDLE, &image->sampler);
 
 	// Create texture image view object
-	vkCreateImageView(Context->Device, &(VkImageViewCreateInfo)
+	vkCreateImageView(context->device, &(VkImageViewCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.image=Image->Image,
-		.viewType=Flags&IMAGE_CUBEMAP_ANGULAR?VK_IMAGE_VIEW_TYPE_CUBE:VK_IMAGE_VIEW_TYPE_2D,
-		.format=Format,
+		.image=image->image,
+		.viewType=flags&IMAGE_CUBEMAP_ANGULAR?VK_IMAGE_VIEW_TYPE_CUBE:VK_IMAGE_VIEW_TYPE_2D,
+		.format=format,
 		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
-		.subresourceRange={ VK_IMAGE_ASPECT_COLOR_BIT, 0, MipLevels, 0, Flags&IMAGE_CUBEMAP_ANGULAR?6:1 },
-	}, VK_NULL_HANDLE, &Image->View);
+		.subresourceRange={ VK_IMAGE_ASPECT_COLOR_BIT, 0, mipLevels, 0, flags&IMAGE_CUBEMAP_ANGULAR?6:1 },
+	}, VK_NULL_HANDLE, &image->imageView);
 
 	return VK_TRUE;
 }

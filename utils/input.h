@@ -136,10 +136,10 @@ typedef struct
 	uint32_t button;
 } MouseEvent_t;
 
-void Event_KeyDown(void *Arg);
-void Event_KeyUp(void *Arg);
-void Event_MouseDown(void *Arg);
-void Event_MouseUp(void *Arg);
-void Event_Mouse(void *Arg);
+void Event_KeyDown(void *arg);
+void Event_KeyUp(void *arg);
+void Event_MouseDown(void *arg);
+void Event_MouseUp(void *arg);
+void Event_Mouse(void *arg);
 
 #endif

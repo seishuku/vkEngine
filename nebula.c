@@ -114,38 +114,38 @@ static float nebula(vec3 p)
 	return min(1.0f, max(0.0f, turb));
 }
 
-VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *Image)
+VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *image)
 {
 	VkCommandBuffer commandBuffer;
 	VkuBuffer_t stagingBuffer;
 	void *data=NULL;
 
-	Image->Width=64;
-	Image->Height=64;
-	Image->Depth=64; // Slight abuse of image struct, depth is supposed to be color depth, not image depth.
+	image->width=64;
+	image->height=64;
+	image->depth=64; // Slight abuse of image struct, depth is supposed to be color depth, not image depth.
 
 	// Byte size of image data
-	uint32_t size=Image->Width*Image->Height*Image->Depth;
+	uint32_t size=image->width*image->height*image->depth;
 
 	// Create staging buffer
 	vkuCreateHostBuffer(Context, &stagingBuffer, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 	// Map image memory and copy data
-	vkMapMemory(Context->Device, stagingBuffer.DeviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
+	vkMapMemory(Context->device, stagingBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
 
 	const float Scale=2.0f;
 
 	for(uint32_t i=0;i<size;i++)
 	{
-		uint32_t x=i%Image->Width;
-		uint32_t y=(i%(Image->Width*Image->Height))/Image->Width;
-		uint32_t z=i/(Image->Width*Image->Height);
+		uint32_t x=i%image->width;
+		uint32_t y=(i%(image->width*image->height))/image->width;
+		uint32_t z=i/(image->width*image->height);
 
 		vec3 v=
 		{
-			((float)x-(Image->Width>>1))/Image->Width,
-			((float)y-(Image->Height>>1))/Image->Height,
-			((float)z-(Image->Depth>>1))/Image->Depth,
+			((float)x-(image->width>>1))/image->width,
+			((float)y-(image->height>>1))/image->height,
+			((float)z-(image->depth>>1))/image->depth,
 		};
 
 		float p=nebula(Vec3_Muls(v, Scale));
@@ -153,10 +153,10 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *Image)
 		((uint8_t *)data)[i]=(uint8_t)(p*255.0f);
 	}
 
-	vkUnmapMemory(Context->Device, stagingBuffer.DeviceMemory);
+	vkUnmapMemory(Context->device, stagingBuffer.deviceMemory);
 
-	if(!vkuCreateImageBuffer(Context, Image,
-		VK_IMAGE_TYPE_3D, VK_FORMAT_R8_UNORM, 1, 1, Image->Width, Image->Height, Image->Depth,
+	if(!vkuCreateImageBuffer(Context, image,
+		VK_IMAGE_TYPE_3D, VK_FORMAT_R8_UNORM, 1, 1, image->width, image->height, image->depth,
 		VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
@@ -166,19 +166,19 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *Image)
 	commandBuffer=vkuOneShotCommandBufferBegin(Context);
 
 	// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
-	vkuTransitionLayout(commandBuffer, Image->Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, image->image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 	// Copy from staging buffer to the texture buffer.
-	vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.Buffer, Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, (VkBufferImageCopy[1])
+	vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, (VkBufferImageCopy[1])
 	{
 		{
-			0, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }, { 0, 0, 0 }, { Image->Width, Image->Height, Image->Depth }
+			0, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }, { 0, 0, 0 }, { image->width, image->height, image->depth }
 		}
 	});
 
 	// Final change to image layout from destination optimal to be optimal reading only by shader.
 	// This is also done by generating mipmaps, if requested.
-	vkuTransitionLayout(commandBuffer, Image->Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, image->image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	// End one shot command buffer and submit
 	vkuOneShotCommandBufferEnd(Context, commandBuffer);
@@ -187,7 +187,7 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *Image)
 	vkuDestroyBuffer(Context, &stagingBuffer);
 
 	// Create texture sampler object
-	vkCreateSampler(Context->Device, &(VkSamplerCreateInfo)
+	vkCreateSampler(Context->device, &(VkSamplerCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 		.magFilter=VK_FILTER_LINEAR,
@@ -203,18 +203,18 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *Image)
 		.maxAnisotropy=1.0f,
 		.anisotropyEnable=VK_FALSE,
 		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-	}, VK_NULL_HANDLE, &Image->Sampler);
+	}, VK_NULL_HANDLE, &image->sampler);
 
 	// Create texture image view object
-	vkCreateImageView(Context->Device, &(VkImageViewCreateInfo)
+	vkCreateImageView(Context->device, &(VkImageViewCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.image=Image->Image,
+		.image=image->image,
 		.viewType=VK_IMAGE_VIEW_TYPE_3D,
 		.format=VK_FORMAT_R8_UNORM,
 		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
 		.subresourceRange={ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
-	}, VK_NULL_HANDLE, &Image->View);
+	}, VK_NULL_HANDLE, &image->imageView);
 
 	return VK_TRUE;
 }
@@ -228,11 +228,11 @@ bool CreateVolumePipeline(void)
 	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&volumeDescriptorSet);
 
-	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
-		.pSetLayouts=&volumeDescriptorSet.DescriptorSetLayout,
+		.pSetLayouts=&volumeDescriptorSet.descriptorSetLayout,
 		.pushConstantRangeCount=1,
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
@@ -247,19 +247,19 @@ bool CreateVolumePipeline(void)
 	vkuPipeline_SetPipelineLayout(&volumePipeline, volumePipelineLayout);
 	vkuPipeline_SetRenderPass(&volumePipeline, renderPass);
 
-	volumePipeline.DepthTest=VK_TRUE;
-	volumePipeline.CullMode=VK_CULL_MODE_BACK_BIT;
-	volumePipeline.DepthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
-	//volumePipeline.DepthWrite=VK_FALSE;
-	volumePipeline.RasterizationSamples=MSAA;
+	volumePipeline.depthTest=VK_TRUE;
+	volumePipeline.cullMode=VK_CULL_MODE_BACK_BIT;
+	volumePipeline.depthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
+	//volumePipeline.depthWrite=VK_FALSE;
+	volumePipeline.rasterizationSamples=MSAA;
 
-	volumePipeline.Blend=VK_TRUE;
-	volumePipeline.SrcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	volumePipeline.DstColorBlendFactor=VK_BLEND_FACTOR_ONE;
-	volumePipeline.ColorBlendOp=VK_BLEND_OP_ADD;
-	volumePipeline.SrcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	volumePipeline.DstAlphaBlendFactor=VK_BLEND_FACTOR_ONE;
-	volumePipeline.AlphaBlendOp=VK_BLEND_OP_ADD;
+	volumePipeline.blend=VK_TRUE;
+	volumePipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
+	volumePipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE;
+	volumePipeline.colorBlendOp=VK_BLEND_OP_ADD;
+	volumePipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
+	volumePipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE;
+	volumePipeline.alphaBlendOp=VK_BLEND_OP_ADD;
 
 	if(!vkuPipeline_AddStage(&volumePipeline, "shaders/volume.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;

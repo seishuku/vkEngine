@@ -5,10 +5,10 @@
 
 static struct
 {
-	void (*Callback)(void *Arg);
+	void (*Callback)(void *arg);
 } EventList[NUM_EVENTS];
 
-bool Event_Add(EventID ID, void (*Callback)(void *Arg))
+bool Event_Add(EventID ID, void (*Callback)(void *arg))
 {
 	if(ID<0||ID>=NUM_EVENTS||Callback==NULL)
 		return false;
@@ -29,12 +29,12 @@ bool Event_Delete(EventID ID)
 
 }
 
-bool Event_Trigger(EventID ID, void *Arg)
+bool Event_Trigger(EventID ID, void *arg)
 {
 	if(ID<0||ID>=NUM_EVENTS||EventList[ID].Callback==NULL)
 		return false;
 
-	EventList[ID].Callback(Arg);
+	EventList[ID].Callback(arg);
 
 	return true;
 }

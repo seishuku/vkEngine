@@ -126,7 +126,7 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
     // Length of data block
     fread(&length, sizeof(uint32_t), 1, stream);
 
-    int16_t *buffer=(int16_t *)Zone_Malloc(Zone, length);
+    int16_t *buffer=(int16_t *)Zone_Malloc(zone, length);
 
     if(buffer==NULL)
     {
@@ -144,17 +144,17 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
     // Covert to match primary buffer sampling rate
     const uint32_t outputSize=(uint32_t)(length/((float)samplesPerSec/AUDIO_SAMPLE_RATE));
 
-    int16_t *resampled=(int16_t *)Zone_Malloc(Zone, sizeof(int16_t)*outputSize*channels);
+    int16_t *resampled=(int16_t *)Zone_Malloc(zone, sizeof(int16_t)*outputSize*channels);
 
     if(resampled==NULL)
     {
-        Zone_Free(Zone, buffer);
+        Zone_Free(zone, buffer);
         return 0;
     }
 
     Resample(buffer, bitPerSample>>3, samplesPerSec, channels, length, resampled);
 
-    Zone_Free(Zone, buffer);
+    Zone_Free(zone, buffer);
 
     sample->data=resampled;
     sample->length=outputSize;

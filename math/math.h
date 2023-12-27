@@ -2,7 +2,6 @@
 #define __MATH_H__
 
 #include <stdint.h>
-#include <string.h>
 #include <math.h>
 
 #ifndef PI

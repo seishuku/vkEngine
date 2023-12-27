@@ -9,9 +9,9 @@
 
 extern VkuContext_t vkContext;
 
-// Add a button to the UI.
+// Add a sprite to the UI.
 // Returns an ID, or UINT32_MAX on failure.
-uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, VkuImage_t *Image, float rotation)
+uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, VkuImage_t *image, float rotation)
 {
 	uint32_t ID=UI->baseID++;
 
@@ -24,9 +24,9 @@ uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, VkuImage_t
 		.ID=ID,
 		.position=position,
 		.color=color,
-		.Sprite.Image=Image,
-		.Sprite.size=size,
-		.Sprite.rotation=rotation
+		.sprite.image=image,
+		.sprite.size=size,
+		.sprite.rotation=rotation
 	};
 
 	if(!List_Add(&UI->controls, &Control))
@@ -37,10 +37,10 @@ uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, VkuImage_t
 	return ID;
 }
 
-// Update UI button parameters.
+// Update UI sprite parameters.
 // Returns true on success, false on failure.
 // Also individual parameter update function as well.
-bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, VkuImage_t *Image, float rotation)
+bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, VkuImage_t *image, float rotation)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -53,9 +53,9 @@ bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color
 		Control->position=position;
 		Control->color=color;
 
-		Control->Sprite.Image=Image,
-		Control->Sprite.rotation=rotation;
-		Control->Sprite.size=size;
+		Control->sprite.image=image,
+		Control->sprite.rotation=rotation;
+		Control->sprite.size=size;
 
 		return true;
 	}
@@ -92,7 +92,7 @@ bool UI_UpdateSpriteSize(UI_t *UI, uint32_t ID, vec2 size)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
 	{
-		Control->Button.size=size;
+		Control->sprite.size=size;
 		return true;
 	}
 
@@ -118,7 +118,7 @@ bool UI_UpdateSpriteColor(UI_t *UI, uint32_t ID, vec3 color)
 	return false;
 }
 
-bool UI_UpdateSpriteImage(UI_t *UI, uint32_t ID, VkuImage_t *Image)
+bool UI_UpdateSpriteImage(UI_t *UI, uint32_t ID, VkuImage_t *image)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -128,7 +128,7 @@ bool UI_UpdateSpriteImage(UI_t *UI, uint32_t ID, VkuImage_t *Image)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
 	{
-		Control->Sprite.Image=Image;
+		Control->sprite.image=image;
 		return true;
 	}
 
@@ -146,7 +146,7 @@ bool UI_UpdateSpriteRotation(UI_t *UI, uint32_t ID, float rotation)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
 	{
-		Control->Sprite.rotation=rotation;
+		Control->sprite.rotation=rotation;
 		return true;
 	}
 

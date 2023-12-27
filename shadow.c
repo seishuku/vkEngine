@@ -38,8 +38,8 @@ void CreateShadowMap(void)
 	vkuCreateTexture2D(&vkContext, &shadowDepth, shadowSize, shadowSize, shadowDepthFormat, VK_SAMPLE_COUNT_1_BIT);
 
 	// Need compare ops, so recreate the sampler
-	vkDestroySampler(vkContext.Device, shadowDepth.Sampler, VK_NULL_HANDLE);
-	vkCreateSampler(vkContext.Device, &(VkSamplerCreateInfo)
+	vkDestroySampler(vkContext.device, shadowDepth.sampler, VK_NULL_HANDLE);
+	vkCreateSampler(vkContext.device, &(VkSamplerCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 		.magFilter=VK_FILTER_LINEAR,
@@ -56,14 +56,14 @@ void CreateShadowMap(void)
 		.maxAnisotropy=1.0f,
 		.anisotropyEnable=VK_FALSE,
 		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-	}, VK_NULL_HANDLE, &shadowDepth.Sampler);
+	}, VK_NULL_HANDLE, &shadowDepth.sampler);
 
-	vkCreateFramebuffer(vkContext.Device, &(VkFramebufferCreateInfo)
+	vkCreateFramebuffer(vkContext.device, &(VkFramebufferCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 		.renderPass=shadowRenderPass,
 		.attachmentCount=1,
-		.pAttachments=(VkImageView[]){ shadowDepth.View },
+		.pAttachments=(VkImageView[]){ shadowDepth.imageView },
 		.width=shadowSize,
 		.height=shadowSize,
 		.layers=1,
@@ -72,7 +72,7 @@ void CreateShadowMap(void)
 
 bool CreateShadowPipeline(void)
 {
-	vkCreateRenderPass(vkContext.Device, &(VkRenderPassCreateInfo)
+	vkCreateRenderPass(vkContext.device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.attachmentCount=1,
@@ -101,7 +101,7 @@ bool CreateShadowPipeline(void)
 		},
 	}, 0, &shadowRenderPass);
 
-	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=0,
@@ -124,12 +124,12 @@ bool CreateShadowPipeline(void)
 		return false;
 
 	// Set states that are different than defaults
-	shadowPipeline.CullMode=VK_CULL_MODE_BACK_BIT;
-	shadowPipeline.DepthTest=VK_TRUE;
+	shadowPipeline.cullMode=VK_CULL_MODE_BACK_BIT;
+	shadowPipeline.depthTest=VK_TRUE;
 
-	shadowPipeline.DepthBias=VK_TRUE;
-	shadowPipeline.DepthBiasConstantFactor=1.25f;
-	shadowPipeline.DepthBiasSlopeFactor=1.75f;
+	shadowPipeline.depthBias=VK_TRUE;
+	shadowPipeline.depthBiasConstantFactor=1.25f;
+	shadowPipeline.depthBiasSlopeFactor=1.75f;
 
 	// Add vertex binding and attrib parameters
 	vkuPipeline_AddVertexBinding(&shadowPipeline, 0, sizeof(float)*20, VK_VERTEX_INPUT_RATE_VERTEX);
@@ -168,7 +168,7 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
 	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline.Pipeline);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline.pipeline);
 
 	vkCmdSetViewport(commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)shadowSize, (float)shadowSize, 0.0f, 1.0f });
 	vkCmdSetScissor(commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { shadowSize, shadowSize } });
@@ -190,7 +190,7 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 	// Multiply matrices together, so we can just send one matrix as a push constant.
 	shadowUBO.mvp=MatrixMult(modelView, projection);
 
-	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &asteroidInstance.Buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &asteroidInstance.buffer, &(VkDeviceSize) { 0 });
 
 	// Draw the models
 	for(uint32_t j=0;j<NUM_MODELS;j++)
@@ -198,11 +198,11 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 		vkCmdPushConstants(commandBuffer, shadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Shadow_UBO_t), &shadowUBO);
 
 		// Bind model data buffers and draw the triangles
-		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &models[j].vertexBuffer.Buffer, &(VkDeviceSize) { 0 });
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &models[j].vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 
 		for(uint32_t k=0;k<models[j].numMesh;k++)
 		{
-			vkCmdBindIndexBuffer(commandBuffer, models[j].mesh[k].indexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdBindIndexBuffer(commandBuffer, models[j].mesh[k].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(commandBuffer, models[j].mesh[k].numFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*j);
 		}
 	}
@@ -214,9 +214,9 @@ void DestroyShadow(void)
 {
 	vkuDestroyImageBuffer(&vkContext, &shadowDepth);
 
-	vkDestroyPipeline(vkContext.Device, shadowPipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.Device, shadowPipelineLayout, VK_NULL_HANDLE);
-	vkDestroyRenderPass(vkContext.Device, shadowRenderPass, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.device, shadowPipeline.pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.device, shadowPipelineLayout, VK_NULL_HANDLE);
+	vkDestroyRenderPass(vkContext.device, shadowRenderPass, VK_NULL_HANDLE);
 
-	vkDestroyFramebuffer(vkContext.Device, shadowFrameBuffer, VK_NULL_HANDLE);
+	vkDestroyFramebuffer(vkContext.device, shadowFrameBuffer, VK_NULL_HANDLE);
 }

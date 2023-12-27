@@ -57,7 +57,7 @@ inline static void DBGPRINTF(const char *level, const char *format, ...)
 #define BUFFER_OFFSET(x) ((char *)NULL+(x))
 #endif
 
-extern MemZone_t *Zone;
+extern MemZone_t *zone;
 
 double GetClock(void);
 

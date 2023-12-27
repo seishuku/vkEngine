@@ -13,11 +13,11 @@
 #include "../utils/input.h"
 #include "../vr/vr.h"
 
-MemZone_t *Zone;
+MemZone_t *zone;
 
 char szAppName[]="Vulkan";
 
-bool Done=false;
+bool isDone=false;
 bool ToggleFullscreen=true;
 
 bool isVR=true;
@@ -42,15 +42,15 @@ void Destroy(void);
 
 double GetClock(void)
 {
-	static uint64_t Frequency=0;
-	uint64_t Count;
+	static uint64_t frequency=0;
+	uint64_t count;
 
-	if(!Frequency)
-		QueryPerformanceFrequency((LARGE_INTEGER *)&Frequency);
+	if(!frequency)
+		QueryPerformanceFrequency((LARGE_INTEGER *)&frequency);
 
-	QueryPerformanceCounter((LARGE_INTEGER *)&Count);
+	QueryPerformanceCounter((LARGE_INTEGER *)&count);
 
-	return (double)Count/Frequency;
+	return (double)count/frequency;
 }
 
 static bool RegisterRawInput(HWND hWnd)
@@ -130,7 +130,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		case WM_SIZE:
 			windowWidth=max(LOWORD(lParam), 2);
 			windowHeight=max(HIWORD(lParam), 2);
-			//RecreateSwapchain();
 			break;
 
 		case WM_ACTIVATE:
@@ -235,7 +234,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 											else
 												code=KB_ENTER;						// Enter
 											break;
-						case VK_PAUSE:		code=KB_PAUSE;					break;	// Pause
+						case VK_PAUSE:		code=KB_PAUSE;					break;	// pause
 						case VK_CAPITAL:	code=KB_CAPS_LOCK;				break;	// Caps Lock
 						case VK_ESCAPE:		code=KB_ESCAPE;					break;	// Esc
 						case VK_SPACE:		code=KB_SPACE;					break;	// Space
@@ -413,9 +412,9 @@ int main(int argc, char **argv)
 #endif
 
 	DBGPRINTF(DEBUG_INFO, "Allocating zone memory...\n");
-	Zone=Zone_Init(256*1000*1000);
+	zone=Zone_Init(256*1000*1000);
 
-	if(Zone==NULL)
+	if(zone==NULL)
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...zone allocation failed!\n");
 
@@ -468,8 +467,8 @@ int main(int argc, char **argv)
 	}
 	else
 	{
-		renderWidth=swapchain.Extent.width;
-		renderHeight=swapchain.Extent.height;
+		renderWidth=swapchain.extent.width;
+		renderHeight=swapchain.extent.height;
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Initializing VR...\n");
@@ -495,7 +494,7 @@ int main(int argc, char **argv)
 	}
 
 	DBGPRINTF(DEBUG_INFO, "\nCurrent system zone memory allocations:\n");
-	Zone_Print(Zone);
+	Zone_Print(zone);
 
 	DBGPRINTF(DEBUG_INFO, "\nCurrent vulkan zone memory allocations:\n");
 	vkuMem_Print(vkZone);
@@ -515,14 +514,14 @@ int main(int argc, char **argv)
 #endif
 
 	DBGPRINTF(DEBUG_INFO, "\nStarting main loop.\n");
-	while(!Done)
+	while(!isDone)
 	{
 		MSG msg;
 
 		if(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
 		{
 			if(msg.message==WM_QUIT)
-				Done=1;
+				isDone=true;
 			else
 			{
 				TranslateMessage(&msg);
@@ -531,9 +530,9 @@ int main(int argc, char **argv)
 		}
 		else
 		{
-			static float avgfps=0.0f;
+			static float avgFPS=0.0f;
 
-			double StartTime=GetClock();
+			double startTime=GetClock();
 
 #if 0
 			// RenderDoc frame capture for VR mode
@@ -543,12 +542,12 @@ int main(int argc, char **argv)
 
 			Render();
 
-			fTimeStep=(float)(GetClock()-StartTime);
+			fTimeStep=(float)(GetClock()-startTime);
 			fTime+=fTimeStep;
 
-			avgfps+=1.0f/fTimeStep;
+			avgFPS+=1.0f/fTimeStep;
 
-			static uint32_t Frames=0;
+			static uint32_t frameCount=0;
 
 #if 0
 			// RenderDoc frame capture for VR mode
@@ -559,13 +558,13 @@ int main(int argc, char **argv)
 			}
 #endif
 
-			if(Frames++>100)
+			if(frameCount++>100)
 			{
 //				captureThisFrame=true;
 
-				fps=avgfps/Frames;
-				avgfps=0.0f;
-				Frames=0;
+				fps=avgFPS/frameCount;
+				avgFPS=0.0f;
+				frameCount=0;
 			}
 		}
 	}
@@ -578,8 +577,8 @@ int main(int argc, char **argv)
 	DestroyWindow(vkContext.hWnd);
 
 	DBGPRINTF(DEBUG_INFO, "Zone remaining block list:\n");
-	Zone_Print(Zone);
-	Zone_Destroy(Zone);
+	Zone_Print(zone);
+	Zone_Destroy(zone);
 
 #ifndef _CONSOLE
 	system("pause");

@@ -1,159 +1,159 @@
 #include "vulkan.h"
 
-VkBool32 vkuRenderPass_AddAttachment(VkuRenderPass_t *RenderPass, VkuRenderPassAttachmentType Type, VkFormat Format, VkSampleCountFlagBits Samples, VkAttachmentLoadOp LoadOp, VkAttachmentStoreOp StoreOp, VkImageLayout SubpassLayout, VkImageLayout FinalLayout)
+VkBool32 vkuRenderPass_AddAttachment(VkuRenderPass_t *renderPass, VkuRenderPassAttachmentType type, VkFormat format, VkSampleCountFlagBits samples, VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp, VkImageLayout subpassLayout, VkImageLayout finalLayout)
 {
-	if(!RenderPass)
+	if(!renderPass)
 		return VK_FALSE;
 
-	if(RenderPass->NumAttachments>=VKU_MAX_RENDERPASS_ATTACHMENTS)
+	if(renderPass->numAttachments>=VKU_MAX_RENDERPASS_ATTACHMENTS)
 		return VK_FALSE;
 
-	RenderPass->Attachments[RenderPass->NumAttachments].Type=Type;
-	RenderPass->Attachments[RenderPass->NumAttachments].Format=Format;
-	RenderPass->Attachments[RenderPass->NumAttachments].Samples=Samples;
-	RenderPass->Attachments[RenderPass->NumAttachments].LoadOp=LoadOp;
-	RenderPass->Attachments[RenderPass->NumAttachments].StoreOp=StoreOp;
-	RenderPass->Attachments[RenderPass->NumAttachments].SubpassLayout=SubpassLayout;
-	RenderPass->Attachments[RenderPass->NumAttachments].FinalLayout=FinalLayout;
-	RenderPass->NumAttachments++;
+	renderPass->attachments[renderPass->numAttachments].type=type;
+	renderPass->attachments[renderPass->numAttachments].format=format;
+	renderPass->attachments[renderPass->numAttachments].samples=samples;
+	renderPass->attachments[renderPass->numAttachments].loadOp=loadOp;
+	renderPass->attachments[renderPass->numAttachments].storeOp=storeOp;
+	renderPass->attachments[renderPass->numAttachments].subpassLayout=subpassLayout;
+	renderPass->attachments[renderPass->numAttachments].finalLayout=finalLayout;
+	renderPass->numAttachments++;
 
 	return VK_TRUE;
 }
 
-VkBool32 vkuRenderPass_AddSubpassDependency(VkuRenderPass_t *RenderPass, uint32_t SourceSubpass, uint32_t DestinationSubpass, VkPipelineStageFlags SourceStageMask, VkPipelineStageFlags DestinationStageMask, VkAccessFlags SourceAccessMask, VkAccessFlags DestinationAccessMask, VkDependencyFlags DependencyFlags)
+VkBool32 vkuRenderPass_AddSubpassDependency(VkuRenderPass_t *renderPass, uint32_t sourceSubpass, uint32_t destinationSubpass, VkPipelineStageFlags sourceStageMask, VkPipelineStageFlags destinationStageMask, VkAccessFlags sourceAccessMask, VkAccessFlags destinationAccessMask, VkDependencyFlags dependencyFlags)
 {
-	if(!RenderPass)
+	if(!renderPass)
 		return VK_FALSE;
 
-	if(RenderPass->NumSubpassDependencies>=VKU_MAX_RENDERPASS_SUBPASS_DEPENDENCIES)
+	if(renderPass->numSubpassDependencies>=VKU_MAX_RENDERPASS_SUBPASS_DEPENDENCIES)
 		return VK_FALSE;
 
 	VkSubpassDependency Dependency=
 	{
-		.srcSubpass=SourceSubpass,
-		.dstSubpass=DestinationSubpass,
-		.srcStageMask=SourceStageMask,
-		.dstStageMask=DestinationStageMask,
-		.srcAccessMask=SourceAccessMask,
-		.dstAccessMask=DestinationAccessMask,
-		.dependencyFlags=DependencyFlags,
+		.srcSubpass=sourceSubpass,
+		.dstSubpass=destinationSubpass,
+		.srcStageMask=sourceStageMask,
+		.dstStageMask=destinationStageMask,
+		.srcAccessMask=sourceAccessMask,
+		.dstAccessMask=destinationAccessMask,
+		.dependencyFlags=dependencyFlags,
 	};
 
-	RenderPass->SubpassDependencies[RenderPass->NumSubpassDependencies]=Dependency;
-	RenderPass->NumSubpassDependencies++;
+	renderPass->subpassDependencies[renderPass->numSubpassDependencies]=Dependency;
+	renderPass->numSubpassDependencies++;
 
 	return VK_TRUE;
 }
 
-VkBool32 vkuInitRenderPass(VkuContext_t *Context, VkuRenderPass_t *RenderPass)
+VkBool32 vkuInitRenderPass(VkuContext_t *context, VkuRenderPass_t *renderPass)
 {
-	if(!Context)
+	if(!context)
 		return VK_FALSE;
 
-	if(!RenderPass)
+	if(!renderPass)
 		return VK_FALSE;
 
-	RenderPass->Device=Context->Device;
+	renderPass->device=context->device;
 
-	RenderPass->RenderPass=VK_NULL_HANDLE;
+	renderPass->renderPass=VK_NULL_HANDLE;
 
-	RenderPass->NumAttachments=0;
-	memset(RenderPass->Attachments, 0, sizeof(VkuRenderPassAttachments_t)*VKU_MAX_RENDERPASS_ATTACHMENTS);
+	renderPass->numAttachments=0;
+	memset(renderPass->attachments, 0, sizeof(VkuRenderPassAttachments_t)*VKU_MAX_RENDERPASS_ATTACHMENTS);
 
-	RenderPass->NumSubpassDependencies=0;
-	memset(RenderPass->SubpassDependencies, 0, sizeof(VkSubpassDependency)*VKU_MAX_RENDERPASS_SUBPASS_DEPENDENCIES);
+	renderPass->numSubpassDependencies=0;
+	memset(renderPass->subpassDependencies, 0, sizeof(VkSubpassDependency)*VKU_MAX_RENDERPASS_SUBPASS_DEPENDENCIES);
 
 	return VK_TRUE;
 }
 
-VkBool32 vkuCreateRenderPass(VkuRenderPass_t *RenderPass)
+VkBool32 vkuCreateRenderPass(VkuRenderPass_t *renderPass)
 {
-	VkAttachmentDescription Descriptions[VKU_MAX_RENDERPASS_ATTACHMENTS];
+	VkAttachmentDescription descriptions[VKU_MAX_RENDERPASS_ATTACHMENTS];
 
-	uint32_t InputRefCount=0;
-	VkAttachmentReference InputReferences[VKU_MAX_RENDERPASS_ATTACHMENTS];
-	uint32_t ColorRefCount=0;
-	VkAttachmentReference ColorReferences[VKU_MAX_RENDERPASS_ATTACHMENTS];
-	uint32_t DepthRefCount=0;
-	VkAttachmentReference DepthReference;
-	uint32_t ResolveRefCount=0;
-	VkAttachmentReference ResolveReference;
+	uint32_t inputRefCount=0;
+	VkAttachmentReference inputReferences[VKU_MAX_RENDERPASS_ATTACHMENTS];
+	uint32_t colorRefCount=0;
+	VkAttachmentReference colorReferences[VKU_MAX_RENDERPASS_ATTACHMENTS];
+	uint32_t depthRefCount=0;
+	VkAttachmentReference depthReference;
+	uint32_t resolveRefCount=0;
+	VkAttachmentReference resolveReference;
 
-	uint32_t Index=0;
+	uint32_t index=0;
 
-	for(uint32_t i=0;i<RenderPass->NumAttachments;i++)
+	for(uint32_t i=0;i<renderPass->numAttachments;i++)
 	{
-		switch(RenderPass->Attachments[i].Type)
+		switch(renderPass->attachments[i].type)
 		{
 			case VKU_RENDERPASS_ATTACHMENT_INPUT:
-				InputReferences[Index].attachment=Index;
-				InputReferences[Index].layout=RenderPass->Attachments[i].SubpassLayout;
-				InputRefCount++;
+				inputReferences[index].attachment=index;
+				inputReferences[index].layout=renderPass->attachments[i].subpassLayout;
+				inputRefCount++;
 				break;
 
 			case VKU_RENDERPASS_ATTACHMENT_COLOR:
-				ColorReferences[Index].attachment=Index;
-				ColorReferences[Index].layout=RenderPass->Attachments[i].SubpassLayout;
-				ColorRefCount++;
+				colorReferences[index].attachment=index;
+				colorReferences[index].layout=renderPass->attachments[i].subpassLayout;
+				colorRefCount++;
 				break;
 
 			case VKU_RENDERPASS_ATTACHMENT_DEPTH:
-				DepthReference.attachment=Index;
-				DepthReference.layout=RenderPass->Attachments[i].SubpassLayout;
-				DepthRefCount++;
+				depthReference.attachment=index;
+				depthReference.layout=renderPass->attachments[i].subpassLayout;
+				depthRefCount++;
 				break;
 
 			case VKU_RENDERPASS_ATTACHMENT_RESOLVE:
-				ResolveReference.attachment=Index;
-				ResolveReference.layout=RenderPass->Attachments[i].SubpassLayout;
-				ResolveRefCount++;
+				resolveReference.attachment=index;
+				resolveReference.layout=renderPass->attachments[i].subpassLayout;
+				resolveRefCount++;
 				break;
 
 			default:
 				break;
 		};
 
-		Descriptions[Index].flags=0;
-		Descriptions[Index].format=RenderPass->Attachments[i].Format;
-		Descriptions[Index].samples=RenderPass->Attachments[i].Samples;
-		Descriptions[Index].loadOp=RenderPass->Attachments[i].LoadOp;
-		Descriptions[Index].storeOp=RenderPass->Attachments[i].StoreOp;
-		Descriptions[Index].stencilLoadOp=RenderPass->Attachments[i].LoadOp;
-		Descriptions[Index].stencilStoreOp=RenderPass->Attachments[i].StoreOp;
-		Descriptions[Index].initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;
-		Descriptions[Index].finalLayout=RenderPass->Attachments[i].FinalLayout;
-		Index++;
+		descriptions[index].flags=0;
+		descriptions[index].format=renderPass->attachments[i].format;
+		descriptions[index].samples=renderPass->attachments[i].samples;
+		descriptions[index].loadOp=renderPass->attachments[i].loadOp;
+		descriptions[index].storeOp=renderPass->attachments[i].storeOp;
+		descriptions[index].stencilLoadOp=renderPass->attachments[i].loadOp;
+		descriptions[index].stencilStoreOp=renderPass->attachments[i].storeOp;
+		descriptions[index].initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;
+		descriptions[index].finalLayout=renderPass->attachments[i].finalLayout;
+		index++;
 	}
 
-	if(DepthRefCount>1)
+	if(depthRefCount>1)
 		return VK_FALSE; // Too many depth attachments
 
-	if(ResolveRefCount>1)
+	if(resolveRefCount>1)
 		return VK_FALSE; // Too many resolve attachments
 
-	VkSubpassDescription Subpasses=
+	VkSubpassDescription subpasses=
 	{
 		.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS,
-		.inputAttachmentCount=InputRefCount,
-		.pInputAttachments=InputReferences,
-		.colorAttachmentCount=ColorRefCount,
-		.pColorAttachments=ColorReferences,
-		.pDepthStencilAttachment=DepthRefCount?&DepthReference:VK_NULL_HANDLE,
-		.pResolveAttachments=ResolveRefCount?&ResolveReference:VK_NULL_HANDLE,
+		.inputAttachmentCount=inputRefCount,
+		.pInputAttachments=inputReferences,
+		.colorAttachmentCount=colorRefCount,
+		.pColorAttachments=colorReferences,
+		.pDepthStencilAttachment=depthRefCount?&depthReference:VK_NULL_HANDLE,
+		.pResolveAttachments=resolveRefCount?&resolveReference:VK_NULL_HANDLE,
 	};
 
-	VkRenderPassCreateInfo RenderPassCreateInfo=
+	VkRenderPassCreateInfo renderPassCreateInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-		.attachmentCount=RenderPass->NumAttachments,
-		.pAttachments=Descriptions,
+		.attachmentCount=renderPass->numAttachments,
+		.pAttachments=descriptions,
 		.subpassCount=1,
-		.pSubpasses=&Subpasses,
-		.dependencyCount=RenderPass->NumSubpassDependencies,
-		.pDependencies=RenderPass->SubpassDependencies,
+		.pSubpasses=&subpasses,
+		.dependencyCount=renderPass->numSubpassDependencies,
+		.pDependencies=renderPass->subpassDependencies,
 	};
 
-	if(vkCreateRenderPass(RenderPass->Device, &RenderPassCreateInfo, 0, &RenderPass->RenderPass)!=VK_SUCCESS)
+	if(vkCreateRenderPass(renderPass->device, &renderPassCreateInfo, 0, &renderPass->renderPass)!=VK_SUCCESS)
 		return VK_FALSE;
 
 	return VK_TRUE;

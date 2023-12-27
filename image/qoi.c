@@ -22,19 +22,19 @@
 
 #define QOI_HASH(C)	(C[0]*3+C[1]*5+C[2]*7+C[3]*11)
 
-const uint8_t qoi_padding[8]={ 0, 0, 0, 0, 0, 0, 0, 1 };
+const uint8_t qoiPadding[8]={ 0, 0, 0, 0, 0, 0, 0, 1 };
 
-uint32_t Int32Swap(const uint32_t l)
+static uint32_t Int32Swap(const uint32_t l)
 {
-	uint8_t b1=(l>>0)&255;
-	uint8_t b2=(l>>8)&255;
-	uint8_t b3=(l>>16)&255;
-	uint8_t b4=(l>>24)&255;
+	const uint8_t b1=(l>>0)&255;
+	const uint8_t b2=(l>>8)&255;
+	const uint8_t b3=(l>>16)&255;
+	const uint8_t b4=(l>>24)&255;
 
 	return ((uint32_t)b1<<24)+((uint32_t)b2<<16)+((uint32_t)b3<<8)+((uint32_t)b4<<0);
 }
 
-bool QOI_Load(const char *Filename, VkuImage_t *Image)
+bool QOI_Load(const char *filename, VkuImage_t *image)
 {
 	FILE *stream=NULL;
 	uint32_t magic=0;
@@ -46,7 +46,7 @@ bool QOI_Load(const char *Filename, VkuImage_t *Image)
 	uint8_t index[64][4]={ {0, 0, 0, 0} }, bytes[4]={ 0 };
 	uint32_t run=0;
 
-	if(!(stream=fopen(Filename, "rb")))
+	if(!(stream=fopen(filename, "rb")))
 		return false;
 
 	fread(&magic, 1, 4, stream);
@@ -64,12 +64,12 @@ bool QOI_Load(const char *Filename, VkuImage_t *Image)
 	if(width==0||height==0||channels<3||channels>4||colorspace>1||magic!=QOI_MAGIC)
 		return false;
 
-	Image->Width=width;
-	Image->Height=height;
-	Image->Depth=channels<<3;
-	Image->Data=(uint8_t *)Zone_Malloc(Zone, width*height*channels);
+	image->width=width;
+	image->height=height;
+	image->depth=channels<<3;
+	image->data=(uint8_t *)Zone_Malloc(zone, width*height*channels);
 
-	if(!Image->Data)
+	if(!image->data)
 		return false;
 
 	memset(index, 0, 64*4);
@@ -122,12 +122,12 @@ bool QOI_Load(const char *Filename, VkuImage_t *Image)
 			index[QOI_HASH(bytes)%64][3]=bytes[3];
 		}
 
-		Image->Data[i+2]=bytes[0];
-		Image->Data[i+1]=bytes[1];
-		Image->Data[i+0]=bytes[2];
+		image->data[i+2]=bytes[0];
+		image->data[i+1]=bytes[1];
+		image->data[i+0]=bytes[2];
 
 		if(channels==4)
-			Image->Data[i+3]=bytes[3];
+			image->data[i+3]=bytes[3];
 	}
 
 	fclose(stream);
@@ -135,18 +135,18 @@ bool QOI_Load(const char *Filename, VkuImage_t *Image)
 	return true;
 }
 
-bool QOI_Write(const char *Filename, VkuImage_t *Image)
+bool QOI_Write(const char *filename, VkuImage_t *image)
 {
 	FILE *stream=NULL;
 	uint32_t temp32, i;
-	uint8_t index[64][4], px[4], px_prev[4];
+	uint8_t index[64][4], px[4], pxPrev[4];
 	uint8_t temp8, channels;
 	uint8_t run=0;
 
-	if(Image==NULL)
+	if(image==NULL)
 		return false;
 
-	if(!(stream=fopen(Filename, "wb")))
+	if(!(stream=fopen(filename, "wb")))
 		return false;
 
 	// MAGIC
@@ -154,15 +154,15 @@ bool QOI_Write(const char *Filename, VkuImage_t *Image)
 	fwrite(&temp32, 1, sizeof(uint32_t), stream);
 
 	// Width
-	temp32=Int32Swap(Image->Width);
+	temp32=Int32Swap(image->width);
 	fwrite(&temp32, 1, sizeof(uint32_t), stream);
 
 	// Height
-	temp32=Int32Swap(Image->Height);
+	temp32=Int32Swap(image->height);
 	fwrite(&temp32, 1, sizeof(uint32_t), stream);
 
 	// Channels
-	channels=Image->Depth>>3;
+	channels=image->depth>>3;
 	fwrite(&channels, 1, sizeof(uint8_t), stream);
 
 	// Colorspace
@@ -171,28 +171,28 @@ bool QOI_Write(const char *Filename, VkuImage_t *Image)
 
 	memset(index, 0, sizeof(index));
 
-	px_prev[0]=0;
-	px_prev[1]=0;
-	px_prev[2]=0;
-	px_prev[3]=255;
+	pxPrev[0]=0;
+	pxPrev[1]=0;
+	pxPrev[2]=0;
+	pxPrev[3]=255;
 
 	px[0]=0;
 	px[1]=0;
 	px[2]=0;
 	px[3]=255;
 
-	for(i=0;i<(uint32_t)Image->Width*Image->Height*channels;i+=channels)
+	for(i=0;i<(uint32_t)image->width*image->height*channels;i+=channels)
 	{
-		px[0]=Image->Data[i+2];
-		px[1]=Image->Data[i+1];
-		px[2]=Image->Data[i+0];
+		px[0]=image->data[i+2];
+		px[1]=image->data[i+1];
+		px[2]=image->data[i+0];
 
 		if(channels==4)
 		{
-			px[3]=Image->Data[i+3];
+			px[3]=image->data[i+3];
 		}
 
-		if(px[0]==px_prev[0]&&px[1]==px_prev[1]&&px[2]==px_prev[2]&&px[3]==px_prev[3])
+		if(px[0]==pxPrev[0]&&px[1]==pxPrev[1]&&px[2]==pxPrev[2]&&px[3]==pxPrev[3])
 		{
 			run++;
 
@@ -205,7 +205,7 @@ bool QOI_Write(const char *Filename, VkuImage_t *Image)
 		}
 		else
 		{
-			int index_pos;
+			int indexPos;
 
 			if(run>0)
 			{
@@ -214,25 +214,25 @@ bool QOI_Write(const char *Filename, VkuImage_t *Image)
 				run=0;
 			}
 
-			index_pos=QOI_HASH(px)%64;
+			indexPos=QOI_HASH(px)%64;
 
-			if(index[index_pos][0]==px[0]&&index[index_pos][1]==px[1]&&index[index_pos][2]==px[2]&&index[index_pos][3]==px[3])
+			if(index[indexPos][0]==px[0]&&index[indexPos][1]==px[1]&&index[indexPos][2]==px[2]&&index[indexPos][3]==px[3])
 			{
-				temp8=QOI_OP_INDEX|index_pos;
+				temp8=QOI_OP_INDEX|indexPos;
 				fwrite(&temp8, 1, sizeof(uint8_t), stream);
 			}
 			else
 			{
-				index[index_pos][0]=px[0];
-				index[index_pos][1]=px[1];
-				index[index_pos][2]=px[2];
-				index[index_pos][3]=px[3];
+				index[indexPos][0]=px[0];
+				index[indexPos][1]=px[1];
+				index[indexPos][2]=px[2];
+				index[indexPos][3]=px[3];
 
-				if(px[3]==px_prev[3])
+				if(px[3]==pxPrev[3])
 				{
-					int8_t vr=px[0]-px_prev[0];
-					int8_t vg=px[1]-px_prev[1];
-					int8_t vb=px[2]-px_prev[2];
+					int8_t vr=px[0]-pxPrev[0];
+					int8_t vg=px[1]-pxPrev[1];
+					int8_t vb=px[2]-pxPrev[2];
 
 					int8_t vg_r=vr-vg;
 					int8_t vg_b=vb-vg;
@@ -270,13 +270,13 @@ bool QOI_Write(const char *Filename, VkuImage_t *Image)
 			}
 		}
 
-		px_prev[0]=px[0];
-		px_prev[1]=px[1];
-		px_prev[2]=px[2];
-		px_prev[3]=px[3];
+		pxPrev[0]=px[0];
+		pxPrev[1]=px[1];
+		pxPrev[2]=px[2];
+		pxPrev[3]=px[3];
 	}
 
-	fwrite(qoi_padding, 1, sizeof(qoi_padding), stream);
+	fwrite(qoiPadding, 1, sizeof(qoiPadding), stream);
 
 	fclose(stream);
 

@@ -4,80 +4,80 @@
 #include "threads.h"
 
 // Main worker thread function, this does the actual calling of various job functions in the thread
-void *Thread_Worker(void *Data)
+void *Thread_Worker(void *data)
 {
 	// Get pointer to thread data
-	ThreadWorker_t *Worker=(ThreadWorker_t *)Data;
+	ThreadWorker_t *worker=(ThreadWorker_t *)data;
 
 	// If there's a constructor function assigned, call it
-	if(Worker->Constructor)
-		Worker->Constructor(Worker->ConstructorArg);
+	if(worker->constructor)
+		worker->constructor(worker->constructorArg);
 
 	// Loop until stop is set
 	for(;;)
 	{
 		// Lock the mutex
-		pthread_mutex_lock(&Worker->Mutex);
+		pthread_mutex_lock(&worker->mutex);
 
 		// Check if there are any jobs
-		while((Worker->NumJobs==0)&&((!Worker->Stop)||(Worker->Pause)))
-			pthread_cond_wait(&Worker->Condition, &Worker->Mutex);
+		while((worker->numJobs==0)&&((!worker->stop)||(worker->pause)))
+			pthread_cond_wait(&worker->condition, &worker->mutex);
 
-		if(Worker->Stop)
+		if(worker->stop)
 			break;
 
-		if(Worker->NumJobs==0)
+		if(worker->numJobs==0)
 			continue;
 
 		// Get a copy of the current job
-		ThreadJob_t Job=Worker->Jobs[0];
+		ThreadJob_t job=worker->jobs[0];
 
 		// Remove it from the job list
-		Worker->NumJobs--;
+		worker->numJobs--;
 
 		// Shift job list
-		for(uint32_t i=0;i<Worker->NumJobs;i++)
-			Worker->Jobs[i]=Worker->Jobs[i+1];
+		for(uint32_t i=0;i<worker->numJobs;i++)
+			worker->jobs[i]=worker->jobs[i+1];
 
 		// Unlock the mutex
-		pthread_mutex_unlock(&Worker->Mutex);
+		pthread_mutex_unlock(&worker->mutex);
 
 		// If there's a valid pointer on the job item, run it
-		if(Job.Function)
-			Job.Function(Job.Arg);
+		if(job.function)
+			job.function(job.arg);
 	}
 
 	// If there's a destructor function assigned, call that.
-	if(Worker->Destructor)
-		Worker->Destructor(Worker->DestructorArg);
+	if(worker->destructor)
+		worker->destructor(worker->destructorArg);
 
-	pthread_mutex_unlock(&Worker->Mutex);
+	pthread_mutex_unlock(&worker->mutex);
 	pthread_exit(NULL);
 
 	return 0;
 }
 
 // Get the number of current jobs
-uint32_t Thread_GetJobCount(ThreadWorker_t *Worker)
+uint32_t Thread_GetJobCount(ThreadWorker_t *worker)
 {
-	if(Worker)
-		return Worker->NumJobs;
+	if(worker)
+		return worker->numJobs;
 
 	return 0;
 }
 
 // Adds a job function and argument to the job list
-bool Thread_AddJob(ThreadWorker_t *Worker, ThreadFunction_t JobFunc, void *Arg)
+bool Thread_AddJob(ThreadWorker_t *worker, ThreadFunction_t jobFunc, void *arg)
 {
-	if(Worker)
+	if(worker)
 	{
-		if(Worker->NumJobs>=THREAD_MAXJOBS)
+		if(worker->numJobs>=THREAD_MAXJOBS)
 			return false;
 
-		pthread_mutex_lock(&Worker->Mutex);
-		Worker->Jobs[Worker->NumJobs++]=(ThreadJob_t){ JobFunc, Arg };
-		pthread_cond_signal(&Worker->Condition);
-		pthread_mutex_unlock(&Worker->Mutex);
+		pthread_mutex_lock(&worker->mutex);
+		worker->jobs[worker->numJobs++]=(ThreadJob_t){ jobFunc, arg };
+		pthread_cond_signal(&worker->condition);
+		pthread_mutex_unlock(&worker->mutex);
 	}
 	else
 		return false;
@@ -86,58 +86,58 @@ bool Thread_AddJob(ThreadWorker_t *Worker, ThreadFunction_t JobFunc, void *Arg)
 }
 
 // Assigns a constructor function and argument to the thread
-void Thread_AddConstructor(ThreadWorker_t *Worker, ThreadFunction_t ConstructorFunc, void *Arg)
+void Thread_AddConstructor(ThreadWorker_t *worker, ThreadFunction_t constructorFunc, void *arg)
 {
-	if(Worker)
+	if(worker)
 	{
-		Worker->Constructor=ConstructorFunc;
-		Worker->ConstructorArg=Arg;
+		worker->constructor=constructorFunc;
+		worker->constructorArg=arg;
 	}
 }
 
 // Assigns a destructor function and argument to the thread
-void Thread_AddDestructor(ThreadWorker_t *Worker, ThreadFunction_t DestructorFunc, void *Arg)
+void Thread_AddDestructor(ThreadWorker_t *worker, ThreadFunction_t destructorFunc, void *arg)
 {
-	if(Worker)
+	if(worker)
 	{
-		Worker->Destructor=DestructorFunc;
-		Worker->DestructorArg=Arg;
+		worker->destructor=destructorFunc;
+		worker->destructorArg=arg;
 	}
 }
 
 // Set up initial parameters and objects
-bool Thread_Init(ThreadWorker_t *Worker)
+bool Thread_Init(ThreadWorker_t *worker)
 {
-	if(Worker==NULL)
+	if(worker==NULL)
 		return false;
 
 	// Not stopped
-	Worker->Stop=false;
+	worker->stop=false;
 
 	// Not paused
-	Worker->Pause=false;
+	worker->pause=false;
 
 	// No constructor
-	Worker->Constructor=NULL;
-	Worker->ConstructorArg=NULL;
+	worker->constructor=NULL;
+	worker->constructorArg=NULL;
 
 	// No destructor
-	Worker->Destructor=NULL;
-	Worker->DestructorArg=NULL;
+	worker->destructor=NULL;
+	worker->destructorArg=NULL;
 
 	// initialize the job list
-	memset(Worker->Jobs, 0, sizeof(ThreadJob_t)*THREAD_MAXJOBS);
-	Worker->NumJobs=0;
+	memset(worker->jobs, 0, sizeof(ThreadJob_t)*THREAD_MAXJOBS);
+	worker->numJobs=0;
 
 	// Initialize the mutex
-	if(pthread_mutex_init(&Worker->Mutex, NULL))
+	if(pthread_mutex_init(&worker->mutex, NULL))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Unable to create mutex.\r\n");
 		return false;
 	}
 
 	// Initialize the condition
-	if(pthread_cond_init(&Worker->Condition, NULL))
+	if(pthread_cond_init(&worker->condition, NULL))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Unable to create condition.\r\n");
 		return false;
@@ -147,62 +147,62 @@ bool Thread_Init(ThreadWorker_t *Worker)
 }
 
 // Starts up worker thread
-bool Thread_Start(ThreadWorker_t *Worker)
+bool Thread_Start(ThreadWorker_t *worker)
 {
-	if(Worker==NULL)
+	if(worker==NULL)
 		return false;
 
-	if(pthread_create(&Worker->Thread, NULL, Thread_Worker, (void *)Worker))
+	if(pthread_create(&worker->thread, NULL, Thread_Worker, (void *)worker))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Unable to create worker thread.\r\n");
 		return false;
 	}
 
-//	pthread_detach(Worker->Thread);
+//	pthread_detach(worker->Thread);
 
 	return true;
 }
 
 // Pauses thread (if a job is currently running, it will finish first)
-void Thread_Pause(ThreadWorker_t *Worker)
+void Thread_Pause(ThreadWorker_t *worker)
 {
-	pthread_mutex_lock(&Worker->Mutex);
-	Worker->Pause=true;
-	pthread_mutex_unlock(&Worker->Mutex);
+	pthread_mutex_lock(&worker->mutex);
+	worker->pause=true;
+	pthread_mutex_unlock(&worker->mutex);
 }
 
 // Resume running jobs
-void Thread_Resume(ThreadWorker_t *Worker)
+void Thread_Resume(ThreadWorker_t *worker)
 {
-	pthread_mutex_lock(&Worker->Mutex);
-	Worker->Pause=false;
-	pthread_cond_broadcast(&Worker->Condition);
-	pthread_mutex_unlock(&Worker->Mutex);
+	pthread_mutex_lock(&worker->mutex);
+	worker->pause=false;
+	pthread_cond_broadcast(&worker->condition);
+	pthread_mutex_unlock(&worker->mutex);
 }
 
 // Stops thread and waits for it to exit and destroys objects.
-bool Thread_Destroy(ThreadWorker_t *Worker)
+bool Thread_Destroy(ThreadWorker_t *worker)
 {
-	if(Worker==NULL)
+	if(worker==NULL)
 		return false;
 
-	pthread_mutex_lock(&Worker->Mutex);
+	pthread_mutex_lock(&worker->mutex);
 
 	// Stop thread
-	Worker->Stop=true;
+	worker->stop=true;
 
 	// Wake up thread
-	Worker->Pause=false;
-	pthread_cond_broadcast(&Worker->Condition);
-	pthread_mutex_unlock(&Worker->Mutex);
+	worker->pause=false;
+	pthread_cond_broadcast(&worker->condition);
+	pthread_mutex_unlock(&worker->mutex);
 
 	// Wait for thread to join back with calling thread
-	pthread_join(Worker->Thread, NULL);
+	pthread_join(worker->thread, NULL);
 
 	// Destroy the mutex and condition variable
-	pthread_mutex_lock(&Worker->Mutex);
-	pthread_mutex_destroy(&Worker->Mutex);
-	pthread_cond_destroy(&Worker->Condition);
+	pthread_mutex_lock(&worker->mutex);
+	pthread_mutex_destroy(&worker->mutex);
+	pthread_cond_destroy(&worker->condition);
 
 	return true;
 }

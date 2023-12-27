@@ -29,249 +29,249 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 #endif
 
 // Creates a Vulkan Context
-VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
+VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 {
 #ifdef WIN32
-	if(vkCreateWin32SurfaceKHR(Instance, &(VkWin32SurfaceCreateInfoKHR)
+	if(vkCreateWin32SurfaceKHR(instance, &(VkWin32SurfaceCreateInfoKHR)
 	{
 		.sType=VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
 		.hinstance=GetModuleHandle(0),
-		.hwnd=Context->hWnd,
-	}, VK_NULL_HANDLE, &Context->Surface)!=VK_SUCCESS)
+		.hwnd=context->hWnd,
+	}, VK_NULL_HANDLE, &context->surface)!=VK_SUCCESS)
 	{
 		DBGPRINTF(DEBUG_ERROR, "vkCreateWin32SurfaceKHR failed.\n");
 		return VK_FALSE;
 	}
 #elif LINUX
-	if(vkCreateXlibSurfaceKHR(Instance, &(VkXlibSurfaceCreateInfoKHR)
+	if(vkCreateXlibSurfaceKHR(instance, &(VkXlibSurfaceCreateInfoKHR)
 	{
 		.sType=VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,
-		.dpy=Context->Dpy,
-		.window=Context->Win,
-	}, VK_NULL_HANDLE, &Context->Surface)!=VK_SUCCESS)
+		.dpy=context->Dpy,
+		.window=context->Win,
+	}, VK_NULL_HANDLE, &context->surface)!=VK_SUCCESS)
 	{
 		DBGPRINTF(DEBUG_ERROR, "vkCreateXlibSurfaceKHR failed.\n");
 		return VK_FALSE;
 	}
 #elif ANDROID
-	if(vkCreateAndroidSurfaceKHR(Instance, &(VkAndroidSurfaceCreateInfoKHR)
+	if(vkCreateAndroidSurfaceKHR(instance, &(VkAndroidSurfaceCreateInfoKHR)
 	{
 		.sType=VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
 		.pNext=NULL,
 		.flags=0,
-		.window=Context->Win,
-	}, VK_NULL_HANDLE, &Context->Surface)!=VK_SUCCESS)
+		.window=context->Win,
+	}, VK_NULL_HANDLE, &context->surface)!=VK_SUCCESS)
 	{
 		DBGPRINTF(DEBUG_ERROR, "vkCreateAndroidSurfaceKHR failed.\n");
 		return VK_FALSE;
 	}
 #endif
 	// Get the number of physical devices in the system
-	uint32_t PhysicalDeviceCount=0;
-	vkEnumeratePhysicalDevices(Instance, &PhysicalDeviceCount, VK_NULL_HANDLE);
+	uint32_t physicalDeviceCount=0;
+	vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, VK_NULL_HANDLE);
 
-	if(!PhysicalDeviceCount)
+	if(!physicalDeviceCount)
 	{
 		DBGPRINTF(DEBUG_ERROR, "No physical devices found.\n");
 		return VK_FALSE;
 	}
 
 	// Allocate an array of handles
-	VkPhysicalDevice *DeviceHandles=(VkPhysicalDevice *)Zone_Malloc(Zone, sizeof(VkPhysicalDevice)*PhysicalDeviceCount);
+	VkPhysicalDevice *deviceHandles=(VkPhysicalDevice *)Zone_Malloc(zone, sizeof(VkPhysicalDevice)*physicalDeviceCount);
 
-	if(DeviceHandles==NULL)
+	if(deviceHandles==NULL)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for physical device handles.\n");
 		return VK_FALSE;
 	}
 
-	uint32_t *QueueIndices=(uint32_t *)Zone_Malloc(Zone, sizeof(uint32_t)*PhysicalDeviceCount);
+	uint32_t *queueIndices=(uint32_t *)Zone_Malloc(zone, sizeof(uint32_t)*physicalDeviceCount);
 
-	if(QueueIndices==NULL)
+	if(queueIndices==NULL)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for queue indices.\n");
 		return VK_FALSE;
 	}
 
 	// Get the handles to the devices
-	vkEnumeratePhysicalDevices(Instance, &PhysicalDeviceCount, DeviceHandles);
+	vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, deviceHandles);
 
 	DBGPRINTF(DEBUG_INFO, "Found devices:\n");
 
-	for(uint32_t i=0;i<PhysicalDeviceCount;i++)
+	for(uint32_t i=0;i<physicalDeviceCount;i++)
 	{
-		VkPhysicalDeviceProperties DeviceProperties;
-		vkGetPhysicalDeviceProperties(DeviceHandles[i], &DeviceProperties);
-		DBGPRINTF(DEBUG_INFO, "\t#%d: %s VendorID: 0x%0.4X ProductID: 0x%0.4X\n", i, DeviceProperties.deviceName, DeviceProperties.vendorID, DeviceProperties.deviceID);
+		VkPhysicalDeviceProperties deviceProperties;
+		vkGetPhysicalDeviceProperties(deviceHandles[i], &deviceProperties);
+		DBGPRINTF(DEBUG_INFO, "\t#%d: %s VendorID: 0x%0.4X ProductID: 0x%0.4X\n", i, deviceProperties.deviceName, deviceProperties.vendorID, deviceProperties.deviceID);
 
 		// Get the number of queue families for this device
-		uint32_t QueueFamilyCount=0;
-		vkGetPhysicalDeviceQueueFamilyProperties(DeviceHandles[i], &QueueFamilyCount, VK_NULL_HANDLE);
+		uint32_t queueFamilyCount=0;
+		vkGetPhysicalDeviceQueueFamilyProperties(deviceHandles[i], &queueFamilyCount, VK_NULL_HANDLE);
 
 		// Allocate the memory for the structs 
-		VkQueueFamilyProperties *QueueFamilyProperties=(VkQueueFamilyProperties *)Zone_Malloc(Zone, sizeof(VkQueueFamilyProperties)*QueueFamilyCount);
+		VkQueueFamilyProperties *queueFamilyProperties=(VkQueueFamilyProperties *)Zone_Malloc(zone, sizeof(VkQueueFamilyProperties)*queueFamilyCount);
 
-		if(QueueFamilyProperties==NULL)
+		if(queueFamilyProperties==NULL)
 		{
 			DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for queue family properties.\n");
-			Zone_Free(Zone, DeviceHandles);
+			Zone_Free(zone, deviceHandles);
 			return VK_FALSE;
 		}
 
 		// Get the queue family properties
-		vkGetPhysicalDeviceQueueFamilyProperties(DeviceHandles[i], &QueueFamilyCount, QueueFamilyProperties);
+		vkGetPhysicalDeviceQueueFamilyProperties(deviceHandles[i], &queueFamilyCount, queueFamilyProperties);
 
 		// Find a queue index on a device that supports both graphics rendering and present support
-		for(uint32_t j=0;j<QueueFamilyCount;j++)
+		for(uint32_t j=0;j<queueFamilyCount;j++)
 		{
-			VkBool32 SupportsPresent=VK_TRUE;
+			VkBool32 supportsPresent=VK_TRUE;
 
-			//vkGetPhysicalDeviceSurfaceSupportKHR(DeviceHandles[i], j, Context->Surface, &SupportsPresent);
+			//vkGetPhysicalDeviceSurfaceSupportKHR(deviceHandles[i], j, context->surface, &SupportsPresent);
 
-			if(SupportsPresent&&(QueueFamilyProperties[j].queueFlags&VK_QUEUE_GRAPHICS_BIT))
+			if(supportsPresent&&(queueFamilyProperties[j].queueFlags&VK_QUEUE_GRAPHICS_BIT))
 			{
-				QueueIndices[i]=j;
+				queueIndices[i]=j;
 				break;
 			}
 		}
 
 		// Done with queue family properties
-		Zone_Free(Zone, QueueFamilyProperties);
+		Zone_Free(zone, queueFamilyProperties);
 	}
 
 	// Select which device to use
-	uint32_t DeviceIndex=0;
-	Context->QueueFamilyIndex=QueueIndices[DeviceIndex];
-	Context->PhysicalDevice=DeviceHandles[DeviceIndex];
+	uint32_t deviceIndex=0;
+	context->queueFamilyIndex=queueIndices[deviceIndex];
+	context->physicalDevice=deviceHandles[deviceIndex];
 
 	// Free allocated handles and queue indices
-	Zone_Free(Zone, DeviceHandles);
-	Zone_Free(Zone, QueueIndices);
+	Zone_Free(zone, deviceHandles);
+	Zone_Free(zone, queueIndices);
 
-	uint32_t ExtensionCount=0;
-	vkEnumerateDeviceExtensionProperties(Context->PhysicalDevice, VK_NULL_HANDLE, &ExtensionCount, VK_NULL_HANDLE);
+	uint32_t extensionCount=0;
+	vkEnumerateDeviceExtensionProperties(context->physicalDevice, VK_NULL_HANDLE, &extensionCount, VK_NULL_HANDLE);
 
-	VkExtensionProperties *ExtensionProperties=(VkExtensionProperties *)Zone_Malloc(Zone, sizeof(VkExtensionProperties)*ExtensionCount);
+	VkExtensionProperties *extensionProperties=(VkExtensionProperties *)Zone_Malloc(zone, sizeof(VkExtensionProperties)*extensionCount);
 
-	if(ExtensionProperties==VK_NULL_HANDLE)
+	if(extensionProperties==VK_NULL_HANDLE)
 	{
-		Zone_Free(Zone, ExtensionProperties);
+		Zone_Free(zone, extensionProperties);
 		DBGPRINTF(DEBUG_ERROR, "Failed to allocate memory for extension properties.\n");
 		return VK_FALSE;
 	}
 
-	vkEnumerateDeviceExtensionProperties(Context->PhysicalDevice, VK_NULL_HANDLE, &ExtensionCount, ExtensionProperties);
+	vkEnumerateDeviceExtensionProperties(context->physicalDevice, VK_NULL_HANDLE, &extensionCount, extensionProperties);
 
-	//DBGPRINTF(DEBUG_INFO, "Device extensions:\n");
-	//for(uint32_t i=0;i<ExtensionCount;i++)
-	//	DBGPRINTF(DEBUG_INFO, "\t%s\n", ExtensionProperties[i].extensionName);
+	//DBGPRINTF(DEBUG_INFO, "device extensions:\n");
+	//for(uint32_t i=0;i<extensionCount;i++)
+	//	DBGPRINTF(DEBUG_INFO, "\t%s\n", extensionProperties[i].extensionName);
 
-	Context->SwapchainExtension=VK_FALSE;
-	Context->PushDescriptorExtension=VK_FALSE;
-	Context->DynamicRenderingExtension=VK_FALSE;
-	Context->DepthStencilResolveExtension=VK_FALSE;
+	context->swapchainExtension=VK_FALSE;
+	context->pushDescriptorExtension=VK_FALSE;
+	context->dynamicRenderingExtension=VK_FALSE;
+	context->depthStencilResolveExtension=VK_FALSE;
 
-	for(uint32_t i=0;i<ExtensionCount;i++)
+	for(uint32_t i=0;i<extensionCount;i++)
 	{
-		if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME)==0)
+		if(strcmp(extensionProperties[i].extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME)==0)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_KHR_SWAPCHAIN_EXTENSION_NAME" extension is supported!\n");
-			Context->SwapchainExtension=VK_TRUE;
+			context->swapchainExtension=VK_TRUE;
 		}
-		else if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)==0)
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)==0)
 		{
-			if((_vkCmdPushDescriptorSetKHR=(PFN_vkCmdPushDescriptorSetKHR)vkGetInstanceProcAddr(Instance, "vkCmdPushDescriptorSetKHR"))==VK_NULL_HANDLE)
+			if((_vkCmdPushDescriptorSetKHR=(PFN_vkCmdPushDescriptorSetKHR)vkGetInstanceProcAddr(instance, "vkCmdPushDescriptorSetKHR"))==VK_NULL_HANDLE)
 				DBGPRINTF(DEBUG_ERROR, "vkGetInstanceProcAddr failed on vkCmdPushDescriptorSetKHR.\n");
 			else
 			{
 				DBGPRINTF(DEBUG_INFO, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME" extension is supported!\n");
-				Context->PushDescriptorExtension=VK_TRUE;
+				context->pushDescriptorExtension=VK_TRUE;
 			}
 		}
-		else if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME)==0)
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME)==0)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME" extension is supported!\n");
-			Context->DynamicRenderingExtension=VK_TRUE;
+			context->dynamicRenderingExtension=VK_TRUE;
 		}		
-		else if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)==0)
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)==0)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME" extension is supported!\n");
-			Context->GetPhysicalDeviceProperties2Extension=VK_TRUE;
+			context->getPhysicalDeviceProperties2Extension=VK_TRUE;
 		}
-		else if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME)==0)
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME)==0)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME" extension is supported!\n");
-			Context->DepthStencilResolveExtension=VK_TRUE;
+			context->depthStencilResolveExtension=VK_TRUE;
 		}
-		else if(strcmp(ExtensionProperties[i].extensionName, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME)==0)
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME)==0)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME" extension is supported!\n");
-			Context->CreateRenderPass2Extension=VK_TRUE;
+			context->createRenderPass2Extension=VK_TRUE;
 		}
 	}
 
-	Zone_Free(Zone, ExtensionProperties);
+	Zone_Free(zone, extensionProperties);
 
-	if(!Context->SwapchainExtension)
+	if(!context->swapchainExtension)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Missing required device extensions!\n");
 		return VK_FALSE;
 	}
 
-	Context->DeviceProperties2.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_3_PROPERTIES;
-	Context->DeviceProperties.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-	Context->DeviceProperties.pNext=&Context->DeviceProperties2;
-	vkGetPhysicalDeviceProperties2(Context->PhysicalDevice, &Context->DeviceProperties);
+	context->deviceProperties2.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_3_PROPERTIES;
+	context->deviceProperties.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+	context->deviceProperties.pNext=&context->deviceProperties2;
+	vkGetPhysicalDeviceProperties2(context->physicalDevice, &context->deviceProperties);
 
 	DBGPRINTF(DEBUG_INFO, "Vulkan device name: %s\nVulkan API version: %d.%d.%d\n",
-			  Context->DeviceProperties.properties.deviceName,
-			  VK_API_VERSION_MAJOR(Context->DeviceProperties.properties.apiVersion),
-			  VK_API_VERSION_MINOR(Context->DeviceProperties.properties.apiVersion),
-			  VK_API_VERSION_PATCH(Context->DeviceProperties.properties.apiVersion));
+			  context->deviceProperties.properties.deviceName,
+			  VK_API_VERSION_MAJOR(context->deviceProperties.properties.apiVersion),
+			  VK_API_VERSION_MINOR(context->deviceProperties.properties.apiVersion),
+			  VK_API_VERSION_PATCH(context->deviceProperties.properties.apiVersion));
 
 	// Get device physical memory properties
-	vkGetPhysicalDeviceMemoryProperties(Context->PhysicalDevice, &Context->DeviceMemProperties);
+	vkGetPhysicalDeviceMemoryProperties(context->physicalDevice, &context->deviceMemProperties);
 
 	DBGPRINTF(DEBUG_INFO, "Vulkan memory heaps: \n");
-	for(uint32_t i=0;i<Context->DeviceMemProperties.memoryHeapCount;i++)
-		DBGPRINTF(DEBUG_INFO, "\t#%d: Size: %0.3fGB\n", i, (float)Context->DeviceMemProperties.memoryHeaps[i].size/1000.0f/1000.0f/1000.0f);
+	for(uint32_t i=0;i<context->deviceMemProperties.memoryHeapCount;i++)
+		DBGPRINTF(DEBUG_INFO, "\t#%d: Size: %0.3fGB\n", i, (float)context->deviceMemProperties.memoryHeaps[i].size/1000.0f/1000.0f/1000.0f);
 
 	DBGPRINTF(DEBUG_INFO, "Vulkan memory types: \n");
-	for(uint32_t i=0;i<Context->DeviceMemProperties.memoryTypeCount;i++)
-		DBGPRINTF(DEBUG_INFO, "\t#%d: Heap index: %d Flags: 0x%X\n", i, Context->DeviceMemProperties.memoryTypes[i].heapIndex, Context->DeviceMemProperties.memoryTypes[i].propertyFlags);
+	for(uint32_t i=0;i<context->deviceMemProperties.memoryTypeCount;i++)
+		DBGPRINTF(DEBUG_INFO, "\t#%d: Heap index: %d Flags: 0x%X\n", i, context->deviceMemProperties.memoryTypes[i].heapIndex, context->deviceMemProperties.memoryTypes[i].propertyFlags);
 
-	VkPhysicalDeviceFeatures Features;
-	vkGetPhysicalDeviceFeatures(Context->PhysicalDevice, &Features);
+	VkPhysicalDeviceFeatures features;
+	vkGetPhysicalDeviceFeatures(context->physicalDevice, &features);
 
-	if(!Features.imageCubeArray)
+	if(!features.imageCubeArray)
 	{
 		DBGPRINTF(DEBUG_WARNING, "Missing cubemap arrays feature.\n");
 		return VK_FALSE;
 	}
 
 	// Enable extensions that are supported
-	const char *Extensions[100];
-	uint32_t NumExtensions=0;
+	const char *extensions[100];
+	uint32_t numExtensions=0;
 
-	if(Context->SwapchainExtension)
-		Extensions[NumExtensions++]=VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+	if(context->swapchainExtension)
+		extensions[numExtensions++]=VK_KHR_SWAPCHAIN_EXTENSION_NAME;
 
-	if(Context->PushDescriptorExtension)
-		Extensions[NumExtensions++]=VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME;
+	if(context->pushDescriptorExtension)
+		extensions[numExtensions++]=VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME;
 
 	void *pNext=VK_NULL_HANDLE;
 	VkPhysicalDeviceDynamicRenderingFeatures deviceDynamicRenderingFeatures={ 0 };
-	if(Context->DynamicRenderingExtension&&
-	   Context->GetPhysicalDeviceProperties2Extension&&
-	   Context->DepthStencilResolveExtension&&
-	   Context->CreateRenderPass2Extension)
+	if(context->dynamicRenderingExtension&&
+	   context->getPhysicalDeviceProperties2Extension&&
+	   context->depthStencilResolveExtension&&
+	   context->createRenderPass2Extension)
 	{
-		Extensions[NumExtensions++]=VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME;
+		extensions[numExtensions++]=VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME;
 
 		// These are also required with dynamic rendering
-		Extensions[NumExtensions++]=VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME;
-		Extensions[NumExtensions++]=VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME;
-		Extensions[NumExtensions++]=VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME;
+		extensions[numExtensions++]=VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME;
+		extensions[numExtensions++]=VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME;
+		extensions[numExtensions++]=VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME;
 		// 
 	
 		deviceDynamicRenderingFeatures=(VkPhysicalDeviceDynamicRenderingFeatures)
@@ -283,113 +283,113 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 	}
 
 #if 1
-	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME;
-	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME;
-	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME;
-	Extensions[NumExtensions++]=VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME;
-	Extensions[NumExtensions++]=VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME;
-	//Extensions[NumExtensions++]=VK_EXT_DEBUG_MARKER_EXTENSION_NAME;
+	extensions[numExtensions++]=VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME;
+	extensions[numExtensions++]=VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME;
+	extensions[numExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME;
+	extensions[numExtensions++]=VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME;
+	extensions[numExtensions++]=VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME;
+	//extensions[numExtensions++]=VK_EXT_DEBUG_MARKER_EXTENSION_NAME;
 
 #ifdef WIN32
-	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME;
-	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME;
-	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME;
-	Extensions[NumExtensions++]=VK_KHR_WIN32_KEYED_MUTEX_EXTENSION_NAME;
+	extensions[numExtensions++]=VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME;
+	extensions[numExtensions++]=VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME;
+	extensions[numExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME;
+	extensions[numExtensions++]=VK_KHR_WIN32_KEYED_MUTEX_EXTENSION_NAME;
 #else
-	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME;
-	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME;
-	Extensions[NumExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME;
+	extensions[numExtensions++]=VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME;
+	extensions[numExtensions++]=VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME;
+	extensions[numExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME;
 #endif
 #endif
 
 	// Create the logical device from the physical device and queue index from above
-	if(vkCreateDevice(Context->PhysicalDevice, &(VkDeviceCreateInfo)
+	if(vkCreateDevice(context->physicalDevice, &(VkDeviceCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
 		.pNext=pNext,
-		.pEnabledFeatures=&Features,
-		.enabledExtensionCount=NumExtensions,
-		.ppEnabledExtensionNames=Extensions,
+		.pEnabledFeatures=&features,
+		.enabledExtensionCount=numExtensions,
+		.ppEnabledExtensionNames=extensions,
 		.queueCreateInfoCount=1,
 		.pQueueCreateInfos=&(VkDeviceQueueCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-			.queueFamilyIndex=Context->QueueFamilyIndex,
+			.queueFamilyIndex=context->queueFamilyIndex,
 			.queueCount=1,
 			.pQueuePriorities=(const float[]) { 1.0f }
 		}
-	}, VK_NULL_HANDLE, &Context->Device)!=VK_SUCCESS)
+	}, VK_NULL_HANDLE, &context->device)!=VK_SUCCESS)
 	{
 		DBGPRINTF(DEBUG_ERROR, "vkCreateDevice failed.\n");
 		return VK_FALSE;
 	}
 
 	// Get device queue
-	vkGetDeviceQueue(Context->Device, Context->QueueFamilyIndex, 0, &Context->Queue);
+	vkGetDeviceQueue(context->device, context->queueFamilyIndex, 0, &context->queue);
 
-	FILE *Stream=fopen("pipelinecache.bin", "rb");
+	FILE *stream=fopen("pipelinecache.bin", "rb");
 
-	if(Stream)
+	if(stream)
 	{
 		DBGPRINTF(DEBUG_INFO, "Reading pipeline cache data...\n");
 
-		fseek(Stream, 0, SEEK_END);
-		size_t PipelineCacheSize=ftell(Stream);
-		fseek(Stream, 0, SEEK_SET);
+		fseek(stream, 0, SEEK_END);
+		size_t pipelineCacheSize=ftell(stream);
+		fseek(stream, 0, SEEK_SET);
 
-		uint8_t *PipelineCacheData=(uint8_t *)Zone_Malloc(Zone, PipelineCacheSize);
+		uint8_t *pipelineCacheData=(uint8_t *)Zone_Malloc(zone, pipelineCacheSize);
 
-		if(PipelineCacheData)
+		if(pipelineCacheData)
 		{
-			VkResult Result=vkCreatePipelineCache(Context->Device, &(VkPipelineCacheCreateInfo)
+			VkResult Result=vkCreatePipelineCache(context->device, &(VkPipelineCacheCreateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
-				.initialDataSize=PipelineCacheSize,
-				.pInitialData=PipelineCacheData,
-			}, VK_NULL_HANDLE, &Context->PipelineCache);
+				.initialDataSize=pipelineCacheSize,
+				.pInitialData=pipelineCacheData,
+			}, VK_NULL_HANDLE, &context->pipelineCache);
 
 			if(Result!=VK_SUCCESS)
 			{
 				DBGPRINTF(DEBUG_ERROR, "Corrupted pipeline cache data, creating new. (Result=%d)\n", Result);
 
-				vkCreatePipelineCache(Context->Device, &(VkPipelineCacheCreateInfo)
+				vkCreatePipelineCache(context->device, &(VkPipelineCacheCreateInfo)
 				{
 					.sType=VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
-			}, VK_NULL_HANDLE, &Context->PipelineCache);
+			}, VK_NULL_HANDLE, &context->pipelineCache);
 	}
 
-			Zone_Free(Zone, PipelineCacheData);
+			Zone_Free(zone, pipelineCacheData);
 		}
 		else
 		{
 			DBGPRINTF(DEBUG_ERROR, "Failed to allocate memory for pipeline cache data, creating new pipeline cache.\n");
 
-			vkCreatePipelineCache(Context->Device, &(VkPipelineCacheCreateInfo)
+			vkCreatePipelineCache(context->device, &(VkPipelineCacheCreateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
-			}, VK_NULL_HANDLE, &Context->PipelineCache);
+			}, VK_NULL_HANDLE, &context->pipelineCache);
 		}
 	}
 	else
 	{
 		DBGPRINTF(DEBUG_INFO, "No pipeline cache data file found, creating new.\n");
 
-		vkCreatePipelineCache(Context->Device, &(VkPipelineCacheCreateInfo)
+		vkCreatePipelineCache(context->device, &(VkPipelineCacheCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
-		}, VK_NULL_HANDLE, &Context->PipelineCache);
+		}, VK_NULL_HANDLE, &context->pipelineCache);
 	}
 
 	// Create a general command pool
-	vkCreateCommandPool(Context->Device, &(VkCommandPoolCreateInfo)
+	vkCreateCommandPool(context->device, &(VkCommandPoolCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 		.flags=0,
-		.queueFamilyIndex=Context->QueueFamilyIndex,
-	}, VK_NULL_HANDLE, &Context->CommandPool);
+		.queueFamilyIndex=context->queueFamilyIndex,
+	}, VK_NULL_HANDLE, &context->commandPool);
 
 #ifdef _DEBUG
-	if(vkCreateDebugUtilsMessengerEXT&&vkCreateDebugUtilsMessengerEXT(Instance, &(VkDebugUtilsMessengerCreateInfoEXT)
+	if(vkCreateDebugUtilsMessengerEXT&&vkCreateDebugUtilsMessengerEXT(instance, &(VkDebugUtilsMessengerCreateInfoEXT)
 	{
 		.sType=VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
 		.messageSeverity=VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT|VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT|VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
@@ -403,25 +403,25 @@ VkBool32 CreateVulkanContext(VkInstance Instance, VkuContext_t *Context)
 }
 
 // Destroys a Vulkan context
-void DestroyVulkan(VkInstance Instance, VkuContext_t *Context)
+void DestroyVulkan(VkInstance instance, VkuContext_t *context)
 {
-	if(!Context)
+	if(!context)
 		return;
 
 	// Destroy general command pool
-	vkDestroyCommandPool(Context->Device, Context->CommandPool, VK_NULL_HANDLE);
+	vkDestroyCommandPool(context->device, context->commandPool, VK_NULL_HANDLE);
 
 	// Destroy pipeline cache
-	vkDestroyPipelineCache(Context->Device, Context->PipelineCache, VK_NULL_HANDLE);
+	vkDestroyPipelineCache(context->device, context->pipelineCache, VK_NULL_HANDLE);
 
 	// Destroy logical device
-	vkDestroyDevice(Context->Device, VK_NULL_HANDLE);
+	vkDestroyDevice(context->device, VK_NULL_HANDLE);
 
 	// Destroy rendering surface
-	vkDestroySurfaceKHR(Instance, Context->Surface, VK_NULL_HANDLE);
+	vkDestroySurfaceKHR(instance, context->surface, VK_NULL_HANDLE);
 
 #ifdef _DEBUG
 	if(vkDestroyDebugUtilsMessengerEXT)
-		vkDestroyDebugUtilsMessengerEXT(Instance, debugMessenger, VK_NULL_HANDLE);
+		vkDestroyDebugUtilsMessengerEXT(instance, debugMessenger, VK_NULL_HANDLE);
 #endif
 }

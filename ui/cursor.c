@@ -21,7 +21,7 @@ uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color)
 		.ID=ID,
 		.position=position,
 		.color=color,
-		.Cursor.radius=radius,
+		.cursor.radius=radius,
 	};
 
 	if(!List_Add(&UI->controls, &Control))
@@ -48,7 +48,7 @@ bool UI_UpdateCursor(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 co
 		Control->position=position;
 		Control->color=color;
 
-		Control->Cursor.radius=radius;
+		Control->cursor.radius=radius;
 
 		return true;
 	}
@@ -85,7 +85,7 @@ bool UI_UpdateCursorRadius(UI_t *UI, uint32_t ID, float radius)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_CURSOR)
 	{
-		Control->Cursor.radius=radius;
+		Control->cursor.radius=radius;
 		return true;
 	}
 

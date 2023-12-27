@@ -11,9 +11,9 @@
 #define FREE(p) { if(p) { free(p); p=NULL; } }
 #endif
 
-void rle_read(uint8_t *row, int32_t width, int32_t bpp, FILE *stream)
+static void rle_read(uint8_t *row, const uint32_t width, const uint8_t bpp, FILE *stream)
 {
-	int32_t pos=0, len, i;
+	uint32_t pos=0, len, i;
 	uint8_t header;
 
 	while(pos<width)
@@ -38,7 +38,7 @@ void rle_read(uint8_t *row, int32_t width, int32_t bpp, FILE *stream)
 	}
 }
 
-bool rle_type(uint8_t *data, uint16_t pos, uint16_t width, uint8_t bpp)
+static bool rle_type(uint8_t *data, const uint32_t pos, const uint32_t width, const uint8_t bpp)
 {
 	if(!memcmp(data+bpp*pos, data+bpp*(pos+1), bpp))
 	{
@@ -49,9 +49,9 @@ bool rle_type(uint8_t *data, uint16_t pos, uint16_t width, uint8_t bpp)
 	return false;
 }
 
-void rle_write(uint8_t *row, int32_t width, int32_t bpp, FILE *stream)
+static void rle_write(uint8_t *row, const uint32_t width, const uint8_t bpp, FILE *stream)
 {
-    uint16_t pos=0;
+    uint32_t pos=0;
 
 	while(pos<width)
 	{
@@ -108,24 +108,24 @@ void rle_write(uint8_t *row, int32_t width, int32_t bpp, FILE *stream)
 	}
 }
 
-bool TGA_Write(const char *filename, VkuImage_t *Image, bool rle)
+bool TGA_Write(const char *filename, VkuImage_t *image, bool rle)
 {
 	FILE *stream;
 	uint8_t IDLength=0;
-	uint8_t ColorMapType=0, ColorMapStart=0, ColorMapLength=0, ColorMapDepth=0;
-	uint16_t XOffset=0, YOffset=0, Width=Image->Width, Height=Image->Height;
-	uint8_t Depth=(uint8_t)Image->Depth, ImageDescriptor=0x20, ImageType;
+	uint8_t colorMapType=0, colorMapStart=0, colorMapLength=0, colorMapDepth=0;
+	uint16_t xOffset=0, yOffset=0, width=image->width, height=image->height;
+	uint8_t depth=(uint8_t)image->depth, imageDescriptor=0x20, imageType;
 
-	switch(Image->Depth)
+	switch(image->depth)
 	{
 		case 32:
 		case 24:
 		case 16:
-			ImageType=rle?10:2;
+			imageType=rle?10:2;
 			break;
 
 		case 8:
-			ImageType=rle?11:3;
+			imageType=rle?11:3;
 			break;
 
 		default:
@@ -136,66 +136,62 @@ bool TGA_Write(const char *filename, VkuImage_t *Image, bool rle)
 		return 0;
 
 	fwrite(&IDLength, sizeof(uint8_t), 1, stream);
-	fwrite(&ColorMapType, sizeof(uint8_t), 1, stream);
-	fwrite(&ImageType, sizeof(uint8_t), 1, stream);
-	fwrite(&ColorMapStart, sizeof(uint16_t), 1, stream);
-	fwrite(&ColorMapLength, sizeof(uint16_t), 1, stream);
-	fwrite(&ColorMapDepth, sizeof(uint8_t), 1, stream);
-	fwrite(&XOffset, sizeof(uint16_t), 1, stream);
-	fwrite(&YOffset, sizeof(uint16_t), 1, stream);
-	fwrite(&Width, sizeof(uint16_t), 1, stream);
-	fwrite(&Height, sizeof(uint16_t), 1, stream);
-	fwrite(&Depth, sizeof(uint8_t), 1, stream);
-	fwrite(&ImageDescriptor, sizeof(uint8_t), 1, stream);
+	fwrite(&colorMapType, sizeof(uint8_t), 1, stream);
+	fwrite(&imageType, sizeof(uint8_t), 1, stream);
+	fwrite(&colorMapStart, sizeof(uint16_t), 1, stream);
+	fwrite(&colorMapLength, sizeof(uint16_t), 1, stream);
+	fwrite(&colorMapDepth, sizeof(uint8_t), 1, stream);
+	fwrite(&xOffset, sizeof(uint16_t), 1, stream);
+	fwrite(&yOffset, sizeof(uint16_t), 1, stream);
+	fwrite(&width, sizeof(uint16_t), 1, stream);
+	fwrite(&height, sizeof(uint16_t), 1, stream);
+	fwrite(&depth, sizeof(uint8_t), 1, stream);
+	fwrite(&imageDescriptor, sizeof(uint8_t), 1, stream);
 
 	if(rle)
 	{
 		uint8_t *ptr;
-		int32_t i, bpp=Depth>>3;
+		int32_t i, bpp=depth>>3;
 
-		for(i=0, ptr=Image->Data;i<Height;i++, ptr+=Width*bpp)
-			rle_write(ptr, Width, bpp, stream);
+		for(i=0, ptr=image->data;i<height;i++, ptr+=width*bpp)
+			rle_write(ptr, width, bpp, stream);
 	}
 	else
-		fwrite(Image->Data, sizeof(uint8_t), Image->Width*Image->Height*(Image->Depth>>3), stream);
+		fwrite(image->data, sizeof(uint8_t), image->width*image->height*(image->depth>>3), stream);
 
 	fclose(stream);
 
 	return true;
 }
 
-bool TGA_Load(const char *Filename, VkuImage_t *Image)
+bool TGA_Load(const char *filename, VkuImage_t *image)
 {
 	FILE *stream=NULL;
-	uint8_t *ptr;
-	uint8_t IDLength;
-	uint8_t ColorMapType, ImageType;
-	uint16_t ColorMapStart, ColorMapLength;
-	uint8_t ColorMapDepth;
-	uint16_t XOffset, YOffset;
-	uint16_t Width, Height;
-	uint8_t Depth;
-	uint8_t ImageDescriptor;
-	int32_t i, bpp;
+	uint8_t IDLength=0;
+	uint8_t colorMapType=0, imageType=0;
+	uint16_t colorMapStart=0, colorMapLength=0;
+	uint8_t colorMapDepth=0;
+	uint16_t xOffset=0, yOffset=0, width=0, height=0;
+	uint8_t depth=0, imageDescriptor=0, bpp;
 
-	if((stream=fopen(Filename, "rb"))==NULL)
+	if((stream=fopen(filename, "rb"))==NULL)
 		return false;
 
 	fread(&IDLength, sizeof(uint8_t), 1, stream);
-	fread(&ColorMapType, sizeof(uint8_t), 1, stream);
-	fread(&ImageType, sizeof(uint8_t), 1, stream);
-	fread(&ColorMapStart, sizeof(uint16_t), 1, stream);
-	fread(&ColorMapLength, sizeof(uint16_t), 1, stream);
-	fread(&ColorMapDepth, sizeof(uint8_t), 1, stream);
-	fread(&XOffset, sizeof(uint16_t), 1, stream);
-	fread(&YOffset, sizeof(uint16_t), 1, stream);
-	fread(&Width, sizeof(uint16_t), 1, stream);
-	fread(&Height, sizeof(uint16_t), 1, stream);
-	fread(&Depth, sizeof(uint8_t), 1, stream);
-	fread(&ImageDescriptor, sizeof(uint8_t), 1, stream);
+	fread(&colorMapType, sizeof(uint8_t), 1, stream);
+	fread(&imageType, sizeof(uint8_t), 1, stream);
+	fread(&colorMapStart, sizeof(uint16_t), 1, stream);
+	fread(&colorMapLength, sizeof(uint16_t), 1, stream);
+	fread(&colorMapDepth, sizeof(uint8_t), 1, stream);
+	fread(&xOffset, sizeof(uint16_t), 1, stream);
+	fread(&yOffset, sizeof(uint16_t), 1, stream);
+	fread(&width, sizeof(uint16_t), 1, stream);
+	fread(&height, sizeof(uint16_t), 1, stream);
+	fread(&depth, sizeof(uint8_t), 1, stream);
+	fread(&imageDescriptor, sizeof(uint8_t), 1, stream);
 	fseek(stream, IDLength, SEEK_CUR);
 
-	switch(ImageType)
+	switch(imageType)
 	{
 		case 11:
 		case 10:
@@ -208,26 +204,28 @@ bool TGA_Load(const char *Filename, VkuImage_t *Image)
 			return false;
 	}
 
-	switch(Depth)
+	switch(depth)
 	{
 		case 32:
 		case 24:
 		case 16:
 		case 8:
-			bpp=Depth>>3;
+			bpp=depth>>3;
 
-			Image->Data=(uint8_t *)Zone_Malloc(Zone, Width*Height*bpp);
+			image->data=(uint8_t *)Zone_Malloc(zone, width*height*bpp);
 
-			if(Image->Data==NULL)
+			if(image->data==NULL)
 				return false;
 
-			if(ImageType==10||ImageType==11)
+			if(imageType==10||imageType==11)
 			{
-				for(i=0, ptr=(uint8_t *)Image->Data;i<Height;i++, ptr+=Width*bpp)
-					rle_read(ptr, Width, bpp, stream);
+				uint8_t *ptr=(uint8_t *)image->data;
+
+				for(uint32_t i=0;i<height;i++, ptr+=width*bpp)
+					rle_read(ptr, width, bpp, stream);
 			}
 			else
-				fread(Image->Data, sizeof(uint8_t), Width*Height*bpp, stream);
+				fread(image->data, sizeof(uint8_t), width*height*bpp, stream);
 			break;
 
 		default:
@@ -237,28 +235,28 @@ bool TGA_Load(const char *Filename, VkuImage_t *Image)
 
 	fclose(stream);
 
-	if(!(ImageDescriptor&0x20))
+	if(!(imageDescriptor&0x20))
 	{
-		int32_t Scanline=Width*bpp, Size=Scanline*Height;
-		uint8_t *Buffer=(uint8_t *)Zone_Malloc(Zone, Size);
+		int32_t scanline=width*bpp, size=scanline*height;
+		uint8_t *buffer=(uint8_t *)Zone_Malloc(zone, size);
 
-		if(Buffer==NULL)
+		if(buffer==NULL)
 		{
-			Zone_Free(Zone, Image->Data);
+			Zone_Free(zone, image->data);
 			return false;
 		}
 
-		for(i=0;i<Height;i++)
-			memcpy(Buffer+(Size-(i+1)*Scanline), Image->Data+i*Scanline, Scanline);
+		for(uint32_t i=0;i<height;i++)
+			memcpy(buffer+(size-(i+1)*scanline), image->data+i*scanline, scanline);
 
-		memcpy(Image->Data, Buffer, Size);
+		memcpy(image->data, buffer, size);
 
-		Zone_Free(Zone, Buffer);
+		Zone_Free(zone, buffer);
 	}
 
-	Image->Width=Width;
-	Image->Height=Height;
-	Image->Depth=Depth;
+	image->width=width;
+	image->height=height;
+	image->depth=depth;
 
 	return true;
 }

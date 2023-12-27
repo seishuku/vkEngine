@@ -1,51 +1,51 @@
 #include "vulkan.h"
 
-VkBool32 vkuFramebufferAddAttachment(VkuFramebuffer_t *Framebuffer, VkImageView Attachment)
+VkBool32 vkuFramebufferAddAttachment(VkuFramebuffer_t *framebuffer, VkImageView attachment)
 {
-	if(!Framebuffer)
+	if(!framebuffer)
 		return VK_FALSE;
 
-	if(Framebuffer->NumAttachments>=VKU_MAX_FRAMEBUFFER_ATTACHMENTS)
+	if(framebuffer->numAttachments>=VKU_MAX_FRAMEBUFFER_ATTACHMENTS)
 		return VK_FALSE;
 
-	Framebuffer->Attachments[Framebuffer->NumAttachments++]=Attachment;
+	framebuffer->attachments[framebuffer->numAttachments++]=attachment;
 
 	return VK_TRUE;
 }
 
-VkBool32 vkuInitFramebuffer(VkuFramebuffer_t *Framebuffer, VkuContext_t *Context, VkRenderPass RenderPass)
+VkBool32 vkuInitFramebuffer(VkuFramebuffer_t *framebuffer, VkuContext_t *context, VkRenderPass renderPass)
 {
-	if(!Framebuffer)
+	if(!framebuffer)
 		return VK_FALSE;
 
-	if(!Context)
+	if(!context)
 		return VK_FALSE;
 
-	Framebuffer->Device=Context->Device;
-	Framebuffer->RenderPass=RenderPass;
+	framebuffer->device=context->device;
+	framebuffer->renderPass=renderPass;
 
-	Framebuffer->NumAttachments=0;
-	memset(Framebuffer->Attachments, 0, sizeof(VkImageView)*VKU_MAX_FRAMEBUFFER_ATTACHMENTS);
+	framebuffer->numAttachments=0;
+	memset(framebuffer->attachments, 0, sizeof(VkImageView)*VKU_MAX_FRAMEBUFFER_ATTACHMENTS);
 
 	return VK_TRUE;
 }
 
-VkBool32 vkuFramebufferCreate(VkuFramebuffer_t *Framebuffer, VkExtent2D Size)
+VkBool32 vkuFramebufferCreate(VkuFramebuffer_t *framebuffer, VkExtent2D size)
 {
 	VkFramebufferCreateInfo FramebufferCreateInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 		.pNext=VK_NULL_HANDLE,
 		.flags=0,
-		.renderPass=Framebuffer->RenderPass,
-		.attachmentCount=Framebuffer->NumAttachments,
-		.pAttachments=Framebuffer->Attachments,
-		.width=Size.width,
-		.height=Size.height,
+		.renderPass=framebuffer->renderPass,
+		.attachmentCount=framebuffer->numAttachments,
+		.pAttachments=framebuffer->attachments,
+		.width=size.width,
+		.height=size.height,
 		.layers=1,
 	};
 
-	if(vkCreateFramebuffer(Framebuffer->Device, &FramebufferCreateInfo, 0, &Framebuffer->Framebuffer)!=VK_SUCCESS)
+	if(vkCreateFramebuffer(framebuffer->device, &FramebufferCreateInfo, 0, &framebuffer->framebuffer)!=VK_SUCCESS)
 		return VK_FALSE;
 
 	return VK_TRUE;

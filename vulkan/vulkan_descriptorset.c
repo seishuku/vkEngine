@@ -8,123 +8,123 @@
 #include "vulkan.h"
 
 // Add a binding to the descriptor set layout
-VkBool32 vkuDescriptorSet_AddBinding(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkDescriptorType Type, VkShaderStageFlags Stage)
+VkBool32 vkuDescriptorSet_AddBinding(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkDescriptorType type, VkShaderStageFlags stage)
 {
-	if(!DescriptorSet)
+	if(!descriptorSet)
 		return VK_FALSE;
 
-	if(Binding>=VKU_MAX_DESCRIPTORSET_BINDINGS)
+	if(binding>=VKU_MAX_DESCRIPTORSET_BINDINGS)
 		return VK_FALSE;
 
 	VkDescriptorSetLayoutBinding DescriptorSetLayoutBinding=
 	{
-		.binding=Binding,
-		.descriptorType=Type,
+		.binding=binding,
+		.descriptorType=type,
 		.descriptorCount=1,
-		.stageFlags=Stage,
+		.stageFlags=stage,
 		.pImmutableSamplers=VK_NULL_HANDLE
 	};
 
-	DescriptorSet->Bindings[Binding]=DescriptorSetLayoutBinding;
+	descriptorSet->bindings[binding]=DescriptorSetLayoutBinding;
 
-	VkWriteDescriptorSet WriteDescriptorSet=
+	VkWriteDescriptorSet writeDescriptorSet=
 	{
 		.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-		.dstBinding=Binding,
+		.dstBinding=binding,
 		.descriptorCount=1,
-		.descriptorType=DescriptorSet->Bindings[Binding].descriptorType,
-		.pBufferInfo=&DescriptorSet->BufferInfo[Binding],
-		.pImageInfo=&DescriptorSet->ImageInfo[Binding],
+		.descriptorType=descriptorSet->bindings[binding].descriptorType,
+		.pBufferInfo=&descriptorSet->bufferInfo[binding],
+		.pImageInfo=&descriptorSet->imageInfo[binding],
 	};
 
-	DescriptorSet->WriteDescriptorSet[Binding]=WriteDescriptorSet;
+	descriptorSet->writeDescriptorSet[binding]=writeDescriptorSet;
 
-	DescriptorSet->NumBindings++;
-
-	return VK_TRUE;
-}
-
-VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkuImage_t *Image)
-{
-	if(!DescriptorSet||!Image)
-		return VK_FALSE;
-
-	if(Binding>=VKU_MAX_DESCRIPTORSET_BINDINGS)
-		return VK_FALSE;
-
-	DescriptorSet->ImageInfo[Binding]=(VkDescriptorImageInfo) { Image->Sampler, Image->View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+	descriptorSet->numBindings++;
 
 	return VK_TRUE;
 }
 
-VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *DescriptorSet, uint32_t Binding, VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Range)
+VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkuImage_t *image)
 {
-	if(!DescriptorSet)
+	if(!descriptorSet||!image)
 		return VK_FALSE;
 
-	if(Binding>=VKU_MAX_DESCRIPTORSET_BINDINGS)
+	if(binding>=VKU_MAX_DESCRIPTORSET_BINDINGS)
 		return VK_FALSE;
 
-	DescriptorSet->BufferInfo[Binding]=(VkDescriptorBufferInfo){ Buffer, Offset, Range };
+	descriptorSet->imageInfo[binding]=(VkDescriptorImageInfo) { image->sampler, image->imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+
+	return VK_TRUE;
+}
+
+VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range)
+{
+	if(!descriptorSet)
+		return VK_FALSE;
+
+	if(binding>=VKU_MAX_DESCRIPTORSET_BINDINGS)
+		return VK_FALSE;
+
+	descriptorSet->bufferInfo[binding]=(VkDescriptorBufferInfo){ buffer, offset, range };
 
 	return VK_TRUE;
 }
 
 // Initialize the descriptor set layout structures
-VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *DescriptorSet, VkuContext_t *Context)
+VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *descriptorSet, VkuContext_t *context)
 {
-	if(!DescriptorSet||!Context)
+	if(!descriptorSet||!context)
 		return VK_FALSE;
 
-	DescriptorSet->Device=Context->Device;
+	descriptorSet->device=context->device;
 
-	DescriptorSet->NumBindings=0;
+	descriptorSet->numBindings=0;
 
-	memset(DescriptorSet->Bindings, 0, sizeof(VkDescriptorSetLayout)*VKU_MAX_DESCRIPTORSET_BINDINGS);
-	memset(DescriptorSet->WriteDescriptorSet, 0, sizeof(VkWriteDescriptorSet)*VKU_MAX_DESCRIPTORSET_BINDINGS);
+	memset(descriptorSet->bindings, 0, sizeof(VkDescriptorSetLayout)*VKU_MAX_DESCRIPTORSET_BINDINGS);
+	memset(descriptorSet->writeDescriptorSet, 0, sizeof(VkWriteDescriptorSet)*VKU_MAX_DESCRIPTORSET_BINDINGS);
 
-	DescriptorSet->DescriptorSet=VK_NULL_HANDLE;
+	descriptorSet->descriptorSet=VK_NULL_HANDLE;
 
 	return VK_TRUE;
 }
 
 // Creates the descriptor set layout
-VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSet_t *DescriptorSet)
+VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSet_t *descriptorSet)
 {
-	if(!DescriptorSet)
+	if(!descriptorSet)
 		return VK_FALSE;
 
 	VkDescriptorSetLayoutCreateInfo LayoutCreateInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-		.bindingCount=DescriptorSet->NumBindings,
-		.pBindings=DescriptorSet->Bindings,
+		.bindingCount=descriptorSet->numBindings,
+		.pBindings=descriptorSet->bindings,
 	};
 
-	if(vkCreateDescriptorSetLayout(DescriptorSet->Device, &LayoutCreateInfo, NULL, &DescriptorSet->DescriptorSetLayout)!=VK_SUCCESS)
+	if(vkCreateDescriptorSetLayout(descriptorSet->device, &LayoutCreateInfo, NULL, &descriptorSet->descriptorSetLayout)!=VK_SUCCESS)
 		return VK_FALSE;
 
 	return VK_TRUE;
 }
 
-VkBool32 vkuAllocateUpdateDescriptorSet(VkuDescriptorSet_t *DescriptorSet, VkDescriptorPool DescriptorPool)
+VkBool32 vkuAllocateUpdateDescriptorSet(VkuDescriptorSet_t *descriptorSet, VkDescriptorPool descriptorPool)
 {
 	VkDescriptorSetAllocateInfo AllocateInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-		.descriptorPool=DescriptorPool,
+		.descriptorPool=descriptorPool,
 		.descriptorSetCount=1,
-		.pSetLayouts=&DescriptorSet->DescriptorSetLayout,
+		.pSetLayouts=&descriptorSet->descriptorSetLayout,
 	};
 
-	//if(DescriptorSet->DescriptorSet==VK_NULL_HANDLE)
-		vkAllocateDescriptorSets(DescriptorSet->Device, &AllocateInfo, &DescriptorSet->DescriptorSet);
+	//if(descriptorSet->descriptorSet==VK_NULL_HANDLE)
+		vkAllocateDescriptorSets(descriptorSet->device, &AllocateInfo, &descriptorSet->descriptorSet);
 
 	// Need to update destination set handle now that one has been allocated.
-	for(uint32_t i=0;i<DescriptorSet->NumBindings;i++)
-		DescriptorSet->WriteDescriptorSet[i].dstSet=DescriptorSet->DescriptorSet;
+	for(uint32_t i=0;i<descriptorSet->numBindings;i++)
+		descriptorSet->writeDescriptorSet[i].dstSet=descriptorSet->descriptorSet;
 
-	vkUpdateDescriptorSets(DescriptorSet->Device, DescriptorSet->NumBindings, DescriptorSet->WriteDescriptorSet, 0, VK_NULL_HANDLE);
+	vkUpdateDescriptorSets(descriptorSet->device, descriptorSet->numBindings, descriptorSet->writeDescriptorSet, 0, VK_NULL_HANDLE);
 
 	return VK_TRUE;
 }

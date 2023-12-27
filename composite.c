@@ -48,7 +48,7 @@ VkFramebuffer gaussianFramebufferBlur[2];
 
 bool CreateThresholdPipeline(void)
 {
-	vkCreateRenderPass(vkContext.Device, &(VkRenderPassCreateInfo)
+	vkCreateRenderPass(vkContext.device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.attachmentCount=1,
@@ -104,11 +104,11 @@ bool CreateThresholdPipeline(void)
 	vkuDescriptorSet_AddBinding(&thresholdDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&thresholdDescriptorSet);
 
-	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
-		.pSetLayouts=&thresholdDescriptorSet.DescriptorSetLayout,
+		.pSetLayouts=&thresholdDescriptorSet.descriptorSetLayout,
 	}, 0, &thresholdPipelineLayout);
 
 	vkuInitPipeline(&thresholdPipeline, &vkContext);
@@ -116,8 +116,8 @@ bool CreateThresholdPipeline(void)
 	vkuPipeline_SetPipelineLayout(&thresholdPipeline, thresholdPipelineLayout);
 	vkuPipeline_SetRenderPass(&thresholdPipeline, thresholdRenderPass);
 
-	thresholdPipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	thresholdPipeline.CullMode=VK_CULL_MODE_FRONT_BIT;
+	thresholdPipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	thresholdPipeline.cullMode=VK_CULL_MODE_FRONT_BIT;
 
 	if(!vkuPipeline_AddStage(&thresholdPipeline, "shaders/fullscreen.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
@@ -140,7 +140,7 @@ bool CreateThresholdPipeline(void)
 
 bool CreateGaussianPipeline(void)
 {
-	vkCreateRenderPass(vkContext.Device, &(VkRenderPassCreateInfo)
+	vkCreateRenderPass(vkContext.device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.attachmentCount=1,
@@ -196,11 +196,11 @@ bool CreateGaussianPipeline(void)
 	vkuDescriptorSet_AddBinding(&gaussianDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&gaussianDescriptorSet);
 
-	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
-		.pSetLayouts=&gaussianDescriptorSet.DescriptorSetLayout,
+		.pSetLayouts=&gaussianDescriptorSet.descriptorSetLayout,
 		.pushConstantRangeCount=1,
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
@@ -214,8 +214,8 @@ bool CreateGaussianPipeline(void)
 	vkuPipeline_SetPipelineLayout(&gaussianPipeline, gaussianPipelineLayout);
 	vkuPipeline_SetRenderPass(&gaussianPipeline, gaussianRenderPass);
 
-	gaussianPipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	gaussianPipeline.CullMode=VK_CULL_MODE_FRONT_BIT;
+	gaussianPipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	gaussianPipeline.cullMode=VK_CULL_MODE_FRONT_BIT;
 
 	if(!vkuPipeline_AddStage(&gaussianPipeline, "shaders/fullscreen.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
@@ -248,49 +248,49 @@ void CreateCompositeFramebuffers(uint32_t eye)
 	}
 	else
 	{
-		targetWidth=swapchain.Extent.width;
-		targetHeight=swapchain.Extent.height;
+		targetWidth=swapchain.extent.width;
+		targetHeight=swapchain.extent.height;
 	}
 
 	vkuCreateTexture2D(&vkContext, &colorTemp[eye], targetWidth>>2, targetHeight>>2, colorFormat, VK_SAMPLE_COUNT_1_BIT);
 	vkuCreateTexture2D(&vkContext, &colorBlur[eye], targetWidth>>2, targetHeight>>2, colorFormat, VK_SAMPLE_COUNT_1_BIT);
 
 	VkCommandBuffer commandBuffer=vkuOneShotCommandBufferBegin(&vkContext);
-	vkuTransitionLayout(commandBuffer, colorTemp[eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuTransitionLayout(commandBuffer, colorBlur[eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, colorTemp[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, colorBlur[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuOneShotCommandBufferEnd(&vkContext, commandBuffer);
 
 	// Threshold framebuffer contains 1/4 sized final main render frame, outputs to ColorBlur image
-	vkCreateFramebuffer(vkContext.Device, &(VkFramebufferCreateInfo)
+	vkCreateFramebuffer(vkContext.device, &(VkFramebufferCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 		.renderPass=thresholdRenderPass,
 		.attachmentCount=1,
-		.pAttachments=(VkImageView[]){ colorBlur[eye].View },
+		.pAttachments=(VkImageView[]){ colorBlur[eye].imageView },
 		.width=targetWidth>>2,
 		.height=targetHeight>>2,
 		.layers=1,
 	}, 0, &thresholdFramebuffer[eye]);
 
 	// Gussian temp frame buffer takes output of thresholding pipeline and does the first gaussian blur pass, outputs to ColorTemp
-	vkCreateFramebuffer(vkContext.Device, &(VkFramebufferCreateInfo)
+	vkCreateFramebuffer(vkContext.device, &(VkFramebufferCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 		.renderPass=gaussianRenderPass,
 		.attachmentCount=1,
-		.pAttachments=(VkImageView[]){ colorTemp[eye].View },
+		.pAttachments=(VkImageView[]){ colorTemp[eye].imageView },
 		.width=targetWidth>>2,
 		.height=targetHeight>>2,
 		.layers=1,
 	}, 0, &gaussianFramebufferTemp[eye]);
 
 	// Gussian blur frame buffer takes output of first pass gaussian blur and does the second gaussian blur pass, outputs to ColorBlur
-	vkCreateFramebuffer(vkContext.Device, &(VkFramebufferCreateInfo)
+	vkCreateFramebuffer(vkContext.device, &(VkFramebufferCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 		.renderPass=gaussianRenderPass,
 		.attachmentCount=1,
-		.pAttachments=(VkImageView[]){ colorBlur[eye].View },
+		.pAttachments=(VkImageView[]){ colorBlur[eye].imageView },
 		.width=targetWidth>>2,
 		.height=targetHeight>>2,
 		.layers=1,
@@ -299,14 +299,14 @@ void CreateCompositeFramebuffers(uint32_t eye)
 	if(!isVR)
 	{
 		// Compositing pipeline images, these are the actual swapchain framebuffers that will get presented
-		for(uint32_t i=0;i<swapchain.NumImages;i++)
+		for(uint32_t i=0;i<swapchain.numImages;i++)
 		{
-			vkCreateFramebuffer(vkContext.Device, &(VkFramebufferCreateInfo)
+			vkCreateFramebuffer(vkContext.device, &(VkFramebufferCreateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 				.renderPass=compositeRenderPass,
 				.attachmentCount=1,
-				.pAttachments=(VkImageView[]){ swapchain.ImageView[i] },
+				.pAttachments=(VkImageView[]){ swapchain.imageView[i] },
 				.width=targetWidth,
 				.height=targetHeight,
 				.layers=1,
@@ -318,7 +318,7 @@ void CreateCompositeFramebuffers(uint32_t eye)
 		// Compositing pipeline images, these are the actual swapchain framebuffers that will get presented
 		for(uint32_t i=0;i<xrContext.swapchain[0].numImages;i++)
 		{
-			vkCreateFramebuffer(vkContext.Device, &(VkFramebufferCreateInfo)
+			vkCreateFramebuffer(vkContext.device, &(VkFramebufferCreateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 				.renderPass=compositeRenderPass,
@@ -329,7 +329,7 @@ void CreateCompositeFramebuffers(uint32_t eye)
 				.layers=1,
 			}, 0, &perFrame[i].compositeFramebuffer[0]);
 
-			vkCreateFramebuffer(vkContext.Device, &(VkFramebufferCreateInfo)
+			vkCreateFramebuffer(vkContext.device, &(VkFramebufferCreateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 				.renderPass=compositeRenderPass,
@@ -352,7 +352,7 @@ bool CreateCompositePipeline(void)
 	if(!isVR)
 	{
 		attachementFinalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		surfaceFormat=swapchain.SurfaceFormat.format;
+		surfaceFormat=swapchain.surfaceFormat.format;
 	}
 	else
 	{
@@ -360,7 +360,7 @@ bool CreateCompositePipeline(void)
 		surfaceFormat=xrContext.swapchainFormat;
 	}
 
-	vkCreateRenderPass(vkContext.Device, &(VkRenderPassCreateInfo)
+	vkCreateRenderPass(vkContext.device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.attachmentCount=1,
@@ -409,11 +409,11 @@ bool CreateCompositePipeline(void)
 
 	vkuAssembleDescriptorSetLayout(&compositeDescriptorSet);
 
-	vkCreatePipelineLayout(vkContext.Device, &(VkPipelineLayoutCreateInfo)
+	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
-		.pSetLayouts=&compositeDescriptorSet.DescriptorSetLayout,
+		.pSetLayouts=&compositeDescriptorSet.descriptorSetLayout,
 	}, 0, &compositePipelineLayout);
 
 	vkuInitPipeline(&compositePipeline, &vkContext);
@@ -421,8 +421,8 @@ bool CreateCompositePipeline(void)
 	vkuPipeline_SetPipelineLayout(&compositePipeline, compositePipelineLayout);
 	vkuPipeline_SetRenderPass(&compositePipeline, compositeRenderPass);
 
-	compositePipeline.Topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	compositePipeline.CullMode=VK_CULL_MODE_FRONT_BIT;
+	compositePipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	compositePipeline.cullMode=VK_CULL_MODE_FRONT_BIT;
 
 	if(!vkuPipeline_AddStage(&compositePipeline, "shaders/fullscreen.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
 		return false;
@@ -434,7 +434,7 @@ bool CreateCompositePipeline(void)
 	//{
 	//	.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
 	//	.colorAttachmentCount=1,
-	//	.pColorAttachmentFormats=&Swapchain.SurfaceFormat.format,
+	//	.pColorAttachmentFormats=&swapchain.surfaceFormat.format,
 	//};
 
 	if(!vkuAssemblePipeline(&compositePipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
@@ -449,49 +449,49 @@ bool CreateCompositePipeline(void)
 void DestroyComposite(void)
 {
 	// Thresholding pipeline
-	vkDestroyDescriptorSetLayout(vkContext.Device, thresholdDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(vkContext.device, thresholdDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
 
-	vkDestroyFramebuffer(vkContext.Device, thresholdFramebuffer[0], VK_NULL_HANDLE);
+	vkDestroyFramebuffer(vkContext.device, thresholdFramebuffer[0], VK_NULL_HANDLE);
 
 	if(isVR)
-		vkDestroyFramebuffer(vkContext.Device, thresholdFramebuffer[1], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(vkContext.device, thresholdFramebuffer[1], VK_NULL_HANDLE);
 
-	vkDestroyPipeline(vkContext.Device, thresholdPipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.Device, thresholdPipelineLayout, VK_NULL_HANDLE);
-	vkDestroyRenderPass(vkContext.Device, thresholdRenderPass, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.device, thresholdPipeline.pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.device, thresholdPipelineLayout, VK_NULL_HANDLE);
+	vkDestroyRenderPass(vkContext.device, thresholdRenderPass, VK_NULL_HANDLE);
 	//////
 
 	// Gaussian blur pipeline
-	vkDestroyDescriptorSetLayout(vkContext.Device, gaussianDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(vkContext.device, gaussianDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
 
-	vkDestroyFramebuffer(vkContext.Device, gaussianFramebufferTemp[0], VK_NULL_HANDLE);
-	vkDestroyFramebuffer(vkContext.Device, gaussianFramebufferBlur[0], VK_NULL_HANDLE);
+	vkDestroyFramebuffer(vkContext.device, gaussianFramebufferTemp[0], VK_NULL_HANDLE);
+	vkDestroyFramebuffer(vkContext.device, gaussianFramebufferBlur[0], VK_NULL_HANDLE);
 
 	if(isVR)
 	{
-		vkDestroyFramebuffer(vkContext.Device, gaussianFramebufferTemp[1], VK_NULL_HANDLE);
-		vkDestroyFramebuffer(vkContext.Device, gaussianFramebufferBlur[1], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(vkContext.device, gaussianFramebufferTemp[1], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(vkContext.device, gaussianFramebufferBlur[1], VK_NULL_HANDLE);
 	}
 
-	vkDestroyPipeline(vkContext.Device, gaussianPipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.Device, gaussianPipelineLayout, VK_NULL_HANDLE);
-	vkDestroyRenderPass(vkContext.Device, gaussianRenderPass, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.device, gaussianPipeline.pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.device, gaussianPipelineLayout, VK_NULL_HANDLE);
+	vkDestroyRenderPass(vkContext.device, gaussianRenderPass, VK_NULL_HANDLE);
 	//////
 
 	// Compositing pipeline
-	vkDestroyDescriptorSetLayout(vkContext.Device, compositeDescriptorSet.DescriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(vkContext.device, compositeDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
 
-	for(uint32_t i=0;i<swapchain.NumImages;i++)
+	for(uint32_t i=0;i<swapchain.numImages;i++)
 	{
-		vkDestroyFramebuffer(vkContext.Device, perFrame[i].compositeFramebuffer[0], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(vkContext.device, perFrame[i].compositeFramebuffer[0], VK_NULL_HANDLE);
 
 		if(isVR)
-			vkDestroyFramebuffer(vkContext.Device, perFrame[i].compositeFramebuffer[1], VK_NULL_HANDLE);
+			vkDestroyFramebuffer(vkContext.device, perFrame[i].compositeFramebuffer[1], VK_NULL_HANDLE);
 	}
 
-	vkDestroyPipeline(vkContext.Device, compositePipeline.Pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.Device, compositePipelineLayout, VK_NULL_HANDLE);
-	vkDestroyRenderPass(vkContext.Device, compositeRenderPass, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.device, compositePipeline.pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.device, compositePipelineLayout, VK_NULL_HANDLE);
+	vkDestroyRenderPass(vkContext.device, compositeRenderPass, VK_NULL_HANDLE);
 	//////
 }
 
@@ -506,15 +506,15 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	}
 	else
 	{
-		width=swapchain.Extent.width;
-		height=swapchain.Extent.height;
+		width=swapchain.extent.width;
+		height=swapchain.extent.height;
 	}
 
 	// Threshold and down sample to 1/4 original image size
 	// Input = colorResolve
 	// Output = colorBlur
-	//vkuTransitionLayout(perFrame[index].commandBuffer, colorResolve[eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	//vkuTransitionLayout(perFrame[index].commandBuffer, colorBlur[eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	//vkuTransitionLayout(perFrame[index].commandBuffer, colorResolve[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	//vkuTransitionLayout(perFrame[index].commandBuffer, colorBlur[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 	//vkCmdBeginRendering(perFrame[index].commandBuffer, &(VkRenderingInfo)
 	//{
@@ -525,7 +525,7 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	//	.pColorAttachments=&(VkRenderingAttachmentInfo)
 	//	{
 	//		.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-	//		.imageView=colorBlur[Eye].View,
+	//		.imageView=colorBlur[Eye].imageView,
 	//		.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	//		.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 	//		.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
@@ -544,12 +544,12 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)(width>>2), (float)(height>>2), 0.0f, 1.0f });
 	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { width>>2, height>>2 } });
 
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, thresholdPipeline.Pipeline);
+	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, thresholdPipeline.pipeline);
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&thresholdDescriptorSet, 0, &colorResolve[eye]);
 
 	vkuAllocateUpdateDescriptorSet(&thresholdDescriptorSet, perFrame[index].descriptorPool);
-	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, thresholdPipelineLayout, 0, 1, &thresholdDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
+	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, thresholdPipelineLayout, 0, 1, &thresholdDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
 
@@ -560,8 +560,8 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	// Gaussian blur (vertical)
 	// Input = colorBlur
 	// Output = colorTemp
-	//vkuTransitionLayout(perFrame[index].commandBuffer, colorBlur[eye] .Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	//vkuTransitionLayout(perFrame[index].commandBuffer, colorTemp[eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	//vkuTransitionLayout(perFrame[index].commandBuffer, colorBlur[eye] .image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	//vkuTransitionLayout(perFrame[index].commandBuffer, colorTemp[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 	//vkCmdBeginRendering(perFrame[index].commandBuffer, &(VkRenderingInfo)
 	//{
@@ -572,7 +572,7 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	//	.pColorAttachments=&(VkRenderingAttachmentInfo)
 	//	{
 	//		.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-	//		.imageView=colorTemp[Eye].View,
+	//		.imageView=colorTemp[Eye].imageView,
 	//		.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	//		.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 	//		.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
@@ -591,14 +591,14 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)(width>>2), (float)(height>>2), 0.0f, 1.0f });
 	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { width>>2, height>>2 } });
 
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.Pipeline);
+	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipeline);
 
 	vkCmdPushConstants(perFrame[index].commandBuffer, gaussianPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*2, &(float[]){ 1.0f, 0.0 });
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianDescriptorSet, 0, &colorBlur[eye]);
 	vkuAllocateUpdateDescriptorSet(&gaussianDescriptorSet, perFrame[index].descriptorPool);
 
-	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipelineLayout, 0, 1, &gaussianDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
+	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipelineLayout, 0, 1, &gaussianDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
 
@@ -609,8 +609,8 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	// Gaussian blur (horizontal)
 	// Input = colorTemp
 	// Output = colorBlur
-	//vkuTransitionLayout(perFrame[index].commandBuffer, colorTemp[eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	//vkuTransitionLayout(perFrame[index].commandBuffer, colorBlur[eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	//vkuTransitionLayout(perFrame[index].commandBuffer, colorTemp[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	//vkuTransitionLayout(perFrame[index].commandBuffer, colorBlur[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 	//vkCmdBeginRendering(perFrame[index].commandBuffer, &(VkRenderingInfo)
 	//{
@@ -622,7 +622,7 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	//	.pColorAttachments=&(VkRenderingAttachmentInfo)
 	//	{
 	//		.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-	//		.imageView=colorBlur[Eye].View,
+	//		.imageView=colorBlur[Eye].imageView,
 	//		.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	//		.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 	//		.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
@@ -641,14 +641,14 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)(width>>2), (float)(height>>2), 0.0f, 1.0f });
 	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { width>>2, height>>2 } });
 
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.Pipeline);
+	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipeline);
 
 	vkCmdPushConstants(perFrame[index].commandBuffer, gaussianPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*2, &(float[]){ 0.0f, 1.0 });
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianDescriptorSet, 0, &colorTemp[eye]);
 	vkuAllocateUpdateDescriptorSet(&gaussianDescriptorSet, perFrame[index].descriptorPool);
 
-	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipelineLayout, 0, 1, &gaussianDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
+	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipelineLayout, 0, 1, &gaussianDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
 
@@ -658,10 +658,10 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 
 	// Draw final composited image
 	// Input = colorResolve, colorBlur
-	// Output = Swapchain
+	// Output = swapchain
 	// NOTE: ColorResolve should already be in shader read-only
-	//vkuTransitionLayout(perFrame[index].commandBuffer, colorBlur[eye].Image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	//vkuTransitionLayout(perFrame[index].commandBuffer, Swapchain.Image[index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	//vkuTransitionLayout(perFrame[index].commandBuffer, colorBlur[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	//vkuTransitionLayout(perFrame[index].commandBuffer, swapchain.image[index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 	//vkCmdBeginRendering(perFrame[index].commandBuffer, &(VkRenderingInfo)
 	//{
@@ -673,7 +673,7 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	//	.pColorAttachments=&(VkRenderingAttachmentInfo)
 	//	{
 	//		.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-	//		.imageView=Swapchain.ImageView[index],
+	//		.imageView=swapchain.imageView[index],
 	//		.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	//		.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 	//		.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
@@ -692,14 +692,14 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)width, (float)height, 0.0f, 1.0f });
 	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { width, height } });
 
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipeline.Pipeline);
+	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipeline.pipeline);
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&compositeDescriptorSet, 0, &colorResolve[eye]);
 //	vkuDescriptorSet_UpdateBindingImageInfo(&compositeDescriptorSet, 0, &shadowDepth);
 	vkuDescriptorSet_UpdateBindingImageInfo(&compositeDescriptorSet, 1, &colorBlur[eye]);
 
 	vkuAllocateUpdateDescriptorSet(&compositeDescriptorSet, perFrame[index].descriptorPool);
-	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipelineLayout, 0, 1, &compositeDescriptorSet.DescriptorSet, 0, VK_NULL_HANDLE);
+	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipelineLayout, 0, 1, &compositeDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
 
