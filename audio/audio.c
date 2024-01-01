@@ -44,7 +44,7 @@ static HRIR_Sphere_t sphere;
 
 #define MAX_VOLUME 128
 
-#define MAX_CHANNELS 128
+#define MAX_CHANNELS 32
 
 typedef struct
 {

@@ -619,7 +619,7 @@ static bool VR_InitSwapchain(XruContext_t *xrContext, VkuContext_t *Context)
 
 		for(uint32_t j=0;j<xrContext->swapchain[i].numImages;j++)
 		{
-			vkuTransitionLayout(CommandBuffer, xrContext->swapchain[i].images[j].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+			vkuTransitionLayout(CommandBuffer, xrContext->swapchain[i].images[j].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 			vkCreateImageView(Context->device, &(VkImageViewCreateInfo)
 			{

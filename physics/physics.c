@@ -68,7 +68,7 @@ void PhysicsIntegrate(RigidBody_t *body, float dt)
 	vec3 axis=body->angularVelocity;
 	Vec3_Normalize(&axis);
 
-	body->orientation=QuatMultiply(body->orientation, QuatAnglev(dt, axis));
+	body->orientation=QuatMultiply(QuatAnglev(dt, axis), body->orientation);
 
 	apply_constraints(body);
 }
@@ -90,6 +90,97 @@ void PhysicsExplode(RigidBody_t *body)
 	// Add it into object's velocity
 	body->velocity=Vec3_Addv(body->velocity, force);
 }
+
+#if 0
+void PhysicsCollisionResponse(void *a, PhysicsObjectType aType, void *b, PhysicsObjectType bType)
+{
+	vec3 aPosition, bPosition;
+	vec3 aVelocity, bVelocity;
+	vec3 aAngularVelocity, bAngularVelocity;
+	float aRadius, bRadius;
+	float aInvMass, bInvMass;
+	float aInvInertia, bInvInertia;
+
+	switch(aType)
+	{
+		case PHYSICS_OBJECT_SPHERE:
+		{
+			RigidBody_t *aRigidBody=(RigidBody_t *)a;
+
+			aPosition=aRigidBody->position;
+			aVelocity=aRigidBody->velocity;
+			aAngularVelocity=aRigidBody->angularVelocity;
+			aRadius=aRigidBody->radius;
+			aInvMass=aRigidBody->invMass;
+			aInvInertia=aRigidBody->invInertia;
+			break;
+		}
+
+		default:
+			return;
+	}
+
+	switch(bType)
+	{
+		case PHYSICS_OBJECT_SPHERE:
+		{
+			RigidBody_t *bRigidBody=(RigidBody_t *)b;
+
+			bPosition=bRigidBody->position;
+			bVelocity=bRigidBody->velocity;
+			bAngularVelocity=bRigidBody->angularVelocity;
+			bRadius=bRigidBody->radius;
+			bInvMass=bRigidBody->invMass;
+			bInvInertia=bRigidBody->invInertia;
+			break;
+		}
+
+		default:
+			return;
+	}
+
+	// Calculate the distance between the two sphere's centers
+	vec3 normal=Vec3_Subv(bPosition, aPosition);
+
+	const float distanceSq=Vec3_Dot(normal, normal);
+
+	// Sum of radii
+	const float radiusSum=aRadius+bRadius;
+
+	// Check if the distance is less than the sum of the radii
+	if(distanceSq<radiusSum*radiusSum)
+	{
+		const float distance=sqrtf(distanceSq);
+
+		if(distance)
+			normal=Vec3_Muls(normal, 1.0f/distance);
+
+		const float penetration=radiusSum-distance;
+		const vec3 positionImpulse=Vec3_Muls(normal, penetration*0.5f);
+
+		aPosition=Vec3_Subv(aPosition, positionImpulse);
+		bPosition=Vec3_Addv(bPosition, positionImpulse);
+
+		const vec3 contactVelocity=Vec3_Subv(bVelocity, aVelocity);
+
+		const float totalMass=aInvMass+bInvMass;
+		const float restitution=0.66f;
+		const float VdotN=Vec3_Dot(contactVelocity, normal);
+		const float j=(-(1.0f+restitution)*VdotN)/totalMass;
+
+		a->velocity=Vec3_Subv(aVelocity, Vec3_Muls(normal, j*aInvMass));
+		b->velocity=Vec3_Addv(bVelocity, Vec3_Muls(normal, j*bInvMass));
+
+		a->angularVelocity=Vec3_Subv(aAngularVelocity, Vec3_Muls(normal, VdotN*aInvInertia));
+		b->angularVelocity=Vec3_Addv(bAngularVelocity, Vec3_Muls(normal, VdotN*bInvInertia));
+
+		const float relVelMag=sqrtf(fabsf(VdotN));
+
+		if(relVelMag>1.0f)
+			Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, relVelMag/50.0f, &aPosition);
+	}
+}
+#endif
 
 void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 {
@@ -227,10 +318,10 @@ void PhysicsCameraToSphereCollisionResponse(Camera_t *camera, RigidBody_t *body)
 		//Camera->AngularVelocity=Vec3_Subv(Camera->AngularVelocity, Vec3_Muls(Normal, j*Camera_invInertia));
 		body->angularVelocity=Vec3_Addv(body->angularVelocity, Vec3_Muls(normal, VdotN*body->invInertia));
 
-		const float relVelMag=sqrtf(fabsf(VdotN));
+		const float relVelMagSq=fabsf(VdotN);
 
-		if(relVelMag>1.0f)
-			Audio_PlaySample(&sounds[SOUND_CRASH], false, relVelMag/50.0f, &body->position);
+		if(relVelMagSq>1.0f)
+			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, &body->position);
 	}
 }
 
@@ -272,10 +363,10 @@ void PhysicsCameraToCameraCollisionResponse(Camera_t *cameraA, Camera_t *cameraB
 		cameraA->velocity=Vec3_Subv(cameraA->velocity, Vec3_Muls(normal, j*cameraInvMass));
 		cameraB->velocity=Vec3_Addv(cameraB->velocity, Vec3_Muls(normal, j*cameraInvMass));
 
-		const float relVelMag=sqrtf(fabsf(VdotN));
+		const float relVelMagSq=fabsf(VdotN);
 
-		if(relVelMag>1.0f)
-			Audio_PlaySample(&sounds[SOUND_CRASH], false, relVelMag/50.0f, &cameraB->position);
+		if(relVelMagSq>1.0f)
+			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, &cameraB->position);
 	}
 }
 
@@ -335,27 +426,27 @@ void PhysicsParticleToSphereCollisionResponse(Particle_t *particle, RigidBody_t 
 
 		particle->life=-1.0f;
 
-		const float relVelMag=sqrtf(fabsf(VdotN));
+		const float relVelMagSq=fabsf(VdotN);
 
-		if(relVelMag>1.0f)
+		if(relVelMagSq>1.0f)
 		{
-			Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, relVelMag/50.0f, &particle->position);
+			Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particle->position);
 
 			// FIXME: Is this causing derelict emitters that never go away?
 			//			I don't think it is, but need to check.
-			ParticleSystem_ResetEmitter(
+			uint32_t ID=ParticleSystem_AddEmitter
+			(
 				&particleSystem,
-				ParticleSystem_AddEmitter(
-					&particleSystem,
-					particle->position,				// Position
-					Vec3(100.0f, 12.0f, 5.0f),	// Start color
-					Vec3(0.0f, 0.0f, 0.0f),		// End color
-					5.0f,						// Radius of particles
-					1000,						// Number of particles in system
-					true,						// Is burst?
-					ExplodeEmitterCallback		// Callback for particle generation
-				)
+				particle->position,			// Position
+				Vec3(100.0f, 12.0f, 5.0f),	// Start color
+				Vec3(0.0f, 0.0f, 0.0f),		// End color
+				5.0f,						// Radius of particles
+				1000,						// Number of particles in system
+				true,						// Is burst?
+				ExplodeEmitterCallback		// Callback for particle generation
 			);
+
+			ParticleSystem_ResetEmitter(&particleSystem, ID);
 
 			// Silly radius reduction on hit
 			//body->radius=fmaxf(body->radius-10.0f, 0.0f);

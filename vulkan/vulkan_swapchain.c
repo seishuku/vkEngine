@@ -181,7 +181,7 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 
 	for(uint32_t i=0;i<swapchain->numImages;i++)
 	{
-		vkuTransitionLayout(commandBuffer, swapchain->image[i], 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+		vkuTransitionLayout(commandBuffer, swapchain->image[i], 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
 		vkCreateImageView(context->device, &(VkImageViewCreateInfo)
 		{

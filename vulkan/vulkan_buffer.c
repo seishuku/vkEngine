@@ -243,13 +243,12 @@ void vkuDestroyBuffer(VkuContext_t *context, VkuBuffer_t *buffer)
 		vkuMem_Free(vkZone, buffer->memory);
 }
 
-void vkuTransitionLayout(VkCommandBuffer commandBuffer, VkImage image, uint32_t levelCount, uint32_t baseLevel, uint32_t layerCount, uint32_t baseLayer, VkImageLayout oldLayout, VkImageLayout newLayout)
+void vkuTransitionLayout(VkCommandBuffer commandBuffer, VkImage image, uint32_t levelCount, uint32_t baseLevel, uint32_t layerCount, uint32_t baseLayer, VkImageAspectFlags aspectMask, VkImageLayout oldLayout, VkImageLayout newLayout)
 {
 	VkPipelineStageFlags srcStageFlag=VK_PIPELINE_STAGE_NONE;
 	VkPipelineStageFlags dstStageFlag=VK_PIPELINE_STAGE_NONE;
 	VkAccessFlags srcAccessMask=VK_ACCESS_NONE;
 	VkAccessFlags dstAccessMask=VK_ACCESS_NONE;
-	VkImageAspectFlags aspectMask=VK_IMAGE_ASPECT_COLOR_BIT;
 
 	switch(oldLayout)
 	{
@@ -265,7 +264,6 @@ void vkuTransitionLayout(VkCommandBuffer commandBuffer, VkImage image, uint32_t 
 
 		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
 			srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT;
 			srcStageFlag=VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
 			break;
 
@@ -310,7 +308,6 @@ void vkuTransitionLayout(VkCommandBuffer commandBuffer, VkImage image, uint32_t 
 		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
 			dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			dstStageFlag=VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-			aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT;
 			break;
 
 		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:

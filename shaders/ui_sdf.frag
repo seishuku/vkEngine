@@ -56,9 +56,10 @@ float sdLine(vec2 p, vec2 a, vec2 b)
 
 float sdfDistance(float dist)
 {
-	float weight=0.01;
-	float px=fwidth(dist);
-	return 1-smoothstep(weight-px, weight+px, dist);
+	dist-=0.01;
+
+    vec2 ddist=vec2(dFdx(dist), dFdy(dist));
+	return clamp(1.0-(dist/length(ddist)), 0.0, 1.0);
 }
 
 void main()

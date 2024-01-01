@@ -755,7 +755,7 @@ static void _GenerateMipmaps(VkCommandBuffer commandBuffer, VkuImage_t *image, u
 {
 	for(uint32_t i=1;i<mipLevels;i++)
 	{
-		vkuTransitionLayout(commandBuffer, image->image, 1, i-1, 1, baseLayer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+		vkuTransitionLayout(commandBuffer, image->image, 1, i-1, 1, baseLayer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
 		vkCmdBlitImage(commandBuffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageBlit)
 		{
@@ -773,10 +773,10 @@ static void _GenerateMipmaps(VkCommandBuffer commandBuffer, VkuImage_t *image, u
 			.dstSubresource.layerCount=layerCount,
 		}, VK_FILTER_LINEAR);
 
-		vkuTransitionLayout(commandBuffer, image->image, 1, i-1, layerCount, baseLayer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		vkuTransitionLayout(commandBuffer, image->image, 1, i-1, layerCount, baseLayer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	}
 
-	vkuTransitionLayout(commandBuffer, image->image, 1, mipLevels-1, layerCount, baseLayer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, image->image, 1, mipLevels-1, layerCount, baseLayer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 // Image_Upload, external function.
@@ -951,7 +951,7 @@ VkBool32 Image_Upload(VkuContext_t *context, VkuImage_t *image, const char *file
 		commandBuffer=vkuOneShotCommandBufferBegin(context);
 
 		// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
-		vkuTransitionLayout(commandBuffer, image->image, mipLevels, 0, 6, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		vkuTransitionLayout(commandBuffer, image->image, mipLevels, 0, 6, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 		// Copy all faces from staging buffer to the texture image buffer.
 		vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, (VkBufferImageCopy[6])
@@ -976,7 +976,7 @@ VkBool32 Image_Upload(VkuContext_t *context, VkuImage_t *image, const char *file
 			_GenerateMipmaps(commandBuffer, image, mipLevels, 6, 5);
 		}
 		else
-			vkuTransitionLayout(commandBuffer, image->image, mipLevels, 0, 6, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			vkuTransitionLayout(commandBuffer, image->image, mipLevels, 0, 6, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 		// End one shot command buffer and submit
 		vkuOneShotCommandBufferEnd(context, commandBuffer);
@@ -1015,7 +1015,7 @@ VkBool32 Image_Upload(VkuContext_t *context, VkuImage_t *image, const char *file
 		commandBuffer=vkuOneShotCommandBufferBegin(context);
 
 		// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
-		vkuTransitionLayout(commandBuffer, image->image, mipLevels, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		vkuTransitionLayout(commandBuffer, image->image, mipLevels, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 		// Copy from staging buffer to the texture buffer.
 		vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, (VkBufferImageCopy[1])
@@ -1028,7 +1028,7 @@ VkBool32 Image_Upload(VkuContext_t *context, VkuImage_t *image, const char *file
 		if(flags&IMAGE_MIPMAP)
 			_GenerateMipmaps(commandBuffer, image, mipLevels, 1, 0);
 		else
-			vkuTransitionLayout(commandBuffer, image->image, mipLevels, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			vkuTransitionLayout(commandBuffer, image->image, mipLevels, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 		// End one shot command buffer and submit
 		vkuOneShotCommandBufferEnd(context, commandBuffer);

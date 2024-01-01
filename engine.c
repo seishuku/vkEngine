@@ -85,7 +85,7 @@ VkFormat colorFormat=VK_FORMAT_R16G16B16A16_SFLOAT;
 VkuImage_t colorImage[2];		// left and right eye color buffer
 
 // Depth buffer image and format
-VkFormat depthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
+VkFormat depthFormat=VK_FORMAT_D32_SFLOAT;
 VkuImage_t depthImage[2];		// left and right eye depth buffers
 
 // Renderpass for primary renderer
@@ -155,26 +155,26 @@ pthread_barrier_t threadBarrier, physicsThreadBarrier;
 // Camera data for sending over the network
 typedef struct
 {
-	vec3 Position, Velocity;
-	vec3 Forward, Up;
+	vec3 position, velocity;
+	vec3 forward, up;
 } NetCamera_t;
 
 // Connect data when connecting to server
 typedef struct
 {
-	uint32_t Seed;
-	uint16_t Port;
+	uint32_t seed;
+	uint16_t port;
 } NetConnect_t;
 
 // Overall data network packet
 typedef struct
 {
-	uint32_t PacketMagic;
-	uint32_t ClientID;
+	uint32_t packetMagic;
+	uint32_t clientID;
 	union
 	{
-		NetConnect_t Connect;
-		NetCamera_t Camera;
+		NetConnect_t connect;
+		NetCamera_t camera;
 	};
 } NetworkPacket_t;
 
@@ -212,10 +212,10 @@ void RecreateSwapchain(void);
 bool CreateFramebuffers(uint32_t eye)
 {
 	VkImageFormatProperties imageFormatProps;
-	VkResult Result;
+	VkResult result;
 
-	depthFormat=VK_FORMAT_D32_SFLOAT_S8_UINT;
-	Result=vkGetPhysicalDeviceImageFormatProperties(vkContext.physicalDevice,
+	depthFormat=VK_FORMAT_D32_SFLOAT;
+	result=vkGetPhysicalDeviceImageFormatProperties(vkContext.physicalDevice,
 													depthFormat,
 													VK_IMAGE_TYPE_2D,
 													VK_IMAGE_TILING_OPTIMAL,
@@ -223,12 +223,12 @@ bool CreateFramebuffers(uint32_t eye)
 													0,
 													&imageFormatProps);
 
-	if(Result!=VK_SUCCESS)
+	if(result!=VK_SUCCESS)
 	{
 		depthFormat=VK_FORMAT_D24_UNORM_S8_UINT;
-		Result=vkGetPhysicalDeviceImageFormatProperties(vkContext.physicalDevice, depthFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT, 0, &imageFormatProps);
+		result=vkGetPhysicalDeviceImageFormatProperties(vkContext.physicalDevice, depthFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT, 0, &imageFormatProps);
 
-		if(Result!=VK_SUCCESS)
+		if(result!=VK_SUCCESS)
 		{
 			DBGPRINTF(DEBUG_ERROR, "CreateFramebuffers: No suitable depth format found.\n");
 			return false;
@@ -240,9 +240,9 @@ bool CreateFramebuffers(uint32_t eye)
 	vkuCreateTexture2D(&vkContext, &colorResolve[eye], renderWidth, renderHeight, colorFormat, VK_SAMPLE_COUNT_1_BIT);
 
 	VkCommandBuffer commandBuffer=vkuOneShotCommandBufferBegin(&vkContext);
-	vkuTransitionLayout(commandBuffer, colorImage[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-	vkuTransitionLayout(commandBuffer, depthImage[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-	vkuTransitionLayout(commandBuffer, colorResolve[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, colorImage[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, depthImage[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, colorResolve[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuOneShotCommandBufferEnd(&vkContext, commandBuffer);
 
 	vkCreateFramebuffer(vkContext.device, &(VkFramebufferCreateInfo)
@@ -319,18 +319,9 @@ bool CreatePipeline(void)
 				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			},
 		},
-		.dependencyCount=3,
+		.dependencyCount=2,
 		.pDependencies=(VkSubpassDependency[])
 		{
-			{
-				.srcSubpass=VK_SUBPASS_EXTERNAL,
-				.dstSubpass=0,
-				.srcStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT|VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-				.dstStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT|VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-				.srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-				.dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT|VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
-				.dependencyFlags=0,
-			},
 			{
 				.srcSubpass=VK_SUBPASS_EXTERNAL,
 				.dstSubpass=0,
@@ -346,6 +337,15 @@ bool CreatePipeline(void)
 				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
+			},
+			{
+				.srcSubpass=0,
+				.dstSubpass=0,
+				.srcStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
 				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
 				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
 			},
@@ -525,8 +525,6 @@ void GenerateSkyParams(void)
 	{
 		vec3 randomDirection=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
 		Vec3_Normalize(&randomDirection);
-
-		const float radiusScale=1.5f;
 
 		asteroids[i].velocity=Vec3_Muls(randomDirection, 10.0f);
 		asteroids[i].force=Vec3b(0.0f);
@@ -801,6 +799,20 @@ void Thread_Destructor(void *arg)
 	}
 }
 
+float raySphereIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 sphereCenter, float sphereRadius)
+{
+	vec3 oc=Vec3_Subv(rayOrigin, sphereCenter);
+	float a=Vec3_Dot(rayDirection, rayDirection);
+	float b=2.0f*Vec3_Dot(oc, rayDirection);
+	float c=Vec3_Dot(oc, oc)-sphereRadius*sphereRadius;
+	float discriminant=b*b-4*a*c;
+
+	if(discriminant<0.0f)
+		return -1.0f;
+	else
+		return (-b-sqrtf(discriminant))/(2.0f*a);
+}
+
 // Asteroids render pass thread
 void Thread_Main(void *arg)
 {
@@ -867,6 +879,26 @@ void Thread_Main(void *arg)
 		{
 			vkCmdBindIndexBuffer(data->perFrame[data->index].secCommandBuffer[data->eye], models[i].mesh[j].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(data->perFrame[data->index].secCommandBuffer[data->eye], models[i].mesh[j].numFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*i);
+		}
+	}
+
+	if(camera.shift)
+	{
+		for(uint32_t i=0;i<10;i++)
+		{
+			const float distance=10000000000.0f;
+			const float val=0.005f;
+			const vec3 randVec=Vec3(RandFloatRange(-val, val), RandFloatRange(-val, val), RandFloatRange(-val, val));
+
+			DrawLine(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye,
+						Vec3_Subv(camera.position, Vec3_Subv(camera.up, camera.right)),
+						Vec3_Addv(camera.position, Vec3_Muls(Vec3_Addv(camera.forward, randVec), distance)),
+						Vec4(1.0f+RandFloatRange(10.0f, 500.0f), 1.0f, 1.0f, 1.0f));
+
+			DrawLine(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye,
+						Vec3_Subv(camera.position, Vec3_Addv(camera.up, camera.right)),
+						Vec3_Addv(camera.position, Vec3_Muls(Vec3_Subv(camera.forward, randVec), distance)),
+						Vec4(1.0f+RandFloatRange(10.0f, 500.0f), 1.0f, 1.0f, 1.0f));
 		}
 	}
 
@@ -948,10 +980,10 @@ void Thread_Main(void *arg)
 			vec4 color, start, end;
 		} line_ubo={ 0 };
 
-		vec4 position=Vec4(netCameras[i].Position.x, netCameras[i].Position.y, netCameras[i].Position.z, 1.0f);
-		vec4 forward=Vec4(netCameras[i].Forward.x, netCameras[i].Forward.y, netCameras[i].Forward.z, 1.0f);
-		vec4 up=Vec4(netCameras[i].Up.x, netCameras[i].Up.y, netCameras[i].Up.z, 1.0f);
-		netCameras[i].Right=Vec3_Cross(netCameras[i].Forward, netCameras[i].Up);
+		vec4 position=Vec4(netCameras[i].position.x, netCameras[i].position.y, netCameras[i].position.z, 1.0f);
+		vec4 forward=Vec4(netCameras[i].forward.x, netCameras[i].forward.y, netCameras[i].forward.z, 1.0f);
+		vec4 up=Vec4(netCameras[i].up.x, netCameras[i].up.y, netCameras[i].up.z, 1.0f);
+		netCameras[i].Right=Vec3_Cross(netCameras[i].forward, netCameras[i].up);
 		vec4 right=Vec4(netCameras[i].Right.x, netCameras[i].Right.y, netCameras[i].Right.z, 1.0f);
 
 		line_ubo.mvp=MatrixMult(perFrame[data->index].Main_UBO[data->eye]->modelview, perFrame[data->index].Main_UBO[data->eye]->projection);
@@ -982,7 +1014,7 @@ void Thread_Main(void *arg)
 
 		matrix local=MatrixIdentity();
 		local=MatrixMult(local, MatrixScale(10.0f, 10.0f, 10.0f));
-		local=MatrixMult(local, MatrixInverse(MatrixLookAt(netCameras[i].Position, Vec3_Addv(netCameras[i].Position, netCameras[i].Forward), netCameras[i].Up)));
+		local=MatrixMult(local, MatrixInverse(MatrixLookAt(netCameras[i].position, Vec3_Addv(netCameras[i].position, netCameras[i].forward), netCameras[i].up)));
 
 		local=MatrixMult(local, perFrame[data->index].Main_UBO[data->eye]->modelview);
 		sphere_ubo.mvp=MatrixMult(local, perFrame[data->index].Main_UBO[data->eye]->projection);
@@ -1065,25 +1097,25 @@ void Thread_Particles(void *arg)
 	vkBeginCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye], &(VkCommandBufferBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
-		//.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
-		//{
-		//	.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-		//	.pNext=&(VkCommandBufferInheritanceRenderingInfo)
-		//	{
-		//		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-		//		.colorAttachmentCount=1,
-		//		.pColorAttachmentFormats=&ColorFormat,
-		//		.depthAttachmentFormat=DepthFormat,
-		//		.rasterizationSamples=MSAA
-		//	},
-		//}
-		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+			.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
+			//.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+			//{
+			//	.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+			//	.pNext=&(VkCommandBufferInheritanceRenderingInfo)
+			//	{
+			//		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
+			//		.colorAttachmentCount=1,
+			//		.pColorAttachmentFormats=&ColorFormat,
+			//		.depthAttachmentFormat=DepthFormat,
+			//		.rasterizationSamples=MSAA
+			//	},
+			//}
+			.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-			.pNext=NULL,
-			.renderPass=renderPass,
-			.framebuffer=framebuffer[data->eye]
+				.pNext=NULL,
+				.renderPass=renderPass,
+				.framebuffer=framebuffer[data->eye]
 		}
 	});
 
@@ -1095,16 +1127,22 @@ void Thread_Particles(void *arg)
 
 	vkCmdBindPipeline(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipeline.pipeline);
 
+	// TODO:
+	// Attempting to get proper depth interaction with the volume rendering, this is currently causing validation errors.
+	// Need to figure out the proper render pass subpass self dependency setup.
+	vkuTransitionLayout(data->perFrame[data->index].secCommandBuffer[data->eye], depthImage[data->eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	uFrame++;
 	vkCmdPushConstants(data->perFrame[data->index].secCommandBuffer[data->eye], volumePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t), &uFrame);
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 0, &textures[TEXTURE_VOLUME]);
 	vkuDescriptorSet_UpdateBindingBufferInfo(&volumeDescriptorSet, 1, perFrame[data->index].mainUBOBuffer[data->eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 2, &depthImage[data->eye]);
 	vkuAllocateUpdateDescriptorSet(&volumeDescriptorSet, data->perFrame[data->index].descriptorPool[data->eye]);
 	vkCmdBindDescriptorSets(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipelineLayout, 0, 1, &volumeDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 	// No vertex data, it's baked into the vertex shader
 	vkCmdDraw(data->perFrame[data->index].secCommandBuffer[data->eye], 36, 1, 0, 0);
+	vkuTransitionLayout(data->perFrame[data->index].secCommandBuffer[data->eye], depthImage[data->eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
@@ -1248,8 +1286,21 @@ void Thread_Physics(void *arg)
 		for(uint32_t j=0;j<emitter->numParticles;j++)
 		{
 			// If the particle ID matches with the projectile ID, then check collision and respond
-			if(emitter->particles[j].ID!=emitter->ID)
+			if(emitter->particles[j].ID!=emitter->ID||emitter->particles[j].life>0.0f)
 				PhysicsParticleToSphereCollisionResponse(&emitter->particles[j], &asteroids[i]);
+		}
+
+		if(camera.shift)
+		{
+			float distance=raySphereIntersect(camera.position, camera.forward, asteroids[i].position, asteroids[i].radius);
+
+			if(distance>0.0f)
+			{
+				Particle_t particle;
+				particle.position=Vec3_Addv(camera.position, Vec3_Muls(camera.forward, distance));
+				particle.velocity=Vec3_Muls(camera.forward, 300.0f);
+				PhysicsParticleToSphereCollisionResponse(&particle, &asteroids[i]);
+			}
 		}
 	}
 
@@ -1258,7 +1309,7 @@ void Thread_Physics(void *arg)
 	{
 		// Don't check for collision with our own net camera
 		if(i!=clientID)
-			PhysicsCameraToCameraCollisionResponse(&Camera, &netCameras[i]);
+			PhysicsCameraToCameraCollisionResponse(&camera, &netCameras[i]);
 	}
 	//////
 #endif
@@ -1290,13 +1341,13 @@ void Thread_Physics(void *arg)
 
 		memset(&StatusPacket, 0, sizeof(NetworkPacket_t));
 
-		StatusPacket.PacketMagic=STATUS_PACKETMAGIC;
-		StatusPacket.ClientID=clientID;
+		StatusPacket.packetMagic=STATUS_PACKETMAGIC;
+		StatusPacket.clientID=clientID;
 
-		StatusPacket.Camera.Position=Camera.Position;
-		StatusPacket.Camera.Velocity=Camera.Velocity;
-		StatusPacket.Camera.Forward=Camera.Forward;
-		StatusPacket.Camera.Up=Camera.Up;
+		StatusPacket.camera.position=camera.position;
+		StatusPacket.camera.velocity=camera.velocity;
+		StatusPacket.camera.forward=camera.forward;
+		StatusPacket.camera.up=camera.up;
 
 		Network_SocketSend(clientSocket, (uint8_t *)&StatusPacket, sizeof(NetworkPacket_t), serverAddress, serverPort);
 	}
@@ -1327,9 +1378,9 @@ void NetUpdate(void *arg)
 		uint8_t *pBuffer=NetBuffer;
 		uint32_t Magic=0;
 		uint32_t Address=0;
-		uint16_t Port=0;
+		uint16_t port=0;
 
-		Network_SocketReceive(clientSocket, NetBuffer, sizeof(NetBuffer), &Address, &Port);
+		Network_SocketReceive(clientSocket, NetBuffer, sizeof(NetBuffer), &Address, &port);
 
 		memcpy(&Magic, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
 
@@ -1343,12 +1394,12 @@ void NetUpdate(void *arg)
 
 				memcpy(&clientID, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
 
-				memcpy(&netCameras[clientID].Position, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-				memcpy(&netCameras[clientID].Velocity, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-				memcpy(&netCameras[clientID].Forward, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-				memcpy(&netCameras[clientID].Up, pBuffer, sizeof(float)*3);			pBuffer+=sizeof(float)*3;
+				memcpy(&netCameras[clientID].position, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
+				memcpy(&netCameras[clientID].velocity, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
+				memcpy(&netCameras[clientID].forward, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
+				memcpy(&netCameras[clientID].up, pBuffer, sizeof(float)*3);			pBuffer+=sizeof(float)*3;
 
-				//DBGPRINTF(DEBUG_INFO, "\033[%d;0H\033[KID %d Pos: %0.1f %0.1f %0.1f", clientID+1, clientID, NetCameras[clientID].Position.x, NetCameras[clientID].Position.y, NetCameras[clientID].Position.z);
+				//DBGPRINTF(DEBUG_INFO, "\033[%d;0H\033[KID %d Pos: %0.1f %0.1f %0.1f", clientID+1, clientID, NetCameras[clientID].position.x, NetCameras[clientID].position.y, NetCameras[clientID].position.z);
 			}
 		}
 		else if(Magic==FIELD_PACKETMAGIC)
@@ -1359,8 +1410,8 @@ void NetUpdate(void *arg)
 
 			for(uint32_t i=0;i<asteroidCount;i++)
 			{
-				memcpy(&asteroids[i].Position, pBuffer, sizeof(vec3));	pBuffer+=sizeof(vec3);
-				memcpy(&asteroids[i].Velocity, pBuffer, sizeof(vec3));	pBuffer+=sizeof(vec3);
+				memcpy(&asteroids[i].position, pBuffer, sizeof(vec3));	pBuffer+=sizeof(vec3);
+				memcpy(&asteroids[i].velocity, pBuffer, sizeof(vec3));	pBuffer+=sizeof(vec3);
 			}
 		}
 	}
@@ -1381,6 +1432,34 @@ void Render(void)
 {
 	static uint32_t index=0;
 	uint32_t imageIndex;
+
+	static uint32_t cleanUpCount=0;
+
+	if(cleanUpCount++>100)
+	{
+		cleanUpCount=0;
+
+		for(uint32_t i=1;i<List_GetCount(&particleSystem.emitters);i++)
+		{
+			ParticleEmitter_t *emitter=List_GetPointer(&particleSystem.emitters, i);
+			bool isActive=false;
+
+			for(uint32_t j=0;j<emitter->numParticles;j++)
+			{
+				if(emitter->particles[i].life>0.0f)
+				{
+					isActive=true;
+					break;
+				}
+			}
+
+			if(!isActive)
+			{
+				DBGPRINTF(DEBUG_WARNING, "REMOVING UNUSED EMMITER #%d\n", emitter->ID);
+				ParticleSystem_DeleteEmitter(&particleSystem, emitter->ID);
+			}
+		}
+	}
 
 	// Handle VR frame start
 	if(isVR)
@@ -1494,12 +1573,12 @@ void Render(void)
 	// Wait for physics to finish before rendering
 	pthread_barrier_wait(&physicsThreadBarrier);
 
-	vkuTransitionLayout(perFrame[index].commandBuffer, colorResolve[0].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	vkuTransitionLayout(perFrame[index].commandBuffer, colorResolve[0].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	EyeRender(index, 0, headPose);
 
 	if(isVR)
 	{
-		vkuTransitionLayout(perFrame[index].commandBuffer, colorResolve[1].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		vkuTransitionLayout(perFrame[index].commandBuffer, colorResolve[1].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		EyeRender(index, 1, headPose);
 	}
 
@@ -1922,24 +2001,24 @@ bool Init(void)
 	while(!Response)
 	{
 		uint32_t Address=0;
-		uint16_t Port=0;
+		uint16_t port=0;
 		NetworkPacket_t ResponsePacket;
 
 		memset(&ResponsePacket, 0, sizeof(NetworkPacket_t));
 
-		if(Network_SocketReceive(clientSocket, (uint8_t *)&ResponsePacket, sizeof(NetworkPacket_t), &Address, &Port)>0)
+		if(Network_SocketReceive(clientSocket, (uint8_t *)&ResponsePacket, sizeof(NetworkPacket_t), &Address, &port)>0)
 		{
-			if(ResponsePacket.PacketMagic==CONNECT_PACKETMAGIC)
+			if(ResponsePacket.packetMagic==CONNECT_PACKETMAGIC)
 			{
 				DBGPRINTF(DEBUG_INFO, "Response from server - ID: %d Seed: %d Port: %d Address: 0x%X Port: %d\n",
-						  ResponsePacket.ClientID,
-						  ResponsePacket.Connect.Seed,
-						  ResponsePacket.Connect.Port,
+						  ResponsePacket.clientID,
+						  ResponsePacket.connect.seed,
+						  ResponsePacket.connect.port,
 						  Address,
-						  Port);
+						  port);
 
-				RandomSeed(ResponsePacket.Connect.Seed);
-				clientID=ResponsePacket.ClientID;
+				RandomSeed(ResponsePacket.connect.seed);
+				clientID=ResponsePacket.clientID;
 				Response=true;
 			}
 		}
@@ -2033,7 +2112,7 @@ void Destroy(void)
 	{
 		Network_SocketSend(clientSocket, (uint8_t *)&(NetworkPacket_t)
 		{
-			.PacketMagic=DISCONNECT_PACKETMAGIC, .ClientID=clientID
+			.packetMagic=DISCONNECT_PACKETMAGIC, .clientID=clientID
 		}, sizeof(NetworkPacket_t), serverAddress, serverPort);
 		Network_SocketClose(clientSocket);
 	}

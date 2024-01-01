@@ -166,7 +166,7 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *image)
 	commandBuffer=vkuOneShotCommandBufferBegin(Context);
 
 	// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
-	vkuTransitionLayout(commandBuffer, image->image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, image->image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 	// Copy from staging buffer to the texture buffer.
 	vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, (VkBufferImageCopy[1])
@@ -178,7 +178,7 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *image)
 
 	// Final change to image layout from destination optimal to be optimal reading only by shader.
 	// This is also done by generating mipmaps, if requested.
-	vkuTransitionLayout(commandBuffer, image->image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, image->image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	// End one shot command buffer and submit
 	vkuOneShotCommandBufferEnd(Context, commandBuffer);
@@ -226,6 +226,7 @@ bool CreateVolumePipeline(void)
 	vkuInitDescriptorSet(&volumeDescriptorSet, &vkContext);
 	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&volumeDescriptorSet);
 
 	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
@@ -250,7 +251,7 @@ bool CreateVolumePipeline(void)
 	volumePipeline.depthTest=VK_TRUE;
 	volumePipeline.cullMode=VK_CULL_MODE_BACK_BIT;
 	volumePipeline.depthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
-	//volumePipeline.depthWrite=VK_FALSE;
+	volumePipeline.depthWrite=VK_FALSE;
 	volumePipeline.rasterizationSamples=MSAA;
 
 	volumePipeline.blend=VK_TRUE;
