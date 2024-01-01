@@ -42,7 +42,7 @@ typedef struct
 
 static HRIR_Sphere_t sphere;
 
-#define MAX_VOLUME 128
+#define MAX_VOLUME 127
 
 #define MAX_CHANNELS 32
 
@@ -68,11 +68,15 @@ static int16_t audioBuffer[2*(MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES)];
 
 typedef struct
 {
-	bool playing;
-	float volume;
 	uint32_t position;
 	int16_t buffer[MAX_STREAM_SAMPLES*2];
-	void (*streamCallback)(void *buffer, size_t length);
+
+	struct
+	{
+		bool playing;
+		float volume;
+		void (*streamCallback)(void *buffer, size_t length);
+	} stream[MAX_AUDIO_STREAMS];
 } AudioStream_t;
 
 static AudioStream_t streamBuffer;
@@ -189,6 +193,9 @@ static void MixAudio(int16_t *dst, const int16_t *src, const size_t length, cons
 	}
 }
 
+#include "../font/font.h"
+extern Font_t Fnt;
+
 static void Audio_FillBuffer(void *buffer, uint32_t length)
 {
 	// Get pointer to output buffer.
@@ -269,21 +276,25 @@ static void Audio_FillBuffer(void *buffer, uint32_t length)
 		}
 	}
 
-	if(streamBuffer.playing)
+	size_t remainingData=min(MAX_STREAM_SAMPLES-streamBuffer.position, length);
+
+	for(uint32_t i=0;i<MAX_AUDIO_STREAMS;i++)
 	{
-		size_t remainingData=min(MAX_STREAM_SAMPLES-streamBuffer.position, length);
-
-		// If there's an assigned callback, call it to load more audio data
-		if(streamBuffer.streamCallback)
+		if(streamBuffer.stream[i].playing)
 		{
-			streamBuffer.streamCallback(&streamBuffer.buffer[streamBuffer.position], remainingData);
-			MixAudio(out, &streamBuffer.buffer[streamBuffer.position], remainingData, (int8_t)(streamBuffer.volume*MAX_VOLUME));
-			streamBuffer.position+=(uint32_t)remainingData;
-
-			if(streamBuffer.position>=MAX_STREAM_SAMPLES)
-				streamBuffer.position=0;
+			// If there's an assigned callback, call it to load more audio data
+			if(streamBuffer.stream[i].streamCallback)
+			{
+				streamBuffer.stream[i].streamCallback(&streamBuffer.buffer[streamBuffer.position], remainingData);
+				MixAudio(out, &streamBuffer.buffer[streamBuffer.position], remainingData, (int8_t)(streamBuffer.stream[i].volume*MAX_VOLUME));
+			}
 		}
 	}
+
+	streamBuffer.position+=(uint32_t)remainingData;
+
+	if(streamBuffer.position>=MAX_STREAM_SAMPLES)
+		streamBuffer.position=0;
 }
 
 // Callback functions for when audio driver needs more data.
@@ -355,27 +366,47 @@ void Audio_StopSample(Sample_t *sample)
 	channels[index].looping=false;
 }
 
-void Audio_SetStreamCallback(void (*streamCallback)(void *buffer, size_t length))
+bool Audio_SetStreamCallback(uint32_t stream, void (*streamCallback)(void *buffer, size_t length))
 {
-	streamBuffer.streamCallback=streamCallback;
+	if(stream>=MAX_AUDIO_STREAMS)
+		return false;
+
+	streamBuffer.stream[stream].streamCallback=streamCallback;
+
+	return true;
 }
 
-void Audio_SetStreamVolume(const float volume)
+bool Audio_SetStreamVolume(uint32_t stream, const float volume)
 {
-	streamBuffer.volume=min(1.0f, max(0.0f, volume));
+	if(stream>=MAX_AUDIO_STREAMS)
+		return false;
+
+	streamBuffer.stream[stream].volume=min(1.0f, max(0.0f, volume));
+
+	return true;
 }
 
-void Audio_StartStream(void)
+bool Audio_StartStream(uint32_t stream)
 {
-	streamBuffer.playing=true;
+	if(stream>=MAX_AUDIO_STREAMS)
+		return false;
+
+	streamBuffer.stream[stream].playing=true;
+
+	return true;
 }
 
-void Audio_StopStream(void)
+bool Audio_StopStream(uint32_t stream)
 {
-	streamBuffer.playing=false;
+	if(stream>=MAX_AUDIO_STREAMS)
+		return false;
+
+	streamBuffer.stream[stream].playing=false;
+
+	return true;
 }
 
-bool HRIR_Init(void)
+static bool HRIR_Init(void)
 {
 	FILE *stream=NULL;
 

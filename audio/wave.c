@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "../system/system.h"
 #include "../math/math.h"
 #include "audio.h"
@@ -198,15 +199,15 @@ void ResetWaveSample(WaveParams_t *params)
 		params->arpeggioModulation=1.0f+(params->changeAmount*params->changeAmount)*10.0f;
 
 	// Reset filter parameters
-	params->fltp=0.0f;
-	params->fltdp=0.0f;
-	params->fltw=(params->lpfCutoff*params->lpfCutoff*params->lpfCutoff)*0.1f;
-	params->fltwd=1.0f+params->lpfCutoffSweep*0.0001f;
-	params->fltdmp=min(0.8f, 5.0f/(1.0f+(params->lpfResonance*params->lpfResonance)*20.0f)*(0.01f+params->fltw));
-	params->fltphp=0.0f;
+	params->fltPoint=0.0f;
+	params->fltPointDerivative=0.0f;
+	params->fltWidth=(params->lpfCutoff*params->lpfCutoff*params->lpfCutoff)*0.1f;
+	params->fltWidthDerivative=1.0f+params->lpfCutoffSweep*0.0001f;
+	params->fltDamping=min(0.8f, 5.0f/(1.0f+(params->lpfResonance*params->lpfResonance)*20.0f)*(0.01f+params->fltWidth));
+	params->fltHPPoint=0.0f;
 
-	params->flthp=(params->hpfCutoff*params->hpfCutoff)*0.1f;
-	params->flthpd=1.0f+params->hpfCutoffSweep*0.0003f;
+	params->fltHPCutoff=(params->hpfCutoff*params->hpfCutoff)*0.1f;
+	params->fltHPDamping=1.0f+params->hpfCutoffSweep*0.0003f;
 
 	// Reset vibrato
 	params->vibPhase=0.0f;
@@ -323,7 +324,7 @@ float GenerateWaveSample(WaveParams_t *params)
 			params->envelopeVolume=1.0f-(float)params->envelopeTime/params->envelopeLength[2];
 			break;
 
-			// Reset envelope stage, this would normally end waveform generation
+		// Reset envelope stage, this would normally end waveform generation
 		default:
 			params->envelopeStage=0;
 			break;
@@ -336,10 +337,10 @@ float GenerateWaveSample(WaveParams_t *params)
 	if(params->iPhase>1023)
 		params->iPhase=1023;
 
-	float ssample=0.0f;
+	float superSample=0.0f;
 
 	// 8x supersampling
-	for(int si=0;si<8;si++)
+	for(int32_t i=0;i<8;i++)
 	{
 		float sample=0.0f;
 
@@ -354,27 +355,21 @@ float GenerateWaveSample(WaveParams_t *params)
 			}
 		}
 
-		// base waveform
-		float fp=(float)params->phase/params->period;
+		// Base waveform
+		float phaseFraction=(float)params->phase/params->period;
 
 		switch(params->waveType)
 		{
 			case 0: // Square wave
-			{
-				if(fp<params->squareDuty)
-					sample=0.5f;
-				else
-					sample=-0.5f;
-
+				sample=phaseFraction<params->squareDuty?0.5f:-0.5f;
 				break;
-			}
 
 			case 1: // Sawtooth wave
-				sample=1.0f-fp*2;
+				sample=1.0f-phaseFraction*2.0f;
 				break;
 
 			case 2: // Sine wave
-				sample=sinf(fp*2*PI);
+				sample=sinf(phaseFraction*2.0f*PI);
 				break;
 
 			case 3: // Noise wave
@@ -386,26 +381,26 @@ float GenerateWaveSample(WaveParams_t *params)
 		}
 
 		// LP filter
-		float pp=params->fltp;
+		float prevPoint=params->fltPoint;
 
-		params->fltw=max(0.0f, min(0.1f, params->fltw*params->fltwd));
+		params->fltWidth=max(0.0f, min(0.1f, params->fltWidth*params->fltWidthDerivative));
 
 		if(params->lpfCutoff<=1.0f)
-			params->fltdp+=((sample-params->fltp)*params->fltw)-(params->fltdp*params->fltdmp);
+			params->fltPointDerivative+=((sample-params->fltPoint)*params->fltWidth)-(params->fltPointDerivative*params->fltDamping);
 		else
 		{
-			params->fltp=sample;
-			params->fltdp=0.0f;
+			params->fltPoint=sample;
+			params->fltPointDerivative=0.0f;
 		}
 
-		params->fltp+=params->fltdp;
+		params->fltPoint+=params->fltPointDerivative;
 
 		// HP filter
-		if(params->flthpd>0.0f||params->flthpd<0.0f)
-			params->flthp=max(0.00001f, min(0.1f, params->flthp*params->flthpd));
+		if(params->fltHPDamping>0.0f||params->fltHPDamping<0.0f)
+			params->fltHPCutoff=max(0.00001f, min(0.1f, params->fltHPCutoff*params->fltHPDamping));
 
-		params->fltphp+=params->fltp-pp-(params->fltphp*params->flthp);
-		sample=params->fltphp;
+		params->fltHPPoint+=params->fltPoint-prevPoint-(params->fltHPPoint*params->fltHPCutoff);
+		sample=params->fltHPPoint;
 
 		// Phaser
 		params->phaserBuffer[params->iPhaserPhase&1023]=sample;
@@ -413,10 +408,10 @@ float GenerateWaveSample(WaveParams_t *params)
 		params->iPhaserPhase=(params->iPhaserPhase+1)&1023;
 
 		// Final accumulation and envelope application
-		ssample+=sample*params->envelopeVolume;
+		superSample+=sample*params->envelopeVolume;
 	}
 
-	ssample/=8;
+	superSample/=8.0f;
 
-	return max(-1.0f, min(1.0f, ssample));
+	return max(-1.0f, min(1.0f, superSample*0.2f));
 }

@@ -34,6 +34,7 @@
     <ClInclude Include="perframe.h" />
     <ClInclude Include="physics\physics.h" />
     <ClInclude Include="renderdoc_app.h" />
+    <ClInclude Include="sfx.h" />
     <ClInclude Include="shadow.h" />
     <ClInclude Include="skybox.h" />
     <ClInclude Include="sounds.h" />
@@ -72,6 +73,7 @@
     <ClCompile Include="particle\particle.c" />
     <ClCompile Include="perframe.c" />
     <ClCompile Include="physics\physics.c" />
+    <ClCompile Include="sfx.c" />
     <ClCompile Include="shadow.c" />
     <ClCompile Include="skybox.c" />
     <ClCompile Include="system\memzone.c" />

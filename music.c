@@ -100,84 +100,8 @@ String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFi
 }
 #endif
 
-#include "camera/camera.h"
-extern Camera_t camera;
-
-void GenLaserShoot(WaveParams_t *params)
+void MusicStreamData(void *buffer, size_t length)
 {
-	params->waveType=2;
-
-	params->attackTime=0.0f;
-	params->sustainTime=0.5f;
-	params->sustainPunch=0.0f;
-	params->decayTime=0.0f;
-
-	params->startFrequency=0.33f;
-	params->minFrequency=0.0f;
-
-	params->slide=0.31f;
-	params->deltaSlide=0.2f;
-	params->vibratoDepth=0.57f;
-	params->vibratoSpeed=0.51f;
-
-	params->changeAmount=0.0f;
-	params->changeSpeed=0.61f;
-	params->squareWaveDuty=0.52f;
-	params->squareWaveDutySweep=-0.49f;
-
-	params->repeatSpeed=0.55f;
-	params->phaserOffset=0.24f;
-	params->phaserSweep=0.33f;
-
-	params->lpfCutoff=0.4f;
-	params->lpfCutoffSweep=0.0f;
-	params->lpfResonance=0.55f;
-	params->hpfCutoff=0.0f;
-	params->hpfCutoffSweep=0.0f;
-
-	ResetWaveSample(params);
-}
-
-void GenEngineNoise(WaveParams_t *params)
-{
-	params->waveType=3;
-
-	params->attackTime=0.0f;
-	params->sustainTime=0.5f;
-	params->sustainPunch=0.0f;
-	params->decayTime=0.0f;
-
-	params->startFrequency=0.08f;
-	params->minFrequency=0.0f;
-
-	params->slide=0.0f;
-	params->deltaSlide=0.0f;
-	params->vibratoDepth=0.0f;
-	params->vibratoSpeed=0.0f;
-
-	params->changeAmount=0.0f;
-	params->changeSpeed=0.0f;
-	params->squareWaveDuty=0.0f;
-	params->squareWaveDutySweep=0.0f;
-
-	params->repeatSpeed=0.0f;
-	params->phaserOffset=0.0f;
-	params->phaserSweep=0.0f;
-
-	params->lpfCutoff=0.08f;
-	params->lpfCutoffSweep=0.0f;
-	params->lpfResonance=0.25f;
-	params->hpfCutoff=0.0f;
-	params->hpfCutoffSweep=0.0f;
-
-	ResetWaveSample(params);
-}
-
-static WaveParams_t Laser, Engine;
-
-void StreamData(void *buffer, size_t length)
-{
-#if 1
 	if(oggFile==NULL)
 		return;
 
@@ -197,41 +121,16 @@ void StreamData(void *buffer, size_t length)
 	// Out of OGG audio, get a new track
 	if(size==0)
 		NextTrackCallback(NULL);
-#endif
-
-	// Mix in synth soundfx only when firing
-	int16_t *bufferPtr=(int16_t *)buffer;
-
-	for(uint32_t i=0;i<length;i++)
-	{
-		int16_t sample=0;
-
-		if(camera.shift)
-		{
-			int16_t laserSample=(int16_t)(GenerateWaveSample(&Laser)*INT16_MAX);
-			sample=min(max(sample+laserSample, INT16_MIN), INT16_MAX);
-		}
-
-		if(camera.key_w||camera.key_s||camera.key_a||camera.key_d||camera.key_v||camera.key_c)
-		{
-			int16_t engineSample=(int16_t)(GenerateWaveSample(&Engine)*INT16_MAX);
-			sample=min(max(sample+engineSample, INT16_MIN), INT16_MAX);
-		}
-
-		bufferPtr[0]=min(max(sample+bufferPtr[0], INT16_MIN), INT16_MAX);
-		bufferPtr[1]=min(max(sample+bufferPtr[1], INT16_MIN), INT16_MAX);
-		bufferPtr+=2;
-	}
 }
 
 void StartStreamCallback(void *arg)
 {
-	Audio_StartStream();
+	Audio_StartStream(0);
 }
 
 void StopStreamCallback(void *arg)
 {
-	Audio_StopStream();
+	Audio_StopStream(0);
 }
 
 void PrevTrackCallback(void *arg)
@@ -286,9 +185,6 @@ void NextTrackCallback(void *arg)
 
 void Music_Init(void)
 {
-	GenLaserShoot(&Laser);
-	GenEngineNoise(&Engine);
-
 	MusicList=BuildFileList(MusicPath, ".ogg", &NumMusic);
 
 	if(MusicList!=NULL)
@@ -311,7 +207,8 @@ void Music_Init(void)
 		}
 	}
 
-	Audio_SetStreamCallback(StreamData);
+	Audio_SetStreamCallback(0, MusicStreamData);
+	Audio_StartStream(0);
 }
 
 void Music_Destroy(void)

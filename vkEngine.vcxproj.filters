@@ -192,6 +192,9 @@
     <ClInclude Include="renderdoc_app.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="sfx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="audio\audio.c">
@@ -333,6 +336,9 @@
       <Filter>Source Files\console</Filter>
     </ClCompile>
     <ClCompile Include="music.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sfx.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

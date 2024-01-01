@@ -33,6 +33,7 @@
 #include "composite.h"
 #include "perframe.h"
 #include "sounds.h"
+#include "sfx.h"
 
 #ifndef ANDROID
 #include "music.h"
@@ -1547,7 +1548,7 @@ void Render(void)
 
 	Console_Draw(&console);
 
-	Audio_SetStreamVolume(UI_GetBarGraphValue(&UI, volumeID));
+	Audio_SetStreamVolume(0, UI_GetBarGraphValue(&UI, volumeID));
 
 #ifndef ANDROID
 	Font_Print(&Fnt, 16.0f, renderWidth-400.0f, renderHeight-50.0f-16.0f, "Current track: %s", MusicList[CurrentMusic].String);
@@ -1749,9 +1750,9 @@ bool Init(void)
 		return false;
 	}
 
+	SFX_Init();
 #ifndef ANDROID
 	Music_Init();
-	StartStreamCallback(NULL);
 #endif
 
 	// Load models

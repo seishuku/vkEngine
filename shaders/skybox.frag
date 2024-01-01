@@ -124,15 +124,29 @@ float noise(vec3 P)
 float nebula(vec3 p)
 {
     const int iterations=6;
-	float turb=0.0f, scale=1.0f;
+	float total=0.0f, scale=1.0f;
 
 	for(int i=0;i<iterations;i++)
 	{
+		total+=scale*noise(p/scale);
 		scale*=0.5f;
-		turb+=scale*noise(p/scale);
 	}
 
-    return turb;
+    return total;
+}
+
+float stars(vec3 p)
+{
+    const int iterations=3;
+	float total=0.0f, scale=1.0f;
+
+	for(int i=0;i<iterations;i++)
+	{
+		total+=scale*pow(max(0.0, noise((p/scale)*uStarsScale)), uStarDensity);
+		scale*=0.5f;
+	}
+
+    return total;
 }
 
 void main()
@@ -144,8 +158,7 @@ void main()
     // Nebula mix B
     Temp+=mix(vec3(0.0), uNebulaBColor.xyz, pow(max(0.0, nebula(uOffset.xyz+Position+0.5)), 2.0));
     // Stars
-    float stars=pow(max(0.0, noise(uOffset.xyz+Position*uStarsScale)), uStarDensity);
-    Temp+=length(vec2(dFdx(stars), dFdy(stars)));
+    Temp+=stars(uOffset.xyz+Position);
     // Sun
 	float d=max(0.0, dot(normalize(Position), normalize(uSunPosition.xyz)));
 	Temp+=mix(vec3(0.0), uSunColor.xyz, smoothstep(1.0-uSunSize*uSunFalloff, 1.0-uSunSize, d)+pow(d, uSunFalloff)*0.5);

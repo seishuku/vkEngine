@@ -1,10 +1,14 @@
 #ifndef __AUDIO_H__
 #define __AUDIO_H__
 
+#include <stdint.h>
+#include "../math/math.h"
+
 #define AUDIO_SAMPLE_RATE 44100
 #define MAX_AUDIO_SAMPLES 4096
 #define MAX_STREAM_SAMPLES (MAX_AUDIO_SAMPLES*2)
 #define MAX_HRIR_SAMPLES 1024
+#define MAX_AUDIO_STREAMS 8
 
 typedef struct
 {
@@ -35,9 +39,9 @@ typedef struct
 
 	float noiseBuffer[32];
 
-	float fltp, fltdp, fltw;
-	float fltwd, fltdmp, fltphp;
-	float flthp, flthpd;
+	float fltPoint, fltPointDerivative, fltWidth;
+	float fltWidthDerivative, fltDamping, fltHPPoint;
+	float fltHPCutoff, fltHPDamping;
 
 	float vibPhase, vibSpeed, vibAmplitude;
 
@@ -94,10 +98,10 @@ typedef struct
 bool Audio_LoadStatic(const char *filename, Sample_t *sample);
 void Audio_PlaySample(Sample_t *sample, const bool looping, const float volume, vec3 *position);
 void Audio_StopSample(Sample_t *sample);
-void Audio_SetStreamCallback(void (*streamCallback)(void *buffer, size_t length));
-void Audio_SetStreamVolume(const float volume);
-void Audio_StartStream(void);
-void Audio_StopStream(void);
+bool Audio_SetStreamCallback(uint32_t stream, void (*streamCallback)(void *buffer, size_t length));
+bool Audio_SetStreamVolume(uint32_t stream, const float volume);
+bool Audio_StartStream(uint32_t stream);
+bool Audio_StopStream(uint32_t stream);
 int Audio_Init(void);
 void Audio_Destroy(void);
 
