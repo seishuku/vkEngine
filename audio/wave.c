@@ -217,9 +217,9 @@ void ResetWaveSample(WaveParams_t *params)
 	// Reset envelope
 	params->envelopeStage=0;
 	params->envelopeTime=0;
-	params->envelopeLength[0]=(int32_t)(params->attackTime*params->attackTime*100000.0f);
-	params->envelopeLength[1]=(int32_t)(params->sustainTime*params->sustainTime*100000.0f);
-	params->envelopeLength[2]=(int32_t)(params->decayTime*params->decayTime*100000.0f);
+	params->envelopeLength[0]=(int32_t)max(1, params->attackTime*params->attackTime*100000.0f);
+	params->envelopeLength[1]=(int32_t)max(1, params->sustainTime*params->sustainTime*100000.0f);
+	params->envelopeLength[2]=(int32_t)max(1, params->decayTime*params->decayTime*100000.0f);
 	params->envelopeVolume=0.0f;
 
 	params->fPhase=(params->phaserOffset*params->phaserOffset)*1020.0f;
@@ -299,12 +299,10 @@ float GenerateWaveSample(WaveParams_t *params)
 		params->period=max(8, (int)params->fPeriod);
 
 	params->squareDuty+=params->squareSlide;
-	params->squareDuty=max(0.0f, min(0.5f, params->squareDuty));
+	params->squareDuty=clamp(params->squareDuty, 0.0f, 0.5f);
 
 	// Volume envelope
-	params->envelopeTime++;
-
-	if(params->envelopeTime>params->envelopeLength[params->envelopeStage])
+	if(++params->envelopeTime>params->envelopeLength[params->envelopeStage])
 	{
 		params->envelopeTime=0;
 		params->envelopeStage++;
@@ -325,17 +323,20 @@ float GenerateWaveSample(WaveParams_t *params)
 			break;
 
 		// Reset envelope stage, this would normally end waveform generation
+		case 3:
 		default:
 			params->envelopeStage=0;
+			params->envelopeTime=0;
+			params->envelopeLength[0]=(int32_t)max(1, params->attackTime*params->attackTime*100000.0f);
+			params->envelopeLength[1]=(int32_t)max(1, params->sustainTime*params->sustainTime*100000.0f);
+			params->envelopeLength[2]=(int32_t)max(1, params->decayTime*params->decayTime*100000.0f);
+			params->envelopeVolume=0.0f;
 			break;
 	}
 
 	// Phaser step
 	params->fPhase+=params->fDeltaPhase;
-	params->iPhase=abs((int32_t)params->fPhase);
-
-	if(params->iPhase>1023)
-		params->iPhase=1023;
+	params->iPhase=min(1023, abs((int32_t)params->fPhase));
 
 	float superSample=0.0f;
 
@@ -344,7 +345,7 @@ float GenerateWaveSample(WaveParams_t *params)
 	{
 		float sample=0.0f;
 
-		if(params->phase++>=params->period)
+		if(++params->phase>=params->period)
 		{
 			params->phase%=params->period;
 
@@ -383,7 +384,7 @@ float GenerateWaveSample(WaveParams_t *params)
 		// LP filter
 		float prevPoint=params->fltPoint;
 
-		params->fltWidth=max(0.0f, min(0.1f, params->fltWidth*params->fltWidthDerivative));
+		params->fltWidth=clamp(params->fltWidth*params->fltWidthDerivative, 0.0f, 0.1f);
 
 		if(params->lpfCutoff<=1.0f)
 			params->fltPointDerivative+=((sample-params->fltPoint)*params->fltWidth)-(params->fltPointDerivative*params->fltDamping);
@@ -397,7 +398,7 @@ float GenerateWaveSample(WaveParams_t *params)
 
 		// HP filter
 		if(params->fltHPDamping>0.0f||params->fltHPDamping<0.0f)
-			params->fltHPCutoff=max(0.00001f, min(0.1f, params->fltHPCutoff*params->fltHPDamping));
+			params->fltHPCutoff=clamp(params->fltHPCutoff*params->fltHPDamping, 0.00001f, 0.1f);
 
 		params->fltHPPoint+=params->fltPoint-prevPoint-(params->fltHPPoint*params->fltHPCutoff);
 		sample=params->fltHPPoint;
@@ -412,6 +413,7 @@ float GenerateWaveSample(WaveParams_t *params)
 	}
 
 	superSample/=8.0f;
+	superSample*=0.06f;
 
-	return max(-1.0f, min(1.0f, superSample*0.2f));
+	return superSample;
 }

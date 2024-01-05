@@ -133,6 +133,10 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 	if(surfaceCaps.supportedUsageFlags&VK_IMAGE_USAGE_TRANSFER_DST_BIT)
 		imageUsage|=VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
+	VkSwapchainKHR newSwapchain;
+	VkImageView newImageView[VKU_MAX_FRAME_COUNT];
+	VkImage newImage[VKU_MAX_FRAME_COUNT];
+
 	result=vkCreateSwapchainKHR(context->device, &(VkSwapchainCreateInfoKHR)
 	{
 		.sType=VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -151,10 +155,9 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 		.preTransform=surfaceCaps.currentTransform,
 		.compositeAlpha=compositeAlpha,
 		.presentMode=swapchainPresentMode,
-		// Setting clipped to VK_TRUE allows the implementation to discard rendering outside of the surface area
 		.clipped=VK_TRUE,
-		.oldSwapchain=VK_NULL_HANDLE,
-	}, VK_NULL_HANDLE, &swapchain->swapchain);
+		.oldSwapchain=swapchain->swapchain,
+	}, VK_NULL_HANDLE, &newSwapchain);
 
 	if(result!=VK_SUCCESS)
 	{
@@ -164,7 +167,7 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 
 	// Get swap chain image count
 	swapchain->numImages=0;
-	vkGetSwapchainImagesKHR(context->device, swapchain->swapchain, &swapchain->numImages, VK_NULL_HANDLE);
+	vkGetSwapchainImagesKHR(context->device, newSwapchain, &swapchain->numImages, VK_NULL_HANDLE);
 
 	// Check to make sure the driver doesn't want more than what we can support
 	if(swapchain->numImages==0||swapchain->numImages>VKU_MAX_FRAME_COUNT)
@@ -174,20 +177,20 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 	}
 
 	// Get the swap chain images
-	vkGetSwapchainImagesKHR(context->device, swapchain->swapchain, &swapchain->numImages, swapchain->image);
+	vkGetSwapchainImagesKHR(context->device, newSwapchain, &swapchain->numImages, newImage);
 
 	// Create imageviews and transition to correct image layout
 	VkCommandBuffer commandBuffer=vkuOneShotCommandBufferBegin(context);
 
 	for(uint32_t i=0;i<swapchain->numImages;i++)
 	{
-		vkuTransitionLayout(commandBuffer, swapchain->image[i], 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+		vkuTransitionLayout(commandBuffer, newImage[i], 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
 		vkCreateImageView(context->device, &(VkImageViewCreateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 			.pNext=VK_NULL_HANDLE,
-			.image=swapchain->image[i],
+			.image=newImage[i],
 			.format=swapchain->surfaceFormat.format,
 			.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
 			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
@@ -197,10 +200,22 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 			.subresourceRange.layerCount=1,
 			.viewType=VK_IMAGE_VIEW_TYPE_2D,
 			.flags=0,
-		}, VK_NULL_HANDLE, &swapchain->imageView[i]);
+		}, VK_NULL_HANDLE, &newImageView[i]);
 	}
 
 	vkuOneShotCommandBufferEnd(context, commandBuffer);
+
+	// If there was already a swapchain
+	if(swapchain->swapchain)
+		vkuDestroySwapchain(context, swapchain);
+
+	swapchain->swapchain=newSwapchain;
+
+	for(uint32_t i=0;i<swapchain->numImages;i++)
+	{
+		swapchain->image[i]=newImage[i];
+		swapchain->imageView[i]=newImageView[i];
+	}
 
 	return VK_TRUE;
 }
@@ -214,4 +229,5 @@ void vkuDestroySwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain)
 		vkDestroyImageView(context->device, swapchain->imageView[i], VK_NULL_HANDLE);
 
 	vkDestroySwapchainKHR(context->device, swapchain->swapchain, VK_NULL_HANDLE);
+	swapchain->swapchain=VK_NULL_HANDLE;
 }

@@ -575,13 +575,9 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye)
 	float z=-1.0f;
 
 	if(isVR)
-	{
 		z=-1.5f;
-		UIPC.viewport=Vec2((float)xrContext.swapchainExtent.width, (float)xrContext.swapchainExtent.height);
-	}
-	else
-		UIPC.viewport=Vec2((float)swapchain.extent.width, (float)swapchain.extent.height);
 
+	UIPC.viewport=UI->size;
 	UIPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale(UIPC.viewport.x/UIPC.viewport.y, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[eye]);
 
 	vkCmdPushConstants(perFrame[index].commandBuffer, UI->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(UIPC), &UIPC);

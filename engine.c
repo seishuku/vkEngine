@@ -282,7 +282,7 @@ bool CreatePipeline(void)
 				.format=depthFormat,
 				.samples=MSAA,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-				.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
@@ -320,17 +320,17 @@ bool CreatePipeline(void)
 				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			},
 		},
-		.dependencyCount=2,
+		.dependencyCount=3,
 		.pDependencies=(VkSubpassDependency[])
 		{
 			{
 				.srcSubpass=VK_SUBPASS_EXTERNAL,
 				.dstSubpass=0,
-				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.srcAccessMask=0,
-				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT|VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
-				.dependencyFlags=0,
+				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
 			},
 			{
 				.srcSubpass=0,
@@ -344,13 +344,13 @@ bool CreatePipeline(void)
 			{
 				.srcSubpass=0,
 				.dstSubpass=0,
-				.srcStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+				.srcStageMask=VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 				.srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
 				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
-			},
-		},
+				.dependencyFlags=0,
+			}
+		}
 	}, 0, &renderPass);
 
 	for(uint32_t i=0;i<swapchain.numImages;i++)
@@ -1131,7 +1131,7 @@ void Thread_Particles(void *arg)
 	// TODO:
 	// Attempting to get proper depth interaction with the volume rendering, this is currently causing validation errors.
 	// Need to figure out the proper render pass subpass self dependency setup.
-	vkuTransitionLayout(data->perFrame[data->index].secCommandBuffer[data->eye], depthImage[data->eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuTransitionLayout(data->perFrame[data->index].secCommandBuffer[data->eye], depthImage[data->eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 	uFrame++;
 	vkCmdPushConstants(data->perFrame[data->index].secCommandBuffer[data->eye], volumePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t), &uFrame);
 
@@ -1143,7 +1143,7 @@ void Thread_Particles(void *arg)
 
 	// No vertex data, it's baked into the vertex shader
 	vkCmdDraw(data->perFrame[data->index].secCommandBuffer[data->eye], 36, 1, 0, 0);
-	vkuTransitionLayout(data->perFrame[data->index].secCommandBuffer[data->eye], depthImage[data->eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+	//vkuTransitionLayout(data->perFrame[data->index].secCommandBuffer[data->eye], depthImage[data->eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
@@ -2047,55 +2047,49 @@ bool Init(void)
 // Rebuild Vulkan swapchain and related data
 void RecreateSwapchain(void)
 {
-	if(vkContext.device!=VK_NULL_HANDLE) // Windows quirk, WM_SIZE is signaled on window creation, *before* Vulkan get initalized
+	// Wait for the device to complete any pending work
+	vkDeviceWaitIdle(vkContext.device);
+
+	// To resize a surface, we need to destroy and recreate anything that's tied to the surface.
+	// This is basically just the swapchain, framebuffers, and depth buffer.
+
+	// swapchain, framebuffer, and depth buffer destruction
+	vkuDestroyImageBuffer(&vkContext, &colorImage[0]);
+	vkuDestroyImageBuffer(&vkContext, &colorResolve[0]);
+	vkuDestroyImageBuffer(&vkContext, &colorBlur[0]);
+	vkuDestroyImageBuffer(&vkContext, &colorTemp[0]);
+	vkuDestroyImageBuffer(&vkContext, &depthImage[0]);
+
+	vkDestroyFramebuffer(vkContext.device, framebuffer[0], VK_NULL_HANDLE);
+
+	if(isVR)
 	{
-		// Wait for the device to complete any pending work
-		vkDeviceWaitIdle(vkContext.device);
+		vkuDestroyImageBuffer(&vkContext, &colorImage[1]);
+		vkuDestroyImageBuffer(&vkContext, &colorResolve[1]);
+		vkuDestroyImageBuffer(&vkContext, &colorBlur[1]);
+		vkuDestroyImageBuffer(&vkContext, &colorTemp[1]);
+		vkuDestroyImageBuffer(&vkContext, &depthImage[1]);
 
-		// To resize a surface, we need to destroy and recreate anything that's tied to the surface.
-		// This is basically just the swapchain, framebuffers, and depth buffer.
+		vkDestroyFramebuffer(vkContext.device, framebuffer[1], VK_NULL_HANDLE);
+	}
 
-		// swapchain, framebuffer, and depth buffer destruction
-		vkuDestroyImageBuffer(&vkContext, &colorImage[0]);
-		vkuDestroyImageBuffer(&vkContext, &colorResolve[0]);
-		vkuDestroyImageBuffer(&vkContext, &colorBlur[0]);
-		vkuDestroyImageBuffer(&vkContext, &colorTemp[0]);
-		vkuDestroyImageBuffer(&vkContext, &depthImage[0]);
+	// Recreate the swapchain, vkuCreateSwapchain will see that there is an existing swapchain and deal accordingly.
+	vkuCreateSwapchain(&vkContext, &swapchain, VK_TRUE);
 
-		vkDestroyFramebuffer(vkContext.device, framebuffer[0], VK_NULL_HANDLE);
+	renderWidth=max(2, swapchain.extent.width);
+	renderHeight=max(2, swapchain.extent.height);
 
-		if(isVR)
-		{
-			vkuDestroyImageBuffer(&vkContext, &colorImage[1]);
-			vkuDestroyImageBuffer(&vkContext, &colorResolve[1]);
-			vkuDestroyImageBuffer(&vkContext, &colorBlur[1]);
-			vkuDestroyImageBuffer(&vkContext, &colorTemp[1]);
-			vkuDestroyImageBuffer(&vkContext, &depthImage[1]);
+	UI.size.x=(float)renderWidth;
+	UI.size.y=(float)renderHeight;
 
-			vkDestroyFramebuffer(vkContext.device, framebuffer[1], VK_NULL_HANDLE);
-		}
+	// Recreate the framebuffer
+	CreateFramebuffers(0);
+	CreateCompositeFramebuffers(0);
 
-		// Destroy the swapchain
-		vkuDestroySwapchain(&vkContext, &swapchain);
-
-		// Recreate the swapchain
-		vkuCreateSwapchain(&vkContext, &swapchain, VK_TRUE);
-
-		renderWidth=swapchain.extent.width;
-		renderHeight=swapchain.extent.height;
-
-		UI.size.x=(float)swapchain.extent.width;
-		UI.size.y=(float)swapchain.extent.height;
-
-		// Recreate the framebuffer
-		CreateFramebuffers(0);
-		CreateCompositeFramebuffers(0);
-
-		if(isVR)
-		{
-			CreateFramebuffers(1);
-			CreateCompositeFramebuffers(1);
-		}
+	if(isVR)
+	{
+		CreateFramebuffers(1);
+		CreateCompositeFramebuffers(1);
 	}
 }
 

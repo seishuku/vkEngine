@@ -128,8 +128,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			break;
 
 		case WM_SIZE:
-			windowWidth=max(LOWORD(lParam), 2);
-			windowHeight=max(HIWORD(lParam), 2);
+			windowWidth=LOWORD(lParam);
+			windowHeight=HIWORD(lParam);
 			break;
 
 		case WM_ACTIVATE:

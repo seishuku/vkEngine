@@ -175,8 +175,8 @@ static void Convolve(const int16_t *input, int16_t *output, const size_t length,
 			inputPtr--;
 		}
 
-		*outputPtr++=(int16_t)(min(0x3fffffff, max(-0x40000000, sum[0]))>>15);
-		*outputPtr++=(int16_t)(min(0x3fffffff, max(-0x40000000, sum[1]))>>15);
+		*outputPtr++=(int16_t)(clamp(sum[0], -0x40000000, 0x3fffffff)>>15);
+		*outputPtr++=(int16_t)(clamp(sum[1], -0x40000000, 0x3fffffff)>>15);
 	}
 }
 
@@ -188,8 +188,8 @@ static void MixAudio(int16_t *dst, const int16_t *src, const size_t length, cons
 
 	for(size_t i=0;i<length*2;i+=2)
 	{
-		dst[i+0]=min(max(((src[i+0]*volume)/MAX_VOLUME)+dst[i+0], INT16_MIN), INT16_MAX);
-		dst[i+1]=min(max(((src[i+1]*volume)/MAX_VOLUME)+dst[i+1], INT16_MIN), INT16_MAX);
+		dst[i+0]=clamp(((src[i+0]*volume)/MAX_VOLUME)+dst[i+0], INT16_MIN, INT16_MAX);
+		dst[i+1]=clamp(((src[i+1]*volume)/MAX_VOLUME)+dst[i+1], INT16_MIN, INT16_MAX);
 	}
 }
 

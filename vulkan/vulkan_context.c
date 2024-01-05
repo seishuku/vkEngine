@@ -47,6 +47,7 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 		return VK_FALSE;
 	}
 #endif
+
 	// Get the number of physical devices in the system
 	uint32_t physicalDeviceCount=0;
 	vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, VK_NULL_HANDLE);

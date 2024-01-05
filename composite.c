@@ -82,11 +82,11 @@ bool CreateThresholdPipeline(void)
 			{
 				.srcSubpass=VK_SUBPASS_EXTERNAL,
 				.dstSubpass=0,
-				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.srcAccessMask=0,
-				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT|VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
-				.dependencyFlags=0,
+				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
 			},
 			{
 				.srcSubpass=0,
@@ -95,8 +95,8 @@ bool CreateThresholdPipeline(void)
 				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
-			},
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
+			}
 		},
 	}, 0, &thresholdRenderPass);
 
@@ -174,11 +174,11 @@ bool CreateGaussianPipeline(void)
 			{
 				.srcSubpass=VK_SUBPASS_EXTERNAL,
 				.dstSubpass=0,
-				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.srcAccessMask=0,
-				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT|VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
-				.dependencyFlags=0,
+				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
 			},
 			{
 				.srcSubpass=0,
@@ -187,8 +187,8 @@ bool CreateGaussianPipeline(void)
 				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
-			},
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
+			}
 		},
 	}, 0, &gaussianRenderPass);
 
@@ -388,20 +388,29 @@ bool CreateCompositePipeline(void)
 				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			}
 		},
-		.dependencyCount=1,
+		.dependencyCount=2,
 		.pDependencies=(VkSubpassDependency[])
 		{
 			{
 				.srcSubpass=VK_SUBPASS_EXTERNAL,
 				.dstSubpass=0,
-				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.srcAccessMask=0,
+				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
 				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-				.dependencyFlags=0,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
 			},
-		}
-		}, 0, &compositeRenderPass);
+			{
+				.srcSubpass=0,
+				.dstSubpass=VK_SUBPASS_EXTERNAL,
+				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
+			}
+		},
+	}, 0, &compositeRenderPass);
 
 	vkuInitDescriptorSet(&compositeDescriptorSet, &vkContext);
 	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);

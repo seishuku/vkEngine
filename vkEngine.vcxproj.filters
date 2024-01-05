@@ -349,9 +349,6 @@
     <GLSL Include="shaders\composite.frag">
       <Filter>Shaders</Filter>
     </GLSL>
-    <GLSL Include="shaders\compositeVR.frag">
-      <Filter>Shaders</Filter>
-    </GLSL>
     <GLSL Include="shaders\font.frag">
       <Filter>Shaders</Filter>
     </GLSL>

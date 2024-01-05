@@ -81,22 +81,25 @@ void SFXStreamData(void *buffer, size_t length)
 
 	for(uint32_t i=0;i<length;i++)
 	{
-		int16_t sample=0;
+		int16_t sample=0, laserSample=0, engineSample=0;
 
 		// Mix in synth soundfx only when triggered
 		if(camera.shift)
 		{
-			int16_t laserSample=(int16_t)(GenerateWaveSample(&Laser)*INT16_MAX);
-			sample+=min(max(sample+laserSample, INT16_MIN), INT16_MAX);
+			laserSample=(int16_t)(GenerateWaveSample(&Laser)*INT16_MAX);
+			sample+=clamp(sample+laserSample, INT16_MIN, INT16_MAX);
 		}
 
 		if(camera.key_w||camera.key_s||camera.key_a||camera.key_d||camera.key_v||camera.key_c)
 		{
-			int16_t engineSample=(int16_t)(GenerateWaveSample(&Engine)*INT16_MAX);
-			sample=min(max(sample+engineSample, INT16_MIN), INT16_MAX);
+			engineSample=(int16_t)(GenerateWaveSample(&Engine)*INT16_MAX);
+			sample=clamp(sample+engineSample, INT16_MIN, INT16_MAX);
 		}
 
-		sample=min(max(sample, INT16_MIN), INT16_MAX);
+		if(sample<=-32000)
+			break;
+
+		sample=clamp(sample, INT16_MIN, INT16_MAX);
 
 		bufferPtr[0]=sample;
 		bufferPtr[1]=sample;

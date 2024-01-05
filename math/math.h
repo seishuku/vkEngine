@@ -9,11 +9,15 @@
 #endif
 
 #ifndef min
-#define min(a, b) ((a)<(b)?(a):(b))
+#define min(a, b) (((a)<(b))?(a):(b))
 #endif
 
 #ifndef max
-#define max(a, b) ((a)>(b)?(a):(b))
+#define max(a, b) (((a)>(b))?(a):(b))
+#endif
+
+#ifndef clamp
+#define clamp(value, min, max) ((value)<(min)?(min):((value)>(max)?(max):(value)))
 #endif
 
 typedef struct { float x, y; } vec2;
