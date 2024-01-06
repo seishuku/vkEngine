@@ -19,24 +19,24 @@
 #include "../utils/input.h"
 #include "../vr/vr.h"
 
-MemZone_t *Zone;
+MemZone_t *zone;
 
 char szAppName[]="Vulkan";
 
 static int _xi_opcode=0;
 
-bool Done=false;
-bool ToggleFullscreen=true;
+bool isDone=false;
+bool toggleFullscreen=true;
 
 bool isVR=true;
 extern XruContext_t xrContext;
 
-extern VkInstance Instance;
-extern VkuContext_t Context;
+extern VkInstance vkInstance;
+extern VkuContext_t vkContext;
 
-extern VkuMemZone_t *VkZone;
+extern VkuMemZone_t *vkZone;
 
-extern VkuSwapchain_t Swapchain;
+extern VkuSwapchain_t swapchain;
 
 uint32_t winWidth=1920, winHeight=1080;
 extern uint32_t renderWidth, renderHeight;
@@ -60,16 +60,15 @@ double GetClock(void)
 
 void EventLoop(void)
 {
-	KeySym Keysym, temp;
+	static MouseEvent_t MouseEvent={ 0, 0, 0, 0 };
 	uint32_t code;
 	XEvent Event;
-	static MouseEvent_t MouseEvent={ 0, 0, 0, 0 };
 
-	while(!Done)
+	while(!isDone)
 	{
-		while(XPending(Context.Dpy)>0)
+		while(XPending(vkContext.display)>0)
 		{
-			XNextEvent(Context.Dpy, &Event);
+			XNextEvent(vkContext.display, &Event);
 
 			switch(Event.type)
 			{
@@ -82,7 +81,7 @@ void EventLoop(void)
 					break;
 			}
 
-			if(XGetEventData(Context.Dpy, &Event.xcookie)&&(Event.xcookie.type==GenericEvent)&&(Event.xcookie.extension==_xi_opcode))
+			if(XGetEventData(vkContext.display, &Event.xcookie)&&(Event.xcookie.type==GenericEvent)&&(Event.xcookie.extension==_xi_opcode))
 			{
 				switch(Event.xcookie.evtype)
 				{
@@ -102,8 +101,8 @@ void EventLoop(void)
 
 							Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
 
-							XWarpPointer(Context.Dpy, None, Context.Win, 0, 0, 0, 0, winWidth/2, winHeight/2);
-							XFlush(Context.Dpy);
+							XWarpPointer(vkContext.display, None, vkContext.window, 0, 0, 0, 0, winWidth/2, winHeight/2);
+							XFlush(vkContext.display);
 						}
 						break;
 					}
@@ -156,39 +155,39 @@ void EventLoop(void)
 					case XI_KeyPress:
 					{
 						XIDeviceEvent *event=(XIDeviceEvent *)Event.xcookie.data;
-						KeySym Keysym=XkbKeycodeToKeysym(Context.Dpy, (KeyCode)event->detail, 0, 0), temp;
+						KeySym Keysym=XkbKeycodeToKeysym(vkContext.display, (KeyCode)event->detail, 0, 0), temp;
 						XConvertCase(Keysym, &temp, &Keysym);
 
 						if(Keysym==XK_Return&&Event.xkey.state&Mod1Mask)
 						{
 							static uint32_t OldWidth, OldHeight;
 
-							if(ToggleFullscreen)
+							if(toggleFullscreen)
 							{
-								ToggleFullscreen=false;
+								toggleFullscreen=false;
 								DBGPRINTF(DEBUG_INFO, "Going full screen...\n");
 
 								OldWidth=winWidth;
 								OldHeight=winHeight;
 
-								winWidth=XDisplayWidth(Context.Dpy, DefaultScreen(Context.Dpy));
-								winHeight=XDisplayHeight(Context.Dpy, DefaultScreen(Context.Dpy));
-								XMoveResizeWindow(Context.Dpy, Context.Win, 0, 0, winWidth, winHeight);
+								winWidth=XDisplayWidth(vkContext.display, DefaultScreen(vkContext.display));
+								winHeight=XDisplayHeight(vkContext.display, DefaultScreen(vkContext.display));
+								XMoveResizeWindow(vkContext.display, vkContext.window, 0, 0, winWidth, winHeight);
 							}
 							else
 							{
-								ToggleFullscreen=true;
+								toggleFullscreen=true;
 								DBGPRINTF(DEBUG_INFO, "Going windowed...\n");
 
 								winWidth=OldWidth;
 								winHeight=OldHeight;
-								XMoveResizeWindow(Context.Dpy, Context.Win, 0, 0, winWidth, winHeight);
+								XMoveResizeWindow(vkContext.display, vkContext.window, 0, 0, winWidth, winHeight);
 							}
 						}
 
 						if(Keysym==XK_Escape)
 						{
-							Done=true;
+							isDone=true;
 							break;
 						}
 
@@ -259,7 +258,7 @@ void EventLoop(void)
 					case XI_KeyRelease:
 					{
 						XIDeviceEvent *event=(XIDeviceEvent *)Event.xcookie.data;
-						KeySym Keysym=XkbKeycodeToKeysym(Context.Dpy, (KeyCode)event->detail, 0, 0), temp;
+						KeySym Keysym=XkbKeycodeToKeysym(vkContext.display, (KeyCode)event->detail, 0, 0), temp;
 						XConvertCase(Keysym, &temp, &Keysym);
 
 						switch(Keysym)
@@ -327,7 +326,7 @@ void EventLoop(void)
 					}
 				}
 
-				XFreeEventData(Context.Dpy, &Event.xcookie);
+				XFreeEventData(vkContext.display, &Event.xcookie);
 			}
 		}
 
@@ -400,9 +399,9 @@ static bool register_input(Display *_display, Window _window)
 int main(int argc, char **argv)
 {
 	DBGPRINTF(DEBUG_INFO, "Allocating zone memory...\n");
-	Zone=Zone_Init(256*1000*1000);
+	zone=Zone_Init(256*1000*1000);
 
-	if(Zone==NULL)
+	if(zone==NULL)
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...zone allocation failed!\n");
 
@@ -410,59 +409,59 @@ int main(int argc, char **argv)
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Opening X display...\n");
-	Context.Dpy=XOpenDisplay(NULL);
+	vkContext.display=XOpenDisplay(NULL);
 
-	if(Context.Dpy==NULL)
+	if(vkContext.display==NULL)
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...can't open display.\n");
 
 		return -1;
 	}
 
-	int32_t Screen=DefaultScreen(Context.Dpy);
-	Window Root=RootWindow(Context.Dpy, Screen);
+	int32_t Screen=DefaultScreen(vkContext.display);
+	Window Root=RootWindow(vkContext.display, Screen);
 
 	DBGPRINTF(DEBUG_INFO, "Creating X11 Window...\n");
-	Context.Win=XCreateSimpleWindow(Context.Dpy, Root, 10, 10, winWidth, winHeight, 1, BlackPixel(Context.Dpy, Screen), WhitePixel(Context.Dpy, Screen));
-	XSelectInput(Context.Dpy, Context.Win, StructureNotifyMask|PointerMotionMask|ExposureMask|ButtonPressMask|KeyPressMask|KeyReleaseMask);
-	XStoreName(Context.Dpy, Context.Win, szAppName);
+	vkContext.window=XCreateSimpleWindow(vkContext.display, Root, 10, 10, winWidth, winHeight, 1, BlackPixel(vkContext.display, Screen), WhitePixel(vkContext.display, Screen));
+	XSelectInput(vkContext.display, vkContext.window, StructureNotifyMask|PointerMotionMask|ExposureMask|ButtonPressMask|KeyPressMask|KeyReleaseMask);
+	XStoreName(vkContext.display, vkContext.window, szAppName);
 
-	XWarpPointer(Context.Dpy, None, Context.Win, 0, 0, 0, 0, winWidth/2, winHeight/2);
-	XFixesHideCursor(Context.Dpy, Context.Win);
+	XWarpPointer(vkContext.display, None, vkContext.window, 0, 0, 0, 0, winWidth/2, winHeight/2);
+	XFixesHideCursor(vkContext.display, vkContext.window);
 
-	register_input(Context.Dpy, Context.Win);
+	register_input(vkContext.display, vkContext.window);
 
-	XFlush(Context.Dpy);
-	XSync(Context.Dpy, False);
+	XFlush(vkContext.display);
+	XSync(vkContext.display, False);
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Instance...\n");
-	if(!CreateVulkanInstance(&Instance))
+	if(!CreateVulkanInstance(&vkInstance))
 	{
 		DBGPRINTF(DEBUG_ERROR, "...failed.\n");
 		return -1;
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Context...\n");
-	if(!CreateVulkanContext(Instance, &Context))
+	if(!CreateVulkanContext(vkInstance, &vkContext))
 	{
 		DBGPRINTF(DEBUG_ERROR, "...failed.\n");
 		return -1;
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Swapchain...\n");
-	if(!vkuCreateSwapchain(&Context, &Swapchain, VK_TRUE))
+	if(!vkuCreateSwapchain(&vkContext, &swapchain, VK_TRUE))
 	{
 		DBGPRINTF(DEBUG_ERROR, "...failed.\n");
 		return -1;
 	}
 	else
 	{
-		renderWidth=Swapchain.Extent.width;
-		renderHeight=Swapchain.Extent.height;
+		renderWidth=swapchain.extent.width;
+		renderHeight=swapchain.extent.height;
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Initializing VR...\n");
-	if(!VR_Init(&xrContext, Instance, &Context))
+	if(!VR_Init(&xrContext, vkInstance, &vkContext))
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
 		isVR=false;
@@ -473,7 +472,7 @@ int main(int argc, char **argv)
 		renderHeight=xrContext.swapchainExtent.height;
 		winWidth=renderWidth;
 		winHeight=renderHeight;
-		XMoveResizeWindow(Context.Dpy, Context.Win, 0, 0, winWidth/2, winHeight/2);
+		XMoveResizeWindow(vkContext.display, vkContext.window, 0, 0, winWidth/2, winHeight/2);
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Initializing Vulkan resources...\n");
@@ -481,40 +480,37 @@ int main(int argc, char **argv)
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
 
-		DestroyVulkan(Instance, &Context);
-		vkDestroyInstance(Instance, VK_NULL_HANDLE);
+		DestroyVulkan(vkInstance, &vkContext);
+		vkDestroyInstance(vkInstance, VK_NULL_HANDLE);
 
-		XDestroyWindow(Context.Dpy, Context.Win);
-		//XCloseDisplay(Context.Dpy);
+		XDestroyWindow(vkContext.display, vkContext.window);
+		XCloseDisplay(vkContext.display);
 
 		return -1;
 	}
 
-	XMapWindow(Context.Dpy, Context.Win);
+	XMapWindow(vkContext.display, vkContext.window);
 
 	DBGPRINTF(DEBUG_WARNING, "\nCurrent system zone memory allocations:\n");
-	Zone_Print(Zone);
+	Zone_Print(zone);
 
 	DBGPRINTF(DEBUG_WARNING, "\nCurrent vulkan zone memory allocations:\n");
-	vkuMem_Print(VkZone);
+	vkuMem_Print(vkZone);
 
 	DBGPRINTF(DEBUG_INFO, "\nStarting main loop.\n");
 	EventLoop();
 
 	DBGPRINTF(DEBUG_INFO, "Shutting down...\n");
 	Destroy();
-	DestroyVulkan(Instance, &Context);
-	vkDestroyInstance(Instance, VK_NULL_HANDLE);
+	DestroyVulkan(vkInstance, &vkContext);
+	vkDestroyInstance(vkInstance, VK_NULL_HANDLE);
 
-	XDestroyWindow(Context.Dpy, Context.Win);
-
-	// TODO: Segfaulting on XCloseDisplay for some reason?
-	//			Not sure what's going on here.
-	//XCloseDisplay(Context.Dpy);
+	XDestroyWindow(vkContext.display, vkContext.window);
+	XCloseDisplay(vkContext.display);
 
 	DBGPRINTF(DEBUG_WARNING, "Zone remaining block list:\n");
-	Zone_Print(Zone);
-	Zone_Destroy(Zone);
+	Zone_Print(zone);
+	Zone_Destroy(zone);
 
 	DBGPRINTF(DEBUG_INFO, "Exit\n");
 

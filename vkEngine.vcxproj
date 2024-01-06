@@ -28,6 +28,7 @@
     <ClInclude Include="math\math.h" />
     <ClInclude Include="models.h" />
     <ClInclude Include="model\bmodel.h" />
+    <ClInclude Include="music.h" />
     <ClInclude Include="nebula.h" />
     <ClInclude Include="network\network.h" />
     <ClInclude Include="particle\particle.h" />

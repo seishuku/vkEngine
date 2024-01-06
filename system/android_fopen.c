@@ -1,7 +1,7 @@
-#include <android/asset_manager.h>
+#undef fopen
 #include <stdio.h>
 #include <errno.h>
-#include "android_fopen.h"
+#include <android/asset_manager.h>
 
 static int android_read(void *cookie, char *buf, int size)
 {
@@ -35,7 +35,7 @@ FILE *android_fopen(const char *fname, const char *mode)
 	AAsset *asset=AAssetManager_open(android_asset_manager, fname, 0);
 
 	if(!asset)
-		return NULL;
+		return fopen(fname, mode);
 
 	return funopen(asset, android_read, android_write, android_seek, android_close);
 }

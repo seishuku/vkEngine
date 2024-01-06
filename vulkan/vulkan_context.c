@@ -27,8 +27,8 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 	if(vkCreateXlibSurfaceKHR(instance, &(VkXlibSurfaceCreateInfoKHR)
 	{
 		.sType=VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,
-		.dpy=context->Dpy,
-		.window=context->Win,
+		.dpy=context->display,
+		.window=context->window,
 	}, VK_NULL_HANDLE, &context->surface)!=VK_SUCCESS)
 	{
 		DBGPRINTF(DEBUG_ERROR, "vkCreateXlibSurfaceKHR failed.\n");
@@ -40,7 +40,7 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 		.sType=VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
 		.pNext=NULL,
 		.flags=0,
-		.window=context->Win,
+		.window=context->window,
 	}, VK_NULL_HANDLE, &context->surface)!=VK_SUCCESS)
 	{
 		DBGPRINTF(DEBUG_ERROR, "vkCreateAndroidSurfaceKHR failed.\n");

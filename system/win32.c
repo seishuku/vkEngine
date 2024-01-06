@@ -18,7 +18,7 @@ MemZone_t *zone;
 char szAppName[]="Vulkan";
 
 bool isDone=false;
-bool ToggleFullscreen=true;
+bool toggleFullscreen=true;
 
 bool isVR=true;
 extern XruContext_t xrContext;
@@ -155,9 +155,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			{
 				static uint32_t OldWidth, OldHeight;
 
-				if(ToggleFullscreen)
+				if(toggleFullscreen)
 				{
-					ToggleFullscreen=false;
+					toggleFullscreen=false;
 					DBGPRINTF(DEBUG_INFO, "Going full screen...\n");
 
 					OldWidth=windowWidth;
@@ -169,7 +169,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				}
 				else
 				{
-					ToggleFullscreen=true;
+					toggleFullscreen=true;
 					DBGPRINTF(DEBUG_INFO, "Going windowed...\n");
 
 					windowWidth=OldWidth;

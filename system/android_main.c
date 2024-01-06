@@ -15,19 +15,19 @@
 #include "../utils/event.h"
 #include "../utils/input.h"
 
-MemZone_t *Zone;
+MemZone_t *zone;
 
-bool Done=false;
+bool isDone=false;
 
 bool isVR=false;
 extern XruContext_t xrContext;
 
-extern VkInstance Instance;
-extern VkuContext_t Context;
+extern VkInstance vkInstance;
+extern VkuContext_t vkContext;
 
-extern VkuMemZone_t *VkZone;
+extern VkuMemZone_t *vkZone;
 
-extern VkuSwapchain_t Swapchain;
+extern VkuSwapchain_t swapchain;
 
 uint32_t winWidth, winHeight;
 extern uint32_t renderWidth, renderHeight;
@@ -187,12 +187,12 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			winWidth=ANativeWindow_getWidth(app->window);
 			winHeight=ANativeWindow_getHeight(app->window);
 
-			Context.Win=app->window;
+			vkContext.window=app->window;
 
 			DBGPRINTF(DEBUG_INFO, "Allocating zone memory...\n");
-			Zone=Zone_Init(256*1000*1000);
+			zone=Zone_Init(256*1000*1000);
 
-			if(Zone==NULL)
+			if(zone==NULL)
 			{
 				DBGPRINTF(DEBUG_ERROR, "\t...zone allocation failed!\n");
 				appState.app->destroyRequested=true;
@@ -201,7 +201,7 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			}
 
 			DBGPRINTF(DEBUG_INFO, "Creating Vulkan instance...\n");
-			if(!CreateVulkanInstance(&Instance))
+			if(!CreateVulkanInstance(&vkInstance))
 			{
 				DBGPRINTF(DEBUG_ERROR, "\t...create Vulkan instance failed.\n");
 				appState.app->destroyRequested=true;
@@ -210,7 +210,7 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			}
 
 			DBGPRINTF(DEBUG_INFO, "Creating Vulkan context...\n");
-			if(!CreateVulkanContext(Instance, &Context))
+			if(!CreateVulkanContext(vkInstance, &vkContext))
 			{
 				DBGPRINTF(DEBUG_ERROR, "\t...create Vulkan context failed.\n");
 				appState.app->destroyRequested=true;
@@ -219,7 +219,7 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			}
 
 			DBGPRINTF(DEBUG_INFO, "Creating swapchain...\n");
-			if(!vkuCreateSwapchain(&Context, &Swapchain, VK_TRUE))
+			if(!vkuCreateSwapchain(&vkContext, &swapchain, VK_TRUE))
 			{
 				DBGPRINTF(DEBUG_ERROR, "\t...create swapchain failed.\n");
 				appState.app->destroyRequested=true;
@@ -228,12 +228,12 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			}
 			else
 			{
-				renderWidth=Swapchain.Extent.width;
-				renderHeight=Swapchain.Extent.height;
+				renderWidth=swapchain.extent.width;
+				renderHeight=swapchain.extent.height;
 			}
 
 			DBGPRINTF(DEBUG_INFO, "Initializing VR...\n");
-			if(!VR_Init(&xrContext, Instance, &Context))
+			if(!VR_Init(&xrContext, vkInstance, &vkContext))
 			{
 				DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
 				isVR=false;
@@ -254,10 +254,10 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			}
 
 			DBGPRINTF(DEBUG_WARNING, "\nCurrent system zone memory allocations:\n");
-			Zone_Print(Zone);
+			Zone_Print(zone);
 
 			DBGPRINTF(DEBUG_WARNING, "\nCurrent vulkan zone memory allocations:\n");
-			vkuMem_Print(VkZone);
+			vkuMem_Print(vkZone);
 
 			DBGPRINTF(DEBUG_INFO, "\nStarting main loop.\n");
 			appState.running=true;
@@ -274,12 +274,12 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 
 			DBGPRINTF(DEBUG_INFO, "Shutting down...\n");
 			Destroy();
-			DestroyVulkan(Instance, &Context);
-			vkDestroyInstance(Instance, VK_NULL_HANDLE);
+			DestroyVulkan(vkInstance, &vkContext);
+			vkDestroyInstance(vkInstance, VK_NULL_HANDLE);
 
 			DBGPRINTF(DEBUG_WARNING, "Zone remaining block list:\n");
-			Zone_Print(Zone);
-			Zone_Destroy(Zone);
+			Zone_Print(zone);
+			Zone_Destroy(zone);
 			break;
 
 		case APP_CMD_WINDOW_RESIZED:
@@ -341,7 +341,7 @@ void android_main(struct android_app *app)
 				return;
 		}
 
-		if(Done)
+		if(isDone)
 			ANativeActivity_finish(appState.app->activity);
 
 		if(appState.running)

@@ -34,10 +34,7 @@
 #include "perframe.h"
 #include "sounds.h"
 #include "sfx.h"
-
-#ifndef ANDROID
 #include "music.h"
-#endif
 
 extern bool isDone;
 
@@ -1550,9 +1547,7 @@ void Render(void)
 
 	Audio_SetStreamVolume(0, UI_GetBarGraphValue(&UI, volumeID));
 
-#ifndef ANDROID
-	Font_Print(&Fnt, 16.0f, renderWidth-400.0f, renderHeight-50.0f-16.0f, "Current track: %s", MusicList[CurrentMusic].String);
-#endif
+	Font_Print(&Fnt, 16.0f, renderWidth-400.0f, renderHeight-50.0f-16.0f, "Current track: %s", musicList[currentMusic].string);
 
 	vkWaitForFences(vkContext.device, 1, &perFrame[index].frameFence, VK_TRUE, UINT64_MAX);
 
@@ -1751,9 +1746,7 @@ bool Init(void)
 	}
 
 	SFX_Init();
-#ifndef ANDROID
 	Music_Init();
-#endif
 
 	// Load models
 	if(LoadBModel(&models[MODEL_ASTEROID1], "assets/asteroid1.bmodel"))
@@ -1868,7 +1861,6 @@ bool Init(void)
 
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)renderWidth, (float)renderHeight));
 
-#ifndef ANDROID
 	UI_AddButton(&UI,
 				 Vec2(renderWidth-400.0f, renderHeight-50.0f),	// Position
 				 Vec2(100.0f, 50.0f),					// Size
@@ -1900,7 +1892,6 @@ bool Init(void)
 							"Volume",					// Title text
 							false,						// Read-only
 							0.0f, 1.0f, 0.125f);		// min/max/initial value
-#endif
 
 	UI_AddSprite(&UI, Vec2((float)renderWidth/2.0f, (float)renderHeight/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &textures[TEXTURE_CROSSHAIR], 0.0f);
 
@@ -2116,10 +2107,8 @@ void Destroy(void)
 #endif
 
 	Audio_Destroy();
-
-#ifndef ANDROID
+	SFX_Destroy();
 	Music_Destroy();
-#endif
 
 	Zone_Free(zone, sounds[SOUND_PEW1].data);
 	Zone_Free(zone, sounds[SOUND_PEW2].data);
@@ -2132,10 +2121,8 @@ void Destroy(void)
 	Zone_Free(zone, sounds[SOUND_EXPLODE2].data);
 	Zone_Free(zone, sounds[SOUND_EXPLODE3].data);
 
-#ifndef ANDROID
 	if(isVR)
 		VR_Destroy(&xrContext);
-#endif
 
 	for(uint32_t i=0;i<NUM_THREADS;i++)
 		Thread_Destroy(&thread[i]);

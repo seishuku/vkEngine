@@ -1,21 +1,26 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #include <vorbis/vorbisfile.h>
 #include "system/system.h"
 #include "math/math.h"
 #include "audio/audio.h"
 #include "music.h"
 
-FILE *oggFile;
-OggVorbis_File oggStream;
+static FILE *oggFile;
+static OggVorbis_File oggStream;
 
-const char *MusicPath="assets/music/";
+#ifdef ANDROID
+static const char *musicPath="/storage/emulated/0/Music/";
+#else
+static const char *musicPath="assets/music/";
+#endif
 
-String_t *MusicList;
-uint32_t NumMusic=0, CurrentMusic=0;
+String_t *musicList;
+uint32_t numMusic=0, currentMusic=0;
 
-#ifdef LINUX
+#if defined(LINUX)||defined(ANDROID)
 #include <dirent.h>
 #include <sys/stat.h>
 
@@ -26,7 +31,10 @@ String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFi
 	String_t *Ret=NULL;
 
 	if((dp=opendir(DirName))==NULL)
+	{
+		DBGPRINTF(DEBUG_ERROR, "BuildFileList: opendir failed.\n");
 		return NULL;
+	}
 
 	while((dir_entry=readdir(dp))!=NULL)
 	{
@@ -39,7 +47,7 @@ String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFi
 				if(!strcmp(ptr, Filter))
 				{
 					Ret=(String_t *)Zone_Realloc(zone, Ret, sizeof(String_t)*(*NumFiles+1));
-					sprintf(Ret[(*NumFiles)++].String, "%s", dir_entry->d_name);
+					sprintf(Ret[(*NumFiles)++].string, "%s", dir_entry->d_name);
 				}
 			}
 		}
@@ -82,7 +90,7 @@ String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFi
 					if(Ret==NULL)
 						return NULL;
 
-					sprintf(Ret[(*NumFiles)++].String, "%s", FileData.cFileName);
+					sprintf(Ret[(*NumFiles)++].string, "%s", FileData.cFileName);
 				}
 			}
 		}
@@ -135,15 +143,15 @@ void StopStreamCallback(void *arg)
 
 void PrevTrackCallback(void *arg)
 {
-	if(MusicList!=NULL)
+	if(musicList!=NULL)
 	{
 		ov_clear(&oggStream);
 
-		char FilePath[1024]={ 0 };
+		char filePath[1024]={ 0 };
 
-		CurrentMusic=(CurrentMusic-1)%NumMusic;
-		sprintf(FilePath, "%s%s", MusicPath, MusicList[CurrentMusic].String);
-		oggFile=fopen(FilePath, "rb");
+		currentMusic=(currentMusic-1)%numMusic;
+		sprintf(filePath, "%s%s", musicPath, musicList[currentMusic].string);
+		oggFile=fopen(filePath, "rb");
 
 		if(oggFile==NULL)
 			return;
@@ -160,14 +168,14 @@ void PrevTrackCallback(void *arg)
 
 void NextTrackCallback(void *arg)
 {
-	if(MusicList!=NULL)
+	if(musicList!=NULL)
 	{
 		ov_clear(&oggStream);
 
 		char FilePath[1024]={ 0 };
 
-		CurrentMusic=(CurrentMusic+1)%NumMusic;
-		sprintf(FilePath, "%s%s", MusicPath, MusicList[CurrentMusic].String);
+		currentMusic=(currentMusic+1)%numMusic;
+		sprintf(FilePath, "%s%s", musicPath, musicList[currentMusic].string);
 		oggFile=fopen(FilePath, "rb");
 
 		if(oggFile==NULL)
@@ -185,23 +193,27 @@ void NextTrackCallback(void *arg)
 
 void Music_Init(void)
 {
-	MusicList=BuildFileList(MusicPath, ".ogg", &NumMusic);
+	musicList=BuildFileList(musicPath, ".ogg", &numMusic);
 
-	if(MusicList!=NULL)
+	if(musicList!=NULL)
 	{
-		char FilePath[1024]={ 0 };
+		char filePath[1024]={ 0 };
 
-		CurrentMusic=RandRange(0, NumMusic-1);
-		sprintf(FilePath, "%s%s", MusicPath, MusicList[CurrentMusic].String);
-		oggFile=fopen(FilePath, "rb");
+		currentMusic=RandRange(0, numMusic-1);
+		sprintf(filePath, "%s%s", musicPath, musicList[currentMusic].string);
+		oggFile=fopen(filePath, "rb");
 
 		if(oggFile==NULL)
+		{
+			DBGPRINTF(DEBUG_ERROR, "Music_Init: Unable to fopen %s\n", filePath);
 			return;
+		}
 
 		int result=ov_open(oggFile, &oggStream, NULL, 0);
 
 		if(result<0)
 		{
+			DBGPRINTF(DEBUG_ERROR, "Music_Init: Unable to ov_open %s\n", filePath);
 			fclose(oggFile);
 			return;
 		}
@@ -215,6 +227,6 @@ void Music_Destroy(void)
 {
 	ov_clear(&oggStream);
 
-	if(MusicList)
-		Zone_Free(zone, MusicList);
+	if(musicList)
+		Zone_Free(zone, musicList);
 }

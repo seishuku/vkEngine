@@ -46,10 +46,10 @@ typedef struct
 #ifdef WIN32
 	HWND hWnd;
 #elif LINUX
-	Display *Dpy;
-	Window Win;
+	Display *display;
+	Window window;
 #elif ANDROID
-	ANativeWindow *Win;
+	ANativeWindow *window;
 #endif
 
 	VkSurfaceKHR surface;

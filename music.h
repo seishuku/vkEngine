@@ -3,13 +3,11 @@
 
 typedef struct
 {
-	char String[256];
+	char string[256];
 } String_t;
 
-extern const char *MusicPath;
-
-extern String_t *MusicList;
-extern uint32_t NumMusic, CurrentMusic;
+extern String_t *musicList;
+extern uint32_t numMusic, currentMusic;
 
 void StartStreamCallback(void *arg);
 void StopStreamCallback(void *arg);
