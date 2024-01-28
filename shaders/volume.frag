@@ -10,15 +10,18 @@ layout(binding=1) uniform MainUBO
 	mat4 HMD;
 	mat4 projection;
     mat4 modelview;
-	mat4 light_mvp;
-	vec4 light_color;
-	vec4 light_direction;
+	mat4 lightMVP;
+	vec4 lightColor;
+	vec4 lightDirection;
 };
 
 layout(push_constant) uniform PC
 {
 	uint uFrame;
 };
+
+//layout (input_attachment_index=1, binding=0) uniform subpassInput inputDepth;
+
 
 layout(location=0) out vec4 Output;
 

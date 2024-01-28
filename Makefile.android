@@ -131,7 +131,7 @@ CC_X86_64=$(NDK)/toolchains/llvm/prebuilt/$(HOST)/bin/x86_64-linux-android$(ANDR
 CC_ARM64=$(NDK)/toolchains/llvm/prebuilt/$(HOST)/bin/aarch64-linux-android$(ANDROIDVERSION)-clang
 CC_ARM32=$(NDK)/toolchains/llvm/prebuilt/$(HOST)/bin/armv7a-linux-androideabi$(ANDROIDVERSION)-clang
 
-#CFLAGS+=-g2 -gdwarf-2 -O1 -D_DEBUG
+#CFLAGS+=-g2 -gdwarf-2 -O0 -D_DEBUG
 CFLAGS+=-O3 -ffast-math -DNDEBUG
 
 CFLAGS+=-fpic -fstack-protector -fno-strict-aliasing -fno-rtti -fno-omit-frame-pointer -fno-exceptions -fno-short-enums
@@ -176,7 +176,8 @@ $(APKFILE): $(SHADERS) apk/lib/armeabi-v7a/lib$(TARGET).so apk/lib/arm64-v8a/lib
 
 	mkdir -p apk/assets/shaders
 	cp $(SHADERS) apk/assets/shaders/
-	cp -r assets apk/assets/
+	mkdir -p apk/assets/assets
+	cp assets/*.* apk/assets/assets
 
 	$(BUILD_TOOLS)/aapt package -f -F temp.apk -I $(ANDROID_HOME)/platforms/android-$(ANDROIDVERSION)/android.jar -M AndroidManifest.xml -v --app-as-shared-lib --target-sdk-version $(ANDROIDVERSION) apk
 	$(BUILD_TOOLS)/zipalign -v 4 temp.apk $(APKFILE)

@@ -13,9 +13,9 @@ layout (binding=3) uniform ubo
 	mat4 HMD;
 	mat4 projection;
     mat4 modelview;
-	mat4 light_mvp;
-	vec4 light_color;
-	vec4 light_direction;
+	mat4 lightMVP;
+	vec4 lightColor;
+	vec4 lightDirection;
 };
 
 layout (push_constant) uniform ubo_pc
@@ -50,5 +50,5 @@ void main()
 	Tangent=mat3(vTangent.xyz, vBinormal.xyz, vNormal.xyz);
 	iMatrix=iPosition;
 
-	Shadow=biasMat*light_mvp*iPosition*local*vec4(vPosition.xyz, 1.0);
+	Shadow=biasMat*lightMVP*iPosition*local*vec4(vPosition.xyz, 1.0);
 }

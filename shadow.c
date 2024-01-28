@@ -14,13 +14,12 @@
 #define NUM_ASTEROIDS 1000
 
 extern VkuContext_t vkContext;
-extern VkuBuffer_t asteroidInstance;
 
 extern float fTime;
 
 extern Camera_t camera;
 
-Shadow_UBO_t shadowUBO;
+matrix shadowMVP;
 
 static VkuPipeline_t shadowPipeline;
 static VkPipelineLayout shadowPipelineLayout;
@@ -109,8 +108,8 @@ bool CreateShadowPipeline(void)
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
 			.offset=0,
-			.size=sizeof(Shadow_UBO_t),
-			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+			.size=sizeof(matrix),
+			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT,
 		},
 	}, 0, &shadowPipelineLayout);
 
@@ -124,6 +123,8 @@ bool CreateShadowPipeline(void)
 		return false;
 
 	// Set states that are different than defaults
+	shadowPipeline.colorWriteMask=0;
+
 	shadowPipeline.cullMode=VK_CULL_MODE_BACK_BIT;
 	shadowPipeline.depthTest=VK_TRUE;
 
@@ -185,18 +186,18 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 	), 3000.0f);
 
 	// Following the camera's position, so we don't have to composite multiple shadow maps or have super large maps.
-	matrix modelView=MatrixLookAt(Vec3_Addv(position, camera.position), camera.position, Vec3(0.0f, 1.0f, 0.0f));
+	matrix modelview=MatrixLookAt(Vec3_Addv(position, camera.position), camera.position, Vec3(0.0f, 1.0f, 0.0f));
 
 	// Multiply matrices together, so we can just send one matrix as a push constant.
-	shadowUBO.mvp=MatrixMult(modelView, projection);
 
-	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &asteroidInstance.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[frameIndex].asteroidInstance.buffer, &(VkDeviceSize) { 0 });
+
+	shadowMVP=MatrixMult(modelview, projection);
+	vkCmdPushConstants(commandBuffer, shadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(matrix), &shadowMVP);
 
 	// Draw the models
 	for(uint32_t j=0;j<NUM_MODELS;j++)
 	{
-		vkCmdPushConstants(commandBuffer, shadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Shadow_UBO_t), &shadowUBO);
-
 		// Bind model data buffers and draw the triangles
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &models[j].vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 

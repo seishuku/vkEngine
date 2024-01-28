@@ -1,12 +1,12 @@
 #ifndef __MEMZONE_H__
 #define __MEMZONE_H__
 
-#include <pthread.h>
+#include <threads.h>
 #include <stdbool.h>
 
 typedef struct
 {
-	pthread_mutex_t mutex;
+	mtx_t mutex;
 
 	size_t allocations;
 	size_t size;

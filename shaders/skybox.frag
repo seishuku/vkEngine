@@ -2,16 +2,6 @@
 
 layout (location=0) in vec3 Position;
 
-layout (binding=0) uniform MainUBO
-{
-	mat4 HMD;
-	mat4 projection;
-    mat4 modelview;
-	mat4 light_mvp;
-	vec4 light_color;
-	vec4 light_direction;
-};
-
 layout (binding=1) uniform SkyboxUBO
 {
 	vec4 uOffset;

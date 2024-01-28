@@ -27,6 +27,9 @@ typedef struct
 	VkuBuffer_t mainUBOBuffer[2];
 	//////
 
+	VkuBuffer_t asteroidInstance;
+	matrix *asteroidInstancePtr;
+
 	VkFramebuffer compositeFramebuffer[2];
 
 	// Descriptor pool
@@ -35,6 +38,7 @@ typedef struct
 	// Command buffer
 	VkCommandPool commandPool;
 	VkCommandBuffer commandBuffer;
+	VkCommandBuffer secCommandBuffer[2];
 
 	// Fences/semaphores
 	VkFence frameFence;

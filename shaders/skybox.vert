@@ -64,27 +64,14 @@ const vec3 ico[]=
 	vec3(-0.525731f, 0, -0.850651f)
 };
 
-layout (binding=0) uniform ubo
+layout (binding=0) uniform MainUBO
 {
 	mat4 HMD;
 	mat4 projection;
     mat4 modelview;
-	vec4 uOffset;
-
-	vec3 uNebulaAColor;
-	float uNebulaADensity;
-	vec3 uNebulaBColor;
-	float uNebulaBDensity;
-
-	float uStarsScale;
-	float uStarDensity;
-	vec2 pad0;
-
-	vec4 uSunPosition;
-	float uSunSize;
-	float uSunFalloff;
-	vec2 pad1;
-	vec4 uSunColor;
+	mat4 lightMVP;
+	vec4 lightColor;
+	vec4 lightDirection;
 };
 
 out gl_PerVertex

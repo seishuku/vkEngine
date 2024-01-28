@@ -76,7 +76,7 @@ VkBool32 vkuCreateImageBuffer(VkuContext_t *context, VkuImage_t *image,
 void vkuCreateTexture2D(VkuContext_t *context, VkuImage_t *image, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits samples)
 {
 	// Set up some typical usage flags
-	VkBufferUsageFlags usageFlags=VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	VkBufferUsageFlags usageFlags=VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	VkImageAspectFlags aspectFlags=VK_IMAGE_ASPECT_COLOR_BIT;
 
 	// If the format is in a range of depth formats, select depth/stencil attachment.

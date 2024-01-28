@@ -35,7 +35,7 @@ MemZone_t *Zone_Init(size_t size)
 	zone->size=size;
 
 	// Create a mutex for thread safety
-	if(pthread_mutex_init(&zone->mutex, NULL))
+	if(mtx_init(&zone->mutex, mtx_plain))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Zone_Init: Unable to create mutex.\n");
 		return false;
@@ -67,7 +67,7 @@ void *Zone_Malloc(MemZone_t *zone, size_t size)
 		return NULL;
 	}
 
-	pthread_mutex_lock(&zone->mutex);
+	mtx_lock(&zone->mutex);
 
 	// Search for free blocks
 	size_t *block=zone->memory;
@@ -96,7 +96,7 @@ void *Zone_Malloc(MemZone_t *zone, size_t size)
 			// Set the new block size
 			*block=size&SIZE_MASK;
 
-			pthread_mutex_unlock(&zone->mutex);
+			mtx_unlock(&zone->mutex);
 
 #ifdef _DEBUG
 			DBGPRINTF(DEBUG_WARNING, "Zone_Malloc: Allocated block, location: %p, size: %0.3fKB\n", block, (float)(size-sizeof(size_t))/1000.0f);
@@ -107,7 +107,7 @@ void *Zone_Malloc(MemZone_t *zone, size_t size)
 		block=(size_t *)((uint8_t *)block+blockSize);
 	}
 
-	pthread_mutex_unlock(&zone->mutex);
+	mtx_unlock(&zone->mutex);
 
 	DBGPRINTF(DEBUG_ERROR, "Zone_Malloc: Unable locate large enough free block (%0.3fKB).\n", (float)(size-sizeof(size_t))/1000.0f);
 	return NULL;
@@ -162,7 +162,7 @@ void *Zone_Realloc(MemZone_t *zone, void *ptr, size_t size)
 			return ptr;
 		}
 
-		pthread_mutex_lock(&zone->mutex);
+		mtx_lock(&zone->mutex);
 
 		// Otherwise, if there is a free block after, expand that block otherwise, create a new free block if possible.
 #ifdef _DEBUG
@@ -212,7 +212,7 @@ void *Zone_Realloc(MemZone_t *zone, void *ptr, size_t size)
 			}
 		}
 
-		pthread_mutex_unlock(&zone->mutex);
+		mtx_unlock(&zone->mutex);
 
 		// Return the adjusted block's address after adjusting free blocks.
 		return ptr;
@@ -236,7 +236,7 @@ void *Zone_Realloc(MemZone_t *zone, void *ptr, size_t size)
 			{
 				size_t freeSize=totalSize-size;
 
-				pthread_mutex_lock(&zone->mutex);
+				mtx_lock(&zone->mutex);
 
 				// Free size must be larger than the header in order to split a free block,
 				//     otherwise consume the whole block.
@@ -260,7 +260,7 @@ void *Zone_Realloc(MemZone_t *zone, void *ptr, size_t size)
 #endif
 				}
 
-				pthread_mutex_unlock(&zone->mutex);
+				mtx_unlock(&zone->mutex);
 
 				return ptr;
 			}
@@ -310,7 +310,7 @@ void Zone_Free(MemZone_t *zone, void *ptr)
 	DBGPRINTF(DEBUG_WARNING, "Zone_Free: Freed block, location: %p, size: %0.3fKB\n", block, (float)(blockSize-sizeof(size_t))/1000.0f);
 #endif
 
-	pthread_mutex_lock(&zone->mutex);
+	mtx_lock(&zone->mutex);
 
 	// Freeing a block is as simple as setting it to free.
 	*block|=FREE_MASK;
@@ -366,7 +366,7 @@ void Zone_Free(MemZone_t *zone, void *ptr)
 		}
 	}
 
-	pthread_mutex_unlock(&zone->mutex);
+	mtx_unlock(&zone->mutex);
 }
 
 // Walk the blocks in the heap and verify that none go out of bounds

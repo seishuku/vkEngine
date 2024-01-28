@@ -32,8 +32,8 @@ bool CreateSkyboxPipeline(void)
 	}
 
 	vkuInitDescriptorSet(&skyboxDescriptorSet, &vkContext);
-	vkuDescriptorSet_AddBinding(&skyboxDescriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&skyboxDescriptorSet, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&skyboxDescriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
+	vkuDescriptorSet_AddBinding(&skyboxDescriptorSet, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&skyboxDescriptorSet);
 
 	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)

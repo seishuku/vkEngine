@@ -24,7 +24,9 @@ VkuImage_t colorResolve[2];		// left and right eye MSAA resolve color buffer
 VkuImage_t colorBlur[2];		// left and right eye blur color buffer
 VkuImage_t colorTemp[2];		// left and right eye blur color buffer
 
-//extern VkuImage_t ShadowDepth;
+extern VkuImage_t depthImage[2];
+extern VkuImage_t shadowDepth;
+
 extern UI_t UI;
 extern Font_t Fnt;
 
@@ -415,6 +417,9 @@ bool CreateCompositePipeline(void)
 	vkuInitDescriptorSet(&compositeDescriptorSet, &vkContext);
 	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
 
 	vkuAssembleDescriptorSetLayout(&compositeDescriptorSet);
 
@@ -423,6 +428,13 @@ bool CreateCompositePipeline(void)
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
 		.pSetLayouts=&compositeDescriptorSet.descriptorSetLayout,
+		.pushConstantRangeCount=1,
+		.pPushConstantRanges=&(VkPushConstantRange)
+		{
+			.offset=0,
+			.size=sizeof(uint32_t)*4,
+			.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
 	}, 0, &compositePipelineLayout);
 
 	vkuInitPipeline(&compositePipeline, &vkContext);
@@ -430,7 +442,6 @@ bool CreateCompositePipeline(void)
 	vkuPipeline_SetPipelineLayout(&compositePipeline, compositePipelineLayout);
 	vkuPipeline_SetRenderPass(&compositePipeline, compositeRenderPass);
 
-	compositePipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	compositePipeline.cullMode=VK_CULL_MODE_FRONT_BIT;
 
 	if(!vkuPipeline_AddStage(&compositePipeline, "shaders/fullscreen.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
@@ -506,6 +517,7 @@ void DestroyComposite(void)
 
 void CompositeDraw(uint32_t index, uint32_t eye)
 {
+	static uint32_t uFrame=0;
 	uint32_t width=0, height=0;
 
 	if(isVR)
@@ -555,7 +567,7 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 
 	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, thresholdPipeline.pipeline);
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&thresholdDescriptorSet, 0, &colorResolve[eye]);
+	vkuDescriptorSet_UpdateBindingImageInfo(&thresholdDescriptorSet, 0, colorResolve[eye].sampler, colorResolve[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	vkuAllocateUpdateDescriptorSet(&thresholdDescriptorSet, perFrame[index].descriptorPool);
 	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, thresholdPipelineLayout, 0, 1, &thresholdDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
@@ -604,7 +616,7 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 
 	vkCmdPushConstants(perFrame[index].commandBuffer, gaussianPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*2, &(float[]){ 1.0f, 0.0 });
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianDescriptorSet, 0, &colorBlur[eye]);
+	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianDescriptorSet, 0, colorBlur[eye].sampler, colorBlur[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuAllocateUpdateDescriptorSet(&gaussianDescriptorSet, perFrame[index].descriptorPool);
 
 	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipelineLayout, 0, 1, &gaussianDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
@@ -654,7 +666,7 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 
 	vkCmdPushConstants(perFrame[index].commandBuffer, gaussianPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*2, &(float[]){ 0.0f, 1.0 });
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianDescriptorSet, 0, &colorTemp[eye]);
+	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianDescriptorSet, 0, colorTemp[eye].sampler, colorTemp[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuAllocateUpdateDescriptorSet(&gaussianDescriptorSet, perFrame[index].descriptorPool);
 
 	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipelineLayout, 0, 1, &gaussianDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
@@ -703,12 +715,27 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 
 	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipeline.pipeline);
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&compositeDescriptorSet, 0, &colorResolve[eye]);
-//	vkuDescriptorSet_UpdateBindingImageInfo(&compositeDescriptorSet, 0, &shadowDepth);
-	vkuDescriptorSet_UpdateBindingImageInfo(&compositeDescriptorSet, 1, &colorBlur[eye]);
+	vkuDescriptorSet_UpdateBindingImageInfo(&compositeDescriptorSet, 0, colorResolve[eye].sampler, colorResolve[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&compositeDescriptorSet, 1, colorBlur[eye].sampler, colorBlur[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&compositeDescriptorSet, 2, depthImage[eye].sampler, depthImage[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&compositeDescriptorSet, 3, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&compositeDescriptorSet, 4, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
 
 	vkuAllocateUpdateDescriptorSet(&compositeDescriptorSet, perFrame[index].descriptorPool);
 	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipelineLayout, 0, 1, &compositeDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+
+	struct
+	{
+		uint32_t uFrame;
+		uint32_t uSize[2];
+		uint32_t Pad;
+	} PC;
+
+	PC.uFrame=uFrame++;
+	PC.uSize[0]=width;
+	PC.uSize[1]=height;
+
+	vkCmdPushConstants(perFrame[index].commandBuffer, compositePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PC), &PC);
 
 	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
 

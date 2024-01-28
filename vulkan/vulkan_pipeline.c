@@ -173,6 +173,9 @@ VkBool32 vkuInitPipeline(VkuPipeline_t *pipeline, VkuContext_t *context)
 	pipeline->numStages=0;
 	memset(pipeline->stages, 0, sizeof(VkPipelineShaderStageCreateInfo)*VKU_MAX_PIPELINE_SHADER_STAGES);
 
+	// Subpass 0
+	pipeline->subpass=0;
+
 	// Input assembly state
 	pipeline->topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	pipeline->primitiveRestart=VK_FALSE;
@@ -355,6 +358,7 @@ VkBool32 vkuAssemblePipeline(VkuPipeline_t *pipeline, void *pNext)
 		},
 		.layout=pipeline->pipelineLayout,
 		.renderPass=pipeline->renderPass,
+		.subpass=pipeline->subpass,
 	}, 0, &pipeline->pipeline);
 
 	// Done with pipeline creation, delete shader modules

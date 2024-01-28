@@ -590,7 +590,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye)
 
 		if(Control->type==UI_CONTROL_SPRITE)
 		{
-			vkuDescriptorSet_UpdateBindingImageInfo(&UI->descriptorSet, 0, Control->sprite.image);
+			vkuDescriptorSet_UpdateBindingImageInfo(&UI->descriptorSet, 0, Control->sprite.image->sampler, Control->sprite.image->imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			vkuAllocateUpdateDescriptorSet(&UI->descriptorSet, perFrame[index].descriptorPool);
 			vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipelineLayout, 0, 1, &UI->descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
@@ -599,7 +599,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye)
 		}
 	}
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&UI->descriptorSet, 0, &UI->blankImage);
+	vkuDescriptorSet_UpdateBindingImageInfo(&UI->descriptorSet, 0, UI->blankImage.sampler, UI->blankImage.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuAllocateUpdateDescriptorSet(&UI->descriptorSet, perFrame[index].descriptorPool);
 	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipelineLayout, 0, 1, &UI->descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 

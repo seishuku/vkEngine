@@ -44,15 +44,15 @@ VkBool32 vkuDescriptorSet_AddBinding(VkuDescriptorSet_t *descriptorSet, uint32_t
 	return VK_TRUE;
 }
 
-VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkuImage_t *image)
+VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkSampler sampler, VkImageView imageView, VkImageLayout imageLayout)
 {
-	if(!descriptorSet||!image)
+	if(!descriptorSet)
 		return VK_FALSE;
 
 	if(binding>=VKU_MAX_DESCRIPTORSET_BINDINGS)
 		return VK_FALSE;
 
-	descriptorSet->imageInfo[binding]=(VkDescriptorImageInfo) { image->sampler, image->imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+	descriptorSet->imageInfo[binding]=(VkDescriptorImageInfo) { sampler, imageView, imageLayout };
 
 	return VK_TRUE;
 }

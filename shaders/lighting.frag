@@ -11,9 +11,9 @@ layout (binding=3) uniform MainUBO
 	mat4 HMD;
 	mat4 projection;
     mat4 modelview;
-	mat4 light_mvp;
-	vec4 light_color;
-	vec4 light_direction;
+	mat4 lightMVP;
+	vec4 lightColor;
+	vec4 lightDirection;
 };
 
 layout (binding=4) uniform SkyboxUBO
@@ -49,7 +49,7 @@ layout (location=0) out vec4 Output;
 
 float ShadowPCF(vec4 Coords)
 {
-	vec2 delta=(light_direction.w*500.0)*(1.0/vec2(textureSize(TexShadow, 0)));
+	vec2 delta=(lightDirection.w*500.0)*(1.0/vec2(textureSize(TexShadow, 0)));
 
 	float shadow=0.0;
 	int count=0;
@@ -72,5 +72,5 @@ void main()
 	vec4 Base=texture(TexBase, UV);
 	vec3 n=normalize(iMatrix*local*vec4(Tangent*(2*texture(TexNormal, UV)-1).xyz, 0.0)).xyz;
 
-	Output=vec4(Base.xyz*light_color.xyz*max(0.01, dot(n, light_direction.xyz)*ShadowPCF(Shadow)), 1.0);
+	Output=vec4(Base.xyz*lightColor.xyz*max(0.01, dot(n, lightDirection.xyz)*ShadowPCF(Shadow)), 1.0);
 }

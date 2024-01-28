@@ -85,6 +85,9 @@ typedef struct
 	// Pipeline to be created
 	VkPipeline pipeline;
 
+	// What subpass
+	uint32_t subpass;
+
 	// Settable states:
 
 	// Vertex bindings
@@ -293,7 +296,7 @@ VkBool32 vkuInitPipeline(VkuPipeline_t *pipeline, VkuContext_t *context);
 VkBool32 vkuAssemblePipeline(VkuPipeline_t *pipeline, void *pNext);
 
 VkBool32 vkuDescriptorSet_AddBinding(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkDescriptorType type, VkShaderStageFlags stage);
-VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkuImage_t *image);
+VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkSampler sampler, VkImageView imageView, VkImageLayout imageLayout);
 VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range);
 VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *descriptorSet, VkuContext_t *context);
 VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSet_t *descriptorSet);

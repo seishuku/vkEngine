@@ -1,7 +1,7 @@
 #ifndef __THREADS_H__
 #define __THREADS_H__
 
-#include <pthread.h>
+#include <threads.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -26,9 +26,9 @@ typedef struct
 	ThreadJob_t jobs[THREAD_MAXJOBS];
 	uint32_t numJobs;
 
-	pthread_t thread;
-	pthread_mutex_t mutex;
-	pthread_cond_t condition;
+	thrd_t thread;
+	mtx_t mutex;
+	cnd_t condition;
 
 	ThreadFunction_t constructor;
 	void *constructorArg;

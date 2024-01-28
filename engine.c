@@ -4,7 +4,8 @@
 #include <stdbool.h>
 #include <stdalign.h>
 #include <string.h>
-
+#include <stdatomic.h>
+#include <pthread.h>
 #include "system/system.h"
 #include "network/network.h"
 #include "vulkan/vulkan.h"
@@ -36,10 +37,13 @@
 #include "sfx.h"
 #include "music.h"
 
+//#include <cvmarkers.h>
+//PCV_PROVIDER provider;
+//PCV_MARKERSERIES flagSeries;
+
 extern bool isDone;
 
-// Initial window size
-extern uint32_t windowWidth, windowHeight;
+// Render size
 uint32_t renderWidth=1920, renderHeight=1080;
 
 // external switch from system for if VR was initialized
@@ -106,9 +110,6 @@ VkuPipeline_t linePipeline;
 //////
 
 // Asteroid data
-VkuBuffer_t asteroidInstance;
-matrix *asteroidInstanceData;
-
 #define NUM_ASTEROIDS 1000
 RigidBody_t asteroids[NUM_ASTEROIDS];
 //////
@@ -127,8 +128,17 @@ typedef struct
 
 #define NUM_THREADS 3
 ThreadData_t threadData[NUM_THREADS];
-ThreadWorker_t thread[NUM_THREADS], threadPhysics, threadNetUpdate;
-pthread_barrier_t threadBarrier, physicsThreadBarrier;
+ThreadWorker_t thread[NUM_THREADS], threadPhysics/*, threadNetUpdate*/;
+
+//pthread_barrier_t threadBarrier, physicsThreadBarrier;
+
+mtx_t threadMutex;
+cnd_t threadCondition;
+_Atomic(int32_t) threadBarrier;
+
+mtx_t physicsThreadMutex;
+cnd_t physicsThreadCondition;
+_Atomic(int32_t) physicsThreadBarrier;
 //////
 
 // Network stuff
@@ -297,24 +307,26 @@ bool CreatePipeline(void)
 			},
 		},
 		.subpassCount=1,
-		.pSubpasses=&(VkSubpassDescription)
+		.pSubpasses=(VkSubpassDescription[])
 		{
-			.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS,
-			.colorAttachmentCount=1,
-			.pColorAttachments=&(VkAttachmentReference)
 			{
-				.attachment=0,
-				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			},
-			.pDepthStencilAttachment=&(VkAttachmentReference)
-			{
-				.attachment=1,
-				.layout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-			},
-			.pResolveAttachments=&(VkAttachmentReference)
-			{
-				.attachment=2,
-				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS,
+				.colorAttachmentCount=1,
+				.pColorAttachments=&(VkAttachmentReference)
+				{
+					.attachment=0,
+					.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				},
+				.pDepthStencilAttachment=&(VkAttachmentReference)
+				{
+					.attachment=1,
+					.layout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				},
+				.pResolveAttachments=&(VkAttachmentReference)
+				{
+					.attachment=2,
+					.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				},
 			},
 		},
 		.dependencyCount=3,
@@ -343,10 +355,10 @@ bool CreatePipeline(void)
 				.dstSubpass=0,
 				.srcStageMask=VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				.srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+				.srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-				.dependencyFlags=0,
-			}
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
+			},
 		}
 	}, 0, &renderPass);
 
@@ -514,10 +526,14 @@ void GenerateSkyParams(void)
 	//////
 
 	// Set up instance data for asteroid rendering
-	if(!asteroidInstance.buffer)
-		vkuCreateHostBuffer(&vkContext, &asteroidInstance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-	vkMapMemory(vkContext.device, asteroidInstance.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&asteroidInstanceData);
+	for(uint32_t i=0;i<swapchain.numImages;i++)
+	{
+		if(!perFrame[i].asteroidInstance.buffer)
+		{
+			vkuCreateHostBuffer(&vkContext, &perFrame[i].asteroidInstance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+			vkMapMemory(vkContext.device, perFrame[i].asteroidInstance.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].asteroidInstancePtr);
+		}
+	}
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
 	{
@@ -851,13 +867,13 @@ void Thread_Main(void *arg)
 	vkCmdBindPipeline(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipeline);
 
 	// Draw the models
-	vkCmdBindVertexBuffers(data->perFrame[data->index].secCommandBuffer[data->eye], 1, 1, &asteroidInstance.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(data->perFrame[data->index].secCommandBuffer[data->eye], 1, 1, &perFrame[data->index].asteroidInstance.buffer, &(VkDeviceSize) { 0 });
 
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 0, &textures[2*i+0]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 1, &textures[2*i+1]);
-		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 2, &shadowDepth);
+		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 0, textures[2*i+0].sampler, textures[2*i+0].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 1, textures[2*i+1].sampler, textures[2*i+1].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 2, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		vkuDescriptorSet_UpdateBindingBufferInfo(&mainDescriptorSet, 3, perFrame[data->index].mainUBOBuffer[data->eye].buffer, 0, VK_WHOLE_SIZE);
 		vkuDescriptorSet_UpdateBindingBufferInfo(&mainDescriptorSet, 4, perFrame[data->index].skyboxUBOBuffer[data->eye].buffer, 0, VK_WHOLE_SIZE);
 		vkuAllocateUpdateDescriptorSet(&mainDescriptorSet, data->perFrame[data->index].descriptorPool[data->eye]);
@@ -880,6 +896,7 @@ void Thread_Main(void *arg)
 		}
 	}
 
+#if 0
 	if(camera.shift)
 	{
 		for(uint32_t i=0;i<10;i++)
@@ -899,6 +916,7 @@ void Thread_Main(void *arg)
 						Vec4(1.0f+RandFloatRange(10.0f, 500.0f), 1.0f, 1.0f, 1.0f));
 		}
 	}
+#endif
 
 	// Draw VR "hands"
 	if(isVR)
@@ -1028,7 +1046,11 @@ void Thread_Main(void *arg)
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
-	pthread_barrier_wait(&threadBarrier);
+	//pthread_barrier_wait(&threadBarrier);
+	mtx_lock(&threadMutex);
+	atomic_fetch_sub(&threadBarrier, 1);
+	cnd_signal(&threadCondition);
+	mtx_unlock(&threadMutex);
 }
 
 // Skybox render pass thread
@@ -1080,14 +1102,17 @@ void Thread_Skybox(void *arg)
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
-	pthread_barrier_wait(&threadBarrier);
+	//pthread_barrier_wait(&threadBarrier);
+	mtx_lock(&threadMutex);
+	atomic_fetch_sub(&threadBarrier, 1);
+	cnd_signal(&threadCondition);
+	mtx_unlock(&threadMutex);
 }
 
 // Particles render pass thread, also has volumetric rendering
 void Thread_Particles(void *arg)
 {
 	ThreadData_t *data=(ThreadData_t *)arg;
-	static uint32_t uFrame=0;
 
 	vkResetDescriptorPool(vkContext.device, data->perFrame[data->index].descriptorPool[data->eye], 0);
 	vkResetCommandPool(vkContext.device, data->perFrame[data->index].commandPool[data->eye], 0);
@@ -1095,25 +1120,25 @@ void Thread_Particles(void *arg)
 	vkBeginCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye], &(VkCommandBufferBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-			.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
-			//.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
-			//{
-			//	.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-			//	.pNext=&(VkCommandBufferInheritanceRenderingInfo)
-			//	{
-			//		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-			//		.colorAttachmentCount=1,
-			//		.pColorAttachmentFormats=&ColorFormat,
-			//		.depthAttachmentFormat=DepthFormat,
-			//		.rasterizationSamples=MSAA
-			//	},
-			//}
-			.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
+		//.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+		//{
+		//	.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+		//	.pNext=&(VkCommandBufferInheritanceRenderingInfo)
+		//	{
+		//		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
+		//		.colorAttachmentCount=1,
+		//		.pColorAttachmentFormats=&ColorFormat,
+		//		.depthAttachmentFormat=DepthFormat,
+		//		.rasterizationSamples=MSAA
+		//	},
+		//}
+		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-				.pNext=NULL,
-				.renderPass=renderPass,
-				.framebuffer=framebuffer[data->eye]
+			.pNext=NULL,
+			.renderPass=renderPass,
+			.framebuffer=framebuffer[data->eye]
 		}
 	});
 
@@ -1123,13 +1148,12 @@ void Thread_Particles(void *arg)
 	matrix Modelview=MatrixMult(perFrame[data->index].mainUBO[data->eye]->modelView, perFrame[data->index].mainUBO[data->eye]->HMD);
 	ParticleSystem_Draw(&particleSystem, data->perFrame[data->index].secCommandBuffer[data->eye], data->perFrame[data->index].descriptorPool[data->eye], Modelview, perFrame[data->index].mainUBO[data->eye]->projection);
 
+#if 0
+	static uint32_t uFrame=0;
+	uFrame++;
+
 	vkCmdBindPipeline(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipeline.pipeline);
 
-	// TODO:
-	// Attempting to get proper depth interaction with the volume rendering, this is currently causing validation errors.
-	// Need to figure out the proper render pass subpass self dependency setup.
-	vkuTransitionLayout(data->perFrame[data->index].secCommandBuffer[data->eye], depthImage[data->eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-	uFrame++;
 	vkCmdPushConstants(data->perFrame[data->index].secCommandBuffer[data->eye], volumePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t), &uFrame);
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 0, &textures[TEXTURE_VOLUME]);
@@ -1140,11 +1164,15 @@ void Thread_Particles(void *arg)
 
 	// No vertex data, it's baked into the vertex shader
 	vkCmdDraw(data->perFrame[data->index].secCommandBuffer[data->eye], 36, 1, 0, 0);
-	//vkuTransitionLayout(data->perFrame[data->index].secCommandBuffer[data->eye], depthImage[data->eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+#endif
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
-	pthread_barrier_wait(&threadBarrier);
+	//pthread_barrier_wait(&threadBarrier);
+	mtx_lock(&threadMutex);
+	atomic_fetch_sub(&threadBarrier, 1);
+	cnd_signal(&threadCondition);
+	mtx_unlock(&threadMutex);
 }
 
 // Render everything together, per-eye, per-frame index
@@ -1162,7 +1190,7 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	perFrame[index].mainUBO[eye]->lightDirection=perFrame[index].skyboxUBO[eye]->uSunPosition;
 	perFrame[index].mainUBO[eye]->lightDirection.w=perFrame[index].skyboxUBO[eye]->uSunSize;
 
-	perFrame[index].mainUBO[eye]->lightMVP=shadowUBO.mvp;
+	perFrame[index].mainUBO[eye]->lightMVP=shadowMVP;
 
 	// Start a render pass and clear the frame/depth buffer
 	//vkCmdBeginRendering(perFrame[index]., &(VkRenderingInfo)
@@ -1217,23 +1245,150 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	threadData[2].eye=eye;
 	Thread_AddJob(&thread[2], Thread_Particles, (void *)&threadData[2]);
 
-	pthread_barrier_wait(&threadBarrier);
+	vkBeginCommandBuffer(perFrame[index].secCommandBuffer[eye], &(VkCommandBufferBeginInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
+		//.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+		//{
+		//	.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+		//	.pNext=&(VkCommandBufferInheritanceRenderingInfo)
+		//	{
+		//		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
+		//		.colorAttachmentCount=1,
+		//		.pColorAttachmentFormats=&ColorFormat,
+		//		.depthAttachmentFormat=DepthFormat,
+		//		.rasterizationSamples=MSAA
+		//	},
+		//}
+		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+			.pNext=NULL,
+			.renderPass=renderPass,
+			.framebuffer=framebuffer[eye],
+			//.subpass=1
+		}
+	});
+
+	vkCmdSetViewport(perFrame[index].secCommandBuffer[eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
+	vkCmdSetScissor(perFrame[index].secCommandBuffer[eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
+
+#if 1
+#ifndef ANDROID
+//	vkuTransitionLayout(perFrame[index].secCommandBuffer[eye], depthImage[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+	// Volumetric rendering is broken on Android when rendering at half resolution for some reason.
+	static uint32_t uFrame=0;
+
+	uFrame++;
+
+	vkCmdBindPipeline(perFrame[index].secCommandBuffer[eye], VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipeline.pipeline);
+
+	vkCmdPushConstants(perFrame[index].secCommandBuffer[eye], volumePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t), &uFrame);
+
+	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 0, textures[TEXTURE_VOLUME].sampler, textures[TEXTURE_VOLUME].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&volumeDescriptorSet, 1, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 2, depthImage[eye].sampler, depthImage[eye].imageView, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+	vkuAllocateUpdateDescriptorSet(&volumeDescriptorSet, perFrame[index].descriptorPool);
+	vkCmdBindDescriptorSets(perFrame[index].secCommandBuffer[eye], VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipelineLayout, 0, 1, &volumeDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+
+	// No vertex data, it's baked into the vertex shader
+	vkCmdDraw(perFrame[index].secCommandBuffer[eye], 36, 1, 0, 0);
+#endif
+#endif
+
+	vkEndCommandBuffer(perFrame[index].secCommandBuffer[eye]);
+
+	mtx_lock(&threadMutex);
+	while(atomic_load(&threadBarrier))
+		cnd_wait(&threadCondition, &threadMutex);
+	mtx_unlock(&threadMutex);
+	atomic_store(&threadBarrier, NUM_THREADS);
+
+	//pthread_barrier_wait(&threadBarrier);
 
 	// Execute the secondary command buffers from the threads
 	vkCmdExecuteCommands(perFrame[index].commandBuffer, 3, (VkCommandBuffer[])
 	{
 		threadData[0].perFrame[index].secCommandBuffer[eye],
 		threadData[1].perFrame[index].secCommandBuffer[eye],
-		threadData[2].perFrame[index].secCommandBuffer[eye]
+		threadData[2].perFrame[index].secCommandBuffer[eye],
+		perFrame[index].secCommandBuffer[eye]
 	});
+
+	//vkCmdNextSubpass(perFrame[index].commandBuffer, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+
+	//vkCmdExecuteCommands(perFrame[index].commandBuffer, 1, (VkCommandBuffer[])
+	//{
+	//	perFrame[index].secCommandBuffer[eye]
+	//});
 
 	//vkCmdEndRendering(perFrame[index].commandBuffer);
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 }
 
+int planeSphereIntersection(vec4 plane, RigidBody_t sphere, vec3 *intersectionA, vec3 *intersectionB)
+{
+	const vec3 planeVec3=Vec3(plane.x, plane.y, plane.z);
+	const float planeSphereSqDist=Vec3_Dot(planeVec3, sphere.position)+plane.w;
+	const float planeSqLength=Vec3_Dot(planeVec3, planeVec3);
+
+	const float distance=fabsf(planeSphereSqDist)/sqrtf(planeSqLength);
+
+	if(distance>sphere.radius)
+		return 0;
+
+	const float projectionFactor=-planeSphereSqDist/planeSqLength;
+
+	const vec3 projection=Vec3_Addv(sphere.position, Vec3_Muls(planeVec3, projectionFactor));
+
+	const float distanceToIntersection=sqrtf(sphere.radius*sphere.radius-distance*distance);
+
+	if(intersectionA)
+		*intersectionA=Vec3_Addv(projection, Vec3_Muls(planeVec3, distanceToIntersection));
+	
+	if(intersectionB)
+		*intersectionB=Vec3_Subv(projection, Vec3_Muls(planeVec3, distanceToIntersection));
+
+	return (distance==sphere.radius)?1:2;
+}
+
+vec4 calculatePlane(vec3 p, vec3 norm)
+{
+	Vec3_Normalize(&norm);
+	return Vec4(norm.x, norm.y, norm.z, Vec3_Dot(norm, p));
+}
+
+void calculateFrustumPlanes(const Camera_t camera, vec4 *frustumPlanes)
+{
+	const float fov=deg2rad(90.0f);
+	const float nearPlane=0.01f;
+	const float farPlane=100000.0f;
+	const float aspect=(float)renderWidth/renderHeight;
+
+	const float half_v=farPlane*tanf(fov*0.5f);
+	const float half_h=half_v*aspect;
+
+	vec3 forward_far=Vec3_Muls(camera.forward, farPlane);
+
+	// Top, bottom, right, left, far, near
+	frustumPlanes[0]=calculatePlane(Vec3_Addv(camera.position, Vec3_Muls(camera.forward, nearPlane)), camera.forward);
+	frustumPlanes[1]=calculatePlane(Vec3_Addv(camera.position, forward_far), Vec3_Muls(camera.forward, -1.0f));
+
+	frustumPlanes[2]=calculatePlane(camera.position, Vec3_Cross(camera.up, Vec3_Addv(forward_far, Vec3_Muls(camera.right, half_h))));
+	frustumPlanes[3]=calculatePlane(camera.position, Vec3_Cross(Vec3_Subv(forward_far, Vec3_Muls(camera.right, half_h)), camera.up));
+	frustumPlanes[4]=calculatePlane(camera.position, Vec3_Cross(camera.right, Vec3_Subv(forward_far, Vec3_Muls(camera.up, half_v))));
+	frustumPlanes[5]=calculatePlane(camera.position, Vec3_Cross(Vec3_Addv(forward_far, Vec3_Muls(camera.up, half_v)), camera.right));
+}
+
 // Runs anything physics related
 void Thread_Physics(void *arg)
 {
+	uint32_t index=*((uint32_t *)arg);
+
+	//CvWriteFlag(flagSeries, "physics start");
+
 	// Get a pointer to the emitter that's providing the positions
 	ParticleEmitter_t *emitter=List_GetPointer(&particleSystem.emitters, 0);
 
@@ -1288,6 +1443,7 @@ void Thread_Physics(void *arg)
 				PhysicsParticleToSphereCollisionResponse(&emitter->particles[j], &asteroids[i]);
 		}
 
+#if 0
 		if(camera.shift)
 		{
 			float distance=raySphereIntersect(camera.position, camera.forward, asteroids[i].position, asteroids[i].radius);
@@ -1300,6 +1456,7 @@ void Thread_Physics(void *arg)
 				PhysicsParticleToSphereCollisionResponse(&particle, &asteroids[i]);
 			}
 		}
+#endif
 	}
 
 #if 0
@@ -1322,10 +1479,11 @@ void Thread_Physics(void *arg)
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
 	{
-		const float radiusScale=1.5f;
-		matrix local=MatrixScale(asteroids[i].radius/radiusScale, asteroids[i].radius/radiusScale, asteroids[i].radius/radiusScale);
+		float radiusScale=0.666667f;
+
+		matrix local=MatrixScale(asteroids[i].radius*radiusScale, asteroids[i].radius*radiusScale, asteroids[i].radius*radiusScale);
 		local=MatrixMult(local, QuatMatrix(asteroids[i].orientation));
-		asteroidInstanceData[i]=MatrixMult(local, MatrixTranslatev(asteroids[i].position));
+		perFrame[index].asteroidInstancePtr[i]=MatrixMult(local, MatrixTranslatev(asteroids[i].position));
 	}
 
 	//vkUnmapMemory(Context.device, asteroidInstance.deviceMemory);
@@ -1352,8 +1510,14 @@ void Thread_Physics(void *arg)
 	//////
 #endif
 
+	//CvWriteFlag(flagSeries, "physics end");
+
 	// Barrier now that we're done here
-	pthread_barrier_wait(&physicsThreadBarrier);
+	//pthread_barrier_wait(&physicsThreadBarrier);
+//	mtx_lock(&physicsThreadMutex);
+	atomic_fetch_sub(&physicsThreadBarrier, 1);
+//	cnd_signal(&physicsThreadCondition);
+//	mtx_unlock(&physicsThreadMutex);
 }
 
 #if 0
@@ -1430,6 +1594,8 @@ void Render(void)
 {
 	static uint32_t index=0;
 	uint32_t imageIndex;
+
+	//CvWriteFlag(flagSeries, "frame start");
 
 	static uint32_t cleanUpCount=0;
 
@@ -1541,7 +1707,7 @@ void Render(void)
 		headPose=MatrixIdentity();
 	}
 
-	Thread_AddJob(&threadPhysics, Thread_Physics, NULL);
+	Thread_AddJob(&threadPhysics, Thread_Physics, (void *)&index);
 
 	Console_Draw(&console);
 
@@ -1566,9 +1732,6 @@ void Render(void)
 	// Update shadow depth map
 	ShadowUpdateMap(perFrame[index].commandBuffer, index);
 
-	// Wait for physics to finish before rendering
-	pthread_barrier_wait(&physicsThreadBarrier);
-
 	vkuTransitionLayout(perFrame[index].commandBuffer, colorResolve[0].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	EyeRender(index, 0, headPose);
 
@@ -1590,6 +1753,16 @@ void Render(void)
 	Font_Reset(&Fnt);
 
 	vkEndCommandBuffer(perFrame[index].commandBuffer);
+
+	// Wait for physics to finish before sumbitting frame
+	//pthread_barrier_wait(&physicsThreadBarrier);
+
+//	mtx_lock(&physicsThreadMutex);
+	while(atomic_load(&physicsThreadBarrier));
+//		cnd_wait(&physicsThreadCondition, &physicsThreadMutex);
+//	mtx_unlock(&physicsThreadMutex);
+
+	atomic_store(&physicsThreadBarrier, 1);
 
 	// Submit command queue
 	VkSubmitInfo SubmitInfo=
@@ -1653,11 +1826,14 @@ void Console_CmdQuit(Console_t *Console, char *Param)
 // Initialization call from system main
 bool Init(void)
 {
+	RandomSeed(42069);
+
+	//CvInitProvider(&CvDefaultProviderGuid, &provider);
+	//CvCreateMarkerSeries(provider, "flag series", &flagSeries);
+
 	// TODO: This is a hack, fix it proper.
 	if(isVR)
 		swapchain.numImages=xrContext.swapchain[0].numImages;
-
-	RandomSeed((uint32_t)GetClock()*UINT32_MAX);
 
 	Event_Add(EVENT_KEYDOWN, Event_KeyDown);
 	Event_Add(EVENT_KEYUP, Event_KeyUp);
@@ -1677,7 +1853,6 @@ bool Init(void)
 	}
 
 	CameraInit(&camera, Vec3(0.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
-	modelView=CameraUpdate(&camera, 0.0f);
 
 	if(!Audio_Init())
 	{
@@ -1953,6 +2128,14 @@ bool Init(void)
 			.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 			.commandBufferCount=1,
 		}, &perFrame[i].commandBuffer);
+
+		vkAllocateCommandBuffers(vkContext.device, &(VkCommandBufferAllocateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.commandPool=perFrame[i].commandPool,
+			.level=VK_COMMAND_BUFFER_LEVEL_SECONDARY,
+			.commandBufferCount=2,
+		}, perFrame[i].secCommandBuffer);
 	}
 
 	// Set up and initialize threads
@@ -1965,12 +2148,19 @@ bool Init(void)
 	}
 
 	// Synchronization barrier, count is number of threads+main thread
-	pthread_barrier_init(&threadBarrier, NULL, NUM_THREADS+1);
+	//pthread_barrier_init(&threadBarrier, NULL, NUM_THREADS+1);
+	cnd_init(&threadCondition);
+	mtx_init(&threadMutex, mtx_plain);
+	atomic_store(&threadBarrier, NUM_THREADS);
 
 	// Thread for physics, and sync barrier
 	Thread_Init(&threadPhysics);
 	Thread_Start(&threadPhysics);
-	pthread_barrier_init(&physicsThreadBarrier, NULL, 2);
+
+	//pthread_barrier_init(&physicsThreadBarrier, NULL, 2);
+	cnd_init(&physicsThreadCondition);
+	mtx_init(&physicsThreadMutex, mtx_plain);
+	atomic_store(&physicsThreadBarrier, 1);
 
 #if 0
 	// Initialize the network API (mainly for winsock)
@@ -2038,6 +2228,8 @@ bool Init(void)
 // Rebuild Vulkan swapchain and related data
 void RecreateSwapchain(void)
 {
+	cnd_broadcast(&physicsThreadCondition);
+
 	// Wait for the device to complete any pending work
 	vkDeviceWaitIdle(vkContext.device);
 
@@ -2177,8 +2369,11 @@ void Destroy(void)
 	//////////
 
 	// Asteroid instance buffer destruction
-	vkUnmapMemory(vkContext.device, asteroidInstance.deviceMemory);
-	vkuDestroyBuffer(&vkContext, &asteroidInstance);
+	for(uint32_t i=0;i<swapchain.numImages;i++)
+	{
+		vkUnmapMemory(vkContext.device, perFrame[i].asteroidInstance.deviceMemory);
+		vkuDestroyBuffer(&vkContext, &perFrame[i].asteroidInstance);
+	}
 	//////////
 
 	// Textures destruction

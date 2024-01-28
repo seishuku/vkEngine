@@ -201,15 +201,15 @@ void Music_Init(void)
 
 		currentMusic=RandRange(0, numMusic-1);
 		sprintf(filePath, "%s%s", musicPath, musicList[currentMusic].string);
-		oggFile=fopen(filePath, "rb");
+		//oggFile=fopen(filePath, "rb");
 
-		if(oggFile==NULL)
-		{
-			DBGPRINTF(DEBUG_ERROR, "Music_Init: Unable to fopen %s\n", filePath);
-			return;
-		}
+		//if(oggFile==NULL)
+		//{
+		//	DBGPRINTF(DEBUG_ERROR, "Music_Init: Unable to fopen %s\n", filePath);
+		//	return;
+		//}
 
-		int result=ov_open(oggFile, &oggStream, NULL, 0);
+		int result=ov_fopen(filePath, &oggStream);
 
 		if(result<0)
 		{

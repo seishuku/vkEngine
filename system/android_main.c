@@ -70,10 +70,7 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 					switch(AKeyEvent_getAction(event)&AMOTION_EVENT_ACTION_MASK)
 					{
 						case AMOTION_EVENT_ACTION_DOWN:
-							if(AMotionEvent_getPointerCount(event)==2)
-								MouseEvent.button|=MOUSE_BUTTON_RIGHT;
-							else
-								MouseEvent.button|=MOUSE_BUTTON_LEFT;
+							MouseEvent.button|=MOUSE_BUTTON_LEFT;
 							Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
 							break;
 
@@ -184,8 +181,9 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 	switch(cmd)
 	{
 		case APP_CMD_INIT_WINDOW:
-			winWidth=ANativeWindow_getWidth(app->window);
-			winHeight=ANativeWindow_getHeight(app->window);
+			winWidth=ANativeWindow_getWidth(app->window)/2;
+			winHeight=ANativeWindow_getHeight(app->window)/2;
+			ANativeWindow_setBuffersGeometry(app->window, winWidth, winHeight, 0);
 
 			vkContext.window=app->window;
 

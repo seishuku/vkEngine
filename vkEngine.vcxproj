@@ -209,11 +209,13 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>c:\program files\microsoft visual studio\2022\community\common7\ide\extensions\rf2nfg00.o0t\SDK\Native\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/experimental:c11atomics %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>vorbisfile.lib;ogg.lib;openxr_loader.lib;portaudio.lib;pthreadVC3d.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vorbisfile.lib;ogg.lib;openxr_loader.lib;portaudio.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug (Clang)|x64'">
@@ -223,16 +225,16 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <LanguageStandard_C>stdc17</LanguageStandard_C>
       <FloatingPointModel>Fast</FloatingPointModel>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <Optimization>Disabled</Optimization>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
+      <AdditionalIncludeDirectories>c:\program files\microsoft visual studio\2022\community\common7\ide\extensions\rf2nfg00.o0t\SDK\Native\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>vorbisfile.lib;ogg.lib;openxr_loader.lib;portaudio.lib;pthreadVC3d.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>pthreadVC3d.lib;vorbisfile.lib;ogg.lib;openxr_loader.lib;portaudio.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -255,13 +257,15 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <OpenMPSupport>
       </OpenMPSupport>
+      <AdditionalIncludeDirectories>c:\program files\microsoft visual studio\2022\community\common7\ide\extensions\rf2nfg00.o0t\SDK\Native\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/experimental:c11atomics %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>vorbisfile.lib;ogg.lib;openxr_loader.lib;portaudio.lib;pthreadVC3.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vorbisfile.lib;ogg.lib;openxr_loader.lib;portaudio.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <Profile>true</Profile>
     </Link>
@@ -279,18 +283,18 @@
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <WholeProgramOptimization>true</WholeProgramOptimization>
       <AdditionalOptions>/Qvec /openmp %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>c:\program files\microsoft visual studio\2022\community\common7\ide\extensions\rf2nfg00.o0t\SDK\Native\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>vorbisfile.lib;ogg.lib;openxr_loader.lib;portaudio.lib;pthreadVC3.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vorbisfile.lib;ogg.lib;openxr_loader.lib;portaudio.lib;vulkan-1.lib;ws2_32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

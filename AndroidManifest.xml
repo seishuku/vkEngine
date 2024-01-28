@@ -1,19 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.NitroGL.vkEngine">
 	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+	<uses-permission android:name="com.oculus.permission.HAND_TRACKING" />
 	<uses-sdk android:minSdkVersion="28" android:targetSdkVersion="28"/>
 	<uses-feature android:name="android.hardware.vr.headtracking" android:required="true"/>
-    <application android:debuggable="true"
-				 android:hasCode="false"
-				 android:label="vkEngine">
-        <activity android:configChanges="screenSize|orientation|keyboardHidden"
+	<uses-feature android:name="oculus.software.handtracking" android:required="false" />
+    <application
+				android:debuggable="true"
+				android:hasCode="false"
+				android:label="vkEngine">
+        <activity
 				android:label="vkEngine"
 				android:launchMode="singleTask"
+				android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+				android:configChanges="screenSize|screenLayout|orientation|keyboardHidden|keyboard|navigation|uiMode"
 				android:name="android.app.NativeActivity">
             <meta-data android:name="android.app.lib_name" android:value="vkEngine"/>
             <intent-filter>
 				<action android:name="android.intent.action.MAIN"/>
-				<!--<category android:name="com.oculus.intent.category.VR" /> -->
+				<category android:name="com.oculus.intent.category.VR"/>
 				<category android:name="android.intent.category.LAUNCHER"/>
 			</intent-filter>
         </activity>
