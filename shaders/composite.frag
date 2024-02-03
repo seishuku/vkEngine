@@ -20,7 +20,8 @@ layout(binding=4) uniform MainUBO
 layout(push_constant) uniform PC
 {
 	uint uFrame;
-	uvec2 uSize;
+	uint uWidth, uHeight;
+	uint pad;
 };
 
 layout(location=0) out vec4 Output;
@@ -112,11 +113,13 @@ vec4 depth2World(float viewZ)
 
 void main(void)
 {
-	seed=uint(gl_FragCoord.x+uSize.x*gl_FragCoord.y)+uSize.x*uSize.y*(uFrame%32);
+//	seed=uint(gl_FragCoord.x*1452.0+gl_FragCoord.y*734.0+uFrame*9525.0);
+	seed=uint(gl_FragCoord.x+uWidth*gl_FragCoord.y)+uWidth*uHeight*(uFrame%32);
 
     vec3 ro=inverse(modelview)[3].xyz;
 	vec4 worldPos=depth2World(max(texture(depthTex, UV).x, 0.00009));
 
 	vec3 lightVolume=volumetricLightScattering(lightDirection.xyz, ro, worldPos.xyz)*lightColor.xyz;
 	Output=1.0-exp(-(texture(original, UV)+texture(blur, UV))*1.0)+vec4(lightVolume, 0.0);
+//	Output=texture(original, UV);
 }

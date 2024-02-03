@@ -38,7 +38,7 @@ VkuMemZone_t *vkuMem_Init(VkuContext_t *context, size_t size)
 	// Search for the first memory type on the local memory heap and set it
 	for(uint32_t Index=0;Index<context->deviceMemProperties.memoryTypeCount;Index++)
 	{
-		if(context->deviceMemProperties.memoryTypes[Index].propertyFlags&(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT|VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD))
+		if(context->deviceMemProperties.memoryTypes[Index].propertyFlags&VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
 		{
 			allocateInfo.memoryTypeIndex=Index;
 			break;

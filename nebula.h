@@ -5,6 +5,7 @@
 extern VkuDescriptorSet_t volumeDescriptorSet;
 extern VkPipelineLayout volumePipelineLayout;
 extern VkuPipeline_t volumePipeline;
+extern VkRenderPass volumeRenderPass;
 //////
 
 VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *image);

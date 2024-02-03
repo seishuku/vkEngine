@@ -4,8 +4,9 @@ layout(location=0) in vec3 Position;
 layout(location=1) flat in float Scale;
 
 layout(binding=0) uniform sampler3D Volume;
+layout(binding=1) uniform sampler2D Depth;
 
-layout(binding=1) uniform MainUBO
+layout(binding=2) uniform MainUBO
 {
 	mat4 HMD;
 	mat4 projection;
@@ -15,15 +16,40 @@ layout(binding=1) uniform MainUBO
 	vec4 lightDirection;
 };
 
+layout (binding=3) uniform SkyboxUBO
+{
+	vec4 uOffset;
+
+	vec3 uNebulaAColor;
+	float uNebulaADensity;
+	vec3 uNebulaBColor;
+	float uNebulaBDensity;
+
+	float uStarsScale;
+	float uStarDensity;
+	vec2 pad0;
+
+	vec4 uSunPosition;
+	float uSunSize;
+	float uSunFalloff;
+	vec2 pad1;
+	vec4 uSunColor;
+};
+
 layout(push_constant) uniform PC
 {
 	uint uFrame;
+	uint uWidth, uHeight;
+	uint pad;
 };
 
-//layout (input_attachment_index=1, binding=0) uniform subpassInput inputDepth;
-
-
 layout(location=0) out vec4 Output;
+
+vec4 depth2World(float viewZ)
+{
+	vec4 clipPosition=inverse(projection)*vec4(vec3((gl_FragCoord.xy/vec2(uWidth, uHeight))*2-1, viewZ), 1.0);
+	return clipPosition/clipPosition.w;
+}
 
 vec2 intersectBox(vec3 origin, vec3 direction)
 {
@@ -38,7 +64,10 @@ vec2 intersectBox(vec3 origin, vec3 direction)
     vec3 tmax=max(ttop, tbot);
 
     // find the largest tmin and the smallest tmax
-    return vec2(max(max(tmin.x, tmin.y), max(tmin.x, tmin.z)), min(min(tmax.x, tmax.y), min(tmax.x, tmax.z)));
+	float t0=max(max(tmin.x, tmin.y), max(tmin.x, tmin.z));
+	float t1=min(min(tmax.x, tmax.y), min(tmax.x, tmax.z));
+
+    return vec2(t0, t1);
 }
 
 uint wang_hash(inout uint seed)
@@ -78,12 +107,21 @@ vec3 TurboColormap(in float x)
 	);
 }
 
+vec3 Bezier(float t, vec3 p0, vec3 p1, vec3 p2, vec3 p3)
+{
+	vec3 c=3.0*(p1-p0);
+	vec3 b=3.0*(p2-p1)-c;
+	vec3 a=p3-p0-c-b;
+
+	return (a*(t*t*t))+(b*(t*t))+(c*t)+p0;
+}
+
 void main()
 {
-    vec3 ray_origin=-inverse(modelview)[3].xyz/Scale;
-    vec3 ray_direction=normalize(inverse(modelview)[3].xyz-Position);
+    vec3 ro=-inverse(modelview)[3].xyz/Scale;
+    vec3 rd=normalize(inverse(modelview)[3].xyz-Position);
 
-    vec2 hit=intersectBox(ray_origin, ray_direction);
+	vec2 hit=intersectBox(ro, rd);
 
 	if(hit.y<hit.x)
 	{
@@ -91,23 +129,28 @@ void main()
 		return;
 	}
 
+	float sceneDepth=texture(Depth, gl_FragCoord.xy/vec2(uWidth, uHeight)).x;
+	vec4 worldPos=depth2World(sceneDepth)/Scale;
+	float localSceneDepth=length(worldPos);
+
 	hit.x=max(hit.x, 0.0);
+	hit.y=min(hit.y, localSceneDepth);
 
-	vec3 dt_vec=1.0/(vec3(Scale)*abs(ray_direction));
-	float stepSize=min(dt_vec.x, min(dt_vec.y, dt_vec.z))*4.0;
+	vec3 dt_vec=1.0/(vec3(Scale)*abs(rd));
+	float stepSize=min(dt_vec.x, min(dt_vec.y, dt_vec.z))*8.0;
 
-	uint seed=uint(gl_FragCoord.x*1452.0+gl_FragCoord.y*734.0+uFrame*9525.0);
-	float random=randomFloat(seed);
+	uint seed=uint(gl_FragCoord.x+uWidth*gl_FragCoord.y)+uWidth*uHeight*(uFrame%32);
 
 	Output=vec4(0.0);
 
 	for(float dist=hit.x;dist<hit.y;dist+=stepSize)
 	{
-		vec3 pos=ray_origin+ray_direction*(dist+stepSize*random);
+		vec3 pos=ro+rd*dist+(rd*randomFloat(seed));
 
 		float d=clamp(1.0-length(pos), 0.0, 1.0);
-		float val=texture(Volume, pos*0.5+0.5).r*d;
-		vec4 val_color=vec4(TurboColormap(val*5.0), val);
+		float density=1.0-exp(-(texture(Volume, pos*0.5+0.5).r*d)*4.0);
+
+		vec4 val_color=vec4(Bezier(min(density*6.0, 1.0), vec3(0.0), uNebulaBColor, uNebulaAColor, vec3(0.0)), density);
 
 		Output.rgb+=(1.0-Output.a)*val_color.rgb*val_color.a;
 		Output.a+=(1.0-Output.a)*val_color.a;

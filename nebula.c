@@ -3,8 +3,8 @@
 
 extern VkuContext_t vkContext;
 extern VkSampleCountFlags MSAA;
-extern VkFormat ColorFormat;
-extern VkFormat DepthFormat;
+extern VkFormat colorFormat;
+extern VkFormat depthFormat;
 extern VkRenderPass renderPass;
 
 // Volume rendering vulkan stuff
@@ -225,8 +225,9 @@ bool CreateVolumePipeline(void)
 {
 	vkuInitDescriptorSet(&volumeDescriptorSet, &vkContext);
 	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&volumeDescriptorSet);
 
 	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
@@ -238,7 +239,7 @@ bool CreateVolumePipeline(void)
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
 			.offset=0,
-			.size=sizeof(uint32_t),
+			.size=sizeof(uint32_t)*4,
 			.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 	}, 0, &volumePipelineLayout);
@@ -248,18 +249,18 @@ bool CreateVolumePipeline(void)
 	vkuPipeline_SetPipelineLayout(&volumePipeline, volumePipelineLayout);
 	vkuPipeline_SetRenderPass(&volumePipeline, renderPass);
 
-	volumePipeline.depthTest=VK_TRUE;
+	volumePipeline.subpass=1;
+
 	volumePipeline.cullMode=VK_CULL_MODE_BACK_BIT;
 	volumePipeline.depthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
-	volumePipeline.depthWrite=VK_FALSE;
 	volumePipeline.rasterizationSamples=MSAA;
 
 	volumePipeline.blend=VK_TRUE;
 	volumePipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	volumePipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE;
+	volumePipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 	volumePipeline.colorBlendOp=VK_BLEND_OP_ADD;
 	volumePipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	volumePipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE;
+	volumePipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 	volumePipeline.alphaBlendOp=VK_BLEND_OP_ADD;
 
 	if(!vkuPipeline_AddStage(&volumePipeline, "shaders/volume.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))

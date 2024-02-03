@@ -1,6 +1,6 @@
 #version 450
 
-layout (binding=1) uniform MainUBO
+layout (binding=2) uniform MainUBO
 {
 	mat4 HMD;
 	mat4 projection;
@@ -25,7 +25,7 @@ vec3 Cube[]=
 
 void main()
 {
-	Scale=300.0;
+	Scale=400.0;
 	vec3 vPosition=Cube[gl_VertexIndex]*Scale.xxx;
 
 	gl_Position=projection*HMD*modelview*vec4(vPosition, 1.0);

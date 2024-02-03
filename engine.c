@@ -279,7 +279,7 @@ bool CreatePipeline(void)
 				.format=colorFormat,
 				.samples=MSAA,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-				.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
@@ -306,7 +306,7 @@ bool CreatePipeline(void)
 				.finalLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			},
 		},
-		.subpassCount=1,
+		.subpassCount=2,
 		.pSubpasses=(VkSubpassDescription[])
 		{
 			{
@@ -328,8 +328,27 @@ bool CreatePipeline(void)
 					.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 				},
 			},
+			{
+				.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS,
+				.colorAttachmentCount=1,
+				.pColorAttachments=&(VkAttachmentReference)
+				{
+					.attachment=0,
+					.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				},
+				.pDepthStencilAttachment=&(VkAttachmentReference)
+				{
+					.attachment=1,
+					.layout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				},
+				.pResolveAttachments=&(VkAttachmentReference)
+				{
+					.attachment=2,
+					.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				},
+			},
 		},
-		.dependencyCount=3,
+		.dependencyCount=4,
 		.pDependencies=(VkSubpassDependency[])
 		{
 			{
@@ -351,11 +370,20 @@ bool CreatePipeline(void)
 				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
 			},
 			{
-				.srcSubpass=0,
+				.srcSubpass=1,
 				.dstSubpass=0,
-				.srcStageMask=VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+				.srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
+			},
+			{
+				.srcSubpass=0,
+				.dstSubpass=1,
+				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				.srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
 				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
 			},
@@ -1156,9 +1184,9 @@ void Thread_Particles(void *arg)
 
 	vkCmdPushConstants(data->perFrame[data->index].secCommandBuffer[data->eye], volumePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t), &uFrame);
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 0, &textures[TEXTURE_VOLUME]);
+	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 0, textures[TEXTURE_VOLUME].sampler, textures[TEXTURE_VOLUME].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingBufferInfo(&volumeDescriptorSet, 1, perFrame[data->index].mainUBOBuffer[data->eye].buffer, 0, VK_WHOLE_SIZE);
-	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 2, &depthImage[data->eye]);
+	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 2, depthImage[data->eye].sampler, depthImage[data->eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuAllocateUpdateDescriptorSet(&volumeDescriptorSet, data->perFrame[data->index].descriptorPool[data->eye]);
 	vkCmdBindDescriptorSets(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipelineLayout, 0, 1, &volumeDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
@@ -1245,61 +1273,6 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	threadData[2].eye=eye;
 	Thread_AddJob(&thread[2], Thread_Particles, (void *)&threadData[2]);
 
-	vkBeginCommandBuffer(perFrame[index].secCommandBuffer[eye], &(VkCommandBufferBeginInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
-		//.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
-		//{
-		//	.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-		//	.pNext=&(VkCommandBufferInheritanceRenderingInfo)
-		//	{
-		//		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-		//		.colorAttachmentCount=1,
-		//		.pColorAttachmentFormats=&ColorFormat,
-		//		.depthAttachmentFormat=DepthFormat,
-		//		.rasterizationSamples=MSAA
-		//	},
-		//}
-		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-			.pNext=NULL,
-			.renderPass=renderPass,
-			.framebuffer=framebuffer[eye],
-			//.subpass=1
-		}
-	});
-
-	vkCmdSetViewport(perFrame[index].secCommandBuffer[eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
-	vkCmdSetScissor(perFrame[index].secCommandBuffer[eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
-
-#if 1
-#ifndef ANDROID
-//	vkuTransitionLayout(perFrame[index].secCommandBuffer[eye], depthImage[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-
-	// Volumetric rendering is broken on Android when rendering at half resolution for some reason.
-	static uint32_t uFrame=0;
-
-	uFrame++;
-
-	vkCmdBindPipeline(perFrame[index].secCommandBuffer[eye], VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipeline.pipeline);
-
-	vkCmdPushConstants(perFrame[index].secCommandBuffer[eye], volumePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t), &uFrame);
-
-	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 0, textures[TEXTURE_VOLUME].sampler, textures[TEXTURE_VOLUME].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingBufferInfo(&volumeDescriptorSet, 1, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
-	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 2, depthImage[eye].sampler, depthImage[eye].imageView, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
-	vkuAllocateUpdateDescriptorSet(&volumeDescriptorSet, perFrame[index].descriptorPool);
-	vkCmdBindDescriptorSets(perFrame[index].secCommandBuffer[eye], VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipelineLayout, 0, 1, &volumeDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
-
-	// No vertex data, it's baked into the vertex shader
-	vkCmdDraw(perFrame[index].secCommandBuffer[eye], 36, 1, 0, 0);
-#endif
-#endif
-
-	vkEndCommandBuffer(perFrame[index].secCommandBuffer[eye]);
-
 	mtx_lock(&threadMutex);
 	while(atomic_load(&threadBarrier))
 		cnd_wait(&threadCondition, &threadMutex);
@@ -1313,8 +1286,7 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	{
 		threadData[0].perFrame[index].secCommandBuffer[eye],
 		threadData[1].perFrame[index].secCommandBuffer[eye],
-		threadData[2].perFrame[index].secCommandBuffer[eye],
-		perFrame[index].secCommandBuffer[eye]
+		threadData[2].perFrame[index].secCommandBuffer[eye]
 	});
 
 	//vkCmdNextSubpass(perFrame[index].commandBuffer, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
@@ -1325,6 +1297,39 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	//});
 
 	//vkCmdEndRendering(perFrame[index].commandBuffer);
+//	vkCmdEndRenderPass(perFrame[index].commandBuffer);
+	vkCmdNextSubpass(perFrame[index].commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
+
+	// Volumetric rendering is broken on Android when rendering at half resolution for some reason.
+	static uint32_t uFrame=0;
+
+	struct
+	{
+		uint32_t uFrame;
+		uint32_t uWidth;
+		uint32_t uHeight;
+		uint32_t pad;
+	} PC;
+
+	PC.uFrame=uFrame++;
+	PC.uWidth=renderWidth;
+	PC.uHeight=renderHeight;
+	PC.pad=0;
+
+	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipeline.pipeline);
+
+	vkCmdPushConstants(perFrame[index].commandBuffer, volumePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PC), &PC);
+
+	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 0, textures[TEXTURE_VOLUME].sampler, textures[TEXTURE_VOLUME].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 1, depthImage[eye].sampler, depthImage[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&volumeDescriptorSet, 2, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&volumeDescriptorSet, 3, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuAllocateUpdateDescriptorSet(&volumeDescriptorSet, perFrame[index].descriptorPool);
+	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipelineLayout, 0, 1, &volumeDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+
+	// No vertex data, it's baked into the vertex shader
+	vkCmdDraw(perFrame[index].commandBuffer, 36, 1, 0, 0);
+
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 }
 
