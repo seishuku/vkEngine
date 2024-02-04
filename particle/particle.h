@@ -2,6 +2,7 @@
 #define __PARTICLE_H__
 
 #include <stdint.h>
+#include <threads.h>
 #include "../utils/list.h"
 #include "../math/math.h"
 #include "../vulkan/vulkan.h"
@@ -36,6 +37,7 @@ typedef struct
 
 	List_t emitters;
 
+	mtx_t mutex;
 	VkuBuffer_t particleBuffer;
 	float *particleArray;
 } ParticleSystem_t;

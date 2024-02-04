@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <threads.h>
 #include <string.h>
 #include "../system/system.h"
 #include "../vulkan/vulkan.h"
@@ -39,6 +40,8 @@ bool ParticleSystem_ResizeBuffer(ParticleSystem_t *system)
 	if(system==NULL)
 		return false;
 
+	mtx_lock(&system->mutex);
+
 	uint32_t count=0;
 
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
@@ -52,13 +55,15 @@ bool ParticleSystem_ResizeBuffer(ParticleSystem_t *system)
 
 	if(system->particleBuffer.buffer)
 	{
-		vkUnmapMemory(vkContext.device, system->particleBuffer.deviceMemory);
+//		vkUnmapMemory(vkContext.device, system->particleBuffer.deviceMemory);
 		vkDestroyBuffer(vkContext.device, system->particleBuffer.buffer, VK_NULL_HANDLE);
 		vkFreeMemory(vkContext.device, system->particleBuffer.deviceMemory, VK_NULL_HANDLE);
 	}
 
 	vkuCreateHostBuffer(&vkContext, &system->particleBuffer, sizeof(vec4)*2*count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	vkMapMemory(vkContext.device, system->particleBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&system->particleArray);
+//	vkMapMemory(vkContext.device, system->particleBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&system->particleArray);
+
+	mtx_unlock(&system->mutex);
 
 	return true;
 }
@@ -226,6 +231,12 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 	if(system==NULL)
 		return false;
 
+	if(mtx_init(&system->mutex, mtx_plain))
+	{
+		DBGPRINTF(DEBUG_ERROR, "ParticleSystem_Init: Unable to create mutex.\r\n");
+		return false;
+	}
+
 	system->baseID=0;
 
 	List_Init(&system->emitters, sizeof(ParticleEmitter_t), 10, NULL);
@@ -358,7 +369,10 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 	if(system==NULL)
 		return;
 
-	float *array=system->particleArray;
+	mtx_lock(&system->mutex);
+
+	float *array=NULL;//system->particleArray;
+	vkMapMemory(vkContext.device, system->particleBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&array);
 
 	if(array==NULL)
 		return;
@@ -389,6 +403,8 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 		}
 	}
 
+	vkUnmapMemory(vkContext.device, system->particleBuffer.deviceMemory);
+
 	particlePC.mvp=MatrixMult(modelview, projection);
 	particlePC.Right=Vec4(modelview.x.x, modelview.y.x, modelview.z.x, modelview.w.x);
 	particlePC.Up=Vec4(modelview.x.y, modelview.y.y, modelview.z.y, modelview.w.y);
@@ -403,6 +419,8 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &system->particleBuffer.buffer, &(VkDeviceSize) { 0 });
 	vkCmdDraw(commandBuffer, count, 1, 0, 0);
+
+	mtx_unlock(&system->mutex);
 }
 
 void ParticleSystem_Destroy(ParticleSystem_t *system)
@@ -410,6 +428,7 @@ void ParticleSystem_Destroy(ParticleSystem_t *system)
 	if(system==NULL)
 		return;
 
+//	vkUnmapMemory(vkContext.device, system->particleBuffer.deviceMemory);
 	vkuDestroyBuffer(&vkContext, &system->particleBuffer);
 
 	//vkuDestroyImageBuffer(&Context, &particleTexture);
