@@ -45,32 +45,34 @@ layout(push_constant) uniform PC
 
 layout(location=0) out vec4 Output;
 
-vec4 depth2World(float viewZ)
+vec4 depth2Eye(float viewZ)
 {
-	vec4 clipPosition=inverse(projection)*vec4(vec3((gl_FragCoord.xy/vec2(uWidth, uHeight))*2-1, viewZ), 1.0);
+	const vec4 clipPosition=inverse(projection)*vec4(vec3((gl_FragCoord.xy/vec2(uWidth, uHeight))*2-1, viewZ), 1.0);
 	return clipPosition/clipPosition.w;
 }
 
 vec2 intersectBox(vec3 origin, vec3 direction)
 {
     // compute intersection of ray with all six bbox planes
-    vec3 invR=1.0/direction;
+    const vec3 invR=1.0/direction;
 
-    vec3 tbot=invR*(vec3(-1.0)-origin);
-    vec3 ttop=invR*(vec3(1.0)-origin);
+    const vec3 tbot=invR*(vec3(-1.0)-origin);
+    const vec3 ttop=invR*(vec3(1.0)-origin);
 
     // re-order intersections to find smallest and largest on each axis
-    vec3 tmin=min(ttop, tbot);
-    vec3 tmax=max(ttop, tbot);
+    const vec3 tmin=min(ttop, tbot);
+    const vec3 tmax=max(ttop, tbot);
 
     // find the largest tmin and the smallest tmax
-	float t0=max(max(tmin.x, tmin.y), max(tmin.x, tmin.z));
-	float t1=min(min(tmax.x, tmax.y), min(tmax.x, tmax.z));
+	const float t0=max(max(tmin.x, tmin.y), max(tmin.x, tmin.z));
+	const float t1=min(min(tmax.x, tmax.y), min(tmax.x, tmax.z));
 
     return vec2(t0, t1);
 }
 
-uint wang_hash(inout uint seed)
+uint seed;
+
+uint wang_hash()
 {
 	seed=(seed^61u)^(seed>>16u);
 	seed*=9u;
@@ -81,9 +83,9 @@ uint wang_hash(inout uint seed)
 	return seed;
 }
 
-float randomFloat(inout uint seed)
+float randomFloat()
 {
-	return float(wang_hash(seed))/4294967296.0;
+	return float(wang_hash())/4294967296.0;
 }
 
 vec3 TurboColormap(in float x)
@@ -107,19 +109,11 @@ vec3 TurboColormap(in float x)
 	);
 }
 
-vec3 Bezier(float t, vec3 p0, vec3 p1, vec3 p2, vec3 p3)
-{
-	vec3 c=3.0*(p1-p0);
-	vec3 b=3.0*(p2-p1)-c;
-	vec3 a=p3-p0-c-b;
-
-	return (a*(t*t*t))+(b*(t*t))+(c*t)+p0;
-}
-
 void main()
 {
-    vec3 ro=-inverse(modelview)[3].xyz/Scale;
-    vec3 rd=normalize(inverse(modelview)[3].xyz-Position);
+	const vec3 eye=inverse(modelview)[3].xyz;
+    const vec3 ro=-eye/Scale;
+    const vec3 rd=normalize(eye-Position);
 
 	vec2 hit=intersectBox(ro, rd);
 
@@ -129,28 +123,34 @@ void main()
 		return;
 	}
 
-	float sceneDepth=texture(Depth, gl_FragCoord.xy/vec2(uWidth, uHeight)).x;
-	vec4 worldPos=depth2World(sceneDepth)/Scale;
-	float localSceneDepth=length(worldPos);
+	const float sceneDepth=texture(Depth, gl_FragCoord.xy/vec2(uWidth, uHeight)).x;
+	const vec4 worldPos=depth2Eye(sceneDepth)/Scale;
+	const float localSceneDepth=length(worldPos);
 
-	hit.x=max(hit.x, 0.0);
+	seed=uint(gl_FragCoord.x+uWidth*gl_FragCoord.y)+uWidth*uHeight*(uFrame%32);
+
+	// make sure near hit doesn't go negative and apply some random jitter to smooth banding
+	hit.x=max(hit.x, 0.0)+randomFloat()*0.1;
+	// clamp far hit to scene depth for proper mixing with exisiting scene
 	hit.y=min(hit.y, localSceneDepth);
 
-	vec3 dt_vec=1.0/(vec3(Scale)*abs(rd));
-	float stepSize=min(dt_vec.x, min(dt_vec.y, dt_vec.z))*8.0;
-
-	uint seed=uint(gl_FragCoord.x+uWidth*gl_FragCoord.y)+uWidth*uHeight*(uFrame%32);
+	const vec3 dt_vec=1.0/(vec3(Scale)*abs(rd));
+	const float stepSize=min(dt_vec.x, min(dt_vec.y, dt_vec.z))*8.0;
 
 	Output=vec4(0.0);
 
 	for(float dist=hit.x;dist<hit.y;dist+=stepSize)
 	{
-		vec3 pos=ro+rd*dist+(rd*randomFloat(seed));
+		const vec3 pos=ro+rd*dist;
 
-		float d=clamp(1.0-length(pos), 0.0, 1.0);
-		float density=1.0-exp(-(texture(Volume, pos*0.5+0.5).r*d)*4.0);
+		const float d=clamp(1.0-length(pos), 0.0, 1.0);
+		const float density=1.0-exp(-(texture(Volume, pos*0.5+0.5).r*d)*2.0);
 
-		vec4 val_color=vec4(Bezier(min(density*6.0, 1.0), vec3(0.0), uNebulaBColor, uNebulaAColor, vec3(0.0)), density);
+		// colorize the cloud sample
+		vec4 val_color=vec4(TurboColormap(density*6.0), density);
+
+		// apply some simple lighting
+		val_color.xyz*=lightColor.xyz*max(0.1, dot(pos, -lightDirection.xyz));
 
 		Output.rgb+=(1.0-Output.a)*val_color.rgb*val_color.a;
 		Output.a+=(1.0-Output.a)*val_color.a;
@@ -158,4 +158,7 @@ void main()
 		if(Output.a>=0.8)
 			break;
 	}
+
+	// boost final color some for a more dramatic cloud
+	Output=clamp(Output*1.3, 0.0, 1.0);
 }

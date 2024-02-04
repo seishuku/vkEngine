@@ -79,30 +79,27 @@ float MiePhase(float cosTheta, float g)
 float volumetricLightScattering(const vec3 lightPos, const vec3 rayOrigin, const vec3 rayEnd)
 {
 	const float g=0.01, mieCoefficient=0.09, decay=0.97;
-	const int numSteps=10;
+	const int numSteps=8;
+	const float fNumSteps=1.0/float(numSteps);
 	const vec3 rayVector=rayEnd-rayOrigin;
 	const float rayLength=length(rayVector);
 	const vec3 rayDirection=rayVector/rayLength;
-	const float stepLength=1.0/float(numSteps);
-    const vec3 rayStep=rayDirection*rayLength*stepLength;
+    const vec3 rayStep=rayDirection*rayLength*fNumSteps;
 	const float cosTheta=dot(rayDirection, normalize(lightPos));
 
 	const float miePhase=MiePhase(cosTheta, g);
 	const float scattering=mieCoefficient/(1.0-g*g);
 
-	float L=0.0, illumDecay=1.0;
+	float L=0.0;
 	vec4 rayPos=vec4(rayOrigin+rayStep*randomFloat(), 1.0);
 
 	for(int i=0;i<numSteps;i++)
 	{
 		L+=ShadowPCF(biasMat*lightMVP*rayPos)*scattering;
-		L*=illumDecay;
-
 		rayPos.xyz+=rayStep;
-		illumDecay*=decay;
 	}
 
-	return L*stepLength;
+	return L*fNumSteps;
 }
 
 vec4 depth2World(float viewZ)
@@ -113,7 +110,6 @@ vec4 depth2World(float viewZ)
 
 void main(void)
 {
-//	seed=uint(gl_FragCoord.x*1452.0+gl_FragCoord.y*734.0+uFrame*9525.0);
 	seed=uint(gl_FragCoord.x+uWidth*gl_FragCoord.y)+uWidth*uHeight*(uFrame%32);
 
     vec3 ro=inverse(modelview)[3].xyz;
