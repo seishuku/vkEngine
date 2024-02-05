@@ -189,28 +189,50 @@ void Event_KeyUp(void *arg)
 }
 
 static uint32_t activeID=UINT32_MAX;
-vec2 mousePosition={ 0.0f, 0.0f };
+static vec2 mousePosition={ 0.0f, 0.0f }, oldMousePosition={ 0.0f, 0.0f };
 
 void Event_MouseDown(void *arg)
 {
 	MouseEvent_t *mouseEvent=arg;
 
+#ifndef ANDROID
 	if(mouseEvent->button&MOUSE_BUTTON_LEFT)
 		activeID=UI_TestHit(&UI, mousePosition);
+#else
+	mousePosition.x=(float)mouseEvent->dx;
+	mousePosition.y=(float)mouseEvent->dy;
+
+	if(mouseEvent->button&MOUSE_TOUCH)
+	{
+		activeID=UI_TestHit(&UI, mousePosition);
+
+		if(activeID!=UINT32_MAX)
+			UI_ProcessControl(&UI, activeID, mousePosition);
+	}
+#endif
 }
 
 void Event_MouseUp(void *arg)
 {
 	MouseEvent_t *mouseEvent=arg;
 
+#ifndef ANDROID
 	if(mouseEvent->button&MOUSE_BUTTON_LEFT)
 		activeID=UINT32_MAX;
+#else
+	mousePosition.x=(float)mouseEvent->dx;
+	mousePosition.y=(float)mouseEvent->dy;
+
+	if(mouseEvent->button&MOUSE_TOUCH)
+		activeID=UINT32_MAX;
+#endif
 }
 
 void Event_Mouse(void *arg)
 {
 	MouseEvent_t *mouseEvent=arg;
 
+#ifndef ANDROID
 	// Calculate relative movement
 	mousePosition=Vec2_Add(mousePosition, (float)mouseEvent->dx, (float)mouseEvent->dy);
 
@@ -226,4 +248,15 @@ void Event_Mouse(void *arg)
 		camera.yaw-=(float)mouseEvent->dx/8000.0f;
 		camera.pitch+=(float)mouseEvent->dy/8000.0f;
 	}
+#else
+	oldMousePosition=mousePosition;
+	mousePosition.x=(float)mouseEvent->dx;
+	mousePosition.y=(float)mouseEvent->dy;
+
+	if(activeID==UINT32_MAX&&mouseEvent->button&MOUSE_TOUCH)
+	{
+		camera.yaw-=(float)(mousePosition.x-oldMousePosition.x)/1000.0f;
+		camera.pitch+=(float)(mousePosition.y-oldMousePosition.y)/1000.0f;
+	}
+#endif
 }

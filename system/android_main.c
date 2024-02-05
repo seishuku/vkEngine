@@ -70,19 +70,22 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 					switch(AKeyEvent_getAction(event)&AMOTION_EVENT_ACTION_MASK)
 					{
 						case AMOTION_EVENT_ACTION_DOWN:
-							MouseEvent.button|=MOUSE_BUTTON_LEFT;
+							MouseEvent.button|=MOUSE_TOUCH;
+							MouseEvent.dx=(int)AMotionEvent_getX(event, 0);
+							MouseEvent.dy=winHeight-(int)AMotionEvent_getY(event, 0);
 							Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
 							break;
 
 						case AMOTION_EVENT_ACTION_UP:
-							MouseEvent.button&=~MOUSE_BUTTON_RIGHT;
-							MouseEvent.button&=~MOUSE_BUTTON_LEFT;
+							MouseEvent.button&=~MOUSE_TOUCH;
+							MouseEvent.dx=(int)AMotionEvent_getX(event, 0);
+							MouseEvent.dy=winHeight-(int)AMotionEvent_getY(event, 0);
 							Event_Trigger(EVENT_MOUSEUP, &MouseEvent);
 							break;
 
 						case AMOTION_EVENT_ACTION_MOVE:
-							MouseEvent.dx=(AMotionEvent_getX(event, 0)-AMotionEvent_getHistoricalX(event, 0, 0))*4;
-							MouseEvent.dy=(AMotionEvent_getHistoricalY(event, 0, 0)-AMotionEvent_getY(event, 0))*4;
+							MouseEvent.dx=(int)AMotionEvent_getX(event, 0);
+							MouseEvent.dy=winHeight-(int)AMotionEvent_getY(event, 0);
 							Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
 							break;
 					}

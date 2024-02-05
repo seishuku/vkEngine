@@ -2041,6 +2041,10 @@ bool Init(void)
 
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)renderWidth, (float)renderHeight));
 
+#ifdef ANDROID
+	UI_AddButton(&UI, Vec2(0.0f, renderHeight-50.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), "Random", (UIControlCallback)GenerateSkyParams);
+#endif
+
 	UI_AddButton(&UI,
 				 Vec2(renderWidth-400.0f, renderHeight-50.0f),	// Position
 				 Vec2(100.0f, 50.0f),					// Size
