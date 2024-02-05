@@ -1,5 +1,5 @@
 # vkEngine
-![vkEngine screen shot](screen shot.png)
+![vkEngine screen shot](/screen shot.png)
 
 vkEngine, my long term "game engine" project.
 Might end up as an actual game at some point, no idea when.
