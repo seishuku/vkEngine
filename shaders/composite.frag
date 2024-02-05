@@ -105,14 +105,14 @@ float volumetricLightScattering(const vec3 lightPos, const vec3 rayOrigin, const
 vec4 depth2World(float viewZ)
 {
 	vec4 clipPosition=inverse(projection)*vec4(vec3(UV*2-1, viewZ), 1.0);
-	return inverse(modelview)*clipPosition/clipPosition.w;
+	return inverse(HMD*modelview)*clipPosition/clipPosition.w;
 }
 
 void main(void)
 {
 	seed=uint(gl_FragCoord.x+uWidth*gl_FragCoord.y)+uWidth*uHeight*(uFrame%32);
 
-    vec3 ro=inverse(modelview)[3].xyz;
+    vec3 ro=inverse(HMD*modelview)[3].xyz;
 	vec4 worldPos=depth2World(max(texture(depthTex, UV).x, 0.00009));
 
 	vec3 lightVolume=volumetricLightScattering(lightDirection.xyz, ro, worldPos.xyz)*lightColor.xyz;
