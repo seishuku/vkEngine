@@ -1,4 +1,5 @@
 # vkEngine
+![vkEngine screen shot](screen shot.png)
 
 vkEngine, my long term "game engine" project.
 Might end up as an actual game at some point, no idea when.
@@ -23,6 +24,5 @@ External dependencies needed for building this (versions as of this writing, new
  - libvorbis 1.3.7
  - libogg 1.3.5
  - OpenXR 1.2
- - pthread (whatever Linux has, or pthread-win32 2.0 for windows)
  - portaudio 2.0
  - Vulkan 1.3.231.1
