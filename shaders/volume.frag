@@ -4,9 +4,10 @@ layout(location=0) in vec3 Position;
 layout(location=1) flat in float Scale;
 
 layout(binding=0) uniform sampler3D Volume;
-layout(binding=1) uniform sampler2D Depth;
+layout(binding=1) uniform sampler2DMS Depth;
+layout(binding=2) uniform sampler2DShadow Shadow;
 
-layout(binding=2) uniform MainUBO
+layout(binding=3) uniform MainUBO
 {
 	mat4 HMD;
 	mat4 projection;
@@ -16,7 +17,7 @@ layout(binding=2) uniform MainUBO
 	vec4 lightDirection;
 };
 
-layout (binding=3) uniform SkyboxUBO
+layout (binding=4) uniform SkyboxUBO
 {
 	vec4 uOffset;
 
@@ -45,8 +46,21 @@ layout(push_constant) uniform PC
 
 layout(location=0) out vec4 Output;
 
-vec4 depth2Eye(float viewZ)
+const mat4 _Bayer4x4=mat4(
+	vec4(0.0   ,0.5,   0.125, 0.625),
+	vec4(0.75  ,0.25,  0.875, 0.375),
+	vec4(0.1875,0.6875,0.0625,0.5625),
+	vec4(0.9375,0.4375,0.8125,0.3125)
+);
+
+vec4 depth2Eye()
 {
+	const float viewZ=(
+		texelFetch(Depth, ivec2(gl_FragCoord.xy), 0).x+
+		texelFetch(Depth, ivec2(gl_FragCoord.xy), 1).x+
+		texelFetch(Depth, ivec2(gl_FragCoord.xy), 2).x+
+		texelFetch(Depth, ivec2(gl_FragCoord.xy), 3).x)*0.25;
+
 	const vec4 clipPosition=inverse(projection)*vec4(vec3((gl_FragCoord.xy/vec2(uWidth, uHeight))*2-1, viewZ), 1.0);
 	return clipPosition/clipPosition.w;
 }
@@ -123,21 +137,20 @@ void main()
 		return;
 	}
 
-	const float sceneDepth=texture(Depth, gl_FragCoord.xy/vec2(uWidth, uHeight)).x;
-	const vec4 worldPos=depth2Eye(sceneDepth)/Scale;
+	const vec4 worldPos=depth2Eye()/Scale;
 	const float localSceneDepth=length(worldPos);
 
-	seed=uint(gl_FragCoord.x+uWidth*gl_FragCoord.y)+uWidth*uHeight*(uFrame%32);
+	seed=uint(gl_FragCoord.x+uWidth*gl_FragCoord.y)*uFrame;
 
 	// make sure near hit doesn't go negative and apply some random jitter to smooth banding
 	hit.x=max(hit.x, 0.0)+randomFloat()*0.1;
 	// clamp far hit to scene depth for proper mixing with exisiting scene
 	hit.y=min(hit.y, localSceneDepth);
 
-	const vec3 dt_vec=1.0/(vec3(Scale)*abs(rd));
+	const vec3 dt_vec=1.0/(Scale.xxx*abs(rd));
 	const float stepSize=min(dt_vec.x, min(dt_vec.y, dt_vec.z))*8.0;
 
-	Output=vec4(0.0);
+	Output=0.0.xxxx;
 
 	for(float dist=hit.x;dist<hit.y;dist+=stepSize)
 	{
@@ -147,7 +160,7 @@ void main()
 		const float density=1.0-exp(-(texture(Volume, pos*0.5+0.5).r*d)*2.0);
 
 		// colorize the cloud sample
-		vec4 val_color=vec4(TurboColormap(density*6.0), density);
+		vec4 val_color=vec4(TurboColormap(density*4.0), density);
 
 		// apply some simple lighting
 		val_color.xyz*=lightColor.xyz*max(0.1, dot(pos, -lightDirection.xyz));

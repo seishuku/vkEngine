@@ -82,5 +82,5 @@ void main()
 	vec3 vPosition=ico[gl_VertexIndex];
 
 	gl_Position=mvp*vec4(vPosition.xyz, 1.0);
-	Color=normalize(vPosition.xyzz*0.5+0.5);
+	Color=color*normalize(vPosition.xyzz*0.5+0.5);
 }

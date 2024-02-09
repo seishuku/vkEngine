@@ -226,8 +226,9 @@ bool CreateVolumePipeline(void)
 	vkuInitDescriptorSet(&volumeDescriptorSet, &vkContext);
 	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
+	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&volumeDescriptorSet);
 
 	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
@@ -251,8 +252,8 @@ bool CreateVolumePipeline(void)
 
 	volumePipeline.subpass=1;
 
+	volumePipeline.depthWrite=VK_FALSE;
 	volumePipeline.cullMode=VK_CULL_MODE_BACK_BIT;
-	volumePipeline.depthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
 	volumePipeline.rasterizationSamples=MSAA;
 
 	volumePipeline.blend=VK_TRUE;

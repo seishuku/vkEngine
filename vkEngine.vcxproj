@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClInclude Include="audio\audio.h" />
     <ClInclude Include="camera\camera.h" />
+    <ClInclude Include="client_network.h" />
     <ClInclude Include="composite.h" />
     <ClInclude Include="console\console.h" />
     <ClInclude Include="font\font.h" />
@@ -54,6 +55,7 @@
     <ClCompile Include="audio\audio.c" />
     <ClCompile Include="audio\wave.c" />
     <ClCompile Include="camera\camera.c" />
+    <ClCompile Include="client_network.c" />
     <ClCompile Include="composite.c" />
     <ClCompile Include="console\console.c" />
     <ClCompile Include="engine.c" />

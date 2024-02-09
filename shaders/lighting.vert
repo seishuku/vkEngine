@@ -18,11 +18,6 @@ layout (binding=3) uniform ubo
 	vec4 lightDirection;
 };
 
-layout (push_constant) uniform ubo_pc
-{
-	mat4 local;
-};
-
 out gl_PerVertex
 {
     vec4 gl_Position;
@@ -42,7 +37,7 @@ const mat4 biasMat = mat4(
 
 void main()
 {
-	gl_Position=projection*HMD*modelview*iPosition*local*vec4(vPosition.xyz, 1.0);
+	gl_Position=projection*HMD*modelview*iPosition*vec4(vPosition.xyz, 1.0);
 
 	Position=vPosition.xyz;
 	UV=vUV.xy;
@@ -50,5 +45,5 @@ void main()
 	Tangent=mat3(vTangent.xyz, vBinormal.xyz, vNormal.xyz);
 	iMatrix=iPosition;
 
-	Shadow=biasMat*lightMVP*iPosition*local*vec4(vPosition.xyz, 1.0);
+	Shadow=biasMat*lightMVP*iPosition*vec4(vPosition.xyz, 1.0);
 }

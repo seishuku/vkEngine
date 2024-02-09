@@ -7,7 +7,6 @@
 #include <stdatomic.h>
 #include <pthread.h>
 #include "system/system.h"
-#include "network/network.h"
 #include "vulkan/vulkan.h"
 #include "math/math.h"
 #include "camera/camera.h"
@@ -58,7 +57,7 @@ VkuContext_t vkContext;
 VkuMemZone_t *vkZone;
 
 // Camera data
-Camera_t camera;
+Camera_t camera, enemy;
 matrix modelView, projection[2], headPose;
 
 // extern timing data from system main
@@ -126,9 +125,9 @@ typedef struct
 	} perFrame[VKU_MAX_FRAME_COUNT];
 } ThreadData_t;
 
-#define NUM_THREADS 3
+#define NUM_THREADS 2
 ThreadData_t threadData[NUM_THREADS];
-ThreadWorker_t thread[NUM_THREADS], threadPhysics/*, threadNetUpdate*/;
+ThreadWorker_t thread[NUM_THREADS], threadPhysics;
 
 //pthread_barrier_t threadBarrier, physicsThreadBarrier;
 
@@ -139,63 +138,6 @@ _Atomic(int32_t) threadBarrier;
 mtx_t physicsThreadMutex;
 cnd_t physicsThreadCondition;
 _Atomic(int32_t) physicsThreadBarrier;
-//////
-
-// Network stuff
-#define CONNECT_PACKETMAGIC		('C'|('o'<<8)|('n'<<16)|('n'<<24)) // "Conn"
-#define DISCONNECT_PACKETMAGIC	('D'|('i'<<8)|('s'<<16)|('C'<<24)) // "DisC"
-#define STATUS_PACKETMAGIC		('S'|('t'<<8)|('a'<<16)|('t'<<24)) // "Stat"
-#define FIELD_PACKETMAGIC		('F'|('e'<<8)|('l'<<16)|('d'<<24)) // "Feld"
-#define MAX_CLIENTS 16
-
-// PacketMagic determines packet type:
-//
-// Connect:
-//		Client sends connect magic, server responds back with current random seed and slot.
-// Disconnect:
-//		Client sends disconnect magic, server closes socket and removes client from list.
-// Status:
-//		Client to server: Sends current camera data
-//		Server to client: Sends all current connected client cameras.
-// Field:
-//		Server sends current play field (as it sees it) to all connected clients at a regular interval.
-
-// Camera data for sending over the network
-typedef struct
-{
-	vec3 position, velocity;
-	vec3 forward, up;
-} NetCamera_t;
-
-// Connect data when connecting to server
-typedef struct
-{
-	uint32_t seed;
-	uint16_t port;
-} NetConnect_t;
-
-// Overall data network packet
-typedef struct
-{
-	uint32_t packetMagic;
-	uint32_t clientID;
-	union
-	{
-		NetConnect_t connect;
-		NetCamera_t camera;
-	};
-} NetworkPacket_t;
-
-uint32_t serverAddress=NETWORK_ADDRESS(192, 168, 1, 10);
-uint16_t serverPort=4545;
-
-uint16_t clientPort=0;
-uint32_t clientID=0;
-
-Socket_t clientSocket=-1;
-
-uint32_t connectedClients=0;
-Camera_t netCameras[MAX_CLIENTS];
 //////
 
 // UI Stuff
@@ -213,6 +155,8 @@ XrPosef leftHand, rightHand;
 float leftTrigger, rightTrigger;
 float leftGrip, rightGrip;
 vec2 leftThumbstick, rightThumbstick;
+
+bool isTargeted=false;
 
 void RecreateSwapchain(void);
 
@@ -249,7 +193,7 @@ bool CreateFramebuffers(uint32_t eye)
 
 	VkCommandBuffer commandBuffer=vkuOneShotCommandBufferBegin(&vkContext);
 	vkuTransitionLayout(commandBuffer, colorImage[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-	vkuTransitionLayout(commandBuffer, depthImage[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, depthImage[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuTransitionLayout(commandBuffer, colorResolve[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuOneShotCommandBufferEnd(&vkContext, commandBuffer);
 
@@ -293,7 +237,7 @@ bool CreatePipeline(void)
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				.finalLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			},
 			{
 				.format=colorFormat,
@@ -330,16 +274,17 @@ bool CreatePipeline(void)
 			},
 			{
 				.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS,
+				.inputAttachmentCount=1,
+				.pInputAttachments=&(VkAttachmentReference)
+				{
+					.attachment=1,
+					.layout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				},
 				.colorAttachmentCount=1,
 				.pColorAttachments=&(VkAttachmentReference)
 				{
 					.attachment=0,
 					.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-				},
-				.pDepthStencilAttachment=&(VkAttachmentReference)
-				{
-					.attachment=1,
-					.layout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				},
 				.pResolveAttachments=&(VkAttachmentReference)
 				{
@@ -348,7 +293,7 @@ bool CreatePipeline(void)
 				},
 			},
 		},
-		.dependencyCount=4,
+		.dependencyCount=3,
 		.pDependencies=(VkSubpassDependency[])
 		{
 			{
@@ -370,20 +315,11 @@ bool CreatePipeline(void)
 				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
 			},
 			{
-				.srcSubpass=1,
-				.dstSubpass=0,
-				.srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
-				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
-			},
-			{
 				.srcSubpass=0,
 				.dstSubpass=1,
-				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.srcStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT|VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
 				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
 			},
@@ -414,13 +350,6 @@ bool CreatePipeline(void)
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
 		.pSetLayouts=&mainDescriptorSet.descriptorSetLayout,
-		.pushConstantRangeCount=1,
-		.pPushConstantRanges=&(VkPushConstantRange)
-		{
-			.offset=0,
-			.size=sizeof(matrix),
-			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
-		},
 	}, 0, &mainPipelineLayout);
 
 	vkuInitPipeline(&mainPipeline, &vkContext);
@@ -581,6 +510,11 @@ void GenerateSkyParams(void)
 		asteroids[i].invInertia=1.0f/asteroids[i].inertia;
 	}
 	//////
+
+	vec3 randomDirection=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
+	Vec3_Normalize(&randomDirection);
+
+	CameraInit(&enemy, Vec3_Muls(randomDirection, 1200.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 }
 //////
 
@@ -732,7 +666,8 @@ void DrawPlayer(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, Cam
 	vec4 up=Vec4_Vec3(player.up, 1.0f);
 	vec4 right=Vec4_Vec3(player.right, 1.0f);
 
-	linePC.mvp=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->projection);
+	matrix local=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
+	linePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
 	linePC.start=position;
 
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.pipeline);
@@ -758,14 +693,19 @@ void DrawPlayer(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, Cam
 		vec4 color;
 	} spherePC;
 
-	matrix local=MatrixIdentity();
-	local=MatrixMult(local, MatrixScale(5.0f, 5.0f, 5.0f));
-	local=MatrixMult(local, MatrixInverse(MatrixLookAt(player.position, Vec3_Addv(player.position, player.forward), player.up)));
+	local=MatrixMult(
+		MatrixScale(player.radius, player.radius, player.radius),
+		MatrixInverse(MatrixLookAt(player.position, Vec3_Addv(player.position, player.forward), player.up))
+	);
 
 	local=MatrixMult(local, perFrame[index].mainUBO[eye]->modelView);
+	local=MatrixMult(local, perFrame[index].mainUBO[eye]->HMD);
 	spherePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
 
-	spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+	if(isTargeted)
+		spherePC.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
+	else
+		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline.pipeline);
 	vkCmdPushConstants(commandBuffer, spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
@@ -841,20 +781,6 @@ void Thread_Destructor(void *arg)
 	}
 }
 
-float raySphereIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 sphereCenter, float sphereRadius)
-{
-	vec3 oc=Vec3_Subv(rayOrigin, sphereCenter);
-	float a=Vec3_Dot(rayDirection, rayDirection);
-	float b=2.0f*Vec3_Dot(oc, rayDirection);
-	float c=Vec3_Dot(oc, oc)-sphereRadius*sphereRadius;
-	float discriminant=b*b-4*a*c;
-
-	if(discriminant<0.0f)
-		return -1.0f;
-	else
-		return (-b-sqrtf(discriminant))/(2.0f*a);
-}
-
 // Asteroids render pass thread
 void Thread_Main(void *arg)
 {
@@ -891,10 +817,22 @@ void Thread_Main(void *arg)
 	vkCmdSetViewport(data->perFrame[data->index].secCommandBuffer[data->eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
 	vkCmdSetScissor(data->perFrame[data->index].secCommandBuffer[data->eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
 
-	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
+	////// Skybox/skysphere
+	vkCmdBindPipeline(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipeline.pipeline);
+
+	vkuDescriptorSet_UpdateBindingBufferInfo(&skyboxDescriptorSet, 0, perFrame[data->index].mainUBOBuffer[data->eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&skyboxDescriptorSet, 1, perFrame[data->index].skyboxUBOBuffer[data->eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuAllocateUpdateDescriptorSet(&skyboxDescriptorSet, data->perFrame[data->index].descriptorPool[data->eye]);
+
+	vkCmdBindDescriptorSets(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipelineLayout, 0, 1, &skyboxDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+
+	// This has no bound vertex data, it's baked into the vertex shader
+	vkCmdDraw(data->perFrame[data->index].secCommandBuffer[data->eye], 60, 1, 0, 0);
+	//////
+
+	////// Asteroids
 	vkCmdBindPipeline(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipeline);
 
-	// Draw the models
 	vkCmdBindVertexBuffers(data->perFrame[data->index].secCommandBuffer[data->eye], 1, 1, &perFrame[data->index].asteroidInstance.buffer, &(VkDeviceSize) { 0 });
 
 	for(uint32_t i=0;i<NUM_MODELS;i++)
@@ -908,13 +846,6 @@ void Thread_Main(void *arg)
 
 		vkCmdBindDescriptorSets(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipelineLayout, 0, 1, &mainDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
-		matrix local=MatrixIdentity();
-		//local=MatrixMult(local, MatrixRotate(fTime, 1.0f, 0.0f, 0.0f));
-		//local=MatrixMult(local, MatrixRotate(fTime, 0.0f, 1.0f, 0.0f));
-
-		vkCmdPushConstants(data->perFrame[data->index].secCommandBuffer[data->eye], mainPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(matrix), &local);
-
-		// Bind model data buffers and draw the triangles
 		vkCmdBindVertexBuffers(data->perFrame[data->index].secCommandBuffer[data->eye], 0, 1, &models[i].vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 
 		for(uint32_t j=0;j<models[i].numMesh;j++)
@@ -923,6 +854,7 @@ void Thread_Main(void *arg)
 			vkCmdDrawIndexed(data->perFrame[data->index].secCommandBuffer[data->eye], models[i].mesh[j].numFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*i);
 		}
 	}
+	//////
 
 #if 0
 	if(camera.shift)
@@ -1008,6 +940,9 @@ void Thread_Main(void *arg)
 		vkCmdDraw(data->perFrame[data->index].secCommandBuffer[data->eye], 2, 1, 0, 0);
 	}
 
+	// Draw enemy
+	DrawPlayer(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, enemy);
+
 #if 0
 	// Draw some simple geometry to represent other client cameras
 	for(uint32_t i=0;i<connectedClients;i++)
@@ -1081,62 +1016,6 @@ void Thread_Main(void *arg)
 	mtx_unlock(&threadMutex);
 }
 
-// Skybox render pass thread
-void Thread_Skybox(void *arg)
-{
-	ThreadData_t *data=(ThreadData_t *)arg;
-
-	vkResetDescriptorPool(vkContext.device, data->perFrame[data->index].descriptorPool[data->eye], 0);
-	vkResetCommandPool(vkContext.device, data->perFrame[data->index].commandPool[data->eye], 0);
-
-	vkBeginCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye], &(VkCommandBufferBeginInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
-		//.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
-		//{
-		//	.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-		//	.pNext=&(VkCommandBufferInheritanceRenderingInfo)
-		//	{
-		//		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-		//		.colorAttachmentCount=1,
-		//		.pColorAttachmentFormats=&ColorFormat,
-		//		.depthAttachmentFormat=DepthFormat,
-		//		.rasterizationSamples=MSAA
-		//	},
-		//}
-		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-			.pNext=NULL,
-			.renderPass=renderPass,
-			.framebuffer=framebuffer[data->eye]
-		}
-	});
-
-	vkCmdSetViewport(data->perFrame[data->index].secCommandBuffer[data->eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
-	vkCmdSetScissor(data->perFrame[data->index].secCommandBuffer[data->eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
-
-	vkCmdBindPipeline(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipeline.pipeline);
-
-	vkuDescriptorSet_UpdateBindingBufferInfo(&skyboxDescriptorSet, 0, perFrame[data->index].mainUBOBuffer[data->eye].buffer, 0, VK_WHOLE_SIZE);
-	vkuDescriptorSet_UpdateBindingBufferInfo(&skyboxDescriptorSet, 1, perFrame[data->index].skyboxUBOBuffer[data->eye].buffer, 0, VK_WHOLE_SIZE);
-	vkuAllocateUpdateDescriptorSet(&skyboxDescriptorSet, data->perFrame[data->index].descriptorPool[data->eye]);
-
-	vkCmdBindDescriptorSets(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipelineLayout, 0, 1, &skyboxDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
-
-	// No vertex data, it's baked into the vertex shader
-	vkCmdDraw(data->perFrame[data->index].secCommandBuffer[data->eye], 60, 1, 0, 0);
-
-	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
-
-	//pthread_barrier_wait(&threadBarrier);
-	mtx_lock(&threadMutex);
-	atomic_fetch_sub(&threadBarrier, 1);
-	cnd_signal(&threadCondition);
-	mtx_unlock(&threadMutex);
-}
-
 // Particles render pass thread, also has volumetric rendering
 void Thread_Particles(void *arg)
 {
@@ -1175,24 +1054,6 @@ void Thread_Particles(void *arg)
 
 	matrix Modelview=MatrixMult(perFrame[data->index].mainUBO[data->eye]->modelView, perFrame[data->index].mainUBO[data->eye]->HMD);
 	ParticleSystem_Draw(&particleSystem, data->perFrame[data->index].secCommandBuffer[data->eye], data->perFrame[data->index].descriptorPool[data->eye], Modelview, perFrame[data->index].mainUBO[data->eye]->projection);
-
-#if 0
-	static uint32_t uFrame=0;
-	uFrame++;
-
-	vkCmdBindPipeline(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipeline.pipeline);
-
-	vkCmdPushConstants(data->perFrame[data->index].secCommandBuffer[data->eye], volumePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t), &uFrame);
-
-	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 0, textures[TEXTURE_VOLUME].sampler, textures[TEXTURE_VOLUME].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingBufferInfo(&volumeDescriptorSet, 1, perFrame[data->index].mainUBOBuffer[data->eye].buffer, 0, VK_WHOLE_SIZE);
-	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 2, depthImage[data->eye].sampler, depthImage[data->eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuAllocateUpdateDescriptorSet(&volumeDescriptorSet, data->perFrame[data->index].descriptorPool[data->eye]);
-	vkCmdBindDescriptorSets(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipelineLayout, 0, 1, &volumeDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
-
-	// No vertex data, it's baked into the vertex shader
-	vkCmdDraw(data->perFrame[data->index].secCommandBuffer[data->eye], 36, 1, 0, 0);
-#endif
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
@@ -1267,11 +1128,7 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 
 	threadData[1].index=index;
 	threadData[1].eye=eye;
-	Thread_AddJob(&thread[1], Thread_Skybox, (void *)&threadData[1]);
-
-	threadData[2].index=index;
-	threadData[2].eye=eye;
-	Thread_AddJob(&thread[2], Thread_Particles, (void *)&threadData[2]);
+	Thread_AddJob(&thread[1], Thread_Particles, (void *)&threadData[1]);
 
 	mtx_lock(&threadMutex);
 	while(atomic_load(&threadBarrier))
@@ -1282,22 +1139,12 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	//pthread_barrier_wait(&threadBarrier);
 
 	// Execute the secondary command buffers from the threads
-	vkCmdExecuteCommands(perFrame[index].commandBuffer, 3, (VkCommandBuffer[])
+	vkCmdExecuteCommands(perFrame[index].commandBuffer, 2, (VkCommandBuffer[])
 	{
 		threadData[0].perFrame[index].secCommandBuffer[eye],
-		threadData[1].perFrame[index].secCommandBuffer[eye],
-		threadData[2].perFrame[index].secCommandBuffer[eye]
+		threadData[1].perFrame[index].secCommandBuffer[eye]
 	});
 
-	//vkCmdNextSubpass(perFrame[index].commandBuffer, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
-
-	//vkCmdExecuteCommands(perFrame[index].commandBuffer, 1, (VkCommandBuffer[])
-	//{
-	//	perFrame[index].secCommandBuffer[eye]
-	//});
-
-	//vkCmdEndRendering(perFrame[index].commandBuffer);
-//	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 	vkCmdNextSubpass(perFrame[index].commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 
 	// Volumetric rendering is broken on Android when rendering at half resolution for some reason.
@@ -1316,20 +1163,24 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	PC.uHeight=renderHeight;
 	PC.pad=0;
 
+	////// Volume cloud
 	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipeline.pipeline);
 
 	vkCmdPushConstants(perFrame[index].commandBuffer, volumePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PC), &PC);
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 0, textures[TEXTURE_VOLUME].sampler, textures[TEXTURE_VOLUME].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 1, depthImage[eye].sampler, depthImage[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingBufferInfo(&volumeDescriptorSet, 2, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
-	vkuDescriptorSet_UpdateBindingBufferInfo(&volumeDescriptorSet, 3, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 2, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&volumeDescriptorSet, 3, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&volumeDescriptorSet, 4, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
 	vkuAllocateUpdateDescriptorSet(&volumeDescriptorSet, perFrame[index].descriptorPool);
 	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipelineLayout, 0, 1, &volumeDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 	// No vertex data, it's baked into the vertex shader
 	vkCmdDraw(perFrame[index].commandBuffer, 36, 1, 0, 0);
+	//////
 
+	//vkCmdEndRendering(perFrame[index].commandBuffer);
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 }
 
@@ -1357,34 +1208,6 @@ int planeSphereIntersection(vec4 plane, RigidBody_t sphere, vec3 *intersectionA,
 		*intersectionB=Vec3_Subv(projection, Vec3_Muls(planeVec3, distanceToIntersection));
 
 	return (distance==sphere.radius)?1:2;
-}
-
-vec4 calculatePlane(vec3 p, vec3 norm)
-{
-	Vec3_Normalize(&norm);
-	return Vec4(norm.x, norm.y, norm.z, Vec3_Dot(norm, p));
-}
-
-void calculateFrustumPlanes(const Camera_t camera, vec4 *frustumPlanes)
-{
-	const float fov=deg2rad(90.0f);
-	const float nearPlane=0.01f;
-	const float farPlane=100000.0f;
-	const float aspect=(float)renderWidth/renderHeight;
-
-	const float half_v=farPlane*tanf(fov*0.5f);
-	const float half_h=half_v*aspect;
-
-	vec3 forward_far=Vec3_Muls(camera.forward, farPlane);
-
-	// Top, bottom, right, left, far, near
-	frustumPlanes[0]=calculatePlane(Vec3_Addv(camera.position, Vec3_Muls(camera.forward, nearPlane)), camera.forward);
-	frustumPlanes[1]=calculatePlane(Vec3_Addv(camera.position, forward_far), Vec3_Muls(camera.forward, -1.0f));
-
-	frustumPlanes[2]=calculatePlane(camera.position, Vec3_Cross(camera.up, Vec3_Addv(forward_far, Vec3_Muls(camera.right, half_h))));
-	frustumPlanes[3]=calculatePlane(camera.position, Vec3_Cross(Vec3_Subv(forward_far, Vec3_Muls(camera.right, half_h)), camera.up));
-	frustumPlanes[4]=calculatePlane(camera.position, Vec3_Cross(camera.right, Vec3_Subv(forward_far, Vec3_Muls(camera.up, half_v))));
-	frustumPlanes[5]=calculatePlane(camera.position, Vec3_Cross(Vec3_Addv(forward_far, Vec3_Muls(camera.up, half_v)), camera.right));
 }
 
 // Runs anything physics related
@@ -1476,6 +1299,7 @@ void Thread_Physics(void *arg)
 
 	// Update camera and modelview matrix
 	modelView=CameraUpdate(&camera, fTimeStep);
+	CameraUpdate(&enemy, fTimeStep);
 	//////
 
 	// Update instance matrix data
@@ -1494,26 +1318,7 @@ void Thread_Physics(void *arg)
 	//vkUnmapMemory(Context.device, asteroidInstance.deviceMemory);
 	//////
 
-#if 0
-	// Network status packet
-	if(clientSocket!=-1)
-	{
-		NetworkPacket_t StatusPacket;
-
-		memset(&StatusPacket, 0, sizeof(NetworkPacket_t));
-
-		StatusPacket.packetMagic=STATUS_PACKETMAGIC;
-		StatusPacket.clientID=clientID;
-
-		StatusPacket.camera.position=camera.position;
-		StatusPacket.camera.velocity=camera.velocity;
-		StatusPacket.camera.forward=camera.forward;
-		StatusPacket.camera.up=camera.up;
-
-		Network_SocketSend(clientSocket, (uint8_t *)&StatusPacket, sizeof(NetworkPacket_t), serverAddress, serverPort);
-	}
-	//////
-#endif
+	//ClientNetwork_SendStatus();
 
 	//CvWriteFlag(flagSeries, "physics end");
 
@@ -1525,66 +1330,6 @@ void Thread_Physics(void *arg)
 //	mtx_unlock(&physicsThreadMutex);
 }
 
-#if 0
-pthread_t UpdateThread;
-bool NetUpdate_Run=true;
-uint8_t NetBuffer[32767]={ 0 };
-
-void NetUpdate(void *arg)
-{
-	memset(netCameras, 0, sizeof(Camera_t)*MAX_CLIENTS);
-
-	if(clientSocket==-1)
-	{
-		NetUpdate_Run=false;
-		return;
-	}
-
-	while(NetUpdate_Run)
-	{
-		uint8_t *pBuffer=NetBuffer;
-		uint32_t Magic=0;
-		uint32_t Address=0;
-		uint16_t port=0;
-
-		Network_SocketReceive(clientSocket, NetBuffer, sizeof(NetBuffer), &Address, &port);
-
-		memcpy(&Magic, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
-
-		if(Magic==STATUS_PACKETMAGIC)
-		{
-			memcpy(&connectedClients, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
-
-			for(uint32_t i=0;i<connectedClients;i++)
-			{
-				uint32_t clientID=0;
-
-				memcpy(&clientID, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
-
-				memcpy(&netCameras[clientID].position, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-				memcpy(&netCameras[clientID].velocity, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-				memcpy(&netCameras[clientID].forward, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-				memcpy(&netCameras[clientID].up, pBuffer, sizeof(float)*3);			pBuffer+=sizeof(float)*3;
-
-				//DBGPRINTF(DEBUG_INFO, "\033[%d;0H\033[KID %d Pos: %0.1f %0.1f %0.1f", clientID+1, clientID, NetCameras[clientID].position.x, NetCameras[clientID].position.y, NetCameras[clientID].position.z);
-			}
-		}
-		else if(Magic==FIELD_PACKETMAGIC)
-		{
-			uint32_t asteroidCount=NUM_ASTEROIDS;
-
-			memcpy(&asteroidCount, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
-
-			for(uint32_t i=0;i<asteroidCount;i++)
-			{
-				memcpy(&asteroids[i].position, pBuffer, sizeof(vec3));	pBuffer+=sizeof(vec3);
-				memcpy(&asteroids[i].velocity, pBuffer, sizeof(vec3));	pBuffer+=sizeof(vec3);
-			}
-		}
-	}
-}
-#endif
-
 extern vec2 mousePosition;
 
 void FireParticleEmitter(vec3 position, vec3 direction);
@@ -1593,6 +1338,8 @@ bool leftTriggerOnce=true;
 bool rightTriggerOnce=true;
 
 static vec3 lastLeftPosition={ 0.0f, 0.0f, 0.0f };
+
+static float fireTime=0.0f;
 
 // Render call from system main event loop
 void Render(void)
@@ -1711,6 +1458,24 @@ void Render(void)
 		projection[0]=MatrixInfPerspective(90.0f, (float)renderWidth/renderHeight, 0.01f);
 		headPose=MatrixIdentity();
 	}
+
+	//////
+	// Do a simple dumb "seek out the player" thing
+	CameraSeekTarget(&enemy, camera.position, camera.radius, asteroids, sizeof(RigidBody_t), offsetof(RigidBody_t, position), NUM_ASTEROIDS);
+
+	// Test for if the player is in a 10 degree view cone, if so fire at them once every 2 seconds.
+	isTargeted=CameraIsTargetInFOV(enemy, camera.position, deg2rad(5.0f));
+	
+	fireTime+=fTimeStep;
+
+	if(isTargeted&&fireTime>2.0f)
+	{
+		fireTime=0.0f;
+
+		Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &enemy.position);
+		FireParticleEmitter(Vec3_Addv(enemy.position, Vec3_Muls(enemy.forward, enemy.radius)), enemy.forward);
+	}
+	//////
 
 	Thread_AddJob(&threadPhysics, Thread_Physics, (void *)&index);
 
@@ -1858,6 +1623,7 @@ bool Init(void)
 	}
 
 	CameraInit(&camera, Vec3(0.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
+	CameraInit(&enemy, Vec3(0.0f, 0.0f, 1200.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 
 	if(!Audio_Init())
 	{
@@ -2171,62 +1937,7 @@ bool Init(void)
 	mtx_init(&physicsThreadMutex, mtx_plain);
 	atomic_store(&physicsThreadBarrier, 1);
 
-#if 0
-	// Initialize the network API (mainly for winsock)
-	Network_Init();
-
-	// Create a new socket
-	clientSocket=Network_CreateSocket();
-
-	if(clientSocket==-1)
-		return false;
-
-	// Send connect magic to initiate connection
-	uint32_t Magic=CONNECT_PACKETMAGIC;
-	if(!Network_SocketSend(clientSocket, (uint8_t *)&Magic, sizeof(uint32_t), serverAddress, serverPort))
-		return false;
-
-	double Timeout=GetClock()+5.0; // Current time +5 seconds
-	bool Response=false;
-
-	while(!Response)
-	{
-		uint32_t Address=0;
-		uint16_t port=0;
-		NetworkPacket_t ResponsePacket;
-
-		memset(&ResponsePacket, 0, sizeof(NetworkPacket_t));
-
-		if(Network_SocketReceive(clientSocket, (uint8_t *)&ResponsePacket, sizeof(NetworkPacket_t), &Address, &port)>0)
-		{
-			if(ResponsePacket.packetMagic==CONNECT_PACKETMAGIC)
-			{
-				DBGPRINTF(DEBUG_INFO, "Response from server - ID: %d Seed: %d Port: %d Address: 0x%X Port: %d\n",
-						  ResponsePacket.clientID,
-						  ResponsePacket.connect.seed,
-						  ResponsePacket.connect.port,
-						  Address,
-						  port);
-
-				RandomSeed(ResponsePacket.connect.seed);
-				clientID=ResponsePacket.clientID;
-				Response=true;
-			}
-		}
-
-		if(GetClock()>Timeout)
-		{
-			DBGPRINTF("Connection timed out...\n");
-			Network_SocketClose(clientSocket);
-			clientSocket=-1;
-			break;
-		}
-	}
-
-	Thread_Init(&threadNetUpdate);
-	Thread_Start(&threadNetUpdate);
-	Thread_AddJob(&threadNetUpdate, NetUpdate, NULL);
-#endif
+	//ClientNetwork_Init();
 
 	if(!Zone_VerifyHeap(zone))
 		exit(-1);
@@ -2290,22 +2001,7 @@ void Destroy(void)
 {
 	vkDeviceWaitIdle(vkContext.device);
 
-#if 0
-	NetUpdate_Run=false;
-	Thread_Destroy(&threadNetUpdate);
-
-	// Send disconnect message to server and close/destroy network stuff
-	if(clientSocket!=-1)
-	{
-		Network_SocketSend(clientSocket, (uint8_t *)&(NetworkPacket_t)
-		{
-			.packetMagic=DISCONNECT_PACKETMAGIC, .clientID=clientID
-		}, sizeof(NetworkPacket_t), serverAddress, serverPort);
-		Network_SocketClose(clientSocket);
-	}
-
-	Network_Destroy();
-#endif
+	//ClientNetwork_Destroy();
 
 	Audio_Destroy();
 	SFX_Destroy();

@@ -27,11 +27,11 @@
 #ifndef DBGPRINTF
 inline static void DBGPRINTF(const char *level, const char *format, ...)
 {
-	char string[256];
+	char string[1024];
 	va_list	ap;
 
 	va_start(ap, format);
-	vsnprintf(string, 255, format, ap);
+	vsnprintf(string, 1023, format, ap);
 	va_end(ap);
 
 	__android_log_print(ANDROID_LOG_INFO, "vkEngine", "%s%s%s", level, string, DEBUG_NONE);
@@ -41,11 +41,11 @@ inline static void DBGPRINTF(const char *level, const char *format, ...)
 #ifndef DBGPRINTF
 inline static void DBGPRINTF(const char *level, const char *format, ...)
 {
-	char string[256];
+	char string[1024];
 	va_list	ap;
 
 	va_start(ap, format);
-	vsnprintf(string, 255, format, ap);
+	vsnprintf(string, 1023, format, ap);
 	va_end(ap);
 
 	fprintf(stderr, "%s%s%s", level, string, DEBUG_NONE);

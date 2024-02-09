@@ -169,12 +169,12 @@ static bool UI_VulkanPipeline(UI_t *UI)
 	vkuPipeline_AddVertexAttribute(&UI->pipeline, 2, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*1);
 	vkuPipeline_AddVertexAttribute(&UI->pipeline, 3, 1, VK_FORMAT_R32G32B32A32_UINT, sizeof(vec4)*2);
 
-	VkPipelineRenderingCreateInfo PipelineRenderingCreateInfo=
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-		.colorAttachmentCount=1,
-		.pColorAttachmentFormats=&swapchain.surfaceFormat.format,
-	};
+	//VkPipelineRenderingCreateInfo PipelineRenderingCreateInfo=
+	//{
+	//	.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+	//	.colorAttachmentCount=1,
+	//	.pColorAttachmentFormats=&swapchain.surfaceFormat.format,
+	//};
 
 	if(!vkuAssemblePipeline(&UI->pipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
 		return false;
@@ -310,6 +310,9 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 
 			case UI_CONTROL_CURSOR:
 				break;
+
+			default:
+				break;
 		}
 	}
 
@@ -356,6 +359,9 @@ bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 position)
 			break;
 
 		case UI_CONTROL_CURSOR:
+			break;
+
+		default:
 			break;
 	}
 
@@ -524,6 +530,9 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye)
 				instanceCount++;
 				break;
 			}
+
+			default:
+				break;
 		}
 	}
 

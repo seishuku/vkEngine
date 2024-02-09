@@ -71,6 +71,9 @@ static void xruPollEvents(XruContext_t *xrContext)
 						DBGPRINTF(DEBUG_WARNING, "VR: State loss pending.\n");
 						xrContext->exitRequested=true;
 						break;
+
+					default:
+						break;
 				}
 			}
 			break;
@@ -79,6 +82,9 @@ static void xruPollEvents(XruContext_t *xrContext)
 				DBGPRINTF(DEBUG_WARNING, "VR: Event data instance loss.\n");
 				xrContext->exitRequested=true;
 				return;
+
+			default:
+				break;
 		}
 
 		event_buffer.type=XR_TYPE_EVENT_DATA_BUFFER;

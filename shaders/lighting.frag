@@ -36,11 +36,6 @@ layout (binding=4) uniform SkyboxUBO
 	vec4 uSunColor;
 };
 
-layout (push_constant) uniform pc
-{
-	mat4 local;
-};
-
 layout (binding=0) uniform sampler2D TexBase;
 layout (binding=1) uniform sampler2D TexNormal;
 layout (binding=2) uniform sampler2DShadow TexShadow;
@@ -70,7 +65,7 @@ float ShadowPCF(vec4 Coords)
 void main()
 {
 	vec4 Base=texture(TexBase, UV);
-	vec3 n=normalize(iMatrix*local*vec4(Tangent*(2*texture(TexNormal, UV)-1).xyz, 0.0)).xyz;
+	vec3 n=normalize(iMatrix*vec4(Tangent*(2*texture(TexNormal, UV)-1).xyz, 0.0)).xyz;
 
 	Output=vec4(Base.xyz*lightColor.xyz*max(0.01, dot(n, lightDirection.xyz)*ShadowPCF(Shadow)), 1.0);
 }

@@ -131,10 +131,8 @@ VkBool32 CreateVulkanInstance(VkInstance *instance)
 	if(surfaceExtension)
 		extensions[numExtensions++]=VK_KHR_SURFACE_EXTENSION_NAME;
 
-#ifdef _DEBUG
 	if(debugExtension)
 		extensions[numExtensions++]=VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
-#endif
 
 	extensions[numExtensions++]=VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME;
 	extensions[numExtensions++]=VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME;

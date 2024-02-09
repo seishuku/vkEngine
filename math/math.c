@@ -157,3 +157,17 @@ float Lerp(const float a, const float b, const float t)
 {
 	return t*(b-a)+a;
 }
+
+float raySphereIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 sphereCenter, float sphereRadius)
+{
+	vec3 oc=Vec3_Subv(rayOrigin, sphereCenter);
+	float a=Vec3_Dot(rayDirection, rayDirection);
+	float b=2.0f*Vec3_Dot(oc, rayDirection);
+	float c=Vec3_Dot(oc, oc)-sphereRadius*sphereRadius;
+	float discriminant=b*b-4*a*c;
+
+	if(discriminant<0.0f)
+		return -1.0f;
+	else
+		return (-b-sqrtf(discriminant))/(2.0f*a);
+}

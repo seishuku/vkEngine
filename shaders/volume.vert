@@ -1,6 +1,6 @@
 #version 450
 
-layout (binding=2) uniform MainUBO
+layout (binding=3) uniform MainUBO
 {
 	mat4 HMD;
 	mat4 projection;

@@ -7,6 +7,99 @@
 #include "../physics/physics.h"
 #include "../camera/camera.h"
 
+static vec4 calculatePlane(vec3 p, vec3 norm)
+{
+	Vec3_Normalize(&norm);
+	return Vec4(norm.x, norm.y, norm.z, Vec3_Dot(norm, p));
+}
+
+void CameraCalculateFrustumPlanes(const Camera_t camera, vec4 *frustumPlanes, const float aspect, const float fov, const float nearPlane, const float farPlane)
+{
+	const float half_v=farPlane*tanf(fov*0.5f);
+	const float half_h=half_v*aspect;
+
+	vec3 forward_far=Vec3_Muls(camera.forward, farPlane);
+
+	// Top, bottom, right, left, far, near
+	frustumPlanes[0]=calculatePlane(Vec3_Addv(camera.position, Vec3_Muls(camera.forward, nearPlane)), camera.forward);
+	frustumPlanes[1]=calculatePlane(Vec3_Addv(camera.position, forward_far), Vec3_Muls(camera.forward, -1.0f));
+
+	frustumPlanes[2]=calculatePlane(camera.position, Vec3_Cross(camera.up, Vec3_Addv(forward_far, Vec3_Muls(camera.right, half_h))));
+	frustumPlanes[3]=calculatePlane(camera.position, Vec3_Cross(Vec3_Subv(forward_far, Vec3_Muls(camera.right, half_h)), camera.up));
+	frustumPlanes[4]=calculatePlane(camera.position, Vec3_Cross(camera.right, Vec3_Subv(forward_far, Vec3_Muls(camera.up, half_v))));
+	frustumPlanes[5]=calculatePlane(camera.position, Vec3_Cross(Vec3_Addv(forward_far, Vec3_Muls(camera.up, half_v)), camera.right));
+}
+
+bool CameraIsTargetInFOV(const Camera_t camera, const vec3 targetPos, const float FOV)
+{
+	const float halfFOVAngle=FOV*0.5f;
+
+	// Calculate the direction from the camera to the target
+	vec3 directionToTarget=Vec3_Subv(targetPos, camera.position);
+	Vec3_Normalize(&directionToTarget);
+
+	// Calculate the angle between the camera's forward vector and the direction to the target
+	// Check if the angle is within half of the FOV angle
+	return acosf(Vec3_Dot(camera.forward, directionToTarget))<=halfFOVAngle;
+}
+
+// Move camera to targetPos while avoiding obstacles.
+void CameraSeekTarget(Camera_t *camera, const vec3 targetPos, const float targetRadius, void *obstacles, size_t stride, size_t offset, size_t numObstacles)
+{
+	const float maxSpeed=1.0f;
+	const float rotationDamping=0.01f;
+	const float positionDamping=0.0005f;
+	const float seekRadius=(camera->radius+targetRadius)*1.5f;
+	const float avoidanceRadius=(camera->radius+targetRadius)*1.5f;
+
+	// Find relative direction between camera and target
+	vec3 directionWorld=Vec3_Subv(targetPos, camera->position);
+
+	// Calculate a relative distance for later speed reduction
+	const float relativeDistance=Vec3_Dot(directionWorld, directionWorld)-(seekRadius*seekRadius);
+
+	Vec3_Normalize(&directionWorld);
+
+	// Check for obstacles in the avoidance radius
+	for(size_t i=0;i<numObstacles;i++)
+	{
+		vec3 *obstacle=(vec3 *)(obstacles+offset+i*stride);
+
+		vec3 cameraToObstacle=Vec3_Subv(*obstacle, camera->position);
+		float cameraToObstacleDistance=Vec3_Length(cameraToObstacle);
+
+		if(cameraToObstacleDistance<avoidanceRadius)
+		{
+			// Adjust the camera trajectory to avoid the obstacle
+			vec3 avoidanceDirection=Vec3_Subv(camera->position, *obstacle);
+			Vec3_Normalize(&avoidanceDirection);
+
+			directionWorld=Vec3_Addv(directionWorld, avoidanceDirection);
+			Vec3_Normalize(&directionWorld);
+		}
+	}
+
+	// Build 3x3 matrix and transform worldspace direction to camera space
+	matrix cameraOrientation=
+	{
+		.x=Vec4(camera->right.x, camera->up.x, camera->forward.x, 0.0f),
+		.y=Vec4(camera->right.y, camera->up.y, camera->forward.y, 0.0f),
+		.z=Vec4(camera->right.z, camera->up.z, camera->forward.z, 0.0f),
+		.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
+	};
+	vec3 directionCamera=Matrix3x3MultVec3(directionWorld, cameraOrientation);
+	Vec3_Normalize(&directionCamera);
+
+	// Aim pitch and yaw
+	camera->yaw=atan2f(directionCamera.x, directionCamera.z)*rotationDamping;
+	camera->pitch=asinf(directionCamera.y)*rotationDamping;
+
+	// Slow down the speed as it gets closer
+	float speed=maxSpeed*relativeDistance;
+
+	camera->velocity=Vec3_Addv(Vec3_Muls(camera->velocity, 1.0f-positionDamping), Vec3_Muls(directionCamera, speed*positionDamping));
+}
+
 // Camera collision stuff
 static int32_t ClassifySphere(const vec3 center, const vec3 normal, const vec3 point, const float radius, float *distance)
 {
