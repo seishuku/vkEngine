@@ -50,6 +50,9 @@ void CameraSeekTarget(Camera_t *camera, const vec3 targetPos, const float target
 	const float rotationDamping=0.01f;
 	const float positionDamping=0.0005f;
 	const float seekRadius=(camera->radius+targetRadius)*1.5f;
+
+	// FIXME: This should be camera+obstacle radius and was trying to keep the function generic,
+	//		but it really should just take RigidBody_t and a count as a parameter.
 	const float avoidanceRadius=(camera->radius+targetRadius)*1.5f;
 
 	// Find relative direction between camera and target
