@@ -4,8 +4,8 @@
 #include "system/system.h"
 #include "system/threads.h"
 #include "math/math.h"
-#include "physics/physics.h"
 #include "camera/camera.h"
+#include "physics/physics.h"
 #include "network/network.h"
 
 #define NUM_ASTEROIDS 1000

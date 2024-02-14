@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "physics.h"
+#include "../particle/particle.h"
+#include "../camera/camera.h"
 
 // For sound playback on collision
 #include "../audio/audio.h"

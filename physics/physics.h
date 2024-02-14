@@ -2,14 +2,15 @@
 #define __PHYSICS_H__
 
 #include "../math/math.h"
-#include "../camera/camera.h"
-#include "../particle/particle.h"
+
+typedef struct Particle_s Particle_t;
+typedef struct Camera_s Camera_t;
 
 // Define constants
 #define WORLD_SCALE 1000.0f
 #define EXPLOSION_POWER (50.0f*WORLD_SCALE)
 
-typedef struct
+typedef struct RigidBody_s
 {
 	vec3 position;
 	vec3 velocity;

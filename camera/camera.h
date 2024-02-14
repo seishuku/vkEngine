@@ -4,8 +4,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "../math/math.h"
+#include "../physics/physics.h"
 
-typedef struct
+typedef struct Camera_s
 {
 	vec3 position;
 	vec3 velocity;
@@ -40,7 +41,7 @@ typedef struct
 } CameraPath_t;
 
 bool CameraIsTargetInFOV(Camera_t camera, vec3 targetPos, float FOV);
-void CameraSeekTarget(Camera_t *camera, const vec3 targetPos, const float targetRadius, void *obstacles, size_t stride, size_t offset, size_t numObstacles);
+void CameraSeekTarget(Camera_t *camera, const vec3 targetPos, const float targetRadius, RigidBody_t *obstacles, size_t numObstacles);
 void CameraInit(Camera_t *camera, const vec3 position, const vec3 right, const vec3 up, const vec3 forward);
 matrix CameraUpdate(Camera_t *camera, float dt);
 void CameraCheckCollision(Camera_t *camera, float *vertex, uint32_t *face, int32_t numFace);

@@ -7,7 +7,7 @@
 #include "../math/math.h"
 #include "../vulkan/vulkan.h"
 
-typedef struct
+typedef struct Particle_s
 {
 	uint32_t ID;
 	float life;
@@ -16,7 +16,7 @@ typedef struct
 
 typedef void (*ParticleInitCallback)(uint32_t index, uint32_t numParticles, Particle_t *particle);
 
-typedef struct
+typedef struct ParticleEmitter_s
 {
 	uint32_t ID;
 	bool burst;
@@ -29,7 +29,7 @@ typedef struct
 	ParticleInitCallback initCallback;
 } ParticleEmitter_t;
 
-typedef struct
+typedef struct ParticleSystem_s
 {
 	uint32_t baseID;
 

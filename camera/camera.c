@@ -4,8 +4,8 @@
 #include "../vulkan/vulkan.h"
 #include "../system/system.h"
 #include "../math/math.h"
-#include "../physics/physics.h"
 #include "../camera/camera.h"
+#include "../physics/physics.h"
 
 static vec4 calculatePlane(vec3 p, vec3 norm)
 {
@@ -43,17 +43,13 @@ bool CameraIsTargetInFOV(const Camera_t camera, const vec3 targetPos, const floa
 	return acosf(Vec3_Dot(camera.forward, directionToTarget))<=halfFOVAngle;
 }
 
-// Move camera to targetPos while avoiding obstacles.
-void CameraSeekTarget(Camera_t *camera, const vec3 targetPos, const float targetRadius, void *obstacles, size_t stride, size_t offset, size_t numObstacles)
+// Move camera to targetPos while avoiding rigid body obstacles.
+void CameraSeekTarget(Camera_t *camera, const vec3 targetPos, const float targetRadius, RigidBody_t *obstacles, size_t numObstacles)
 {
 	const float maxSpeed=1.0f;
 	const float rotationDamping=0.01f;
 	const float positionDamping=0.0005f;
 	const float seekRadius=(camera->radius+targetRadius)*1.5f;
-
-	// FIXME: This should be camera+obstacle radius and was trying to keep the function generic,
-	//		but it really should just take RigidBody_t and a count as a parameter.
-	const float avoidanceRadius=(camera->radius+targetRadius)*1.5f;
 
 	// Find relative direction between camera and target
 	vec3 directionWorld=Vec3_Subv(targetPos, camera->position);
@@ -66,39 +62,40 @@ void CameraSeekTarget(Camera_t *camera, const vec3 targetPos, const float target
 	// Check for obstacles in the avoidance radius
 	for(size_t i=0;i<numObstacles;i++)
 	{
-		vec3 *obstacle=(vec3 *)(obstacles+offset+i*stride);
+		const float avoidanceRadius=(camera->radius+obstacles[i].radius)*1.1f;
+		const vec3 cameraToObstacle=Vec3_Subv(camera->position, obstacles[i].position);
+		const float cameraToObstacleDistanceSq=Vec3_Dot(cameraToObstacle, cameraToObstacle);
 
-		vec3 cameraToObstacle=Vec3_Subv(*obstacle, camera->position);
-		float cameraToObstacleDistance=Vec3_Length(cameraToObstacle);
-
-		if(cameraToObstacleDistance<avoidanceRadius)
+		if(cameraToObstacleDistanceSq<=avoidanceRadius*avoidanceRadius)
 		{
-			// Adjust the camera trajectory to avoid the obstacle
-			vec3 avoidanceDirection=Vec3_Subv(camera->position, *obstacle);
-			Vec3_Normalize(&avoidanceDirection);
+			if(cameraToObstacleDistanceSq>0.0f)
+			{
+				// Adjust the camera trajectory to avoid the obstacle
+				const float rMag=1.0f/sqrtf(cameraToObstacleDistanceSq);
+				const vec3 avoidanceDirection=Vec3_Muls(cameraToObstacle, rMag);
 
-			directionWorld=Vec3_Addv(directionWorld, avoidanceDirection);
-			Vec3_Normalize(&directionWorld);
+				directionWorld=Vec3_Addv(directionWorld, avoidanceDirection);
+				Vec3_Normalize(&directionWorld);
+			}
 		}
 	}
 
 	// Build 3x3 matrix and transform worldspace direction to camera space
-	matrix cameraOrientation=
+	const matrix cameraOrientation=
 	{
 		.x=Vec4(camera->right.x, camera->up.x, camera->forward.x, 0.0f),
 		.y=Vec4(camera->right.y, camera->up.y, camera->forward.y, 0.0f),
 		.z=Vec4(camera->right.z, camera->up.z, camera->forward.z, 0.0f),
 		.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
 	};
-	vec3 directionCamera=Matrix3x3MultVec3(directionWorld, cameraOrientation);
-	Vec3_Normalize(&directionCamera);
+	const vec3 directionCamera=Matrix3x3MultVec3(directionWorld, cameraOrientation);
 
 	// Aim pitch and yaw
 	camera->yaw=atan2f(directionCamera.x, directionCamera.z)*rotationDamping;
 	camera->pitch=asinf(directionCamera.y)*rotationDamping;
 
 	// Slow down the speed as it gets closer
-	float speed=maxSpeed*relativeDistance;
+	const float speed=maxSpeed*relativeDistance;
 
 	camera->velocity=Vec3_Addv(Vec3_Muls(camera->velocity, 1.0f-positionDamping), Vec3_Muls(directionCamera, speed*positionDamping));
 }

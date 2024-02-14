@@ -1,6 +1,9 @@
 #ifndef __LIST_H__
 #define __LIST_H__
 
+#include <stdint.h>
+#include <stdbool.h>
+
 typedef struct
 {
     size_t Size;

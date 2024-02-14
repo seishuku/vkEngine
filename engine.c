@@ -5,7 +5,6 @@
 #include <stdalign.h>
 #include <string.h>
 #include <stdatomic.h>
-#include <pthread.h>
 #include "system/system.h"
 #include "vulkan/vulkan.h"
 #include "math/math.h"
@@ -1461,8 +1460,9 @@ void Render(void)
 
 	//////
 	// Do a simple dumb "seek out the player" thing
-	CameraSeekTarget(&enemy, camera.position, camera.radius, asteroids, sizeof(RigidBody_t), offsetof(RigidBody_t, position), NUM_ASTEROIDS);
+	CameraSeekTarget(&enemy, camera.position, camera.radius, asteroids, NUM_ASTEROIDS);
 
+#if 1
 	// Test for if the player is in a 10 degree view cone, if so fire at them once every 2 seconds.
 	isTargeted=CameraIsTargetInFOV(enemy, camera.position, deg2rad(5.0f));
 	
@@ -1476,6 +1476,7 @@ void Render(void)
 		FireParticleEmitter(Vec3_Addv(enemy.position, Vec3_Muls(enemy.forward, enemy.radius)), enemy.forward);
 	}
 	//////
+#endif
 
 	Thread_AddJob(&threadPhysics, Thread_Physics, (void *)&index);
 

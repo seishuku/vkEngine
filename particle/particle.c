@@ -25,7 +25,7 @@ extern VkuMemZone_t *vkZone;
 static VkPipelineLayout particlePipelineLayout;
 static VkuPipeline_t particlePipeline;
 
-static VkuImage_t particleTexture;
+//static VkuImage_t particleTexture;
 
 struct
 {
