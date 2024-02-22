@@ -1,5 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <float.h>
 #include "physics.h"
 #include "../particle/particle.h"
 #include "../camera/camera.h"
@@ -42,6 +44,35 @@ static void apply_constraints(RigidBody_t *body)
 	//body->angularVelocity=Vec3_Muls(body->angularVelocity, angularDamping);
 }
 
+vec4 integrateAngularVelocity(const vec4 q, const vec3 w, const float dt)
+{
+	const float halfDT=0.5f*dt;
+
+	// First Midpoint step
+	vec4 k1=Vec4_Muls(Vec4(
+		 q.w*w.x+q.y*w.z-q.z*w.y,
+		 q.w*w.y-q.x*w.z+q.z*w.x,
+		 q.w*w.z+q.x*w.y-q.y*w.x,
+		-q.x*w.x-q.y*w.y-q.z*w.z
+	), halfDT);
+
+	vec4 result=Vec4_Addv(q, k1);
+
+	// Second Midpoint step
+	vec4 k2=Vec4_Muls(Vec4(
+		 result.w*w.x+result.y*w.z-result.z*w.y,
+		 result.w*w.y-result.x*w.z+result.z*w.x,
+		 result.w*w.z+result.x*w.y-result.y*w.x,
+		-result.x*w.x-result.y*w.y-result.z*w.z
+	), halfDT);
+
+	result=Vec4_Addv(q, k2);
+
+	Vec4_Normalize(&result);
+
+	return result;
+}
+
 void PhysicsIntegrate(RigidBody_t *body, float dt)
 {
 	const float damping=0.0f;
@@ -67,10 +98,7 @@ void PhysicsIntegrate(RigidBody_t *body, float dt)
 	body->force=Vec3b(0.0f);
 
 	// Integrate angular velocity using quaternions
-	vec3 axis=body->angularVelocity;
-	Vec3_Normalize(&axis);
-
-	body->orientation=QuatMultiply(QuatAnglev(dt, axis), body->orientation);
+	body->orientation=integrateAngularVelocity(body->orientation, body->angularVelocity, dt);
 
 	apply_constraints(body);
 }
@@ -94,138 +122,125 @@ void PhysicsExplode(RigidBody_t *body)
 }
 
 #if 0
-void PhysicsCollisionResponse(void *a, PhysicsObjectType aType, void *b, PhysicsObjectType bType)
+float PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 {
-	vec3 aPosition, bPosition;
-	vec3 aVelocity, bVelocity;
-	vec3 aAngularVelocity, bAngularVelocity;
-	float aRadius, bRadius;
-	float aInvMass, bInvMass;
-	float aInvInertia, bInvInertia;
+	// Calculate relative position
+	vec3 relativePosition=Vec3_Subv(b->position, a->position);
+	const float distanceSq=Vec3_Dot(relativePosition, relativePosition);
+	const float radiiSum=a->radius+b->radius;
 
-	switch(aType)
-	{
-		case PHYSICS_OBJECT_SPHERE:
-		{
-			RigidBody_t *aRigidBody=(RigidBody_t *)a;
+	// Check if spheres are not colliding
+	if(distanceSq>radiiSum*radiiSum)
+		return 0.0f;
 
-			aPosition=aRigidBody->position;
-			aVelocity=aRigidBody->velocity;
-			aAngularVelocity=aRigidBody->angularVelocity;
-			aRadius=aRigidBody->radius;
-			aInvMass=aRigidBody->invMass;
-			aInvInertia=aRigidBody->invInertia;
-			break;
-		}
+	const float distance=sqrtf(distanceSq);
+	const vec3 normal=Vec3_Muls(relativePosition, 1.0f/distance);
 
-		default:
-			return;
-	}
+	// Calculate relative velocity
+	const vec3 relativeVelocity=Vec3_Subv(b->velocity, a->velocity);
 
-	switch(bType)
-	{
-		case PHYSICS_OBJECT_SPHERE:
-		{
-			RigidBody_t *bRigidBody=(RigidBody_t *)b;
+	// Calculate relative velocity along the normal
+	const float relativeSpeed=Vec3_Dot(relativeVelocity, normal);
 
-			bPosition=bRigidBody->position;
-			bVelocity=bRigidBody->velocity;
-			bAngularVelocity=bRigidBody->angularVelocity;
-			bRadius=bRigidBody->radius;
-			bInvMass=bRigidBody->invMass;
-			bInvInertia=bRigidBody->invInertia;
-			break;
-		}
+	// If spheres are moving away from each other
+	if(relativeSpeed>0.0f)
+		return 0.0f;
 
-		default:
-			return;
-	}
+	// Calculate impulse
+	float elasticity=0.8f;
+	float impulse=-(1.0f+elasticity)*relativeSpeed/(a->invMass+b->invMass);
 
-	// Calculate the distance between the two sphere's centers
-	vec3 normal=Vec3_Subv(bPosition, aPosition);
+	// Update velocities
+	a->velocity=Vec3_Subv(a->velocity, Vec3_Muls(normal, impulse*a->invMass));
+	b->velocity=Vec3_Addv(b->velocity, Vec3_Muls(normal, impulse*b->invMass));
+	
+	// Update angular velocities (considering inertia)
+	const vec3 r1=Vec3_Addv(a->position, Vec3_Muls(normal, -a->radius));
+	const vec3 r2=Vec3_Addv(b->position, Vec3_Muls(normal, b->radius));
 
-	const float distanceSq=Vec3_Dot(normal, normal);
+	const vec3 torque1=Vec3_Cross(r1, normal);
+	const vec3 torque2=Vec3_Cross(r2, normal);
 
-	// Sum of radii
-	const float radiusSum=aRadius+bRadius;
+	a->angularVelocity=Vec3_Addv(a->angularVelocity, Vec3_Muls(torque1, a->invInertia));
+	b->angularVelocity=Vec3_Addv(b->angularVelocity, Vec3_Muls(torque2, b->invInertia));
 
-	// Check if the distance is less than the sum of the radii
-	if(distanceSq<radiusSum*radiusSum)
-	{
-		const float distance=sqrtf(distanceSq);
-
-		if(distance)
-			normal=Vec3_Muls(normal, 1.0f/distance);
-
-		const float penetration=radiusSum-distance;
-		const vec3 positionImpulse=Vec3_Muls(normal, penetration*0.5f);
-
-		aPosition=Vec3_Subv(aPosition, positionImpulse);
-		bPosition=Vec3_Addv(bPosition, positionImpulse);
-
-		const vec3 contactVelocity=Vec3_Subv(bVelocity, aVelocity);
-
-		const float totalMass=aInvMass+bInvMass;
-		const float restitution=0.66f;
-		const float VdotN=Vec3_Dot(contactVelocity, normal);
-		const float j=(-(1.0f+restitution)*VdotN)/totalMass;
-
-		a->velocity=Vec3_Subv(aVelocity, Vec3_Muls(normal, j*aInvMass));
-		b->velocity=Vec3_Addv(bVelocity, Vec3_Muls(normal, j*bInvMass));
-
-		a->angularVelocity=Vec3_Subv(aAngularVelocity, Vec3_Muls(normal, VdotN*aInvInertia));
-		b->angularVelocity=Vec3_Addv(bAngularVelocity, Vec3_Muls(normal, VdotN*bInvInertia));
-
-		const float relVelMag=sqrtf(fabsf(VdotN));
-
-		if(relVelMag>1.0f)
-			Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, relVelMag/50.0f, &aPosition);
-	}
+	return sqrtf(fabs(relativeSpeed));
 }
 #endif
 
-void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
+float PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 {
-	// Calculate the distance between the two sphere's centers
-	vec3 normal=Vec3_Subv(b->position, a->position);
+	const vec3 relativePosition=Vec3_Subv(b->position, a->position);
+	const float distanceSq=Vec3_Dot(relativePosition, relativePosition);
+	const float radiiSum=a->radius+b->radius;
 
-	const float distanceSq=Vec3_Dot(normal, normal);
-
-	// Sum of radii
-	const float radiusSum=a->radius+b->radius;
-
-	// Check if the distance is less than the sum of the radii
-	if(distanceSq<radiusSum*radiusSum)
+	if(distanceSq<radiiSum*radiiSum)
 	{
 		const float distance=sqrtf(distanceSq);
+		const vec3 normal=Vec3_Muls(relativePosition, 1.0f/distance);
 
-		if(distance)
-			normal=Vec3_Muls(normal, 1.0f/distance);
+		const vec3 contact=Vec3_Addv(a->position, Vec3_Muls(normal, a->radius-(fabsf(Vec3_Length(normal)-radiiSum)*0.5f)));
 
-		const float penetration=radiusSum-distance;
-		const vec3 positionImpulse=Vec3_Muls(normal, penetration*0.5f);
+		const vec3 r1=Vec3_Subv(contact, a->position);
+		const vec3 r2=Vec3_Subv(contact, b->position);
 
-		a->position=Vec3_Subv(a->position, positionImpulse);
-		b->position=Vec3_Addv(b->position, positionImpulse);
+		const vec3 relativeVel=Vec3_Subv(
+			Vec3_Addv(b->velocity, Vec3_Cross(b->angularVelocity, r2)),
+			Vec3_Addv(a->velocity, Vec3_Cross(a->angularVelocity, r1))
+		);
 
-		const vec3 contactVelocity=Vec3_Subv(b->velocity, a->velocity);
+		const float relativeSpeed=Vec3_Dot(relativeVel, normal);
 
-		const float totalMass=a->invMass+b->invMass;
-		const float restitution=0.66f;
-		const float VdotN=Vec3_Dot(contactVelocity, normal);
-		const float j=(-(1.0f+restitution)*VdotN)/totalMass;
+		if(relativeSpeed>0.0f)
+			return 0.0f;
 
-		a->velocity=Vec3_Subv(a->velocity, Vec3_Muls(normal, j*a->invMass));
-		b->velocity=Vec3_Addv(b->velocity, Vec3_Muls(normal, j*b->invMass));
+		vec3 d1=Vec3_Cross(Vec3_Muls(Vec3_Cross(r1, normal), a->invInertia), r1);
+		vec3 d2=Vec3_Cross(Vec3_Muls(Vec3_Cross(r2, normal), b->invInertia), r2);
+		const float invMassSum=a->invMass+b->invMass;
+		float denominator=invMassSum+Vec3_Dot(normal, Vec3_Addv(d1, d2));
 
-		a->angularVelocity=Vec3_Subv(a->angularVelocity, Vec3_Muls(normal, VdotN*a->invInertia));
-		b->angularVelocity=Vec3_Addv(b->angularVelocity, Vec3_Muls(normal, VdotN*b->invInertia));
+		const float e=0.8f;
+		const float j=-(1.0f+e)*relativeSpeed/denominator;
 
-		const float relVelMag=sqrtf(fabsf(VdotN));
+		const vec3 impulse=Vec3_Muls(normal, j);
 
-		if(relVelMag>1.0f)
-			Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, relVelMag/50.0f, &a->position);
+		a->velocity=Vec3_Subv(a->velocity, Vec3_Muls(impulse, a->invMass));
+		b->velocity=Vec3_Addv(b->velocity, Vec3_Muls(impulse, b->invMass));
+
+		a->angularVelocity=Vec3_Subv(a->angularVelocity, Vec3_Muls(Vec3_Cross(r1, impulse), a->invInertia));
+		b->angularVelocity=Vec3_Addv(b->angularVelocity, Vec3_Muls(Vec3_Cross(r2, impulse), b->invInertia));
+
+		// Friction
+		vec3 t=Vec3_Subv(relativeVel, Vec3_Muls(normal, Vec3_Dot(relativeVel, normal)));
+
+		Vec3_Normalize(&t);
+
+		d1=Vec3_Cross(Vec3_Muls(Vec3_Cross(r1, t), a->invInertia), r1);
+		d2=Vec3_Cross(Vec3_Muls(Vec3_Cross(r2, t), b->invInertia), r2);
+		denominator=invMassSum+Vec3_Dot(t, Vec3_Addv(d1, d2));
+
+		float jT=-Vec3_Dot(relativeVel, t)/denominator;
+
+		const float friction=sqrtf(0.5f*0.5f);
+		const float maxjT=friction*j;
+
+		if(jT>maxjT)
+			jT=maxjT;
+		else if(jT<-maxjT)
+			jT=-maxjT;
+
+		vec3 impuseT=Vec3_Muls(t, jT);
+
+		a->velocity=Vec3_Subv(a->velocity, Vec3_Muls(impuseT, a->invMass));
+		b->velocity=Vec3_Addv(b->velocity, Vec3_Muls(impuseT, b->invMass));
+
+		a->angularVelocity=Vec3_Subv(a->angularVelocity, Vec3_Muls(Vec3_Cross(r1, impuseT), a->invInertia));
+		b->angularVelocity=Vec3_Addv(b->angularVelocity, Vec3_Muls(Vec3_Cross(r2, impuseT), b->invInertia));
+
+		return sqrtf(-relativeSpeed);
 	}
+
+	return 0.0f;
 }
 
 void PhysicsSphereToAABBCollisionResponse(RigidBody_t *sphere, RigidBody_t *aabb)
@@ -275,183 +290,5 @@ void PhysicsSphereToAABBCollisionResponse(RigidBody_t *sphere, RigidBody_t *aabb
 
 		sphere->angularVelocity=Vec3_Subv(sphere->angularVelocity, Vec3_Muls(normal, VdotN*sphere->invInertia));
 		aabb->angularVelocity=Vec3_Addv(aabb->angularVelocity, Vec3_Muls(normal, VdotN*aabb->invInertia));
-	}
-}
-
-// Camera<->Rigid body collision detection and response
-void PhysicsCameraToSphereCollisionResponse(Camera_t *camera, RigidBody_t *body)
-{
-	// Camera mass constants, since camera struct doesn't store these
-	const float cameraMass=100.0f;
-	const float cameraInvMass=1.0f/cameraMass;
-
-	// Calculate the distance between the camera and the sphere's center
-	vec3 normal=Vec3_Subv(body->position, camera->position);
-
-	const float distanceSq=Vec3_Dot(normal, normal);
-
-	// Sum of radii
-	const float radiusSum=camera->radius+body->radius;
-
-	// Check if the distance is less than the sum of the radii
-	if(distanceSq<=radiusSum*radiusSum&&distanceSq)
-	{
-		const float distance=sqrtf(distanceSq);
-
-		if(distance)
-			normal=Vec3_Muls(normal, 1.0f/distance);
-
-		const float penetration=radiusSum-distance;
-		const vec3 positionImpulse=Vec3_Muls(normal, penetration*0.5f);
-
-		camera->position=Vec3_Subv(camera->position, positionImpulse);
-		body->position=Vec3_Addv(body->position, positionImpulse);
-
-		const vec3 contactVelocity=Vec3_Subv(body->velocity, camera->velocity);
-
-		const float totalMass=cameraInvMass+body->invMass;
-		const float restitution=0.66f;
-		const float VdotN=Vec3_Dot(contactVelocity, normal);
-		const float j=(-(1.0f+restitution)*VdotN)/totalMass;
-
-		camera->velocity=Vec3_Subv(camera->velocity, Vec3_Muls(normal, j*cameraInvMass));
-		body->velocity=Vec3_Addv(body->velocity, Vec3_Muls(normal, j*body->invMass));
-
-		//Camera->AngularVelocity=Vec3_Subv(Camera->AngularVelocity, Vec3_Muls(Normal, j*Camera_invInertia));
-		body->angularVelocity=Vec3_Addv(body->angularVelocity, Vec3_Muls(normal, VdotN*body->invInertia));
-
-		const float relVelMagSq=fabsf(VdotN);
-
-		if(relVelMagSq>1.0f)
-			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, &body->position);
-	}
-}
-
-void PhysicsCameraToCameraCollisionResponse(Camera_t *cameraA, Camera_t *cameraB)
-{
-	// Camera mass constants, since camera struct doesn't store these
-	const float cameraMass=100.0f;
-	const float cameraInvMass=1.0f/cameraMass;
-
-	// Calculate the distance between the camera and the sphere's center
-	vec3 normal=Vec3_Subv(cameraB->position, cameraA->position);
-
-	const float distanceSq=Vec3_Dot(normal, normal);
-
-	// Sum of radii
-	const float radiusSum=cameraA->radius+cameraB->radius;
-
-	// Check if the distance is less than the sum of the radii
-	if(distanceSq<=radiusSum*radiusSum&&distanceSq)
-	{
-		const float distance=sqrtf(distanceSq);
-
-		if(distance)
-			normal=Vec3_Muls(normal, 1.0f/distance);
-
-		const float penetration=radiusSum-distance;
-		const vec3 positionImpulse=Vec3_Muls(normal, penetration*0.5f);
-
-		cameraA->position=Vec3_Subv(cameraA->position, positionImpulse);
-		cameraB->position=Vec3_Addv(cameraB->position, positionImpulse);
-
-		const vec3 contactVelocity=Vec3_Subv(cameraB->velocity, cameraA->velocity);
-
-		const float totalMass=cameraInvMass+cameraInvMass;
-		const float restitution=0.66f;
-		const float VdotN=Vec3_Dot(contactVelocity, normal);
-		const float j=(-(1.0f+restitution)*VdotN)/totalMass;
-
-		cameraA->velocity=Vec3_Subv(cameraA->velocity, Vec3_Muls(normal, j*cameraInvMass));
-		cameraB->velocity=Vec3_Addv(cameraB->velocity, Vec3_Muls(normal, j*cameraInvMass));
-
-		const float relVelMagSq=fabsf(VdotN);
-
-		if(relVelMagSq>1.0f)
-			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, &cameraB->position);
-	}
-}
-
-void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *particle)
-{
-	particle->position=Vec3b(0.0f);
-
-	particle->velocity=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
-	Vec3_Normalize(&particle->velocity);
-	particle->velocity=Vec3_Muls(particle->velocity, RandFloat()*50.0f);
-
-	particle->life=RandFloat()*0.5f+0.01f;
-}
-
-// Particle<->Rigid body collision detection and response
-void PhysicsParticleToSphereCollisionResponse(Particle_t *particle, RigidBody_t *body)
-{
-	// Particle constants, since particle struct doesn't store these
-	const float particleRadius=2.0f;
-	const float particleMass=1.0f;
-	const float particleInvMass=1.0f/particleMass;
-
-	// Calculate the distance between the particle and the sphere's center
-	vec3 normal=Vec3_Subv(body->position, particle->position);
-
-	const float distanceSq=Vec3_Dot(normal, normal);
-
-	// Sum of radii
-	const float radiusSum=particleRadius+body->radius;
-
-	// Check if the distance is less than the sum of the radii
-	if(distanceSq<=radiusSum*radiusSum&&distanceSq)
-	{
-		const float distance=sqrtf(distanceSq);
-
-		if(distance)
-			normal=Vec3_Muls(normal, 1.0f/distance);
-
-		const float penetration=radiusSum-distance;
-		const vec3 positionImpulse=Vec3_Muls(normal, penetration*0.5f);
-
-		particle->position=Vec3_Subv(particle->position, positionImpulse);
-		body->position=Vec3_Addv(body->position, positionImpulse);
-
-		const vec3 contactVelocity=Vec3_Subv(body->velocity, particle->velocity);
-
-		const float totalMass=particleInvMass+body->invMass;
-		const float restitution=0.66f;
-		const float VdotN=Vec3_Dot(contactVelocity, normal);
-		const float j=(-(1.0f+restitution)*VdotN)/totalMass;
-
-		particle->velocity=Vec3_Subv(particle->velocity, Vec3_Muls(normal, j*particleInvMass));
-		body->velocity=Vec3_Addv(body->velocity, Vec3_Muls(normal, j*body->invMass));
-
-		//a->AngularVelocity=Vec3_Subv(a->AngularVelocity, Vec3_Muls(Normal, VdotN*a->invInertia));
-		body->angularVelocity=Vec3_Addv(body->angularVelocity, Vec3_Muls(normal, VdotN*body->invInertia));
-
-		particle->life=-1.0f;
-
-		const float relVelMagSq=fabsf(VdotN);
-
-		if(relVelMagSq>1.0f)
-		{
-			Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particle->position);
-
-			// FIXME: Is this causing derelict emitters that never go away?
-			//			I don't think it is, but need to check.
-			uint32_t ID=ParticleSystem_AddEmitter
-			(
-				&particleSystem,
-				particle->position,			// Position
-				Vec3(100.0f, 12.0f, 5.0f),	// Start color
-				Vec3(0.0f, 0.0f, 0.0f),		// End color
-				5.0f,						// Radius of particles
-				1000,						// Number of particles in system
-				true,						// Is burst?
-				ExplodeEmitterCallback		// Callback for particle generation
-			);
-
-			ParticleSystem_ResetEmitter(&particleSystem, ID);
-
-			// Silly radius reduction on hit
-			//body->radius=fmaxf(body->radius-10.0f, 0.0f);
-		}
 	}
 }

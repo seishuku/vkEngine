@@ -500,7 +500,7 @@ void GenerateSkyParams(void)
 		asteroids[i].force=Vec3b(0.0f);
 
 		asteroids[i].orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-		asteroids[i].angularVelocity=randomDirection;
+		asteroids[i].angularVelocity=Vec3b(0.0f);//randomDirection;
 
 		asteroids[i].mass=(1.0f/3000.0f)*(1.33333333f*PI*asteroids[i].radius);
 		asteroids[i].invMass=1.0f/asteroids[i].mass;
@@ -1209,6 +1209,17 @@ int planeSphereIntersection(vec4 plane, RigidBody_t sphere, vec3 *intersectionA,
 	return (distance==sphere.radius)?1:2;
 }
 
+void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *particle)
+{
+	particle->position=Vec3b(0.0f);
+
+	particle->velocity=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
+	Vec3_Normalize(&particle->velocity);
+	particle->velocity=Vec3_Muls(particle->velocity, RandFloat()*50.0f);
+
+	particle->life=RandFloat()*0.5f+0.01f;
+}
+
 // Runs anything physics related
 void Thread_Physics(void *arg)
 {
@@ -1245,10 +1256,37 @@ void Thread_Physics(void *arg)
 
 		// Check asteroids against other asteroids
 		for(uint32_t j=i+1;j<NUM_ASTEROIDS;j++)
-			PhysicsSphereToSphereCollisionResponse(&asteroids[i], &asteroids[j]);
+		{
+			const float mag=PhysicsSphereToSphereCollisionResponse(&asteroids[i], &asteroids[j]);
+
+			if(mag>1.0f)
+				Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, mag/50.0f, &asteroids[i].position);
+		}
 
 		// Check asteroids against the camera
-		PhysicsCameraToSphereCollisionResponse(&camera, &asteroids[i]);
+		RigidBody_t cameraBody;
+
+		cameraBody.position=camera.position;
+		cameraBody.velocity=camera.velocity;
+		cameraBody.force=Vec3b(0.0f);
+
+		cameraBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		cameraBody.angularVelocity=Vec3b(0.0f);
+
+		cameraBody.radius=camera.radius;
+
+		cameraBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*cameraBody.radius);
+		cameraBody.invMass=1.0f/cameraBody.mass;
+
+		cameraBody.inertia=0.4f*cameraBody.mass*(cameraBody.radius*cameraBody.radius);
+		cameraBody.invInertia=1.0f/cameraBody.inertia;
+
+		const float mag=PhysicsSphereToSphereCollisionResponse(&cameraBody, &asteroids[i]);
+
+		camera.velocity=cameraBody.velocity;
+
+		if(mag>1.0f)
+			Audio_PlaySample(&sounds[SOUND_CRASH], false, mag/50.0f, &camera.position);
 
 #if 0
 		for(uint32_t j=0;j<connectedClients;j++)
@@ -1267,7 +1305,50 @@ void Thread_Physics(void *arg)
 		{
 			// If the particle ID matches with the projectile ID, then check collision and respond
 			if(emitter->particles[j].ID!=emitter->ID||emitter->particles[j].life>0.0f)
-				PhysicsParticleToSphereCollisionResponse(&emitter->particles[j], &asteroids[i]);
+			{
+				RigidBody_t particleBody;
+
+				particleBody.position=emitter->particles[j].position;
+				particleBody.velocity=emitter->particles[j].velocity;
+				particleBody.force=Vec3b(0.0f);
+
+				particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+				particleBody.angularVelocity=Vec3b(0.0f);
+
+				particleBody.radius=2.0f;
+
+				particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*10000.0f;
+				particleBody.invMass=1.0f/particleBody.mass;
+
+				particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
+				particleBody.invInertia=1.0f/particleBody.inertia;
+
+				if(PhysicsSphereToSphereCollisionResponse(&particleBody, &asteroids[i])>1.0f)
+				{
+					emitter->particles[j].life=-1.0f;
+
+					Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &emitter->particles[j].position);
+
+					// FIXME: Is this causing derelict emitters that never go away?
+					//			I don't think it is, but need to check.
+					uint32_t ID=ParticleSystem_AddEmitter
+					(
+						&particleSystem,
+						particleBody.position,		// Position
+						Vec3(100.0f, 12.0f, 5.0f),	// Start color
+						Vec3(0.0f, 0.0f, 0.0f),		// End color
+						5.0f,						// Radius of particles
+						1000,						// Number of particles in system
+						true,						// Is burst?
+						ExplodeEmitterCallback		// Callback for particle generation
+					);
+
+					ParticleSystem_ResetEmitter(&particleSystem, ID);
+
+					// Silly radius reduction on hit
+					//body->radius=fmaxf(body->radius-10.0f, 0.0f);
+				}
+			}
 		}
 
 #if 0
@@ -1350,6 +1431,7 @@ void Render(void)
 
 	static uint32_t cleanUpCount=0;
 
+	// Every 100 frames, check the emitter list for dead active emitters and delete them.
 	if(cleanUpCount++>100)
 	{
 		cleanUpCount=0;
@@ -1461,11 +1543,10 @@ void Render(void)
 	//////
 	// Do a simple dumb "seek out the player" thing
 	CameraSeekTarget(&enemy, camera.position, camera.radius, asteroids, NUM_ASTEROIDS);
-
-#if 1
-	// Test for if the player is in a 10 degree view cone, if so fire at them once every 2 seconds.
 	isTargeted=CameraIsTargetInFOV(enemy, camera.position, deg2rad(5.0f));
-	
+
+#if 0
+	// Test for if the player is in a 10 degree view cone, if so fire at them once every 2 seconds.
 	fireTime+=fTimeStep;
 
 	if(isTargeted&&fireTime>2.0f)

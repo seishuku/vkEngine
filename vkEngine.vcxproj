@@ -227,7 +227,7 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <FloatingPointModel>Fast</FloatingPointModel>
+      <FloatingPointModel>Precise</FloatingPointModel>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <Optimization>Disabled</Optimization>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>

@@ -37,9 +37,6 @@ typedef enum
 
 void PhysicsIntegrate(RigidBody_t *body, float dt);
 void PhysicsExplode(RigidBody_t *bodies);
-void PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b);
-void PhysicsCameraToSphereCollisionResponse(Camera_t *camera, RigidBody_t *body);
-void PhysicsCameraToCameraCollisionResponse(Camera_t *cameraA, Camera_t *cameraB);
-void PhysicsParticleToSphereCollisionResponse(Particle_t *particle, RigidBody_t *body);
+float PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b);
 
 #endif
