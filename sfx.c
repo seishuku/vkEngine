@@ -9,6 +9,8 @@
 #include "camera/camera.h"
 extern Camera_t camera;
 
+extern bool isControlPressed;
+
 static WaveParams_t Engine=
 {
 	.waveType=3,
@@ -84,22 +86,37 @@ void SFXStreamData(void *buffer, size_t length)
 		int16_t sample=0, laserSample=0, engineSample=0;
 
 		// Mix in synth soundfx only when triggered
-		//if(camera.shift)
-		//{
-		//	laserSample=(int16_t)(GenerateWaveSample(&Laser)*INT16_MAX);
-		//	sample+=clamp(sample+laserSample, INT16_MIN, INT16_MAX);
-		//}
+		if(isControlPressed)
+		{
+			laserSample=sample+(int16_t)(GenerateWaveSample(&Laser)*INT16_MAX);
+
+			if(laserSample<INT16_MIN)
+				laserSample=INT16_MIN;
+			else if(laserSample>INT16_MAX)
+				laserSample=INT16_MAX;
+
+			sample=laserSample;
+		}
 
 		if(camera.key_w||camera.key_s||camera.key_a||camera.key_d||camera.key_v||camera.key_c)
 		{
-			engineSample=(int16_t)(GenerateWaveSample(&Engine)*INT16_MAX);
-			sample=clamp(sample+engineSample, INT16_MIN, INT16_MAX);
+			engineSample=sample+(int16_t)(GenerateWaveSample(&Engine)*INT16_MAX);
+
+			if(engineSample<INT16_MIN)
+				engineSample=INT16_MIN;
+			else if(engineSample>INT16_MAX)
+				engineSample=INT16_MAX;
+
+			sample=engineSample;
 		}
 
 		if(sample<=-32000)
 			break;
 
-		sample=clamp(sample, INT16_MIN, INT16_MAX);
+		if(sample<INT16_MIN)
+			sample=INT16_MIN;
+		else if(sample>INT16_MAX)
+			sample=INT16_MAX;
 
 		bufferPtr[0]=sample;
 		bufferPtr[1]=sample;

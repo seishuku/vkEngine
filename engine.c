@@ -156,6 +156,7 @@ float leftGrip, rightGrip;
 vec2 leftThumbstick, rightThumbstick;
 
 bool isTargeted=false;
+bool isControlPressed=false;
 
 void RecreateSwapchain(void);
 
@@ -855,8 +856,8 @@ void Thread_Main(void *arg)
 	}
 	//////
 
-#if 0
-	if(camera.shift)
+#if 1
+	if(isControlPressed)
 	{
 		for(uint32_t i=0;i<10;i++)
 		{
@@ -1351,17 +1352,53 @@ void Thread_Physics(void *arg)
 			}
 		}
 
-#if 0
-		if(camera.shift)
+#if 1
+		if(isControlPressed)
 		{
 			float distance=raySphereIntersect(camera.position, camera.forward, asteroids[i].position, asteroids[i].radius);
 
 			if(distance>0.0f)
 			{
-				Particle_t particle;
-				particle.position=Vec3_Addv(camera.position, Vec3_Muls(camera.forward, distance));
-				particle.velocity=Vec3_Muls(camera.forward, 300.0f);
-				PhysicsParticleToSphereCollisionResponse(&particle, &asteroids[i]);
+				RigidBody_t particleBody;
+
+				particleBody.position=Vec3_Addv(camera.position, Vec3_Muls(camera.forward, distance));
+				particleBody.velocity=Vec3_Muls(camera.forward, 300.0f);
+				particleBody.force=Vec3b(0.0f);
+
+				particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+				particleBody.angularVelocity=Vec3b(0.0f);
+
+				particleBody.radius=2.0f;
+
+				particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*10000.0f;
+				particleBody.invMass=1.0f/particleBody.mass;
+
+				particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
+				particleBody.invInertia=1.0f/particleBody.inertia;
+
+				if(PhysicsSphereToSphereCollisionResponse(&particleBody, &asteroids[i])>1.0f)
+				{
+					Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particleBody.position);
+
+					// FIXME: Is this causing derelict emitters that never go away?
+					//			I don't think it is, but need to check.
+					uint32_t ID=ParticleSystem_AddEmitter
+					(
+						&particleSystem,
+						particleBody.position,		// Position
+						Vec3(100.0f, 12.0f, 5.0f),	// Start color
+						Vec3(0.0f, 0.0f, 0.0f),		// End color
+						5.0f,						// Radius of particles
+						1000,						// Number of particles in system
+						true,						// Is burst?
+						ExplodeEmitterCallback		// Callback for particle generation
+					);
+
+					ParticleSystem_ResetEmitter(&particleSystem, ID);
+
+					// Silly radius reduction on hit
+					//body->radius=fmaxf(body->radius-10.0f, 0.0f);
+				}
 			}
 		}
 #endif

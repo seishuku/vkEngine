@@ -32,6 +32,8 @@ extern UI_t UI;
 extern uint32_t cursorID;
 
 extern Console_t console;
+
+extern bool isControlPressed;
 //////////////////////////////
 
 // Emitter callback for the launched emitter's particles
@@ -159,6 +161,8 @@ void Event_KeyDown(void *arg)
 			for(int i=0;i<NUM_ASTEROIDS;i++)
 				PhysicsExplode(&asteroids[i]);
 			break;
+		case KB_LCTRL:
+		case KB_RCTRL:	isControlPressed=true;	break;
 		default:		break;
 	}
 }
@@ -183,6 +187,8 @@ void Event_KeyUp(void *arg)
 		case KB_RIGHT:	camera.key_right=false;	break;
 		case KB_LSHIFT:
 		case KB_RSHIFT:	camera.shift=false;		break;
+		case KB_LCTRL:
+		case KB_RCTRL:	isControlPressed=false;	break;
 
 		default:		break;
 	}

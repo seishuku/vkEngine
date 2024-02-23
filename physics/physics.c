@@ -13,7 +13,7 @@
 // Particle system
 extern ParticleSystem_t particleSystem;
 
-static void apply_constraints(RigidBody_t *body)
+static void applyConstraints(RigidBody_t *body)
 {
 	vec3 center={ 0.0f, 0.0f, 0.0f };
 	const float maxRadius=2000.0f;
@@ -90,9 +90,7 @@ void PhysicsIntegrate(RigidBody_t *body, float dt)
 	// Position+=Velocity*dt+0.5f*Force/Mass*dt*dt
 	// Velocity+=Force/Mass*dt
 	const float massDeltaTimeSq=0.5f*body->invMass*dt*dt;
-
 	body->position=Vec3_Addv(body->position, Vec3_Addv(Vec3_Muls(body->velocity, dt), Vec3_Muls(body->force, massDeltaTimeSq)));
-
 	body->velocity=Vec3_Addv(body->velocity, Vec3_Muls(body->force, body->invMass*dt));
 
 	body->force=Vec3b(0.0f);
@@ -100,73 +98,26 @@ void PhysicsIntegrate(RigidBody_t *body, float dt)
 	// Integrate angular velocity using quaternions
 	body->orientation=integrateAngularVelocity(body->orientation, body->angularVelocity, dt);
 
-	apply_constraints(body);
+	applyConstraints(body);
 }
 
 void PhysicsExplode(RigidBody_t *body)
 {
-	vec3 explosion_center={ 0.0f, 0.0f, 0.0f };
+	const vec3 explosion_center={ 0.0f, 0.0f, 0.0f };
 
 	// Calculate direction from explosion center to fragment
 	vec3 direction=Vec3_Subv(body->position, explosion_center);
 	Vec3_Normalize(&direction);
 
 	// Calculate acceleration and impulse force
-	vec3 acceleration=Vec3_Muls(direction, EXPLOSION_POWER);
+	const vec3 acceleration=Vec3_Muls(direction, EXPLOSION_POWER);
 
 	// F=M*A bla bla...
-	vec3 force=Vec3_Muls(acceleration, body->mass);
+	const vec3 force=Vec3_Muls(acceleration, body->mass);
 
 	// Add it into object's velocity
 	body->velocity=Vec3_Addv(body->velocity, force);
 }
-
-#if 0
-float PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
-{
-	// Calculate relative position
-	vec3 relativePosition=Vec3_Subv(b->position, a->position);
-	const float distanceSq=Vec3_Dot(relativePosition, relativePosition);
-	const float radiiSum=a->radius+b->radius;
-
-	// Check if spheres are not colliding
-	if(distanceSq>radiiSum*radiiSum)
-		return 0.0f;
-
-	const float distance=sqrtf(distanceSq);
-	const vec3 normal=Vec3_Muls(relativePosition, 1.0f/distance);
-
-	// Calculate relative velocity
-	const vec3 relativeVelocity=Vec3_Subv(b->velocity, a->velocity);
-
-	// Calculate relative velocity along the normal
-	const float relativeSpeed=Vec3_Dot(relativeVelocity, normal);
-
-	// If spheres are moving away from each other
-	if(relativeSpeed>0.0f)
-		return 0.0f;
-
-	// Calculate impulse
-	float elasticity=0.8f;
-	float impulse=-(1.0f+elasticity)*relativeSpeed/(a->invMass+b->invMass);
-
-	// Update velocities
-	a->velocity=Vec3_Subv(a->velocity, Vec3_Muls(normal, impulse*a->invMass));
-	b->velocity=Vec3_Addv(b->velocity, Vec3_Muls(normal, impulse*b->invMass));
-	
-	// Update angular velocities (considering inertia)
-	const vec3 r1=Vec3_Addv(a->position, Vec3_Muls(normal, -a->radius));
-	const vec3 r2=Vec3_Addv(b->position, Vec3_Muls(normal, b->radius));
-
-	const vec3 torque1=Vec3_Cross(r1, normal);
-	const vec3 torque2=Vec3_Cross(r2, normal);
-
-	a->angularVelocity=Vec3_Addv(a->angularVelocity, Vec3_Muls(torque1, a->invInertia));
-	b->angularVelocity=Vec3_Addv(b->angularVelocity, Vec3_Muls(torque2, b->invInertia));
-
-	return sqrtf(fabs(relativeSpeed));
-}
-#endif
 
 float PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 {
@@ -179,8 +130,11 @@ float PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 		const float distance=sqrtf(distanceSq);
 		const vec3 normal=Vec3_Muls(relativePosition, 1.0f/distance);
 
-		const vec3 contact=Vec3_Addv(a->position, Vec3_Muls(normal, a->radius-(fabsf(Vec3_Length(normal)-radiiSum)*0.5f)));
+		// Point of contact
+		const float penetration=fabsf(distance-radiiSum)*0.5f;
+		const vec3 contact=Vec3_Addv(a->position, Vec3_Muls(normal, a->radius-penetration));
 
+		// Torque arms
 		const vec3 r1=Vec3_Subv(contact, a->position);
 		const vec3 r2=Vec3_Subv(contact, b->position);
 
@@ -194,42 +148,41 @@ float PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 		if(relativeSpeed>0.0f)
 			return 0.0f;
 
-		vec3 d1=Vec3_Cross(Vec3_Muls(Vec3_Cross(r1, normal), a->invInertia), r1);
-		vec3 d2=Vec3_Cross(Vec3_Muls(Vec3_Cross(r2, normal), b->invInertia), r2);
+		// Masses
+		const vec3 d1=Vec3_Cross(Vec3_Muls(Vec3_Cross(r1, normal), a->invInertia), r1);
+		const vec3 d2=Vec3_Cross(Vec3_Muls(Vec3_Cross(r2, normal), b->invInertia), r2);
 		const float invMassSum=a->invMass+b->invMass;
-		float denominator=invMassSum+Vec3_Dot(normal, Vec3_Addv(d1, d2));
 
-		const float e=0.8f;
-		const float j=-(1.0f+e)*relativeSpeed/denominator;
+		const float e=1.0f;
+		const float j=-(1.0f+e)*relativeSpeed/(invMassSum+Vec3_Dot(normal, Vec3_Addv(d1, d2)));
 
 		const vec3 impulse=Vec3_Muls(normal, j);
 
+		// Head-on collision velocities
 		a->velocity=Vec3_Subv(a->velocity, Vec3_Muls(impulse, a->invMass));
 		b->velocity=Vec3_Addv(b->velocity, Vec3_Muls(impulse, b->invMass));
 
 		a->angularVelocity=Vec3_Subv(a->angularVelocity, Vec3_Muls(Vec3_Cross(r1, impulse), a->invInertia));
 		b->angularVelocity=Vec3_Addv(b->angularVelocity, Vec3_Muls(Vec3_Cross(r2, impulse), b->invInertia));
 
-		// Friction
-		vec3 t=Vec3_Subv(relativeVel, Vec3_Muls(normal, Vec3_Dot(relativeVel, normal)));
+		// Calculate tangential velocities
+		vec3 tangentialVel=Vec3_Subv(relativeVel, Vec3_Muls(normal, Vec3_Dot(relativeVel, normal)));
+		Vec3_Normalize(&tangentialVel);
 
-		Vec3_Normalize(&t);
-
-		d1=Vec3_Cross(Vec3_Muls(Vec3_Cross(r1, t), a->invInertia), r1);
-		d2=Vec3_Cross(Vec3_Muls(Vec3_Cross(r2, t), b->invInertia), r2);
-		denominator=invMassSum+Vec3_Dot(t, Vec3_Addv(d1, d2));
-
-		float jT=-Vec3_Dot(relativeVel, t)/denominator;
+		const vec3 d1T=Vec3_Cross(Vec3_Muls(Vec3_Cross(r1, tangentialVel), a->invInertia), r1);
+		const vec3 d2T=Vec3_Cross(Vec3_Muls(Vec3_Cross(r2, tangentialVel), b->invInertia), r2);
 
 		const float friction=sqrtf(0.5f*0.5f);
 		const float maxjT=friction*j;
+
+		float jT=-Vec3_Dot(relativeVel, tangentialVel)/(invMassSum+Vec3_Dot(tangentialVel, Vec3_Addv(d1T, d2T)));
 
 		if(jT>maxjT)
 			jT=maxjT;
 		else if(jT<-maxjT)
 			jT=-maxjT;
 
-		vec3 impuseT=Vec3_Muls(t, jT);
+		const vec3 impuseT=Vec3_Muls(tangentialVel, jT);
 
 		a->velocity=Vec3_Subv(a->velocity, Vec3_Muls(impuseT, a->invMass));
 		b->velocity=Vec3_Addv(b->velocity, Vec3_Muls(impuseT, b->invMass));
@@ -243,7 +196,7 @@ float PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 	return 0.0f;
 }
 
-void PhysicsSphereToAABBCollisionResponse(RigidBody_t *sphere, RigidBody_t *aabb)
+float PhysicsSphereToAABBCollisionResponse(RigidBody_t *sphere, RigidBody_t *aabb)
 {
 	// Calculate the half extents of the AABB
 	const vec3 half=Vec3_Muls(aabb->size, 0.5f);
@@ -260,35 +213,76 @@ void PhysicsSphereToAABBCollisionResponse(RigidBody_t *sphere, RigidBody_t *aabb
 	);
 
 	// Calculate the distance between the closest point and the sphere's center
-	vec3 normal=Vec3_Subv(closest, sphere->position);
+	vec3 relativePosition=Vec3_Subv(closest, sphere->position);
 
-	const float distanceSq=Vec3_Dot(normal, normal);
+	const float distanceSq=Vec3_Dot(relativePosition, relativePosition);
 
 	// Check if the distance is less than the sphere's radius
 	if(distanceSq<=sphere->radius*sphere->radius&&distanceSq)
 	{
 		const float distance=sqrtf(distanceSq);
+		const vec3 normal=Vec3_Muls(relativePosition, 1.0f/distance);
 
-		if(distance)
-			normal=Vec3_Muls(normal, 1.0f/distance);
+		const vec3 contact=Vec3_Addv(sphere->position, Vec3_Muls(normal, sphere->radius));
 
-		const float penetration=sphere->radius-distance;
-		const vec3 positionImpulse=Vec3_Muls(normal, penetration*0.5f);
+		const vec3 r1=Vec3_Subv(contact, sphere->position);
+		const vec3 r2=Vec3_Subv(contact, aabb->position);
 
-		sphere->position=Vec3_Subv(sphere->position, positionImpulse);
-		aabb->position=Vec3_Addv(aabb->position, positionImpulse);
+		const vec3 relativeVel=Vec3_Subv(
+			Vec3_Addv(aabb->velocity, Vec3_Cross(aabb->angularVelocity, r2)),
+			Vec3_Addv(sphere->velocity, Vec3_Cross(sphere->angularVelocity, r1))
+		);
 
-		const vec3 contactVelocity=Vec3_Subv(aabb->velocity, sphere->velocity);
+		const float relativeSpeed=Vec3_Dot(relativeVel, normal);
 
-		const float totalMass=sphere->invMass+aabb->invMass;
-		const float restitution=0.6f;
-		const float VdotN=Vec3_Dot(contactVelocity, normal);
-		const float j=(-(1.0f+restitution)*VdotN)/totalMass;
+		if(relativeSpeed>0.0f)
+			return 0.0f;
 
-		sphere->velocity=Vec3_Subv(sphere->velocity, Vec3_Muls(normal, j*sphere->invMass));
-		aabb->velocity=Vec3_Addv(aabb->velocity, Vec3_Muls(normal, j*aabb->invMass));
+		vec3 d1=Vec3_Cross(Vec3_Muls(Vec3_Cross(r1, normal), sphere->invInertia), r1);
+		vec3 d2=Vec3_Cross(Vec3_Muls(Vec3_Cross(r2, normal), aabb->invInertia), r2);
+		const float invMassSum=sphere->invMass+aabb->invMass;
+		float denominator=invMassSum+Vec3_Dot(normal, Vec3_Addv(d1, d2));
 
-		sphere->angularVelocity=Vec3_Subv(sphere->angularVelocity, Vec3_Muls(normal, VdotN*sphere->invInertia));
-		aabb->angularVelocity=Vec3_Addv(aabb->angularVelocity, Vec3_Muls(normal, VdotN*aabb->invInertia));
+		const float e=0.8f;
+		const float j=-(1.0f+e)*relativeSpeed/denominator;
+
+		const vec3 impulse=Vec3_Muls(normal, j);
+
+		sphere->velocity=Vec3_Subv(sphere->velocity, Vec3_Muls(impulse, sphere->invMass));
+		aabb->velocity=Vec3_Addv(aabb->velocity, Vec3_Muls(impulse, aabb->invMass));
+
+		sphere->angularVelocity=Vec3_Subv(sphere->angularVelocity, Vec3_Muls(Vec3_Cross(r1, impulse), sphere->invInertia));
+		aabb->angularVelocity=Vec3_Addv(aabb->angularVelocity, Vec3_Muls(Vec3_Cross(r2, impulse), aabb->invInertia));
+
+		// Friction
+		vec3 t=Vec3_Subv(relativeVel, Vec3_Muls(normal, Vec3_Dot(relativeVel, normal)));
+
+		Vec3_Normalize(&t);
+
+		d1=Vec3_Cross(Vec3_Muls(Vec3_Cross(r1, t), sphere->invInertia), r1);
+		d2=Vec3_Cross(Vec3_Muls(Vec3_Cross(r2, t), aabb->invInertia), r2);
+		denominator=invMassSum+Vec3_Dot(t, Vec3_Addv(d1, d2));
+
+		float jT=-Vec3_Dot(relativeVel, t)/denominator;
+
+		const float friction=sqrtf(0.5f*0.5f);
+		const float maxjT=friction*j;
+
+		if(jT>maxjT)
+			jT=maxjT;
+		else if(jT<-maxjT)
+			jT=-maxjT;
+
+		vec3 impuseT=Vec3_Muls(t, jT);
+
+		sphere->velocity=Vec3_Subv(sphere->velocity, Vec3_Muls(impuseT, sphere->invMass));
+		aabb->velocity=Vec3_Addv(aabb->velocity, Vec3_Muls(impuseT, aabb->invMass));
+
+		sphere->angularVelocity=Vec3_Subv(sphere->angularVelocity, Vec3_Muls(Vec3_Cross(r1, impuseT), sphere->invInertia));
+		aabb->angularVelocity=Vec3_Addv(aabb->angularVelocity, Vec3_Muls(Vec3_Cross(r2, impuseT), aabb->invInertia));
+
+		return sqrtf(-relativeSpeed);
 	}
+
+	return 0.0f;
 }

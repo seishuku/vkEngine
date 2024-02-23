@@ -113,7 +113,7 @@ static void HRIRInterpolate(vec3 xyz)
 	);
 
 	// Calculate distance fall-off
-	float falloffDist=max(0.0f, 1.0f-Vec3_Length(Vec3_Muls(position, invRadius)));
+	float falloffDist=fmaxf(0.0f, 1.0f-Vec3_Length(Vec3_Muls(position, invRadius)));
 
 	// Normalize also returns the length of the vector...
 	Vec3_Normalize(&position);
@@ -175,8 +175,18 @@ static void Convolve(const int16_t *input, int16_t *output, const size_t length,
 			inputPtr--;
 		}
 
-		*outputPtr++=(int16_t)(clamp(sum[0], -0x40000000, 0x3fffffff)>>15);
-		*outputPtr++=(int16_t)(clamp(sum[1], -0x40000000, 0x3fffffff)>>15);
+		if(sum[0]<-0x40000000)
+			sum[0]=-0x40000000;
+		else if(sum[0]>0x3fffffff)
+			sum[0]=0x3fffffff;
+
+		if(sum[1]<-0x40000000)
+			sum[1]=-0x40000000;
+		else if(sum[1]>0x3fffffff)
+			sum[1]=0x3fffffff;
+
+		*outputPtr++=(int16_t)(sum[0]>>15);
+		*outputPtr++=(int16_t)(sum[1]>>15);
 	}
 }
 
@@ -188,13 +198,23 @@ static void MixAudio(int16_t *dst, const int16_t *src, const size_t length, cons
 
 	for(size_t i=0;i<length*2;i+=2)
 	{
-		dst[i+0]=clamp(((src[i+0]*volume)/MAX_VOLUME)+dst[i+0], INT16_MIN, INT16_MAX);
-		dst[i+1]=clamp(((src[i+1]*volume)/MAX_VOLUME)+dst[i+1], INT16_MIN, INT16_MAX);
+		int32_t sampleL=((src[i+0]*volume)/MAX_VOLUME)+dst[i+0];
+		int32_t sampleR=((src[i+1]*volume)/MAX_VOLUME)+dst[i+1];
+
+		if(sampleL<INT16_MIN)
+			sampleL=INT16_MIN;
+		else if(sampleL>INT16_MAX)
+			sampleL=INT16_MAX;
+
+		if(sampleR<INT16_MIN)
+			sampleR=INT16_MIN;
+		else if(sampleR>INT16_MAX)
+			sampleR=INT16_MAX;
+
+		dst[i+0]=sampleL;
+		dst[i+1]=sampleR;
 	}
 }
-
-#include "../font/font.h"
-extern Font_t Fnt;
 
 static void Audio_FillBuffer(void *buffer, uint32_t length)
 {
@@ -343,7 +363,7 @@ void Audio_PlaySample(Sample_t *sample, const bool looping, const float volume, 
 	else
 		channels[index].xyz=&sample->xyz;
 
-	channels[index].volume=min(1.0f, max(0.0f, volume));
+	channels[index].volume=min(1.0f, fmaxf(0.0f, volume));
 }
 
 void Audio_StopSample(Sample_t *sample)

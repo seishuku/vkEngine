@@ -299,7 +299,7 @@ float GenerateWaveSample(WaveParams_t *params)
 		params->period=max(8, (int)params->fPeriod);
 
 	params->squareDuty+=params->squareSlide;
-	params->squareDuty=clamp(params->squareDuty, 0.0f, 0.5f);
+	params->squareDuty=clampf(params->squareDuty, 0.0f, 0.5f);
 
 	// Volume envelope
 	if(++params->envelopeTime>params->envelopeLength[params->envelopeStage])
@@ -384,7 +384,7 @@ float GenerateWaveSample(WaveParams_t *params)
 		// LP filter
 		float prevPoint=params->fltPoint;
 
-		params->fltWidth=clamp(params->fltWidth*params->fltWidthDerivative, 0.0f, 0.1f);
+		params->fltWidth=clampf(params->fltWidth*params->fltWidthDerivative, 0.0f, 0.1f);
 
 		if(params->lpfCutoff<=1.0f)
 			params->fltPointDerivative+=((sample-params->fltPoint)*params->fltWidth)-(params->fltPointDerivative*params->fltDamping);
@@ -398,7 +398,7 @@ float GenerateWaveSample(WaveParams_t *params)
 
 		// HP filter
 		if(params->fltHPDamping>0.0f||params->fltHPDamping<0.0f)
-			params->fltHPCutoff=clamp(params->fltHPCutoff*params->fltHPDamping, 0.00001f, 0.1f);
+			params->fltHPCutoff=clampf(params->fltHPCutoff*params->fltHPDamping, 0.00001f, 0.1f);
 
 		params->fltHPPoint+=params->fltPoint-prevPoint-(params->fltHPPoint*params->fltHPCutoff);
 		sample=params->fltHPPoint;
