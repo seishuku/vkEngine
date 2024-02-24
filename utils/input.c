@@ -244,8 +244,8 @@ void Event_Mouse(void *arg)
 	// Calculate relative movement
 	mousePosition=Vec2_Add(mousePosition, (float)mouseEvent->dx, (float)mouseEvent->dy);
 
-	mousePosition.x=min(max(mousePosition.x, 0.0f), (float)renderWidth);
-	mousePosition.y=min(max(mousePosition.y, 0.0f), (float)renderHeight);
+	mousePosition.x=clampf(mousePosition.x, 0.0f, (float)renderWidth);
+	mousePosition.y=clampf(mousePosition.y, 0.0f, (float)renderHeight);
 
 	UI_UpdateCursorPosition(&UI, cursorID, mousePosition);
 

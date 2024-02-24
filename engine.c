@@ -503,7 +503,7 @@ void GenerateSkyParams(void)
 		vec3 randomDirection=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
 		Vec3_Normalize(&randomDirection);
 
-		asteroids[i].velocity=Vec3_Muls(randomDirection, 10.0f);
+		asteroids[i].velocity=Vec3b(0.0f);// Vec3_Muls(randomDirection, 10.0f);
 		asteroids[i].force=Vec3b(0.0f);
 
 		asteroids[i].orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -1434,10 +1434,10 @@ void Thread_Physics(void *arg)
 
 	// Barrier now that we're done here
 	//pthread_barrier_wait(&physicsThreadBarrier);
-//	mtx_lock(&physicsThreadMutex);
+	mtx_lock(&physicsThreadMutex);
 	atomic_fetch_sub(&physicsThreadBarrier, 1);
-//	cnd_signal(&physicsThreadCondition);
-//	mtx_unlock(&physicsThreadMutex);
+	cnd_signal(&physicsThreadCondition);
+	mtx_unlock(&physicsThreadMutex);
 }
 
 extern vec2 mousePosition;
@@ -1610,12 +1610,12 @@ void Render(void)
 	// Wait for physics to finish before sumbitting frame
 	//pthread_barrier_wait(&physicsThreadBarrier);
 
-//	mtx_lock(&physicsThreadMutex);
-	while(atomic_load(&physicsThreadBarrier));
-//		cnd_wait(&physicsThreadCondition, &physicsThreadMutex);
-//	mtx_unlock(&physicsThreadMutex);
-
+	mtx_lock(&physicsThreadMutex);
+	while(atomic_load(&physicsThreadBarrier))
+		cnd_wait(&physicsThreadCondition, &physicsThreadMutex);
 	atomic_store(&physicsThreadBarrier, 1);
+	mtx_unlock(&physicsThreadMutex);
+
 
 	// Submit command queue
 	VkSubmitInfo SubmitInfo=

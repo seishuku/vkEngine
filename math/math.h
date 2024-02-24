@@ -4,6 +4,14 @@
 #include <stdint.h>
 #include <math.h>
 
+#ifdef WIN32
+#undef min
+#undef max
+#endif
+
+inline static int32_t min(int32_t a, int32_t b) { return (a<b)?a:b; }
+inline static int32_t max(int32_t a, int32_t b) { return (a>b)?a:b; }
+
 #ifndef PI
 #define PI 3.1415926f
 #endif

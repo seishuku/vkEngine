@@ -111,7 +111,7 @@ static float nebula(vec3 p)
 		turb+=scale*noise(p.x/scale, p.y/scale, p.z/scale);
 	}
 
-	return min(1.0f, max(0.0f, turb));
+	return clampf(turb, 0.0f, 1.0f);
 }
 
 VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *image)

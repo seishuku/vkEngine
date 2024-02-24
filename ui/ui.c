@@ -391,7 +391,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye)
 				float textLength=Font_StringBaseWidth(control->button.titleText);
 
 				// Scale text size based on the button size and length of text, but no bigger than 80% of button height
-				float textSize=min(control->button.size.x/textLength*0.8f, control->button.size.y*0.8f);
+				float textSize=fminf(control->button.size.x/textLength*0.8f, control->button.size.y*0.8f);
 
 				// Print the text centered
 				Font_Print(&Fnt,
@@ -467,7 +467,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye)
 				float textLength=Font_StringBaseWidth(control->barGraph.titleText);
 
 				// Scale text size based on the button size and length of text, but no bigger than 80% of button height
-				float textSize=min(control->barGraph.size.x/textLength*0.8f, control->barGraph.size.y*0.8f);
+				float textSize=fminf(control->barGraph.size.x/textLength*0.8f, control->barGraph.size.y*0.8f);
 
 				// Print the text centered
 				Font_Print(&Fnt,

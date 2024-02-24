@@ -171,10 +171,10 @@ static const float speedRatio=100.0f;
 void ResetWaveSample(WaveParams_t *params)
 {
 	// Minimum frequency can't be higher than start frequency
-	params->minFrequency=min(params->startFrequency, params->minFrequency);
+	params->minFrequency=fminf(params->startFrequency, params->minFrequency);
 
 	// Slide can't be less than delta slide
-	params->slide=max(params->deltaSlide, params->slide);
+	params->slide=fmaxf(params->deltaSlide, params->slide);
 
 	params->fPeriod=speedRatio/(params->startFrequency*params->startFrequency+0.001f);
 	params->fMaxPeriod=speedRatio/(params->minFrequency*params->minFrequency+0.001f);
@@ -203,7 +203,7 @@ void ResetWaveSample(WaveParams_t *params)
 	params->fltPointDerivative=0.0f;
 	params->fltWidth=(params->lpfCutoff*params->lpfCutoff*params->lpfCutoff)*0.1f;
 	params->fltWidthDerivative=1.0f+params->lpfCutoffSweep*0.0001f;
-	params->fltDamping=min(0.8f, 5.0f/(1.0f+(params->lpfResonance*params->lpfResonance)*20.0f)*(0.01f+params->fltWidth));
+	params->fltDamping=fminf(0.8f, 5.0f/(1.0f+(params->lpfResonance*params->lpfResonance)*20.0f)*(0.01f+params->fltWidth));
 	params->fltHPPoint=0.0f;
 
 	params->fltHPCutoff=(params->hpfCutoff*params->hpfCutoff)*0.1f;
@@ -217,9 +217,9 @@ void ResetWaveSample(WaveParams_t *params)
 	// Reset envelope
 	params->envelopeStage=0;
 	params->envelopeTime=0;
-	params->envelopeLength[0]=(int32_t)max(1, params->attackTime*params->attackTime*100000.0f);
-	params->envelopeLength[1]=(int32_t)max(1, params->sustainTime*params->sustainTime*100000.0f);
-	params->envelopeLength[2]=(int32_t)max(1, params->decayTime*params->decayTime*100000.0f);
+	params->envelopeLength[0]=(int32_t)fmaxf(1.0f, params->attackTime*params->attackTime*100000.0f);
+	params->envelopeLength[1]=(int32_t)fmaxf(1.0f, params->sustainTime*params->sustainTime*100000.0f);
+	params->envelopeLength[2]=(int32_t)fmaxf(1.0f, params->decayTime*params->decayTime*100000.0f);
 	params->envelopeVolume=0.0f;
 
 	params->fPhase=(params->phaserOffset*params->phaserOffset)*1020.0f;
@@ -288,7 +288,7 @@ float GenerateWaveSample(WaveParams_t *params)
 	}
 
 	params->fSlide+=params->fDeltaSlide;
-	params->fPeriod=min(params->fMaxPeriod, params->fPeriod*params->fSlide);
+	params->fPeriod=fminf(params->fMaxPeriod, params->fPeriod*params->fSlide);
 
 	if(params->vibAmplitude>0.0f)
 	{
@@ -327,9 +327,9 @@ float GenerateWaveSample(WaveParams_t *params)
 		default:
 			params->envelopeStage=0;
 			params->envelopeTime=0;
-			params->envelopeLength[0]=(int32_t)max(1, params->attackTime*params->attackTime*100000.0f);
-			params->envelopeLength[1]=(int32_t)max(1, params->sustainTime*params->sustainTime*100000.0f);
-			params->envelopeLength[2]=(int32_t)max(1, params->decayTime*params->decayTime*100000.0f);
+			params->envelopeLength[0]=(int32_t)fmaxf(1.0f, params->attackTime*params->attackTime*100000.0f);
+			params->envelopeLength[1]=(int32_t)fmaxf(1.0f, params->sustainTime*params->sustainTime*100000.0f);
+			params->envelopeLength[2]=(int32_t)fmaxf(1.0f, params->decayTime*params->decayTime*100000.0f);
 			params->envelopeVolume=0.0f;
 			break;
 	}

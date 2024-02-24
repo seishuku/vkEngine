@@ -8,7 +8,6 @@
 #include "audio/audio.h"
 #include "music.h"
 
-static FILE *oggFile;
 static OggVorbis_File oggStream;
 
 #ifdef ANDROID
@@ -110,9 +109,6 @@ String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFi
 
 void MusicStreamData(void *buffer, size_t length)
 {
-	if(oggFile==NULL)
-		return;
-
 	int size=0;
 
 	// Callback param length is in frames, ov_read needs bytes:
@@ -151,16 +147,12 @@ void PrevTrackCallback(void *arg)
 
 		currentMusic=(currentMusic-1)%numMusic;
 		sprintf(filePath, "%s%s", musicPath, musicList[currentMusic].string);
-		oggFile=fopen(filePath, "rb");
 
-		if(oggFile==NULL)
-			return;
-
-		int result=ov_open(oggFile, &oggStream, NULL, 0);
+		int result=ov_fopen(filePath, &oggStream);
 
 		if(result<0)
 		{
-			fclose(oggFile);
+			ov_clear(&oggStream);
 			return;
 		}
 	}
@@ -172,20 +164,16 @@ void NextTrackCallback(void *arg)
 	{
 		ov_clear(&oggStream);
 
-		char FilePath[1024]={ 0 };
+		char filePath[1024]={ 0 };
 
 		currentMusic=(currentMusic+1)%numMusic;
-		sprintf(FilePath, "%s%s", musicPath, musicList[currentMusic].string);
-		oggFile=fopen(FilePath, "rb");
+		sprintf(filePath, "%s%s", musicPath, musicList[currentMusic].string);
 
-		if(oggFile==NULL)
-			return;
-
-		int result=ov_open(oggFile, &oggStream, NULL, 0);
+		int result=ov_fopen(filePath, &oggStream);
 
 		if(result<0)
 		{
-			fclose(oggFile);
+			ov_clear(&oggStream);
 			return;
 		}
 	}
@@ -201,20 +189,13 @@ void Music_Init(void)
 
 		currentMusic=RandRange(0, numMusic-1);
 		sprintf(filePath, "%s%s", musicPath, musicList[currentMusic].string);
-		//oggFile=fopen(filePath, "rb");
-
-		//if(oggFile==NULL)
-		//{
-		//	DBGPRINTF(DEBUG_ERROR, "Music_Init: Unable to fopen %s\n", filePath);
-		//	return;
-		//}
 
 		int result=ov_fopen(filePath, &oggStream);
 
 		if(result<0)
 		{
 			DBGPRINTF(DEBUG_ERROR, "Music_Init: Unable to ov_open %s\n", filePath);
-			fclose(oggFile);
+			ov_clear(&oggStream);
 			return;
 		}
 	}

@@ -363,7 +363,7 @@ void Audio_PlaySample(Sample_t *sample, const bool looping, const float volume, 
 	else
 		channels[index].xyz=&sample->xyz;
 
-	channels[index].volume=min(1.0f, fmaxf(0.0f, volume));
+	channels[index].volume=clampf(volume, 0.0f, 1.0f);
 }
 
 void Audio_StopSample(Sample_t *sample)
@@ -401,7 +401,7 @@ bool Audio_SetStreamVolume(uint32_t stream, const float volume)
 	if(stream>=MAX_AUDIO_STREAMS)
 		return false;
 
-	streamBuffer.stream[stream].volume=min(1.0f, max(0.0f, volume));
+	streamBuffer.stream[stream].volume=clampf(volume, 0.0f, 1.0f);
 
 	return true;
 }
