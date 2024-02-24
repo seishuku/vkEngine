@@ -65,6 +65,12 @@ extern float fps, fTimeStep, fTime;
 // Main particle system struct
 ParticleSystem_t particleSystem;
 
+// Particle system emitters as rigid bodies with life and ID hashmaps
+#define MAX_EMITTERS 1000
+RigidBody_t particleEmitters[MAX_EMITTERS];
+uint32_t particleEmittersID[MAX_EMITTERS];
+float particleEmittersLife[MAX_EMITTERS];
+
 // 3D Model data
 BModel_t models[NUM_MODELS];
 
@@ -1228,26 +1234,39 @@ void Thread_Physics(void *arg)
 
 	//CvWriteFlag(flagSeries, "physics start");
 
-	// Get a pointer to the emitter that's providing the positions
-	ParticleEmitter_t *emitter=List_GetPointer(&particleSystem.emitters, 0);
+	ParticleSystem_Step(&particleSystem, fTimeStep);
 
-	for(uint32_t i=0;i<emitter->numParticles;i++)
+	// Run integration for particle emitter objects
+	for(uint32_t i=0;i<MAX_EMITTERS;i++)
 	{
-		if(emitter->particles[i].ID!=emitter->ID)
+		// If it's alive reduce the life and integrate,
+		// otherwise if it's dead and still has an ID assigned, delete/unassign it.
+		if(particleEmittersLife[i]>0.0f)
 		{
-			// Get those positions and set the other emitter's positions to those
-			ParticleSystem_SetEmitterPosition(&particleSystem, emitter->particles[i].ID, emitter->particles[i].position);
+			particleEmittersLife[i]-=fTimeStep;
+			PhysicsIntegrate(&particleEmitters[i], fTimeStep);
 
-			// If this particle is dead, delete that emitter and reset it's ID 
-			if(emitter->particles[i].life<0.0f)
+			for(uint32_t j=0;j<List_GetCount(&particleSystem.emitters);j++)
 			{
-				ParticleSystem_DeleteEmitter(&particleSystem, emitter->particles[i].ID);
-				emitter->particles[i].ID=0;
+				ParticleEmitter_t *emitter=List_GetPointer(&particleSystem.emitters, j);
+
+				if(emitter->ID==particleEmittersID[i])
+				{
+					emitter->position=particleEmitters[i].position;
+
+					if(particleEmittersLife[i]<5.0f)
+						emitter->particleSize*=fmaxf(0.0f, fminf(1.0f, particleEmittersLife[i]/5.0f));
+
+					break;
+				}
 			}
 		}
+		else if(particleEmittersID[i]!=UINT32_MAX)
+		{
+			ParticleSystem_DeleteEmitter(&particleSystem, particleEmittersID[i]);
+			particleEmittersID[i]=UINT32_MAX;
+		}
 	}
-
-	ParticleSystem_Step(&particleSystem, fTimeStep);
 
 	// Loop through objects, integrate and check/resolve collisions
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
@@ -1298,53 +1317,29 @@ void Thread_Physics(void *arg)
 		}
 #endif
 
-		// Check asteroids against projectile particles
-		// Emitter '0' on the particle system contains particles that drive the projectile physics
-		ParticleEmitter_t *emitter=List_GetPointer(&particleSystem.emitters, 0);
-		// Loop through all the possible particles
-		for(uint32_t j=0;j<emitter->numParticles;j++)
+		// Check asteroids against projectile emitters
+		for(uint32_t j=0;j<MAX_EMITTERS;j++)
 		{
-			// If the particle ID matches with the projectile ID, then check collision and respond
-			if(emitter->particles[j].ID!=emitter->ID||emitter->particles[j].life>0.0f)
+			if(particleEmittersLife[j]>0.0f)
 			{
-				RigidBody_t particleBody;
-
-				particleBody.position=emitter->particles[j].position;
-				particleBody.velocity=emitter->particles[j].velocity;
-				particleBody.force=Vec3b(0.0f);
-
-				particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-				particleBody.angularVelocity=Vec3b(0.0f);
-
-				particleBody.radius=2.0f;
-
-				particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*10000.0f;
-				particleBody.invMass=1.0f/particleBody.mass;
-
-				particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
-				particleBody.invInertia=1.0f/particleBody.inertia;
-
-				if(PhysicsSphereToSphereCollisionResponse(&particleBody, &asteroids[i])>1.0f)
+				if(PhysicsSphereToSphereCollisionResponse(&particleEmitters[j], &asteroids[i])>1.0f)
 				{
-					emitter->particles[j].life=-1.0f;
+					// It collided, kill it.
+					// Setting this directly to <0.0 seems to cause emitters that won't get removed,
+					//     so setting it to nearly 0.0 allows the natural progression kill it off.
+					particleEmittersLife[j]=0.001f;
 
-					Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &emitter->particles[j].position);
+					Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particleEmitters[j].position);
 
-					// FIXME: Is this causing derelict emitters that never go away?
-					//			I don't think it is, but need to check.
-					uint32_t ID=ParticleSystem_AddEmitter
-					(
-						&particleSystem,
-						particleBody.position,		// Position
-						Vec3(100.0f, 12.0f, 5.0f),	// Start color
-						Vec3(0.0f, 0.0f, 0.0f),		// End color
-						5.0f,						// Radius of particles
-						1000,						// Number of particles in system
-						true,						// Is burst?
-						ExplodeEmitterCallback		// Callback for particle generation
+					ParticleSystem_AddEmitter(&particleSystem,
+						particleEmitters[j].position,	// Position
+						Vec3(100.0f, 12.0f, 5.0f),		// Start color
+						Vec3(0.0f, 0.0f, 0.0f),			// End color
+						5.0f,							// Radius of particles
+						1000,							// Number of particles in system
+						PARTICLE_EMITTER_ONCE,			// Type?
+						ExplodeEmitterCallback			// Callback for particle generation
 					);
-
-					ParticleSystem_ResetEmitter(&particleSystem, ID);
 
 					// Silly radius reduction on hit
 					//body->radius=fmaxf(body->radius-10.0f, 0.0f);
@@ -1382,7 +1377,7 @@ void Thread_Physics(void *arg)
 
 					// FIXME: Is this causing derelict emitters that never go away?
 					//			I don't think it is, but need to check.
-					uint32_t ID=ParticleSystem_AddEmitter
+					ParticleSystem_AddEmitter
 					(
 						&particleSystem,
 						particleBody.position,		// Position
@@ -1390,11 +1385,9 @@ void Thread_Physics(void *arg)
 						Vec3(0.0f, 0.0f, 0.0f),		// End color
 						5.0f,						// Radius of particles
 						1000,						// Number of particles in system
-						true,						// Is burst?
+						PARTICLE_EMITTER_ONCE,		// Type?
 						ExplodeEmitterCallback		// Callback for particle generation
 					);
-
-					ParticleSystem_ResetEmitter(&particleSystem, ID);
 
 					// Silly radius reduction on hit
 					//body->radius=fmaxf(body->radius-10.0f, 0.0f);
@@ -1465,35 +1458,6 @@ void Render(void)
 	uint32_t imageIndex;
 
 	//CvWriteFlag(flagSeries, "frame start");
-
-	static uint32_t cleanUpCount=0;
-
-	// Every 100 frames, check the emitter list for dead active emitters and delete them.
-	if(cleanUpCount++>100)
-	{
-		cleanUpCount=0;
-
-		for(uint32_t i=1;i<List_GetCount(&particleSystem.emitters);i++)
-		{
-			ParticleEmitter_t *emitter=List_GetPointer(&particleSystem.emitters, i);
-			bool isActive=false;
-
-			for(uint32_t j=0;j<emitter->numParticles;j++)
-			{
-				if(emitter->particles[i].life>0.0f)
-				{
-					isActive=true;
-					break;
-				}
-			}
-
-			if(!isActive)
-			{
-				DBGPRINTF(DEBUG_WARNING, "REMOVING UNUSED EMMITER #%d\n", emitter->ID);
-				ParticleSystem_DeleteEmitter(&particleSystem, emitter->ID);
-			}
-		}
-	}
 
 	// Handle VR frame start
 	if(isVR)
@@ -1919,8 +1883,33 @@ bool Init(void)
 	
 	ParticleSystem_SetGravity(&particleSystem, 0.0f, 0.0f, 0.0f);
 
-	volatile vec3 Zero=Vec3(0.0f, 0.0f, 0.0f);
-	ParticleSystem_AddEmitter(&particleSystem, Zero, Zero, Zero, 0.0f, 1000, true, NULL);
+	ParticleSystem_AddEmitter(&particleSystem, Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f), 0.0f, 1, PARTICLE_EMITTER_BURST, NULL);
+
+	// Set up emitter initial state and projectial rigid body parameters
+	for(uint32_t i=0;i<MAX_EMITTERS;i++)
+	{
+		particleEmittersID[i]=UINT32_MAX;	// No assigned particle ID
+		particleEmittersLife[i]=-1.0f;		// No life
+
+		RigidBody_t particleBody;
+
+		particleBody.position=Vec3b(0.0f);
+		particleBody.velocity=Vec3b(0.0f);
+		particleBody.force=Vec3b(0.0f);
+
+		particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		particleBody.angularVelocity=Vec3b(0.0f);
+
+		particleBody.radius=2.0f;
+
+		particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*10.0f;
+		particleBody.invMass=1.0f/particleBody.mass;
+
+		particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
+		particleBody.invInertia=1.0f/particleBody.inertia;
+
+		particleEmitters[i]=particleBody;
+	}
 
 	Font_Init(&Fnt);
 

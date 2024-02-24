@@ -2,6 +2,7 @@
 #define __PARTICLE_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <threads.h>
 #include "../utils/list.h"
 #include "../math/math.h"
@@ -16,10 +17,17 @@ typedef struct Particle_s
 
 typedef void (*ParticleInitCallback)(uint32_t index, uint32_t numParticles, Particle_t *particle);
 
+typedef enum ParticleEmitterType_e
+{
+	PARTICLE_EMITTER_CONTINOUS=0,
+	PARTICLE_EMITTER_BURST=1,
+	PARTICLE_EMITTER_ONCE=2,
+} ParticleEmitterType_e;
+
 typedef struct ParticleEmitter_s
 {
 	uint32_t ID;
-	bool burst;
+	ParticleEmitterType_e type;
 	vec3 position;
 	vec3 startColor, endColor;
 	float particleSize;
@@ -42,7 +50,7 @@ typedef struct ParticleSystem_s
 	float *particleArray;
 } ParticleSystem_t;
 
-uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3 startColor, vec3 endColor, float particleSize, uint32_t numParticles, bool burst, ParticleInitCallback initCallback);
+uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3 startColor, vec3 endColor, float particleSize, uint32_t numParticles, ParticleEmitterType_e type, ParticleInitCallback initCallback);
 void ParticleSystem_DeleteEmitter(ParticleSystem_t *system, uint32_t ID);
 void ParticleSystem_ResetEmitter(ParticleSystem_t *system, uint32_t ID);
 void ParticleSystem_SetEmitterPosition(ParticleSystem_t *system, uint32_t ID, vec3 position);

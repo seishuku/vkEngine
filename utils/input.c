@@ -25,6 +25,11 @@ extern Camera_t camera;
 
 extern ParticleSystem_t particleSystem;
 
+#define MAX_EMITTERS 1000
+extern RigidBody_t particleEmitters[MAX_EMITTERS];
+extern uint32_t particleEmittersID[MAX_EMITTERS];
+extern float particleEmittersLife[MAX_EMITTERS];
+
 #define NUM_ASTEROIDS 1000
 extern RigidBody_t asteroids[NUM_ASTEROIDS];
 
@@ -53,33 +58,30 @@ void emitterCallback(uint32_t index, uint32_t numParticles, Particle_t *particle
 // This is basically the same as an emitter callback, but done manually by working on the particle array directly.
 void FireParticleEmitter(vec3 position, vec3 direction)
 {
-	// Get pointer to the emitter that's being used to drive the other emitters
-	ParticleEmitter_t *emitter=List_GetPointer(&particleSystem.emitters, 0);
-
 	// Create a new particle emitter
 	vec3 randVec=Vec3(RandFloat(), RandFloat(), RandFloat());
 	Vec3_Normalize(&randVec);
 	randVec=Vec3_Muls(randVec, 100.0f);
 
 	// Fire the emitter camera radius units away from Position in the direction of Direction
-	uint32_t ID=ParticleSystem_AddEmitter(&particleSystem, position, Vec3b(0.0f), randVec, 5.0f, 500, false, emitterCallback);
+	uint32_t ID=ParticleSystem_AddEmitter(&particleSystem, position, Vec3b(0.0f), randVec, 5.0f, 500, PARTICLE_EMITTER_CONTINOUS, emitterCallback);
 
 	// Emitter list full?
 	if(ID==UINT32_MAX)
 		return;
 
-	// Search list for first dead particle
-	for(uint32_t i=0;i<emitter->numParticles;i++)
+	// Search for first dead particle emitter
+	for(uint32_t i=0;i<MAX_EMITTERS;i++)
 	{
 		// When found, assign the new emitter ID to that particle, set position/direction/life and break out
-		if(emitter->particles[i].life<0.0f)
+		if(particleEmittersLife[i]<0.0f)
 		{
-			emitter->particles[i].ID=ID;
-			emitter->particles[i].position=position;
+			particleEmittersID[i]=ID;
+			particleEmitters[i].position=position;
 			Vec3_Normalize(&direction);
-			emitter->particles[i].velocity=Vec3_Muls(direction, 100.0f);
+			particleEmitters[i].velocity=Vec3_Muls(direction, 100.0f);
 
-			emitter->particles[i].life=10.0f;
+			particleEmittersLife[i]=15.0f;
 
 			break;
 		}

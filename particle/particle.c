@@ -40,8 +40,6 @@ bool ParticleSystem_ResizeBuffer(ParticleSystem_t *system)
 	if(system==NULL)
 		return false;
 
-	mtx_lock(&system->mutex);
-
 	uint32_t count=0;
 
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
@@ -63,16 +61,16 @@ bool ParticleSystem_ResizeBuffer(ParticleSystem_t *system)
 	vkuCreateHostBuffer(&vkContext, &system->particleBuffer, sizeof(vec4)*2*count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 //	vkMapMemory(vkContext.device, system->particleBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&system->particleArray);
 
-	mtx_unlock(&system->mutex);
-
 	return true;
 }
 
 // Adds a particle emitter to the system
-uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3 startColor, vec3 endColor, float particleSize, uint32_t numParticles, bool burst, ParticleInitCallback initCallback)
+uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3 startColor, vec3 endColor, float particleSize, uint32_t numParticles, ParticleEmitterType_e type, ParticleInitCallback initCallback)
 {
 	if(system==NULL)
 		return UINT32_MAX;
+
+	mtx_lock(&system->mutex);
 
 	// Pull the next ID from the global ID count
 	uint32_t ID=system->baseID++;
@@ -87,7 +85,7 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3
 		emitter.initCallback=initCallback;
 
 	// Set various flags/parameters
-	emitter.burst=burst;
+	emitter.type=type;
 	emitter.ID=ID;
 	emitter.startColor=startColor;
 	emitter.endColor=endColor;
@@ -105,12 +103,36 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3
 	// Set emitter position (used when resetting/recycling particles when they die)
 	emitter.position=position;
 
-	// Set initial particle position and life to -1.0 (dead)
+	// Set initial particle position and life to -1.0 (dead), unless it's a one-shot, then set it up with default or callback
 	for(uint32_t i=0;i<emitter.numParticles;i++)
 	{
 		emitter.particles[i].ID=ID;
 		emitter.particles[i].position=position;
-		emitter.particles[i].life=-1.0f;
+
+		if(emitter.type==PARTICLE_EMITTER_ONCE)
+		{
+			if(emitter.initCallback)
+			{
+				emitter.initCallback(i, emitter.numParticles, &emitter.particles[i]);
+
+				// Add particle emitter position to the calculated position
+				emitter.particles[i].position=Vec3_Addv(emitter.particles[i].position, emitter.position);
+			}
+			else
+			{
+				float seedRadius=30.0f;
+				float theta=RandFloat()*2.0f*PI;
+				float r=RandFloat()*seedRadius;
+
+				// Set particle start position to emitter position
+				emitter.particles[i].position=emitter.position;
+				emitter.particles[i].velocity=Vec3(r*sinf(theta), RandFloat()*100.0f, r*cosf(theta));
+
+				emitter.particles[i].life=RandFloat()*0.999f+0.001f;
+			}
+		}
+		else
+			emitter.particles[i].life=-1.0f;
 	}
 
 	List_Add(&system->emitters, &emitter);
@@ -118,6 +140,8 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3
 	// Resize vertex buffers (both system memory and OpenGL buffer)
 	if(!ParticleSystem_ResizeBuffer(system))
 		return UINT32_MAX;
+
+	mtx_unlock(&system->mutex);
 
 	return ID;
 }
@@ -127,6 +151,8 @@ void ParticleSystem_DeleteEmitter(ParticleSystem_t *system, uint32_t ID)
 {
 	if(system==NULL||ID==UINT32_MAX)
 		return;
+
+	mtx_lock(&system->mutex);
 
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
 	{
@@ -139,9 +165,11 @@ void ParticleSystem_DeleteEmitter(ParticleSystem_t *system, uint32_t ID)
 
 			// Resize vertex buffers (both system memory and OpenGL buffer)
 			ParticleSystem_ResizeBuffer(system);
-			return;
+			break;
 		}
 	}
+
+	mtx_unlock(&system->mutex);
 }
 
 // Resets the emitter to the initial parameters (mostly for a "burst" trigger)
@@ -322,14 +350,17 @@ void ParticleSystem_Step(ParticleSystem_t *system, float dt)
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
 	{
 		ParticleEmitter_t *emitter=List_GetPointer(&system->emitters, i);
+		bool isActive=false;
 
 		for(uint32_t j=0;j<emitter->numParticles;j++)
 		{
-			emitter->particles[j].life-=dt*0.75f;
-
-			// If the particle is dead and isn't a one shot (burst), restart it...
-			// Otherwise run the math for the particle system motion.
-			if(emitter->particles[j].life<0.0f&&!emitter->burst)
+			if(emitter->particles[j].life>0.0f)
+			{
+				isActive=true;
+				emitter->particles[j].velocity=Vec3_Addv(emitter->particles[j].velocity, Vec3_Muls(system->gravity, dt));
+				emitter->particles[j].position=Vec3_Addv(emitter->particles[j].position, Vec3_Muls(emitter->particles[j].velocity, dt));
+			}
+			else if(emitter->type==PARTICLE_EMITTER_CONTINOUS)
 			{
 				// If a velocity/life callback was set, use it... Otherwise use default "fountain" style
 				if(emitter->initCallback)
@@ -352,21 +383,21 @@ void ParticleSystem_Step(ParticleSystem_t *system, float dt)
 					emitter->particles[j].life=RandFloat()*0.999f+0.001f;
 				}
 			}
-			else
-			{
-				if(emitter->particles[j].life>0.0f)
-				{
-					emitter->particles[j].velocity=Vec3_Addv(emitter->particles[j].velocity, Vec3_Muls(system->gravity, dt));
-					emitter->particles[j].position=Vec3_Addv(emitter->particles[j].position, Vec3_Muls(emitter->particles[j].velocity, dt));
-				}
-			}
+
+			emitter->particles[j].life-=dt*0.75f;
+		}
+
+		if(!isActive&&emitter->type==PARTICLE_EMITTER_ONCE)
+		{
+			DBGPRINTF(DEBUG_WARNING, "REMOVING UNUSED EMITTER #%d\n", emitter->ID);
+			ParticleSystem_DeleteEmitter(system, emitter->ID);
 		}
 	}
 }
 
 void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, matrix modelview, matrix projection)
 {
-	if(system==NULL)
+	if(system==NULL||!system->particleBuffer.buffer)
 		return;
 
 	mtx_lock(&system->mutex);
@@ -375,7 +406,10 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 	vkMapMemory(vkContext.device, system->particleBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&array);
 
 	if(array==NULL)
+	{
+		mtx_unlock(&system->mutex);
 		return;
+	}
 
 	uint32_t count=0;
 
@@ -396,7 +430,7 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 				*array++=color.x;
 				*array++=color.y;
 				*array++=color.z;
-				*array++=emitter->particles[j].life;
+				*array++=clampf(emitter->particles[j].life, 0.0f, 1.0f);
 
 				count++;
 			}
