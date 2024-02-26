@@ -201,6 +201,15 @@
     <ClInclude Include="client_network.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="lighting.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="line.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sphere.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="audio\audio.c">
@@ -348,6 +357,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="client_network.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lighting.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="line.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sphere.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

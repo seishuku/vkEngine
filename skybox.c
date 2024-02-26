@@ -89,3 +89,17 @@ void DestroySkybox(void)
 	vkDestroyPipeline(vkContext.device, skyboxPipeline.pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(vkContext.device, skyboxPipelineLayout, VK_NULL_HANDLE);
 }
+
+void DrawSkybox(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool)
+{
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipeline.pipeline);
+
+	vkuDescriptorSet_UpdateBindingBufferInfo(&skyboxDescriptorSet, 0, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&skyboxDescriptorSet, 1, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuAllocateUpdateDescriptorSet(&skyboxDescriptorSet, descriptorPool);
+
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipelineLayout, 0, 1, &skyboxDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+
+	// This has no bound vertex data, it's baked into the vertex shader
+	vkCmdDraw(commandBuffer, 60, 1, 0, 0);
+}

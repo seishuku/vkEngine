@@ -46,5 +46,6 @@ extern VkuPipeline_t skyboxPipeline;
 
 bool CreateSkyboxPipeline(void);
 void DestroySkybox(void);
+void DrawSkybox(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool);
 
 #endif
