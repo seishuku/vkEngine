@@ -2,7 +2,10 @@
 
 include(FetchContent)
 
-project ("vkEngine")
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED True)
+
+project ("vkEngine" LANGUAGES C)
 
 message(STATUS "${PROJECT_NAME}: Fetching OpenXR...")
 FetchContent_Declare(openxr-loader
@@ -88,7 +91,6 @@ set(PROJECT_SOURCES
 	physics/physics.c
 	system/memzone.c
 	system/threads.c
-	system/win32.c
 	ui/bargraph.c
 	ui/button.c
 	ui/checkbox.c
@@ -124,10 +126,17 @@ set(PROJECT_SOURCES
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 add_definitions(-DWIN32 -D_CRT_SECURE_NO_WARNINGS -D_CONSOLE)
+list(APPEND PROJECT_SOURCES system/win32.c)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 add_definitions(-DLINUX)
+list(APPEND PROJECT_SOURCES system/linux_x11.c)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Android")
 add_definitions(-DANDROID)
+list(APPEND PROJECT_SOURCES
+	system/android_fopen.c
+	system/android_main.c
+	system/android_native_app_glue.c
+)
 endif()
 
 add_executable (${CMAKE_PROJECT_NAME} ${PROJECT_SOURCES})
@@ -139,16 +148,23 @@ target_link_libraries(
     ${CMAKE_PROJECT_NAME} PUBLIC
 	Vulkan::Vulkan
 	OpenXR::openxr_loader
-	portaudio
 	Vorbis::vorbisfile
 )
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC ws2_32.lib)
+target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC portaudio_static ws2_32.lib)
+endif()
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC portaudio_static X11 Xi Xfixes)
+endif()
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
+target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC android log aaudio)
 endif()
 
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "MSVC")
-target_compile_options(${CMAKE_PROJECT_NAME} PUBLIC	/experimental:c11atomics)
+target_compile_options(${CMAKE_PROJECT_NAME} PUBLIC /experimental:c11atomics)
 endif()
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
