@@ -4,18 +4,40 @@ include(FetchContent)
 
 project ("vkEngine")
 
-FetchContent_Declare(
-	portaudio SYSTEM
-	GIT_REPOSITORY https://github.com/PortAudio/portaudio/
-	GIT_TAG 147dd722548358763a8b649b3e4b41dfffbcfbb6 # v19.7.0 release
+message(STATUS "${PROJECT_NAME}: Fetching OpenXR...")
+FetchContent_Declare(openxr-loader
+	GIT_REPOSITORY https://github.com/KhronosGroup/OpenXR-SDK.git
+	GIT_SHALLOW TRUE
+	GIT_TAG 288d3a7ebc1ad959f62d51da75baa3d27438c499 #1.0.34
+ )
+FetchContent_MakeAvailable(openxr-loader)
+
+message(STATUS "${PROJECT_NAME}: Fetching PortAudio...")
+FetchContent_Declare(portaudio
+	GIT_REPOSITORY https://github.com/PortAudio/portaudio.git
+	GIT_SHALLOW TRUE
+	GIT_TAG 147dd722548358763a8b649b3e4b41dfffbcfbb6 #v19.7.0
 )
-message(STATUS "${CMAKE_PROJECT_NAME}: Fetching portaudio...")
 FetchContent_MakeAvailable(portaudio)
 
+message(STATUS "${PROJECT_NAME}: Fetching OGG...")
+FetchContent_Declare(ogg
+	GIT_REPOSITORY https://github.com/xiph/ogg.git
+	GIT_SHALLOW TRUE
+#	GIT_TAG e1774cd77f471443541596e09078e78fdc342e4f #1.3.5
+)
+FetchContent_MakeAvailable(ogg)
+
+message(STATUS "${PROJECT_NAME}: Fetching Vorbis...")
+FetchContent_Declare(vorbis
+	GIT_REPOSITORY https://github.com/xiph/vorbis.git
+	GIT_SHALLOW TRUE
+#	Apparently this commit won't properly find ogg with FetchContent, so just use whatever latest is.
+#	GIT_TAG 0657aee69dec8508a0011f47f3b69d7538e9d262 #1.3.7
+)
+FetchContent_MakeAvailable(vorbis)
+
 find_package(Vulkan REQUIRED COMPONENTS glslc)
-find_package(OpenXR REQUIRED)
-find_package(portaudio REQUIRED)
-find_package(Vorbis REQUIRED)
 
 set(SHADER_SOURCES
 	shaders/bezier.frag shaders/bezier.geom shaders/bezier.vert
