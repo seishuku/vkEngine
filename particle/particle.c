@@ -34,36 +34,6 @@ struct
 	vec4 Up;
 } particlePC;
 
-// Resizes the OpenGL vertex buffer and system memory vertex buffer
-bool ParticleSystem_ResizeBuffer(ParticleSystem_t *system)
-{
-	if(system==NULL)
-		return false;
-
-	uint32_t count=0;
-
-	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
-	{
-		ParticleEmitter_t *emitter=List_GetPointer(&system->emitters, i);
-		count+=emitter->numParticles;
-	}
-
-	// Resize vertex buffer
-	vkDeviceWaitIdle(vkContext.device);
-
-	if(system->particleBuffer.buffer)
-	{
-//		vkUnmapMemory(vkContext.device, system->particleBuffer.deviceMemory);
-		vkDestroyBuffer(vkContext.device, system->particleBuffer.buffer, VK_NULL_HANDLE);
-		vkFreeMemory(vkContext.device, system->particleBuffer.deviceMemory, VK_NULL_HANDLE);
-	}
-
-	vkuCreateHostBuffer(&vkContext, &system->particleBuffer, sizeof(vec4)*2*count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-//	vkMapMemory(vkContext.device, system->particleBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&system->particleArray);
-
-	return true;
-}
-
 // Adds a particle emitter to the system
 uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3 startColor, vec3 endColor, float particleSize, uint32_t numParticles, ParticleEmitterType_e type, ParticleInitCallback initCallback)
 {
@@ -96,7 +66,10 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3
 	emitter.particles=Zone_Malloc(zone, numParticles*sizeof(Particle_t));
 
 	if(emitter.particles==NULL)
+	{
+		mtx_unlock(&system->mutex);
 		return UINT32_MAX;
+	}
 
 	memset(emitter.particles, 0, numParticles*sizeof(Particle_t));
 
@@ -138,8 +111,11 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3
 	List_Add(&system->emitters, &emitter);
 
 	// Resize vertex buffers (both system memory and OpenGL buffer)
-	if(!ParticleSystem_ResizeBuffer(system))
-		return UINT32_MAX;
+	// if(!ParticleSystem_ResizeBuffer(system))
+	// {
+	// 	atomic_store(&system->mutex, false);
+	// 	return UINT32_MAX;
+	// }
 
 	mtx_unlock(&system->mutex);
 
@@ -164,7 +140,7 @@ void ParticleSystem_DeleteEmitter(ParticleSystem_t *system, uint32_t ID)
 			List_Del(&system->emitters, i);
 
 			// Resize vertex buffers (both system memory and OpenGL buffer)
-			ParticleSystem_ResizeBuffer(system);
+			// ParticleSystem_ResizeBuffer(system);
 			break;
 		}
 	}
@@ -269,7 +245,7 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 
 	List_Init(&system->emitters, sizeof(ParticleEmitter_t), 10, NULL);
 
-	system->particleArray=NULL;
+	system->count=0;
 
 	// Default generic gravity
 	system->gravity=Vec3(0.0f, -9.81f, 0.0f);
@@ -397,12 +373,38 @@ void ParticleSystem_Step(ParticleSystem_t *system, float dt)
 
 void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, matrix modelview, matrix projection)
 {
-	if(system==NULL||!system->particleBuffer.buffer)
+	if(system==NULL)
 		return;
 
 	mtx_lock(&system->mutex);
 
-	float *array=NULL;//system->particleArray;
+	uint32_t count=0;
+
+	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
+	{
+		ParticleEmitter_t *emitter=List_GetPointer(&system->emitters, i);
+		count+=emitter->numParticles;
+	}
+
+	// If the count isn't what the last count was, resize the buffer.
+	if(count!=system->count)
+	{
+		system->count=count;
+
+		// Resize vertex buffer, this is not ideal.
+		vkDeviceWaitIdle(vkContext.device);
+
+		if(system->particleBuffer.buffer)
+		{
+			vkDestroyBuffer(vkContext.device, system->particleBuffer.buffer, VK_NULL_HANDLE);
+			vkFreeMemory(vkContext.device, system->particleBuffer.deviceMemory, VK_NULL_HANDLE);
+		}
+
+		vkuCreateHostBuffer(&vkContext, &system->particleBuffer, sizeof(vec4)*2*count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	}
+
+	count=0;
+	float *array=NULL;
 	vkMapMemory(vkContext.device, system->particleBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&array);
 
 	if(array==NULL)
@@ -410,8 +412,6 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 		mtx_unlock(&system->mutex);
 		return;
 	}
-
-	uint32_t count=0;
 
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
 	{
@@ -439,6 +439,8 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 
 	vkUnmapMemory(vkContext.device, system->particleBuffer.deviceMemory);
 
+	mtx_unlock(&system->mutex);
+
 	particlePC.mvp=MatrixMult(modelview, projection);
 	particlePC.Right=Vec4(modelview.x.x, modelview.y.x, modelview.z.x, modelview.w.x);
 	particlePC.Up=Vec4(modelview.x.y, modelview.y.y, modelview.z.y, modelview.w.y);
@@ -453,8 +455,6 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &system->particleBuffer.buffer, &(VkDeviceSize) { 0 });
 	vkCmdDraw(commandBuffer, count, 1, 0, 0);
-
-	mtx_unlock(&system->mutex);
 }
 
 void ParticleSystem_Destroy(ParticleSystem_t *system)

@@ -476,7 +476,9 @@ void Thread_Main(void *arg)
 						Vec4(1.0f+RandFloatRange(10.0f, 500.0f), 1.0f, 1.0f, 1.0f));
 		}
 	}
+#endif
 
+#if 0
 	if(isTargeted)
 	{
 		for(uint32_t i=0;i<10;i++)
@@ -951,7 +953,7 @@ void Thread_Physics(void *arg)
 			}
 		}
 
-#if 1
+#if 0
 		if(isTargeted)
 		{
 			float distance=raySphereIntersect(enemy.position, enemy.forward, asteroids[i].position, asteroids[i].radius);

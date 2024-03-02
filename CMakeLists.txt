@@ -70,6 +70,8 @@ foreach(GLSL_SOURCE ${SHADER_SOURCES})
 	list(APPEND SHADER_BINARIES ${SPRIV})
 endforeach()
 
+add_custom_target(SHADERS DEPENDS ${SHADER_BINARIES})
+
 set(PROJECT_SOURCES
 	audio/audio.c
 	audio/wave.c
@@ -128,7 +130,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 add_definitions(-DWIN32 -D_CRT_SECURE_NO_WARNINGS -D_CONSOLE)
 list(APPEND PROJECT_SOURCES system/win32.c)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-add_definitions(-DLINUX)
+add_definitions(-DLINUX -g)
 list(APPEND PROJECT_SOURCES system/linux_x11.c)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Android")
 add_definitions(-DANDROID)
@@ -140,9 +142,6 @@ list(APPEND PROJECT_SOURCES
 endif()
 
 add_executable (${CMAKE_PROJECT_NAME} ${PROJECT_SOURCES})
-
-add_custom_target(SHADERS DEPENDS ${SHADER_BINARIES})
-add_dependencies(${CMAKE_PROJECT_NAME} SHADERS)
 
 target_link_libraries(
     ${CMAKE_PROJECT_NAME} PUBLIC

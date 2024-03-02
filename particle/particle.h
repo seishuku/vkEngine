@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 #include <threads.h>
 #include "../utils/list.h"
 #include "../math/math.h"
@@ -46,8 +47,9 @@ typedef struct ParticleSystem_s
 	List_t emitters;
 
 	mtx_t mutex;
+
+	uint32_t count;
 	VkuBuffer_t particleBuffer;
-	float *particleArray;
 } ParticleSystem_t;
 
 uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3 startColor, vec3 endColor, float particleSize, uint32_t numParticles, ParticleEmitterType_e type, ParticleInitCallback initCallback);
