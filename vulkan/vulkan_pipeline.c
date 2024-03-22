@@ -367,3 +367,23 @@ VkBool32 vkuAssemblePipeline(VkuPipeline_t *pipeline, void *pNext)
 
 	return result==VK_SUCCESS?VK_TRUE:VK_FALSE;
 }
+
+VkBool32 vkuAssembleComputePipeline(VkuPipeline_t *pipeline, void *pNext)
+{
+	if(!pipeline)
+		return VK_FALSE;
+
+	VkResult result=vkCreateComputePipelines(pipeline->device, pipeline->pipelineCache, 1, &(VkComputePipelineCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+		.pNext=pNext,
+		.stage=pipeline->stages[0],
+		.layout=pipeline->pipelineLayout,
+	}, 0, &pipeline->pipeline);
+
+	// Done with pipeline creation, delete shader modules
+	for(uint32_t i=0;i<pipeline->numStages;i++)
+		vkDestroyShaderModule(pipeline->device, pipeline->stages[i].module, 0);
+
+	return result==VK_SUCCESS?VK_TRUE:VK_FALSE;
+}

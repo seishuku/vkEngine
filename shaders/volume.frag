@@ -41,7 +41,7 @@ layout(push_constant) uniform PC
 {
 	uint uFrame;
 	uint uWidth, uHeight;
-	uint pad;
+	float fShift;
 };
 
 layout(location=0) out vec4 Output;
@@ -123,6 +123,13 @@ vec3 TurboColormap(in float x)
 	);
 }
 
+vec3 hsv2rgb(vec3 c)
+{
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
 void main()
 {
 	const vec3 eye=inverse(modelview)[3].xyz;
@@ -160,7 +167,7 @@ void main()
 		const float density=1.0-exp(-(texture(Volume, pos*0.5+0.5).r*d)*2.0);
 
 		// colorize the cloud sample
-		vec4 val_color=vec4(TurboColormap(density*4.0), density);
+		vec4 val_color=vec4(hsv2rgb(vec3(density+fShift, 1.0, 1.0)), density);//vec4(TurboColormap((density+1.0)*1.2), density);
 
 		// apply some simple lighting
 		val_color.xyz*=lightColor.xyz*max(0.1, dot(pos, -lightDirection.xyz));

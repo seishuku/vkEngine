@@ -18,7 +18,7 @@ typedef struct Console_s Console_t;
 typedef struct
 {
 	char commandName[CONSOLE_MAX_COMMAND_NAME];
-	void (*commandFunction)(Console_t *, char *);
+	void (*commandFunction)(Console_t *, const char *);
 } ConsoleCommand_t;
 
 typedef struct Console_s
@@ -42,20 +42,20 @@ typedef struct Console_s
 	bool active;
 } Console_t;
 
-bool Console_ExecFile(Console_t *console, char *filename);
+bool Console_ExecFile(Console_t *console, const char *filename);
 void Console_ClearCommandHistory(Console_t *console);
 void Console_Clear(Console_t *console);
-void Console_Init(Console_t *console, uint32_t width, uint32_t height);
+void Console_Init(Console_t *console, const uint32_t width, const uint32_t height);
 void Console_Destroy(Console_t *console);
 void Console_Advance(Console_t *console);
-void Console_Scroll(Console_t *console, bool up);
-void Console_Out(Console_t *console, char *string);
-bool Console_AddCommand(Console_t *console, char *commandName, void (*commandFunction)(Console_t *, char *));
-bool Console_ExecCommand(Console_t *console, char *command, char *param);
-void Console_History(Console_t *console, bool up);
+void Console_Scroll(Console_t *console, const bool up);
+void Console_Out(Console_t *console, const char *string);
+bool Console_AddCommand(Console_t *console, const char *commandName, void (*commandFunction)(Console_t *, const char *));
+bool Console_ExecCommand(Console_t *console, const char *command, const char *param);
+void Console_History(Console_t *console, const bool up);
 void Console_Backspace(Console_t *console);
 void Console_Process(Console_t *console);
-void Console_KeyInput(Console_t *console, uint32_t keyCode);
+void Console_KeyInput(Console_t *console, const uint32_t keyCode);
 void Console_Draw(Console_t *console);
 
 #endif

@@ -55,6 +55,8 @@ XruContext_t xrContext;
 VkInstance vkInstance;
 VkuContext_t vkContext;
 
+VkuComputeContext_t vkComputeContext;
+
 // Vulkan memory allocator zone
 VkuMemZone_t *vkZone;
 
@@ -119,7 +121,7 @@ typedef struct
 	} perFrame[VKU_MAX_FRAME_COUNT];
 } ThreadData_t;
 
-#define NUM_THREADS 2
+#define NUM_THREADS 1
 ThreadData_t threadData[NUM_THREADS];
 ThreadWorker_t thread[NUM_THREADS], threadPhysics;
 
@@ -139,6 +141,8 @@ UI_t UI;
 uint32_t volumeID=UINT32_MAX;
 uint32_t faceID=UINT32_MAX;
 uint32_t cursorID=UINT32_MAX;
+uint32_t colorShiftID=UINT32_MAX;
+
 //////
 
 Console_t console;
@@ -740,9 +744,9 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	threadData[0].eye=eye;
 	Thread_AddJob(&thread[0], Thread_Main, (void *)&threadData[0]);
 
-	threadData[1].index=index;
-	threadData[1].eye=eye;
-	Thread_AddJob(&thread[1], Thread_Particles, (void *)&threadData[1]);
+	//threadData[1].index=index;
+	//threadData[1].eye=eye;
+	//Thread_AddJob(&thread[1], Thread_Particles, (void *)&threadData[1]);
 
 	mtx_lock(&threadMutex);
 	while(atomic_load(&threadBarrier))
@@ -751,7 +755,7 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	atomic_store(&threadBarrier, NUM_THREADS);
 
 	// Execute the secondary command buffers from the threads
-	vkCmdExecuteCommands(perFrame[index].commandBuffer, 2, (VkCommandBuffer[])
+	vkCmdExecuteCommands(perFrame[index].commandBuffer, 1, (VkCommandBuffer[])
 	{
 		threadData[0].perFrame[index].secCommandBuffer[eye],
 		threadData[1].perFrame[index].secCommandBuffer[eye]
@@ -767,13 +771,13 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 		uint32_t uFrame;
 		uint32_t uWidth;
 		uint32_t uHeight;
-		uint32_t pad;
+		float fShift;
 	} PC;
 
 	PC.uFrame=uFrame++;
 	PC.uWidth=renderWidth;
 	PC.uHeight=renderHeight;
-	PC.pad=0;
+	PC.fShift=UI_GetBarGraphValue(&UI, colorShiftID);
 
 	////// Volume cloud
 	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipeline.pipeline);
@@ -791,6 +795,9 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	// No vertex data, it's baked into the vertex shader
 	vkCmdDraw(perFrame[index].commandBuffer, 36, 1, 0, 0);
 	//////
+
+	matrix Modelview=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
+	ParticleSystem_Draw(&particleSystem, perFrame[index].commandBuffer, perFrame[index].descriptorPool, Modelview, perFrame[index].mainUBO[eye]->projection);
 
 	//vkCmdEndRendering(perFrame[index].commandBuffer);
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
@@ -1113,6 +1120,10 @@ void Render(void)
 
 	//CvWriteFlag(flagSeries, "frame start");
 
+	Thread_AddJob(&threadPhysics, Thread_Physics, (void *)&index);
+
+	vkWaitForFences(vkContext.device, 1, &perFrame[index].frameFence, VK_TRUE, UINT64_MAX);
+
 	// Handle VR frame start
 	if(isVR)
 	{
@@ -1214,15 +1225,11 @@ void Render(void)
 	//////
 #endif
 
-	Thread_AddJob(&threadPhysics, Thread_Physics, (void *)&index);
-
 	Console_Draw(&console);
 
 	Audio_SetStreamVolume(0, UI_GetBarGraphValue(&UI, volumeID));
 
 	Font_Print(&Fnt, 16.0f, renderWidth-400.0f, renderHeight-50.0f-16.0f, "Current track: %s", musicList[currentMusic].string);
-
-	vkWaitForFences(vkContext.device, 1, &perFrame[index].frameFence, VK_TRUE, UINT64_MAX);
 
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
@@ -1323,7 +1330,7 @@ void Render(void)
 	}
 }
 
-void Console_CmdQuit(Console_t *Console, char *Param)
+void Console_CmdQuit(Console_t *Console, const char *Param)
 {
 	isDone=true;
 }
@@ -1494,6 +1501,95 @@ bool Init(void)
 	vkuDestroyImageBuffer(&vkContext, &temp);
 
 	GenNebulaVolume(&vkContext, &textures[TEXTURE_VOLUME]);
+	{
+		VkuGetComputeContext(&vkComputeContext, vkContext.physicalDevice);
+
+		VkCommandBuffer computeCommand;
+		VkDescriptorPool computeDescriptorPool;
+		VkuDescriptorSet_t computeDescriptor;
+		VkuPipeline_t compute;
+		VkPipelineLayout computeLayout;
+
+		vkuInitDescriptorSet(&computeDescriptor, &vkContext);
+		vkuDescriptorSet_AddBinding(&computeDescriptor, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
+		vkuAssembleDescriptorSetLayout(&computeDescriptor);
+
+		vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+			.setLayoutCount=1,
+			.pSetLayouts=&computeDescriptor.descriptorSetLayout,
+		}, 0, &computeLayout);
+
+		vkuInitPipeline(&compute, &vkContext);
+		vkuPipeline_SetPipelineLayout(&compute, computeLayout);
+		vkuPipeline_AddStage(&compute, "shaders/test.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
+		vkuAssembleComputePipeline(&compute, VK_NULL_HANDLE);
+
+		vkCreateDescriptorPool(vkContext.device, &(VkDescriptorPoolCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+			.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
+			.poolSizeCount=1,
+			.pPoolSizes=(VkDescriptorPoolSize[]) { { .type=VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount=1, }, },
+		}, VK_NULL_HANDLE, &computeDescriptorPool);
+
+		vkAllocateCommandBuffers(vkContext.device, &(VkCommandBufferAllocateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.commandPool=vkComputeContext.commandPool,
+			.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+			.commandBufferCount=1,
+		}, &computeCommand);
+
+		vkBeginCommandBuffer(computeCommand, &(VkCommandBufferBeginInfo) {.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, });
+
+		VkImageMemoryBarrier imageMemoryBarrier={ 0 };
+		imageMemoryBarrier.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		imageMemoryBarrier.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED;
+		imageMemoryBarrier.newLayout=VK_IMAGE_LAYOUT_GENERAL;
+		imageMemoryBarrier.image=textures[TEXTURE_VOLUME].image;
+		imageMemoryBarrier.subresourceRange=(VkImageSubresourceRange) { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+		imageMemoryBarrier.srcAccessMask=VK_ACCESS_SHADER_WRITE_BIT;
+		imageMemoryBarrier.dstAccessMask=VK_ACCESS_SHADER_READ_BIT;
+		imageMemoryBarrier.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
+		imageMemoryBarrier.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
+		vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
+
+		vkCmdBindPipeline(computeCommand, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipeline);
+
+		vkuDescriptorSet_UpdateBindingImageInfo(&computeDescriptor, 0, VK_NULL_HANDLE, textures[TEXTURE_VOLUME].imageView, VK_IMAGE_LAYOUT_GENERAL);
+		vkuAllocateUpdateDescriptorSet(&computeDescriptor, computeDescriptorPool);
+
+		vkCmdBindDescriptorSets(computeCommand, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipelineLayout, 0, 1, &computeDescriptor.descriptorSet, 0, 0);
+
+		vkCmdDispatch(computeCommand, textures[TEXTURE_VOLUME].width/8, textures[TEXTURE_VOLUME].height/8, textures[TEXTURE_VOLUME].depth/8);
+
+		imageMemoryBarrier.oldLayout=VK_IMAGE_LAYOUT_GENERAL;
+		imageMemoryBarrier.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
+
+		// End command buffer and submit
+		if(vkEndCommandBuffer(computeCommand)!=VK_SUCCESS)
+			return VK_FALSE;
+
+		VkFence fence=VK_NULL_HANDLE;
+
+		if(vkCreateFence(vkContext.device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &fence)!=VK_SUCCESS)
+			return VK_FALSE;
+
+		VkSubmitInfo submitInfo=
+		{
+			.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
+			.commandBufferCount=1,
+			.pCommandBuffers=&computeCommand,
+		};
+
+		vkQueueSubmit(vkComputeContext.queue, 1, &submitInfo, fence);
+
+		if(vkWaitForFences(vkContext.device, 1, &fence, VK_TRUE, UINT64_MAX)!=VK_SUCCESS)
+			return VK_FALSE;
+	}
 
 	// Create primary pipeline
 	CreateLightingPipeline();
@@ -1602,6 +1698,14 @@ bool Init(void)
 							"Volume",					// Title text
 							false,						// Read-only
 							0.0f, 1.0f, 0.125f);		// min/max/initial value
+
+	colorShiftID=UI_AddBarGraph(&UI,
+							Vec2(renderWidth-400.0f, renderHeight-50.0f-16.0f-30.0f-50.0f),// Position
+							Vec2(400.0f, 30.0f),		// Size
+							Vec3(0.25f, 0.25f, 0.25f),	// Color
+							"Cloud Color Shift",		// Title text
+							false,						// Read-only
+							0.0f, 1.0f, 0.45f);			// min/max/initial value
 
 	UI_AddSprite(&UI, Vec2((float)renderWidth/2.0f, (float)renderHeight/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &textures[TEXTURE_CROSSHAIR], 0.0f);
 

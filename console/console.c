@@ -14,17 +14,17 @@
 extern Font_t Fnt;
 
 // Standard/basic console commands
-void Console_CmdClear(Console_t *console, char *param)
+void Console_CmdClear(Console_t *console, const char *param)
 {
 	Console_Clear(console);
 }
 
-void Console_CmdEcho(Console_t *console, char *param)
+void Console_CmdEcho(Console_t *console, const char *param)
 {
 	Console_Out(console, param);
 }
 
-bool Console_ExecFile(Console_t *console, char *filename)
+bool Console_ExecFile(Console_t *console, const char *filename)
 {
 	FILE *stream=NULL;
 	char buf[CONSOLE_MAX_COLUMN];
@@ -79,7 +79,7 @@ void Console_Clear(Console_t *console)
 	console->viewBottom=0;
 }
 
-void Console_Init(Console_t *console, uint32_t width, uint32_t height)
+void Console_Init(Console_t *console, const uint32_t width, const uint32_t height)
 {
 	console->column=1;
 
@@ -116,7 +116,7 @@ void Console_Advance(Console_t *console)
 	console->viewBottom=console->newLine;
 }
 
-void Console_Scroll(Console_t *console, bool up)
+void Console_Scroll(Console_t *console, const bool up)
 {
 	if(up)
 	{
@@ -140,7 +140,7 @@ void Console_Scroll(Console_t *console, bool up)
 	}
 }
 
-void Console_Out(Console_t *console, char *string)
+void Console_Out(Console_t *console, const char *string)
 {
 	Console_Advance(console);
 
@@ -148,7 +148,7 @@ void Console_Out(Console_t *console, char *string)
 		strcpy(console->buffer[console->newLine].text, string);
 }
 
-bool Console_AddCommand(Console_t *console, char *commandName, void (*commandFunction)(Console_t *, char *))
+bool Console_AddCommand(Console_t *console, const char *commandName, void (*commandFunction)(Console_t *, const char *))
 {
 	if(console==NULL)
 		return false;
@@ -164,7 +164,7 @@ bool Console_AddCommand(Console_t *console, char *commandName, void (*commandFun
 	return true;
 }
 
-bool Console_ExecCommand(Console_t *console, char *command, char *param)
+bool Console_ExecCommand(Console_t *console, const char *command, const char *param)
 {
 	if(console==NULL)
 		return false;
@@ -185,7 +185,7 @@ bool Console_ExecCommand(Console_t *console, char *command, char *param)
 	return false;
 }
 
-void Console_History(Console_t *console, bool up)
+void Console_History(Console_t *console, const bool up)
 {
 	if(up)
 	{
@@ -279,7 +279,7 @@ void Console_Process(Console_t *console)
 	console->buffer[console->newLine].text[2]='\0';
 }
 
-void Console_KeyInput(Console_t *console, uint32_t keyCode)
+void Console_KeyInput(Console_t *console, const uint32_t keyCode)
 {
 	// Don't type past edge of console
 	if(console->column>(signed)console->width-2)

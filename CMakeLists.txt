@@ -40,8 +40,6 @@ FetchContent_Declare(vorbis
 )
 FetchContent_MakeAvailable(vorbis)
 
-find_package(Vulkan REQUIRED COMPONENTS glslc)
-
 set(SHADER_SOURCES
 	shaders/bezier.frag shaders/bezier.geom shaders/bezier.vert
 	shaders/threshold.frag shaders/gaussian.frag shaders/composite.frag shaders/fullscreen.vert
@@ -54,23 +52,24 @@ set(SHADER_SOURCES
 	shaders/sphere.frag shaders/sphere.vert
 	shaders/font.frag shaders/font.vert
 	shaders/ui_sdf.frag shaders/ui_sdf.vert
+	shaders/test.comp
 )
 
+find_package(Vulkan COMPONENTS glslc)
 find_program(GLSLC NAMES glslc HINTS Vulkan::glslc)
 
-foreach(GLSL_SOURCE ${SHADER_SOURCES})
-	set(SPRIV "${GLSL_SOURCE}.spv")
-	
+foreach(SOURCE ${SHADER_SOURCES})
+	set(SHADER_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE}.spv)
+	set(SHADER_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE})
 	add_custom_command(
-		OUTPUT ${SPRIV}
-		DEPENDS ${GLSL_SOURCE}
-		COMMAND ${GLSLC} --target-env=vulkan1.1 -O ${CMAKE_SOURCE_DIR}/${GLSL_SOURCE} -o ${CMAKE_SOURCE_DIR}/${SPRIV}
+		OUTPUT ${SHADER_OUTPUT}
+		DEPENDS ${SOURCE}
+		COMMAND ${GLSLC} --target-env=vulkan1.1 -O -o ${SHADER_OUTPUT} ${SHADER_SOURCE}
 	)
-
-	list(APPEND SHADER_BINARIES ${SPRIV})
+	list(APPEND SHADER_BINARIES ${SHADER_OUTPUT})
 endforeach()
 
-add_custom_target(SHADERS DEPENDS ${SHADER_BINARIES})
+add_custom_target(ShaderCompilation DEPENDS ${SHADER_BINARIES})
 
 set(PROJECT_SOURCES
 	audio/audio.c
@@ -104,6 +103,7 @@ set(PROJECT_SOURCES
 	utils/list.c
 	vr/vr.c
 	vulkan/vulkan_buffer.c
+	vulkan/vulkan_compute.c
 	vulkan/vulkan_context.c
 	vulkan/vulkan_descriptorset.c
 	vulkan/vulkan_framebuffer.c
@@ -126,6 +126,10 @@ set(PROJECT_SOURCES
 	sphere.c
 )
 
+if(${CMAKE_BUILD_TYPE} MATCHES "Debug")
+add_definitions(-D_DEBUG)
+endif()
+
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 add_definitions(-DWIN32 -D_CRT_SECURE_NO_WARNINGS -D_CONSOLE)
 list(APPEND PROJECT_SOURCES system/win32.c)
@@ -141,7 +145,8 @@ list(APPEND PROJECT_SOURCES
 )
 endif()
 
-add_executable (${CMAKE_PROJECT_NAME} ${PROJECT_SOURCES})
+add_executable(${CMAKE_PROJECT_NAME} ${PROJECT_SOURCES})
+add_dependencies(${CMAKE_PROJECT_NAME} ShaderCompilation)
 
 target_link_libraries(
     ${CMAKE_PROJECT_NAME} PUBLIC

@@ -14,6 +14,7 @@ VkuPipeline_t volumePipeline;
 //////
 
 // Nebula volume texture generation
+#if 0
 static int p[512]=
 {
 	151, 160, 137, 91,  90,  15,  131, 13,  201, 95,  96,  53,  194, 233, 7,   225,
@@ -113,16 +114,18 @@ static float nebula(vec3 p)
 
 	return clampf(turb, 0.0f, 1.0f);
 }
+#endif
 
 VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *image)
 {
+#if 0
 	VkCommandBuffer commandBuffer;
 	VkuBuffer_t stagingBuffer;
 	void *data=NULL;
 
-	image->width=64;
-	image->height=64;
-	image->depth=64; // Slight abuse of image struct, depth is supposed to be color depth, not image depth.
+	image->width=512;
+	image->height=512;
+	image->depth=512; // Slight abuse of image struct, depth is supposed to be color depth, not image depth.
 
 	// Byte size of image data
 	uint32_t size=image->width*image->height*image->depth;
@@ -185,6 +188,17 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *image)
 
 	// Delete staging buffers
 	vkuDestroyBuffer(Context, &stagingBuffer);
+#endif
+	image->width=1024;
+	image->height=1024;
+	image->depth=1024; // Slight abuse of image struct, depth is supposed to be color depth, not image depth.
+
+	if(!vkuCreateImageBuffer(Context, image,
+							 VK_IMAGE_TYPE_3D, VK_FORMAT_R8_UNORM, 1, 1, image->width, image->height, image->depth,
+							 VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
+							 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_STORAGE_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
+		return VK_FALSE;
 
 	// Create texture sampler object
 	vkCreateSampler(Context->device, &(VkSamplerCreateInfo)

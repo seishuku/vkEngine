@@ -63,7 +63,7 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3
 
 	// Set number of particles and allocate memory
 	emitter.numParticles=numParticles;
-	emitter.particles=Zone_Malloc(zone, numParticles*sizeof(Particle_t));
+	emitter.particles=(Particle_t *)Zone_Malloc(zone, numParticles*sizeof(Particle_t));
 
 	if(emitter.particles==NULL)
 	{
@@ -132,7 +132,7 @@ void ParticleSystem_DeleteEmitter(ParticleSystem_t *system, uint32_t ID)
 
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
 	{
-		ParticleEmitter_t *emitter=List_GetPointer(&system->emitters, i);
+		ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&system->emitters, i);
 
 		if(emitter->ID==ID)
 		{
@@ -156,7 +156,7 @@ void ParticleSystem_ResetEmitter(ParticleSystem_t *system, uint32_t ID)
 
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
 	{
-		ParticleEmitter_t *emitter=List_GetPointer(&system->emitters, i);
+		ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&system->emitters, i);
 
 		if(emitter->ID==ID)
 		{
@@ -200,7 +200,7 @@ void ParticleSystem_SetEmitterPosition(ParticleSystem_t *system, uint32_t ID, ve
 
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
 	{
-		ParticleEmitter_t *emitter=List_GetPointer(&system->emitters, i);
+		ParticleEmitter_t *emitter=(ParticleEmitter_t*)List_GetPointer(&system->emitters, i);
 
 		if(emitter->ID==ID)
 		{
@@ -276,6 +276,8 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 	vkuPipeline_SetPipelineLayout(&particlePipeline, particlePipelineLayout);
 	vkuPipeline_SetRenderPass(&particlePipeline, renderPass);
 
+	particlePipeline.subpass=1;
+
 	particlePipeline.topology=VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
 	particlePipeline.cullMode=VK_CULL_MODE_BACK_BIT;
 	particlePipeline.depthTest=VK_TRUE;
@@ -325,7 +327,7 @@ void ParticleSystem_Step(ParticleSystem_t *system, float dt)
 
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
 	{
-		ParticleEmitter_t *emitter=List_GetPointer(&system->emitters, i);
+		ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&system->emitters, i);
 		bool isActive=false;
 
 		for(uint32_t j=0;j<emitter->numParticles;j++)
@@ -382,7 +384,7 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
 	{
-		ParticleEmitter_t *emitter=List_GetPointer(&system->emitters, i);
+		ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&system->emitters, i);
 		count+=emitter->numParticles;
 	}
 
@@ -415,7 +417,7 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
 	{
-		ParticleEmitter_t *emitter=List_GetPointer(&system->emitters, i);
+		ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&system->emitters, i);
 
 		for(uint32_t j=0;j<emitter->numParticles;j++)
 		{
@@ -473,7 +475,7 @@ void ParticleSystem_Destroy(ParticleSystem_t *system)
 
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
 	{
-		ParticleEmitter_t *emitter=List_GetPointer(&system->emitters, i);
+		ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&system->emitters, i);
 
 		Zone_Free(zone, emitter->particles);
 	}

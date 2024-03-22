@@ -25,7 +25,7 @@ vec3 Cube[]=
 
 void main()
 {
-	Scale=400.0;
+	Scale=800.0;
 	vec3 vPosition=Cube[gl_VertexIndex]*Scale.xxx;
 
 	gl_Position=projection*HMD*modelview*vec4(vPosition, 1.0);

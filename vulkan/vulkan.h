@@ -145,7 +145,7 @@ typedef struct
 	uint32_t backStencilReference;
 
 	// Multisample state
-	VkSampleCountFlagBits rasterizationSamples;
+	VkSampleCountFlags rasterizationSamples;
 	VkBool32 sampleShading;
 	float minSampleShading;
 	const VkSampleMask *sampleMask;
@@ -268,7 +268,16 @@ typedef struct
 	VkSubpassDependency subpassDependencies[VKU_MAX_RENDERPASS_SUBPASS_DEPENDENCIES];
 } VkuRenderPass_t;
 
-VkShaderModule vkuCreateShaderModule(VkDevice device, const char *shaderFile);
+typedef struct
+{
+	VkPhysicalDevice physicalDevice;
+	VkDevice device;
+
+	uint32_t queueFamilyIndex;
+	VkQueue queue;
+
+	VkCommandPool commandPool;
+} VkuComputeContext_t;
 
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask);
 
@@ -286,6 +295,8 @@ VkCommandBuffer vkuOneShotCommandBufferBegin(VkuContext_t *context);
 VkBool32 vkuOneShotCommandBufferFlush(VkuContext_t *context, VkCommandBuffer commandBuffer);
 VkBool32 vkuOneShotCommandBufferEnd(VkuContext_t *context, VkCommandBuffer commandBuffer);
 
+VkShaderModule vkuCreateShaderModule(VkDevice device, const char *shaderFile);
+
 VkBool32 vkuPipeline_AddVertexBinding(VkuPipeline_t *pipeline, uint32_t binding, uint32_t stride, VkVertexInputRate inputRate);
 VkBool32 vkuPipeline_AddVertexAttribute(VkuPipeline_t *pipeline, uint32_t location, uint32_t binding, VkFormat format, uint32_t offset);
 VkBool32 vkuPipeline_AddStage(VkuPipeline_t *pipeline, const char *shaderFilename, VkShaderStageFlagBits stage);
@@ -293,6 +304,7 @@ VkBool32 vkuPipeline_SetRenderPass(VkuPipeline_t *pipeline, VkRenderPass renderP
 VkBool32 vkuPipeline_SetPipelineLayout(VkuPipeline_t *pipeline, VkPipelineLayout pipelineLayout);
 VkBool32 vkuInitPipeline(VkuPipeline_t *pipeline, VkuContext_t *context);
 VkBool32 vkuAssemblePipeline(VkuPipeline_t *pipeline, void *pNext);
+VkBool32 vkuAssembleComputePipeline(VkuPipeline_t *pipeline, void *pNext);
 
 VkBool32 vkuDescriptorSet_AddBinding(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkDescriptorType type, VkShaderStageFlags stage);
 VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkSampler sampler, VkImageView imageView, VkImageLayout imageLayout);
@@ -322,5 +334,7 @@ VkBool32 vkuRenderPass_AddAttachment(VkuRenderPass_t *renderPass, VkuRenderPassA
 VkBool32 vkuRenderPass_AddSubpassDependency(VkuRenderPass_t *renderPass, uint32_t sourceSubpass, uint32_t destinationSubpass, VkPipelineStageFlags sourceStageMask, VkPipelineStageFlags destinationStageMask, VkAccessFlags sourceAccessMask, VkAccessFlags destinationAccessMask, VkDependencyFlags dependencyFlags);
 VkBool32 vkuInitRenderPass(VkuContext_t *context, VkuRenderPass_t *renderPass);
 VkBool32 vkuCreateRenderPass(VkuRenderPass_t *renderPass);
+
+VkBool32 VkuGetComputeContext(VkuComputeContext_t *computeContext, VkPhysicalDevice physicalDevice);
 
 #endif
