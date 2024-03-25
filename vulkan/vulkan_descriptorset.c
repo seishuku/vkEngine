@@ -71,12 +71,12 @@ VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *descriptor
 }
 
 // Initialize the descriptor set layout structures
-VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *descriptorSet, VkuContext_t *context)
+VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *descriptorSet, VkDevice device)
 {
-	if(!descriptorSet||!context)
+	if(!descriptorSet)
 		return VK_FALSE;
 
-	descriptorSet->device=context->device;
+	descriptorSet->device=device;
 
 	descriptorSet->numBindings=0;
 

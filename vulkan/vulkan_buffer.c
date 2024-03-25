@@ -169,7 +169,7 @@ VkBool32 vkuCreateHostBuffer(VkuContext_t *context, VkuBuffer_t *buffer, uint32_
 		.usage=flags,
 		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount=1,
-		.pQueueFamilyIndices=&context->queueFamilyIndex,
+		.pQueueFamilyIndices=&context->graphicsQueueIndex,
 	};
 
 	if(vkCreateBuffer(context->device, &bufferInfo, NULL, &buffer->buffer)!=VK_SUCCESS)
@@ -209,7 +209,7 @@ VkBool32 vkuCreateGPUBuffer(VkuContext_t *context, VkuBuffer_t *buffer, uint32_t
 		.usage=flags,
 		.sharingMode=VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount=1,
-		.pQueueFamilyIndices=&context->queueFamilyIndex,
+		.pQueueFamilyIndices=&context->graphicsQueueIndex,
 	};
 
 	if(vkCreateBuffer(context->device, &bufferInfo, NULL, &buffer->buffer)!=VK_SUCCESS)
@@ -379,7 +379,7 @@ VkBool32 vkuOneShotCommandBufferFlush(VkuContext_t *context, VkCommandBuffer com
 	if(vkCreateFence(context->device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &fence)!=VK_SUCCESS)
 		return VK_FALSE;
 
-	if(vkQueueSubmit(context->queue, 1, &(VkSubmitInfo)
+	if(vkQueueSubmit(context->graphicsQueue, 1, &(VkSubmitInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.commandBufferCount=1,
@@ -417,7 +417,7 @@ VkBool32 vkuOneShotCommandBufferEnd(VkuContext_t *context, VkCommandBuffer comma
 	if(vkCreateFence(context->device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &fence)!=VK_SUCCESS)
 		return VK_FALSE;
 
-	if(vkQueueSubmit(context->queue, 1, &(VkSubmitInfo)
+	if(vkQueueSubmit(context->graphicsQueue, 1, &(VkSubmitInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.commandBufferCount=1,

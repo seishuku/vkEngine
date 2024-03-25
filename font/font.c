@@ -41,7 +41,7 @@ bool Font_Init(Font_t *font)
 	void *data=NULL;
 
 	// Create descriptors and pipeline
-	vkuInitDescriptorSet(&font->descriptorSet, &vkContext);
+	vkuInitDescriptorSet(&font->descriptorSet, vkContext.device);
 	vkuAssembleDescriptorSetLayout(&font->descriptorSet);
 
 	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
@@ -58,7 +58,7 @@ bool Font_Init(Font_t *font)
 		},
 	}, 0, &font->pipelineLayout);
 
-	vkuInitPipeline(&font->pipeline, &vkContext);
+	vkuInitPipeline(&font->pipeline, vkContext.device, vkContext.pipelineCache);
 
 	vkuPipeline_SetPipelineLayout(&font->pipeline, font->pipelineLayout);
 	vkuPipeline_SetRenderPass(&font->pipeline, compositeRenderPass);

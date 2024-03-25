@@ -237,7 +237,7 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *image)
 // Create functions for volume rendering
 bool CreateVolumePipeline(void)
 {
-	vkuInitDescriptorSet(&volumeDescriptorSet, &vkContext);
+	vkuInitDescriptorSet(&volumeDescriptorSet, vkContext.device);
 	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -259,7 +259,7 @@ bool CreateVolumePipeline(void)
 		},
 	}, 0, &volumePipelineLayout);
 
-	vkuInitPipeline(&volumePipeline, &vkContext);
+	vkuInitPipeline(&volumePipeline, vkContext.device, vkContext.pipelineCache);
 
 	vkuPipeline_SetPipelineLayout(&volumePipeline, volumePipelineLayout);
 	vkuPipeline_SetRenderPass(&volumePipeline, renderPass);

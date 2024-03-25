@@ -67,17 +67,10 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 		return VK_FALSE;
 	}
 
-	uint32_t *queueIndices=(uint32_t *)Zone_Malloc(zone, sizeof(uint32_t)*physicalDeviceCount);
-
-	if(queueIndices==NULL)
-	{
-		DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for queue indices.\n");
-		return VK_FALSE;
-	}
-
 	// Get the handles to the devices
 	vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, deviceHandles);
 
+	// Print out the available devices
 	DBGPRINTF(DEBUG_INFO, "Found devices:\n");
 
 	for(uint32_t i=0;i<physicalDeviceCount;i++)
@@ -85,50 +78,79 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 		VkPhysicalDeviceProperties deviceProperties;
 		vkGetPhysicalDeviceProperties(deviceHandles[i], &deviceProperties);
 		DBGPRINTF(DEBUG_INFO, "\t#%d: %s VendorID: 0x%0.4X ProductID: 0x%0.4X\n", i, deviceProperties.deviceName, deviceProperties.vendorID, deviceProperties.deviceID);
-
-		// Get the number of queue families for this device
-		uint32_t queueFamilyCount=0;
-		vkGetPhysicalDeviceQueueFamilyProperties(deviceHandles[i], &queueFamilyCount, VK_NULL_HANDLE);
-
-		// Allocate the memory for the structs 
-		VkQueueFamilyProperties *queueFamilyProperties=(VkQueueFamilyProperties *)Zone_Malloc(zone, sizeof(VkQueueFamilyProperties)*queueFamilyCount);
-
-		if(queueFamilyProperties==NULL)
-		{
-			DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for queue family properties.\n");
-			Zone_Free(zone, deviceHandles);
-			return VK_FALSE;
-		}
-
-		// Get the queue family properties
-		vkGetPhysicalDeviceQueueFamilyProperties(deviceHandles[i], &queueFamilyCount, queueFamilyProperties);
-
-		// Find a queue index on a device that supports both graphics rendering and present support
-		for(uint32_t j=0;j<queueFamilyCount;j++)
-		{
-			VkBool32 supportsPresent=VK_TRUE;
-
-			//vkGetPhysicalDeviceSurfaceSupportKHR(deviceHandles[i], j, context->surface, &SupportsPresent);
-
-			if(supportsPresent&&(queueFamilyProperties[j].queueFlags&VK_QUEUE_GRAPHICS_BIT))
-			{
-				queueIndices[i]=j;
-				break;
-			}
-		}
-
-		// Done with queue family properties
-		Zone_Free(zone, queueFamilyProperties);
 	}
 
 	// Select which device to use
 	uint32_t deviceIndex=0;
-	context->queueFamilyIndex=queueIndices[deviceIndex];
+
+	// Get the number of queue families for this device
+	uint32_t queueFamilyCount=0;
+	vkGetPhysicalDeviceQueueFamilyProperties(deviceHandles[deviceIndex], &queueFamilyCount, VK_NULL_HANDLE);
+
+	// Allocate the memory for the structs 
+	VkQueueFamilyProperties *queueFamilyProperties=(VkQueueFamilyProperties *)Zone_Malloc(zone, sizeof(VkQueueFamilyProperties)*queueFamilyCount);
+
+	if(queueFamilyProperties==NULL)
+	{
+		DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for queue family properties.\n");
+		Zone_Free(zone, deviceHandles);
+		return VK_FALSE;
+	}
+
+	// Get the queue family properties
+	vkGetPhysicalDeviceQueueFamilyProperties(deviceHandles[deviceIndex], &queueFamilyCount, queueFamilyProperties);
+
+	// Find a queue index on a device that supports both graphics rendering and present support
+	for(uint32_t i=0;i<queueFamilyCount;i++)
+	{
+		VkBool32 supportsPresent=VK_TRUE;
+
+		//vkGetPhysicalDeviceSurfaceSupportKHR(deviceHandles[deviceIndex], i, context->surface, &SupportsPresent);
+
+		if(supportsPresent&&(queueFamilyProperties[i].queueFlags&VK_QUEUE_GRAPHICS_BIT))
+		{
+			context->graphicsQueueIndex=i;
+			break;
+		}
+	}
+
+	// Find a queue index on the device that has compute support
+	VkBool32 computeFound=VK_FALSE;
+	for(uint32_t i=0;i<queueFamilyCount;i++)
+	{
+		if(queueFamilyProperties[i].queueFlags&VK_QUEUE_COMPUTE_BIT&&!(queueFamilyProperties[i].queueFlags&VK_QUEUE_GRAPHICS_BIT))
+		{
+			context->computeQueueIndex=i;
+			computeFound=VK_TRUE;
+			break;
+		}
+	}
+
+	if(!computeFound)
+	{
+		DBGPRINTF(DEBUG_ERROR, "No dedicated compute only queue found, looking for any supported compute queue...\n");
+
+		for(uint32_t i=0;i<queueFamilyCount;i++)
+		{
+			if(queueFamilyProperties[i].queueFlags&VK_QUEUE_COMPUTE_BIT)
+			{
+				context->computeQueueIndex=i;
+				computeFound=VK_TRUE;
+				break;
+			}
+		}
+
+		if(!computeFound)
+			DBGPRINTF(DEBUG_ERROR, "No compute queue found.\n");
+	}
+
+	// Done with queue family properties
+	Zone_Free(zone, queueFamilyProperties);
+
 	context->physicalDevice=deviceHandles[deviceIndex];
 
-	// Free allocated handles and queue indices
+	// Free allocated handles
 	Zone_Free(zone, deviceHandles);
-	Zone_Free(zone, queueIndices);
 
 	uint32_t extensionCount=0;
 	vkEnumerateDeviceExtensionProperties(context->physicalDevice, VK_NULL_HANDLE, &extensionCount, VK_NULL_HANDLE);
@@ -292,13 +314,21 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 		.pEnabledFeatures=&features,
 		.enabledExtensionCount=numExtensions,
 		.ppEnabledExtensionNames=extensions,
-		.queueCreateInfoCount=1,
-		.pQueueCreateInfos=&(VkDeviceQueueCreateInfo)
+		.queueCreateInfoCount=2,
+		.pQueueCreateInfos=(VkDeviceQueueCreateInfo [])
 		{
-			.sType=VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-			.queueFamilyIndex=context->queueFamilyIndex,
-			.queueCount=1,
-			.pQueuePriorities=(const float[]) { 1.0f }
+			{
+				.sType=VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+				.queueFamilyIndex=context->graphicsQueueIndex,
+				.queueCount=1,
+				.pQueuePriorities=(const float[]) { 1.0f }
+			},
+			{
+				.sType=VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+				.queueFamilyIndex=context->computeQueueIndex,
+				.queueCount=1,
+				.pQueuePriorities=(const float[]) { 1.0f }
+			}
 		}
 	}, VK_NULL_HANDLE, &context->device)!=VK_SUCCESS)
 	{
@@ -306,8 +336,9 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 		return VK_FALSE;
 	}
 
-	// Get device queue
-	vkGetDeviceQueue(context->device, context->queueFamilyIndex, 0, &context->queue);
+	// Get device queues
+	vkGetDeviceQueue(context->device, context->graphicsQueueIndex, 0, &context->graphicsQueue);
+	vkGetDeviceQueue(context->device, context->computeQueueIndex, 0, &context->computeQueue);
 
 	FILE *stream=fopen("pipelinecache.bin", "rb");
 
@@ -367,7 +398,7 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 		.flags=0,
-		.queueFamilyIndex=context->queueFamilyIndex,
+		.queueFamilyIndex=context->graphicsQueueIndex,
 	}, VK_NULL_HANDLE, &context->commandPool);
 
 	return VK_TRUE;

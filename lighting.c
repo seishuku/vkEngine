@@ -145,7 +145,7 @@ bool CreateLightingPipeline(void)
 		vkMapMemory(vkContext.device, perFrame[i].mainUBOBuffer[1].deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].mainUBO[1]);
 	}
 
-	vkuInitDescriptorSet(&mainDescriptorSet, &vkContext);
+	vkuInitDescriptorSet(&mainDescriptorSet, vkContext.device);
 
 	vkuDescriptorSet_AddBinding(&mainDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&mainDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -162,7 +162,7 @@ bool CreateLightingPipeline(void)
 		.pSetLayouts=&mainDescriptorSet.descriptorSetLayout,
 	}, 0, &mainPipelineLayout);
 
-	vkuInitPipeline(&mainPipeline, &vkContext);
+	vkuInitPipeline(&mainPipeline, vkContext.device, vkContext.pipelineCache);
 
 	vkuPipeline_SetPipelineLayout(&mainPipeline, mainPipelineLayout);
 	vkuPipeline_SetRenderPass(&mainPipeline, renderPass);

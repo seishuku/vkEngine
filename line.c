@@ -29,7 +29,7 @@ bool CreateLinePipeline(void)
 		},
 	}, 0, &linePipelineLayout);
 
-	vkuInitPipeline(&linePipeline, &vkContext);
+	vkuInitPipeline(&linePipeline, vkContext.device, vkContext.pipelineCache);
 
 	vkuPipeline_SetPipelineLayout(&linePipeline, linePipelineLayout);
 	vkuPipeline_SetRenderPass(&linePipeline, renderPass);

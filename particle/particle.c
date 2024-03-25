@@ -271,7 +271,7 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 		},
 	}, 0, &particlePipelineLayout);
 
-	vkuInitPipeline(&particlePipeline, &vkContext);
+	vkuInitPipeline(&particlePipeline, vkContext.device, vkContext.pipelineCache);
 
 	vkuPipeline_SetPipelineLayout(&particlePipeline, particlePipelineLayout);
 	vkuPipeline_SetRenderPass(&particlePipeline, renderPass);

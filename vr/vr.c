@@ -487,7 +487,7 @@ static bool VR_InitSession(XruContext_t *xrContext, VkInstance Instance, VkuCont
 		.instance=Instance,
 		.physicalDevice=physicalDevice,
 		.device=Context->device,
-		.queueFamilyIndex=Context->queueFamilyIndex,
+		.queueFamilyIndex=Context->graphicsQueueIndex,
 		.queueIndex=0
 	};
 

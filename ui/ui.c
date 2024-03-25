@@ -120,7 +120,7 @@ static bool UI_VulkanVertex(UI_t *UI)
 
 static bool UI_VulkanPipeline(UI_t *UI)
 {
-	vkuInitDescriptorSet(&UI->descriptorSet, &vkContext);
+	vkuInitDescriptorSet(&UI->descriptorSet, vkContext.device);
 	vkuDescriptorSet_AddBinding(&UI->descriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&UI->descriptorSet);
 
@@ -138,7 +138,7 @@ static bool UI_VulkanPipeline(UI_t *UI)
 		},		
 	}, 0, &UI->pipelineLayout);
 
-	vkuInitPipeline(&UI->pipeline, &vkContext);
+	vkuInitPipeline(&UI->pipeline, vkContext.device, vkContext.pipelineCache);
 
 	vkuPipeline_SetPipelineLayout(&UI->pipeline, UI->pipelineLayout);
 	vkuPipeline_SetRenderPass(&UI->pipeline, compositeRenderPass);

@@ -53,9 +53,6 @@ typedef struct
 
 	VkSurfaceKHR surface;
 
-	uint32_t queueFamilyIndex;
-	VkPhysicalDevice physicalDevice;
-
 	VkBool32 swapchainExtension;
 	VkBool32 pushDescriptorExtension;
 	VkBool32 dynamicRenderingExtension;
@@ -67,9 +64,17 @@ typedef struct
 	VkPhysicalDeviceMaintenance3Properties deviceProperties2;
 	VkPhysicalDeviceMemoryProperties deviceMemProperties;
 
+	VkPhysicalDevice physicalDevice;
 	VkDevice device;
-	VkQueue queue;
+
+	uint32_t graphicsQueueIndex;
+	uint32_t computeQueueIndex;
+
+	VkQueue graphicsQueue;
+	VkQueue computeQueue;
+
 	VkPipelineCache pipelineCache;
+
 	VkCommandPool commandPool;
 } VkuContext_t;
 
@@ -268,17 +273,6 @@ typedef struct
 	VkSubpassDependency subpassDependencies[VKU_MAX_RENDERPASS_SUBPASS_DEPENDENCIES];
 } VkuRenderPass_t;
 
-typedef struct
-{
-	VkPhysicalDevice physicalDevice;
-	VkDevice device;
-
-	uint32_t queueFamilyIndex;
-	VkQueue queue;
-
-	VkCommandPool commandPool;
-} VkuComputeContext_t;
-
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask);
 
 VkBool32 vkuCreateImageBuffer(VkuContext_t* Context, VkuImage_t* image, VkImageType imageType, VkFormat format, uint32_t mipLevels, uint32_t layers, uint32_t width, uint32_t height, uint32_t depth, VkSampleCountFlagBits samples, VkImageTiling tiling, VkBufferUsageFlags flags, VkFlags requirementsMask, VkImageCreateFlags createFlags);
@@ -302,14 +296,14 @@ VkBool32 vkuPipeline_AddVertexAttribute(VkuPipeline_t *pipeline, uint32_t locati
 VkBool32 vkuPipeline_AddStage(VkuPipeline_t *pipeline, const char *shaderFilename, VkShaderStageFlagBits stage);
 VkBool32 vkuPipeline_SetRenderPass(VkuPipeline_t *pipeline, VkRenderPass renderPass);
 VkBool32 vkuPipeline_SetPipelineLayout(VkuPipeline_t *pipeline, VkPipelineLayout pipelineLayout);
-VkBool32 vkuInitPipeline(VkuPipeline_t *pipeline, VkuContext_t *context);
+VkBool32 vkuInitPipeline(VkuPipeline_t *pipeline, VkDevice device, VkPipelineCache pipelineCache);
 VkBool32 vkuAssemblePipeline(VkuPipeline_t *pipeline, void *pNext);
 VkBool32 vkuAssembleComputePipeline(VkuPipeline_t *pipeline, void *pNext);
 
 VkBool32 vkuDescriptorSet_AddBinding(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkDescriptorType type, VkShaderStageFlags stage);
 VkBool32 vkuDescriptorSet_UpdateBindingImageInfo(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkSampler sampler, VkImageView imageView, VkImageLayout imageLayout);
 VkBool32 vkuDescriptorSet_UpdateBindingBufferInfo(VkuDescriptorSet_t *descriptorSet, uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range);
-VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *descriptorSet, VkuContext_t *context);
+VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *descriptorSet, VkDevice device);
 VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSet_t *descriptorSet);
 VkBool32 vkuAllocateUpdateDescriptorSet(VkuDescriptorSet_t *descriptorSet, VkDescriptorPool descriptorPool);
 
@@ -334,7 +328,5 @@ VkBool32 vkuRenderPass_AddAttachment(VkuRenderPass_t *renderPass, VkuRenderPassA
 VkBool32 vkuRenderPass_AddSubpassDependency(VkuRenderPass_t *renderPass, uint32_t sourceSubpass, uint32_t destinationSubpass, VkPipelineStageFlags sourceStageMask, VkPipelineStageFlags destinationStageMask, VkAccessFlags sourceAccessMask, VkAccessFlags destinationAccessMask, VkDependencyFlags dependencyFlags);
 VkBool32 vkuInitRenderPass(VkuContext_t *context, VkuRenderPass_t *renderPass);
 VkBool32 vkuCreateRenderPass(VkuRenderPass_t *renderPass);
-
-VkBool32 VkuGetComputeContext(VkuComputeContext_t *computeContext, VkPhysicalDevice physicalDevice);
 
 #endif

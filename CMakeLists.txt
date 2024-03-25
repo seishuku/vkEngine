@@ -103,7 +103,6 @@ set(PROJECT_SOURCES
 	utils/list.c
 	vr/vr.c
 	vulkan/vulkan_buffer.c
-	vulkan/vulkan_compute.c
 	vulkan/vulkan_context.c
 	vulkan/vulkan_descriptorset.c
 	vulkan/vulkan_framebuffer.c
@@ -126,23 +125,23 @@ set(PROJECT_SOURCES
 	sphere.c
 )
 
-if(${CMAKE_BUILD_TYPE} MATCHES "Debug")
-add_definitions(-D_DEBUG)
+if(CMAKE_BUILD_TYPE MATCHES "Debug")
+	add_definitions(-D_DEBUG)
 endif()
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-add_definitions(-DWIN32 -D_CRT_SECURE_NO_WARNINGS -D_CONSOLE)
-list(APPEND PROJECT_SOURCES system/win32.c)
-elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-add_definitions(-DLINUX -g)
-list(APPEND PROJECT_SOURCES system/linux_x11.c)
-elseif(${CMAKE_SYSTEM_NAME} MATCHES "Android")
-add_definitions(-DANDROID)
-list(APPEND PROJECT_SOURCES
-	system/android_fopen.c
-	system/android_main.c
-	system/android_native_app_glue.c
-)
+if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+	add_definitions(-DWIN32 -D_CRT_SECURE_NO_WARNINGS -D_CONSOLE)
+	list(APPEND PROJECT_SOURCES system/win32.c)
+elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
+	add_definitions(-DLINUX -g)
+	list(APPEND PROJECT_SOURCES system/linux_x11.c)
+elseif(CMAKE_SYSTEM_NAME MATCHES "Android")
+	add_definitions(-DANDROID)
+	list(APPEND PROJECT_SOURCES
+		system/android_fopen.c
+		system/android_main.c
+		system/android_native_app_glue.c
+	)
 endif()
 
 add_executable(${CMAKE_PROJECT_NAME} ${PROJECT_SOURCES})
@@ -155,22 +154,18 @@ target_link_libraries(
 	Vorbis::vorbisfile
 )
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+if(CMAKE_SYSTEM_NAME MATCHES "Windows")
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC portaudio_static ws2_32.lib)
 endif()
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC portaudio_static X11 Xi Xfixes)
 endif()
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
+if(CMAKE_SYSTEM_NAME MATCHES "Android")
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC android log aaudio)
 endif()
 
-if(${CMAKE_CXX_COMPILER_ID} MATCHES "MSVC")
+if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
 target_compile_options(${CMAKE_PROJECT_NAME} PUBLIC /experimental:c11atomics)
-endif()
-
-if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET vkEngine PROPERTY C_STANDARD 11)
 endif()

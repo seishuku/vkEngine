@@ -29,7 +29,7 @@ bool CreateSpherePipeline(void)
 		},
 	}, 0, &spherePipelineLayout);
 
-	vkuInitPipeline(&spherePipeline, &vkContext);
+	vkuInitPipeline(&spherePipeline, vkContext.device, vkContext.pipelineCache);
 
 	vkuPipeline_SetPipelineLayout(&spherePipeline, spherePipelineLayout);
 	vkuPipeline_SetRenderPass(&spherePipeline, renderPass);

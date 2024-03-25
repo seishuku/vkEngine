@@ -102,7 +102,7 @@ bool CreateThresholdPipeline(void)
 		},
 	}, 0, &thresholdRenderPass);
 
-	vkuInitDescriptorSet(&thresholdDescriptorSet, &vkContext);
+	vkuInitDescriptorSet(&thresholdDescriptorSet, vkContext.device);
 	vkuDescriptorSet_AddBinding(&thresholdDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&thresholdDescriptorSet);
 
@@ -113,7 +113,7 @@ bool CreateThresholdPipeline(void)
 		.pSetLayouts=&thresholdDescriptorSet.descriptorSetLayout,
 	}, 0, &thresholdPipelineLayout);
 
-	vkuInitPipeline(&thresholdPipeline, &vkContext);
+	vkuInitPipeline(&thresholdPipeline, vkContext.device, vkContext.pipelineCache);
 
 	vkuPipeline_SetPipelineLayout(&thresholdPipeline, thresholdPipelineLayout);
 	vkuPipeline_SetRenderPass(&thresholdPipeline, thresholdRenderPass);
@@ -194,7 +194,7 @@ bool CreateGaussianPipeline(void)
 		},
 	}, 0, &gaussianRenderPass);
 
-	vkuInitDescriptorSet(&gaussianDescriptorSet, &vkContext);
+	vkuInitDescriptorSet(&gaussianDescriptorSet, vkContext.device);
 	vkuDescriptorSet_AddBinding(&gaussianDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&gaussianDescriptorSet);
 
@@ -211,7 +211,7 @@ bool CreateGaussianPipeline(void)
 		},
 	}, 0, &gaussianPipelineLayout);
 
-	vkuInitPipeline(&gaussianPipeline, &vkContext);
+	vkuInitPipeline(&gaussianPipeline, vkContext.device, vkContext.pipelineCache);
 
 	vkuPipeline_SetPipelineLayout(&gaussianPipeline, gaussianPipelineLayout);
 	vkuPipeline_SetRenderPass(&gaussianPipeline, gaussianRenderPass);
@@ -414,7 +414,7 @@ bool CreateCompositePipeline(void)
 		},
 	}, 0, &compositeRenderPass);
 
-	vkuInitDescriptorSet(&compositeDescriptorSet, &vkContext);
+	vkuInitDescriptorSet(&compositeDescriptorSet, vkContext.device);
 	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -437,7 +437,7 @@ bool CreateCompositePipeline(void)
 		},
 	}, 0, &compositePipelineLayout);
 
-	vkuInitPipeline(&compositePipeline, &vkContext);
+	vkuInitPipeline(&compositePipeline, vkContext.device, vkContext.pipelineCache);
 
 	vkuPipeline_SetPipelineLayout(&compositePipeline, compositePipelineLayout);
 	vkuPipeline_SetRenderPass(&compositePipeline, compositeRenderPass);

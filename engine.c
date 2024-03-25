@@ -55,8 +55,6 @@ XruContext_t xrContext;
 VkInstance vkInstance;
 VkuContext_t vkContext;
 
-VkuComputeContext_t vkComputeContext;
-
 // Vulkan memory allocator zone
 VkuMemZone_t *vkZone;
 
@@ -361,7 +359,7 @@ void Thread_Constructor(void *arg)
 			{
 				.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 				.flags=0,
-				.queueFamilyIndex=vkContext.queueFamilyIndex,
+				.queueFamilyIndex=vkContext.graphicsQueueIndex,
 			}, VK_NULL_HANDLE, &data->perFrame[Frame].commandPool[eye]);
 
 			vkAllocateCommandBuffers(vkContext.device, &(VkCommandBufferAllocateInfo)
@@ -1297,7 +1295,7 @@ void Render(void)
 		SubmitInfo.pSignalSemaphores=VK_NULL_HANDLE;
 	}
 
-	vkQueueSubmit(vkContext.queue, 1, &SubmitInfo, perFrame[index].frameFence);
+	vkQueueSubmit(vkContext.graphicsQueue, 1, &SubmitInfo, perFrame[index].frameFence);
 
 	// Handle VR frame end
 	if(isVR)
@@ -1309,7 +1307,7 @@ void Render(void)
 	// Handle non-VR frame end
 	{
 		// And present it to the screen
-		VkResult Result=vkQueuePresentKHR(vkContext.queue, &(VkPresentInfoKHR)
+		VkResult Result=vkQueuePresentKHR(vkContext.graphicsQueue, &(VkPresentInfoKHR)
 		{
 			.sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 			.waitSemaphoreCount=1,
@@ -1502,15 +1500,14 @@ bool Init(void)
 
 	GenNebulaVolume(&vkContext, &textures[TEXTURE_VOLUME]);
 	{
-		VkuGetComputeContext(&vkComputeContext, vkContext.physicalDevice);
-
+		VkCommandPool computeCommandPool;
 		VkCommandBuffer computeCommand;
 		VkDescriptorPool computeDescriptorPool;
 		VkuDescriptorSet_t computeDescriptor;
 		VkuPipeline_t compute;
 		VkPipelineLayout computeLayout;
 
-		vkuInitDescriptorSet(&computeDescriptor, &vkContext);
+		vkuInitDescriptorSet(&computeDescriptor, vkContext.device);
 		vkuDescriptorSet_AddBinding(&computeDescriptor, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
 		vkuAssembleDescriptorSetLayout(&computeDescriptor);
 
@@ -1521,7 +1518,7 @@ bool Init(void)
 			.pSetLayouts=&computeDescriptor.descriptorSetLayout,
 		}, 0, &computeLayout);
 
-		vkuInitPipeline(&compute, &vkContext);
+		vkuInitPipeline(&compute, vkContext.device, VK_NULL_HANDLE);
 		vkuPipeline_SetPipelineLayout(&compute, computeLayout);
 		vkuPipeline_AddStage(&compute, "shaders/test.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
 		vkuAssembleComputePipeline(&compute, VK_NULL_HANDLE);
@@ -1533,14 +1530,30 @@ bool Init(void)
 			.poolSizeCount=1,
 			.pPoolSizes=(VkDescriptorPoolSize[]) { { .type=VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount=1, }, },
 		}, VK_NULL_HANDLE, &computeDescriptorPool);
+		VkResult result=VK_ERROR_UNKNOWN;
 
-		vkAllocateCommandBuffers(vkContext.device, &(VkCommandBufferAllocateInfo)
+		if(vkCreateCommandPool(vkContext.device, &(VkCommandPoolCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+			.flags=0,
+			.queueFamilyIndex=vkContext.computeQueueIndex,
+		}, VK_NULL_HANDLE, &computeCommandPool)!=VK_SUCCESS)
+		{
+			DBGPRINTF(DEBUG_ERROR, "vkCreateCommandPool failed.\n");
+			return VK_FALSE;
+		}
+
+		if((result=vkAllocateCommandBuffers(vkContext.device, &(VkCommandBufferAllocateInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-			.commandPool=vkComputeContext.commandPool,
+			.commandPool=computeCommandPool,
 			.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 			.commandBufferCount=1,
-		}, &computeCommand);
+		}, &computeCommand))!=VK_SUCCESS)
+		{
+			DBGPRINTF(DEBUG_ERROR, "vkAllocateCommandBuffers failed.\n");
+			return false;
+		}
 
 		vkBeginCommandBuffer(computeCommand, &(VkCommandBufferBeginInfo) {.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, });
 
@@ -1554,7 +1567,7 @@ bool Init(void)
 		imageMemoryBarrier.dstAccessMask=VK_ACCESS_SHADER_READ_BIT;
 		imageMemoryBarrier.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
 		imageMemoryBarrier.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
-		vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
+		vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
 
 		vkCmdBindPipeline(computeCommand, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipeline);
 
@@ -1567,7 +1580,7 @@ bool Init(void)
 
 		imageMemoryBarrier.oldLayout=VK_IMAGE_LAYOUT_GENERAL;
 		imageMemoryBarrier.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
+		vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
 
 		// End command buffer and submit
 		if(vkEndCommandBuffer(computeCommand)!=VK_SUCCESS)
@@ -1585,7 +1598,7 @@ bool Init(void)
 			.pCommandBuffers=&computeCommand,
 		};
 
-		vkQueueSubmit(vkComputeContext.queue, 1, &submitInfo, fence);
+		vkQueueSubmit(vkContext.computeQueue, 1, &submitInfo, fence);
 
 		if(vkWaitForFences(vkContext.device, 1, &fence, VK_TRUE, UINT64_MAX)!=VK_SUCCESS)
 			return VK_FALSE;
@@ -1756,7 +1769,7 @@ bool Init(void)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 			.flags=0,
-			.queueFamilyIndex=vkContext.queueFamilyIndex,
+			.queueFamilyIndex=vkContext.graphicsQueueIndex,
 		}, VK_NULL_HANDLE, &perFrame[i].commandPool);
 
 		// Allocate the command buffers we will be rendering into

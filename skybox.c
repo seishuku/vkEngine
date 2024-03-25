@@ -31,7 +31,7 @@ bool CreateSkyboxPipeline(void)
 		vkMapMemory(vkContext.device, perFrame[i].skyboxUBOBuffer[1].deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].skyboxUBO[1]);
 	}
 
-	vkuInitDescriptorSet(&skyboxDescriptorSet, &vkContext);
+	vkuInitDescriptorSet(&skyboxDescriptorSet, vkContext.device);
 	vkuDescriptorSet_AddBinding(&skyboxDescriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
 	vkuDescriptorSet_AddBinding(&skyboxDescriptorSet, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&skyboxDescriptorSet);
@@ -44,7 +44,7 @@ bool CreateSkyboxPipeline(void)
 		.pushConstantRangeCount=0,
 	}, 0, &skyboxPipelineLayout);
 
-	vkuInitPipeline(&skyboxPipeline, &vkContext);
+	vkuInitPipeline(&skyboxPipeline, vkContext.device, vkContext.pipelineCache);
 
 	vkuPipeline_SetPipelineLayout(&skyboxPipeline, skyboxPipelineLayout);
 	vkuPipeline_SetRenderPass(&skyboxPipeline, renderPass);

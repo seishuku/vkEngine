@@ -113,7 +113,7 @@ bool CreateShadowPipeline(void)
 		},
 	}, 0, &shadowPipelineLayout);
 
-	vkuInitPipeline(&shadowPipeline, &vkContext);
+	vkuInitPipeline(&shadowPipeline, vkContext.device, vkContext.pipelineCache);
 
 	vkuPipeline_SetPipelineLayout(&shadowPipeline, shadowPipelineLayout);
 	vkuPipeline_SetRenderPass(&shadowPipeline, shadowRenderPass);

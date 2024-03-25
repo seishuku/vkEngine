@@ -147,14 +147,14 @@ VkBool32 vkuPipeline_SetPipelineLayout(VkuPipeline_t *pipeline, VkPipelineLayout
 }
 
 // Create an initial pipeline configuration with some default states
-VkBool32 vkuInitPipeline(VkuPipeline_t *pipeline, VkuContext_t *context)
+VkBool32 vkuInitPipeline(VkuPipeline_t *pipeline, VkDevice device, VkPipelineCache pipelineCache)
 {
-	if(!pipeline||!context)
+	if(!pipeline)
 		return VK_FALSE;
 
 	// Pass in handles to dependencies
-	pipeline->device=context->device;
-	pipeline->pipelineCache=context->pipelineCache;
+	pipeline->device=device;
+	pipeline->pipelineCache=pipelineCache;
 
 	pipeline->pipelineLayout=VK_NULL_HANDLE;
 	pipeline->renderPass=VK_NULL_HANDLE;
