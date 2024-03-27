@@ -13,7 +13,6 @@
 #include "../math/math.h"
 #include "../vr/vr.h"
 #include "../utils/event.h"
-#include "../utils/input.h"
 
 MemZone_t *zone;
 

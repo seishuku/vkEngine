@@ -99,7 +99,6 @@ set(PROJECT_SOURCES
 	ui/sprite.c
 	ui/ui.c
 	utils/event.c
-	utils/input.c
 	utils/list.c
 	vr/vr.c
 	vulkan/vulkan_buffer.c

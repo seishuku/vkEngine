@@ -14,7 +14,6 @@
 #include "utils/list.h"
 #include "lights/lights.h"
 #include "utils/event.h"
-#include "utils/input.h"
 #include "particle/particle.h"
 #include "system/threads.h"
 #include "vr/vr.h"
@@ -1344,12 +1343,6 @@ bool Init(void)
 	// TODO: This is a hack, fix it proper.
 	if(isVR)
 		swapchain.numImages=xrContext.swapchain[0].numImages;
-
-	Event_Add(EVENT_KEYDOWN, Event_KeyDown);
-	Event_Add(EVENT_KEYUP, Event_KeyUp);
-	Event_Add(EVENT_MOUSEDOWN, Event_MouseDown);
-	Event_Add(EVENT_MOUSEUP, Event_MouseUp);
-	Event_Add(EVENT_MOUSEMOVE, Event_Mouse);
 
 	Console_Init(&console, 80, 25);
 	Console_AddCommand(&console, "quit", Console_CmdQuit);

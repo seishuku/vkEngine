@@ -16,7 +16,6 @@
 #include "../camera/camera.h"
 #include "../utils/list.h"
 #include "../utils/event.h"
-#include "../utils/input.h"
 #include "../vr/vr.h"
 
 MemZone_t *zone;
