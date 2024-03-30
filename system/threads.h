@@ -42,8 +42,7 @@ typedef struct
 {
     mtx_t mutex;
     cnd_t cond;
-    uint32_t count, threshold;
-	uint32_t generation;
+	uint32_t count_init, count;
 } ThreadBarrier_t;
 
 uint32_t Thread_GetJobCount(ThreadWorker_t *worker);
@@ -57,7 +56,6 @@ void Thread_Resume(ThreadWorker_t *worker);
 bool Thread_Destroy(ThreadWorker_t *worker);
 
 bool ThreadBarrier_Init(ThreadBarrier_t *barrier, uint32_t count);
-void ThreadBarrier_Reset(ThreadBarrier_t *barrier);
 bool ThreadBarrier_Wait(ThreadBarrier_t *barrier);
 
 #endif

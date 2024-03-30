@@ -215,42 +215,29 @@ bool ThreadBarrier_Init(ThreadBarrier_t *barrier, uint32_t count)
 		return false;
 
 	barrier->count=count;
-	barrier->threshold=count;
-	barrier->generation=0;
+	barrier->count_init=count;
 
 	return true;
-}
-
-void ThreadBarrier_Reset(ThreadBarrier_t *barrier)
-{
-	mtx_lock(&barrier->mutex);
-	barrier->count=barrier->threshold;
-	cnd_broadcast(&barrier->cond);
-	mtx_unlock(&barrier->mutex);
 }
 
 bool ThreadBarrier_Wait(ThreadBarrier_t *barrier)
 {
 	mtx_lock(&barrier->mutex);
-	uint32_t generation=barrier->generation;
 
 	if(--barrier->count==0)
 	{
-		barrier->count=barrier->threshold;
-		barrier->generation++;
 		cnd_broadcast(&barrier->cond);
 		mtx_unlock(&barrier->mutex);
 
-		return true;
+		return false;
 	}
 
-	while(generation==barrier->generation)
-	{
-		if(cnd_wait(&barrier->cond, &barrier->mutex)!=0)
-			DBGPRINTF(DEBUG_ERROR, "UNEXPECTED WAKEUP!\n");
-	}
+	while(barrier->count!=0)
+		cnd_wait(&barrier->cond, &barrier->mutex);
+
+	barrier->count=barrier->count_init;
 
 	mtx_unlock(&barrier->mutex);
 
-	return false;
+	return true;
 }
