@@ -1770,7 +1770,7 @@ bool Init(void)
 	}
 
 	// Synchronization barrier, count is number of threads+main thread
-	ThreadBarrier_Init(&threadBarrier, NUM_THREADS);
+	ThreadBarrier_Init(&threadBarrier, NUM_THREADS+1);
 
 	// Thread for physics, and sync barrier
 	Thread_Init(&threadPhysics);
