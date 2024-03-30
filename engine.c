@@ -104,6 +104,9 @@ VkFramebuffer framebuffer[2];
 // Asteroid data
 #define NUM_ASTEROIDS 1000
 RigidBody_t asteroids[NUM_ASTEROIDS];
+
+VkuBuffer_t asteroidInstance;
+matrix *asteroidInstancePtr;
 //////
 
 // Thread stuff
@@ -122,13 +125,8 @@ typedef struct
 ThreadData_t threadData[NUM_THREADS];
 ThreadWorker_t thread[NUM_THREADS], threadPhysics;
 
-mtx_t threadMutex;
-cnd_t threadCondition;
-_Atomic(int32_t) threadBarrier;
-
-mtx_t physicsThreadMutex;
-cnd_t physicsThreadCondition;
-_Atomic(int32_t) physicsThreadBarrier;
+ThreadBarrier_t threadBarrier;
+ThreadBarrier_t physicsThreadBarrier;
 //////
 
 // UI Stuff
@@ -139,7 +137,6 @@ uint32_t volumeID=UINT32_MAX;
 uint32_t faceID=UINT32_MAX;
 uint32_t cursorID=UINT32_MAX;
 uint32_t colorShiftID=UINT32_MAX;
-
 //////
 
 Console_t console;
@@ -151,6 +148,8 @@ vec2 leftThumbstick, rightThumbstick;
 
 bool isTargeted=false;
 bool isControlPressed=false;
+
+bool pausePhysics=false;
 
 void RecreateSwapchain(void);
 bool CreateFramebuffers(uint32_t eye);
@@ -243,13 +242,10 @@ void GenerateSkyParams(void)
 	//////
 
 	// Set up instance data for asteroid rendering
-	for(uint32_t i=0;i<swapchain.numImages;i++)
+	if(!asteroidInstance.buffer)
 	{
-		if(!perFrame[i].asteroidInstance.buffer)
-		{
-			vkuCreateHostBuffer(&vkContext, &perFrame[i].asteroidInstance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-			vkMapMemory(vkContext.device, perFrame[i].asteroidInstance.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].asteroidInstancePtr);
-		}
+		vkuCreateHostBuffer(&vkContext, &asteroidInstance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+		vkMapMemory(vkContext.device, asteroidInstance.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&asteroidInstancePtr);
 	}
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
@@ -627,10 +623,7 @@ void Thread_Main(void *arg)
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
-	mtx_lock(&threadMutex);
-	atomic_fetch_sub(&threadBarrier, 1);
-	cnd_signal(&threadCondition);
-	mtx_unlock(&threadMutex);
+	ThreadBarrier_Wait(&threadBarrier);
 }
 
 void Thread_Particles(void *arg)
@@ -673,10 +666,7 @@ void Thread_Particles(void *arg)
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
-	mtx_lock(&threadMutex);
-	atomic_fetch_sub(&threadBarrier, 1);
-	cnd_signal(&threadCondition);
-	mtx_unlock(&threadMutex);
+	ThreadBarrier_Wait(&threadBarrier);
 }
 
 // Render everything together, per-eye, per-frame index
@@ -745,11 +735,7 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	//threadData[1].eye=eye;
 	//Thread_AddJob(&thread[1], Thread_Particles, (void *)&threadData[1]);
 
-	mtx_lock(&threadMutex);
-	while(atomic_load(&threadBarrier))
-		cnd_wait(&threadCondition, &threadMutex);
-	mtx_unlock(&threadMutex);
-	atomic_store(&threadBarrier, NUM_THREADS);
+	ThreadBarrier_Wait(&threadBarrier);
 
 	// Execute the secondary command buffers from the threads
 	vkCmdExecuteCommands(perFrame[index].commandBuffer, 1, (VkCommandBuffer[])
@@ -840,262 +826,255 @@ void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *p
 // Runs anything physics related
 void Thread_Physics(void *arg)
 {
-	uint32_t index=*((uint32_t *)arg);
-
 	//CvWriteFlag(flagSeries, "physics start");
 
-	ParticleSystem_Step(&particleSystem, fTimeStep);
-
-	// Run integration for particle emitter objects
-	for(uint32_t i=0;i<MAX_EMITTERS;i++)
+	if(!pausePhysics)
 	{
-		// If it's alive reduce the life and integrate,
-		// otherwise if it's dead and still has an ID assigned, delete/unassign it.
-		if(particleEmittersLife[i]>0.0f)
+		ParticleSystem_Step(&particleSystem, fTimeStep);
+
+		// Run integration for particle emitter objects
+		for(uint32_t i=0;i<MAX_EMITTERS;i++)
 		{
-			particleEmittersLife[i]-=fTimeStep;
-			PhysicsIntegrate(&particleEmitters[i], fTimeStep);
-
-			for(uint32_t j=0;j<List_GetCount(&particleSystem.emitters);j++)
+			// If it's alive reduce the life and integrate,
+			// otherwise if it's dead and still has an ID assigned, delete/unassign it.
+			if(particleEmittersLife[i]>0.0f)
 			{
-				ParticleEmitter_t *emitter=List_GetPointer(&particleSystem.emitters, j);
+				particleEmittersLife[i]-=fTimeStep;
+				PhysicsIntegrate(&particleEmitters[i], fTimeStep);
 
-				if(emitter->ID==particleEmittersID[i])
+				for(uint32_t j=0;j<List_GetCount(&particleSystem.emitters);j++)
 				{
-					emitter->position=particleEmitters[i].position;
+					ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&particleSystem.emitters, j);
 
-					if(particleEmittersLife[i]<5.0f)
-						emitter->particleSize*=fmaxf(0.0f, fminf(1.0f, particleEmittersLife[i]/5.0f));
+					if(emitter->ID==particleEmittersID[i])
+					{
+						emitter->position=particleEmitters[i].position;
 
-					break;
+						if(particleEmittersLife[i]<5.0f)
+							emitter->particleSize*=fmaxf(0.0f, fminf(1.0f, particleEmittersLife[i]/5.0f));
+
+						break;
+					}
 				}
 			}
+			else if(particleEmittersID[i]!=UINT32_MAX)
+			{
+				ParticleSystem_DeleteEmitter(&particleSystem, particleEmittersID[i]);
+				particleEmittersID[i]=UINT32_MAX;
+			}
 		}
-		else if(particleEmittersID[i]!=UINT32_MAX)
-		{
-			ParticleSystem_DeleteEmitter(&particleSystem, particleEmittersID[i]);
-			particleEmittersID[i]=UINT32_MAX;
-		}
-	}
 
-	// Loop through objects, integrate and check/resolve collisions
-	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
-	{
-		// Run physics integration on the asteroids
-		PhysicsIntegrate(&asteroids[i], fTimeStep);
-
-		// Check asteroids against other asteroids
-		for(uint32_t j=i+1;j<NUM_ASTEROIDS;j++)
+		// Loop through objects, integrate and check/resolve collisions
+		for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
 		{
-			const float mag=PhysicsSphereToSphereCollisionResponse(&asteroids[i], &asteroids[j]);
+			// Run physics integration on the asteroids
+			PhysicsIntegrate(&asteroids[i], fTimeStep);
+
+			// Check asteroids against other asteroids
+			for(uint32_t j=i+1;j<NUM_ASTEROIDS;j++)
+			{
+				const float mag=PhysicsSphereToSphereCollisionResponse(&asteroids[i], &asteroids[j]);
+
+				if(mag>1.0f)
+					Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, mag/50.0f, &asteroids[i].position);
+			}
+
+			// Check asteroids against the camera
+			RigidBody_t cameraBody;
+
+			cameraBody.position=camera.position;
+			cameraBody.velocity=camera.velocity;
+			cameraBody.force=Vec3b(0.0f);
+
+			cameraBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+			cameraBody.angularVelocity=Vec3b(0.0f);
+
+			cameraBody.radius=camera.radius;
+
+			cameraBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*cameraBody.radius);
+			cameraBody.invMass=1.0f/cameraBody.mass;
+
+			cameraBody.inertia=0.4f*cameraBody.mass*(cameraBody.radius*cameraBody.radius);
+			cameraBody.invInertia=1.0f/cameraBody.inertia;
+
+			const float mag=PhysicsSphereToSphereCollisionResponse(&cameraBody, &asteroids[i]);
+
+			camera.velocity=cameraBody.velocity;
 
 			if(mag>1.0f)
-				Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, mag/50.0f, &asteroids[i].position);
-		}
-
-		// Check asteroids against the camera
-		RigidBody_t cameraBody;
-
-		cameraBody.position=camera.position;
-		cameraBody.velocity=camera.velocity;
-		cameraBody.force=Vec3b(0.0f);
-
-		cameraBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-		cameraBody.angularVelocity=Vec3b(0.0f);
-
-		cameraBody.radius=camera.radius;
-
-		cameraBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*cameraBody.radius);
-		cameraBody.invMass=1.0f/cameraBody.mass;
-
-		cameraBody.inertia=0.4f*cameraBody.mass*(cameraBody.radius*cameraBody.radius);
-		cameraBody.invInertia=1.0f/cameraBody.inertia;
-
-		const float mag=PhysicsSphereToSphereCollisionResponse(&cameraBody, &asteroids[i]);
-
-		camera.velocity=cameraBody.velocity;
-
-		if(mag>1.0f)
-			Audio_PlaySample(&sounds[SOUND_CRASH], false, mag/50.0f, &camera.position);
+				Audio_PlaySample(&sounds[SOUND_CRASH], false, mag/50.0f, &camera.position);
 
 #if 0
-		for(uint32_t j=0;j<connectedClients;j++)
-		{
-			// Don't check for collision with our own net camera
-			if(j!=clientID)
-				PhysicsCameraToSphereCollisionResponse(&netCameras[j], &asteroids[i]);
-		}
+			for(uint32_t j=0;j<connectedClients;j++)
+			{
+				// Don't check for collision with our own net camera
+				if(j!=clientID)
+					PhysicsCameraToSphereCollisionResponse(&netCameras[j], &asteroids[i]);
+			}
 #endif
 
-		// Check asteroids against projectile emitters
-		for(uint32_t j=0;j<MAX_EMITTERS;j++)
-		{
-			if(particleEmittersLife[j]>0.0f)
+			// Check asteroids against projectile emitters
+			for(uint32_t j=0;j<MAX_EMITTERS;j++)
 			{
-				if(PhysicsSphereToSphereCollisionResponse(&particleEmitters[j], &asteroids[i])>1.0f)
+				if(particleEmittersLife[j]>0.0f)
 				{
-					// It collided, kill it.
-					// Setting this directly to <0.0 seems to cause emitters that won't get removed,
-					//     so setting it to nearly 0.0 allows the natural progression kill it off.
-					particleEmittersLife[j]=0.001f;
+					if(PhysicsSphereToSphereCollisionResponse(&particleEmitters[j], &asteroids[i])>1.0f)
+					{
+						// It collided, kill it.
+						// Setting this directly to <0.0 seems to cause emitters that won't get removed,
+						//     so setting it to nearly 0.0 allows the natural progression kill it off.
+						particleEmittersLife[j]=0.001f;
 
-					Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particleEmitters[j].position);
+						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particleEmitters[j].position);
 
-					ParticleSystem_AddEmitter(&particleSystem,
-						particleEmitters[j].position,	// Position
-						Vec3(100.0f, 12.0f, 5.0f),		// Start color
-						Vec3(0.0f, 0.0f, 0.0f),			// End color
-						5.0f,							// Radius of particles
-						1000,							// Number of particles in system
-						PARTICLE_EMITTER_ONCE,			// Type?
-						ExplodeEmitterCallback			// Callback for particle generation
-					);
+						ParticleSystem_AddEmitter(&particleSystem,
+												  particleEmitters[j].position,	// Position
+												  Vec3(100.0f, 12.0f, 5.0f),		// Start color
+												  Vec3(0.0f, 0.0f, 0.0f),			// End color
+												  5.0f,							// Radius of particles
+												  1000,							// Number of particles in system
+												  PARTICLE_EMITTER_ONCE,			// Type?
+												  ExplodeEmitterCallback			// Callback for particle generation
+						);
 
-					// Silly radius reduction on hit
-					//body->radius=fmaxf(body->radius-10.0f, 0.0f);
+						// Silly radius reduction on hit
+						//body->radius=fmaxf(body->radius-10.0f, 0.0f);
+					}
 				}
 			}
-		}
 
 #if 0
-		if(isTargeted)
-		{
-			float distance=raySphereIntersect(enemy.position, enemy.forward, asteroids[i].position, asteroids[i].radius);
-
-			if(distance>0.0f)
+			if(isTargeted)
 			{
-				RigidBody_t particleBody;
+				float distance=raySphereIntersect(enemy.position, enemy.forward, asteroids[i].position, asteroids[i].radius);
 
-				particleBody.position=Vec3_Addv(enemy.position, Vec3_Muls(enemy.forward, distance));
-				particleBody.velocity=Vec3_Muls(enemy.forward, 300.0f);
-				particleBody.force=Vec3b(0.0f);
-
-				particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-				particleBody.angularVelocity=Vec3b(0.0f);
-
-				particleBody.radius=2.0f;
-
-				particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*10000.0f;
-				particleBody.invMass=1.0f/particleBody.mass;
-
-				particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
-				particleBody.invInertia=1.0f/particleBody.inertia;
-
-				if(PhysicsSphereToSphereCollisionResponse(&particleBody, &asteroids[i])>1.0f)
+				if(distance>0.0f)
 				{
-					Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particleBody.position);
+					RigidBody_t particleBody;
 
-					// FIXME: Is this causing derelict emitters that never go away?
-					//			I don't think it is, but need to check.
-					ParticleSystem_AddEmitter
-					(
-						&particleSystem,
-						particleBody.position,		// Position
-						Vec3(100.0f, 12.0f, 5.0f),	// Start color
-						Vec3(0.0f, 0.0f, 0.0f),		// End color
-						5.0f,						// Radius of particles
-						1000,						// Number of particles in system
-						PARTICLE_EMITTER_ONCE,		// Type?
-						ExplodeEmitterCallback		// Callback for particle generation
-					);
+					particleBody.position=Vec3_Addv(enemy.position, Vec3_Muls(enemy.forward, distance));
+					particleBody.velocity=Vec3_Muls(enemy.forward, 300.0f);
+					particleBody.force=Vec3b(0.0f);
 
-					// Silly radius reduction on hit
-					//body->radius=fmaxf(body->radius-10.0f, 0.0f);
+					particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+					particleBody.angularVelocity=Vec3b(0.0f);
+
+					particleBody.radius=2.0f;
+
+					particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*10000.0f;
+					particleBody.invMass=1.0f/particleBody.mass;
+
+					particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
+					particleBody.invInertia=1.0f/particleBody.inertia;
+
+					if(PhysicsSphereToSphereCollisionResponse(&particleBody, &asteroids[i])>1.0f)
+					{
+						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particleBody.position);
+
+						// FIXME: Is this causing derelict emitters that never go away?
+						//			I don't think it is, but need to check.
+						ParticleSystem_AddEmitter
+						(
+							&particleSystem,
+							particleBody.position,		// Position
+							Vec3(100.0f, 12.0f, 5.0f),	// Start color
+							Vec3(0.0f, 0.0f, 0.0f),		// End color
+							5.0f,						// Radius of particles
+							1000,						// Number of particles in system
+							PARTICLE_EMITTER_ONCE,		// Type?
+							ExplodeEmitterCallback		// Callback for particle generation
+						);
+
+						// Silly radius reduction on hit
+						//body->radius=fmaxf(body->radius-10.0f, 0.0f);
+					}
 				}
 			}
-		}
 #endif
 
 #if 1
-		if(isControlPressed)
-		{
-			float distance=raySphereIntersect(camera.position, camera.forward, asteroids[i].position, asteroids[i].radius);
-
-			if(distance>0.0f)
+			if(isControlPressed)
 			{
-				RigidBody_t particleBody;
+				float distance=raySphereIntersect(camera.position, camera.forward, asteroids[i].position, asteroids[i].radius);
 
-				particleBody.position=Vec3_Addv(camera.position, Vec3_Muls(camera.forward, distance));
-				particleBody.velocity=Vec3_Muls(camera.forward, 300.0f);
-				particleBody.force=Vec3b(0.0f);
-
-				particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-				particleBody.angularVelocity=Vec3b(0.0f);
-
-				particleBody.radius=2.0f;
-
-				particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*10000.0f;
-				particleBody.invMass=1.0f/particleBody.mass;
-
-				particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
-				particleBody.invInertia=1.0f/particleBody.inertia;
-
-				if(PhysicsSphereToSphereCollisionResponse(&particleBody, &asteroids[i])>1.0f)
+				if(distance>0.0f)
 				{
-					Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particleBody.position);
+					RigidBody_t particleBody;
 
-					// FIXME: Is this causing derelict emitters that never go away?
-					//			I don't think it is, but need to check.
-					ParticleSystem_AddEmitter
-					(
-						&particleSystem,
-						particleBody.position,		// Position
-						Vec3(100.0f, 12.0f, 5.0f),	// Start color
-						Vec3(0.0f, 0.0f, 0.0f),		// End color
-						5.0f,						// Radius of particles
-						1000,						// Number of particles in system
-						PARTICLE_EMITTER_ONCE,		// Type?
-						ExplodeEmitterCallback		// Callback for particle generation
-					);
+					particleBody.position=Vec3_Addv(camera.position, Vec3_Muls(camera.forward, distance));
+					particleBody.velocity=Vec3_Muls(camera.forward, 300.0f);
+					particleBody.force=Vec3b(0.0f);
 
-					// Silly radius reduction on hit
-					//body->radius=fmaxf(body->radius-10.0f, 0.0f);
+					particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+					particleBody.angularVelocity=Vec3b(0.0f);
+
+					particleBody.radius=2.0f;
+
+					particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*10000.0f;
+					particleBody.invMass=1.0f/particleBody.mass;
+
+					particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
+					particleBody.invInertia=1.0f/particleBody.inertia;
+
+					if(PhysicsSphereToSphereCollisionResponse(&particleBody, &asteroids[i])>1.0f)
+					{
+						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particleBody.position);
+
+						// FIXME: Is this causing derelict emitters that never go away?
+						//			I don't think it is, but need to check.
+						ParticleSystem_AddEmitter
+						(
+							&particleSystem,
+							particleBody.position,		// Position
+							Vec3(100.0f, 12.0f, 5.0f),	// Start color
+							Vec3(0.0f, 0.0f, 0.0f),		// End color
+							5.0f,						// Radius of particles
+							1000,						// Number of particles in system
+							PARTICLE_EMITTER_ONCE,		// Type?
+							ExplodeEmitterCallback		// Callback for particle generation
+						);
+
+						// Silly radius reduction on hit
+						//body->radius=fmaxf(body->radius-10.0f, 0.0f);
+					}
 				}
 			}
-		}
 #endif
-	}
+		}
 
 #if 0
-	for(uint32_t i=0;i<connectedClients;i++)
-	{
-		// Don't check for collision with our own net camera
-		if(i!=clientID)
-			PhysicsCameraToCameraCollisionResponse(&camera, &netCameras[i]);
-	}
-	//////
+		for(uint32_t i=0;i<connectedClients;i++)
+		{
+			// Don't check for collision with our own net camera
+			if(i!=clientID)
+				PhysicsCameraToCameraCollisionResponse(&camera, &netCameras[i]);
+		}
+		//////
 #endif
+
+		// Update instance matrix data
+		for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
+		{
+			float radiusScale=0.666667f;
+
+			matrix local=MatrixScale(asteroids[i].radius*radiusScale, asteroids[i].radius*radiusScale, asteroids[i].radius*radiusScale);
+			local=MatrixMult(local, QuatMatrix(asteroids[i].orientation));
+			asteroidInstancePtr[i]=MatrixMult(local, MatrixTranslatev(asteroids[i].position));
+		}
+		//////
+
+		//ClientNetwork_SendStatus();
+	}
 
 	// Update camera and modelview matrix
 	modelView=CameraUpdate(&camera, fTimeStep);
 	CameraUpdate(&enemy, fTimeStep);
 	//////
 
-	// Update instance matrix data
-	//matrix *data=NULL;
-	//vkMapMemory(Context.device, asteroidInstance.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&data);
-
-	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
-	{
-		float radiusScale=0.666667f;
-
-		matrix local=MatrixScale(asteroids[i].radius*radiusScale, asteroids[i].radius*radiusScale, asteroids[i].radius*radiusScale);
-		local=MatrixMult(local, QuatMatrix(asteroids[i].orientation));
-		perFrame[index].asteroidInstancePtr[i]=MatrixMult(local, MatrixTranslatev(asteroids[i].position));
-	}
-
-	//vkUnmapMemory(Context.device, asteroidInstance.deviceMemory);
-	//////
-
-	//ClientNetwork_SendStatus();
-
 	//CvWriteFlag(flagSeries, "physics end");
 
 	// Barrier now that we're done here
-	mtx_lock(&physicsThreadMutex);
-	atomic_fetch_sub(&physicsThreadBarrier, 1);
-	cnd_signal(&physicsThreadCondition);
-	mtx_unlock(&physicsThreadMutex);
+	ThreadBarrier_Wait(&physicsThreadBarrier);
 }
 
 extern vec2 mousePosition;
@@ -1107,17 +1086,15 @@ bool rightTriggerOnce=true;
 
 static vec3 lastLeftPosition={ 0.0f, 0.0f, 0.0f };
 
-static float fireTime=0.0f;
-
 // Render call from system main event loop
 void Render(void)
 {
-	static uint32_t index=0;
-	uint32_t imageIndex;
+	static uint32_t index=0, lastImageIndex=0, imageIndex=2;
 
 	//CvWriteFlag(flagSeries, "frame start");
 
-	Thread_AddJob(&threadPhysics, Thread_Physics, (void *)&index);
+	Thread_AddJob(&threadPhysics, Thread_Physics, NULL);
+	//Thread_Physics(NULL);
 
 	vkWaitForFences(vkContext.device, 1, &perFrame[index].frameFence, VK_TRUE, UINT64_MAX);
 
@@ -1190,7 +1167,11 @@ void Render(void)
 	else
 	// Handle non-VR frame start
 	{
+		lastImageIndex=imageIndex;
 		VkResult Result=vkAcquireNextImageKHR(vkContext.device, swapchain.swapchain, UINT64_MAX, perFrame[index].presentCompleteSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+		if(imageIndex!=((lastImageIndex+1)%swapchain.numImages))
+			DBGPRINTF(DEBUG_ERROR, "FRAME OUT OF ORDER: last Index=%d Index=%d\n", lastImageIndex, imageIndex);
 
 		if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
 		{
@@ -1210,6 +1191,7 @@ void Render(void)
 
 #if 0
 	// Test for if the player is in a 10 degree view cone, if so fire at them once every 2 seconds.
+	static float fireTime=0.0f;
 	fireTime+=fTimeStep;
 
 	if(isTargeted&&fireTime>2.0f)
@@ -1265,13 +1247,8 @@ void Render(void)
 
 	vkEndCommandBuffer(perFrame[index].commandBuffer);
 
-	// Wait for physics to finish before sumbitting frame
-	mtx_lock(&physicsThreadMutex);
-	while(atomic_load(&physicsThreadBarrier))
-		cnd_wait(&physicsThreadCondition, &physicsThreadMutex);
-	atomic_store(&physicsThreadBarrier, 1);
-	mtx_unlock(&physicsThreadMutex);
-
+	// Wait for physics to finish before submitting frame
+	ThreadBarrier_Wait(&physicsThreadBarrier);
 
 	// Submit command queue
 	VkSubmitInfo SubmitInfo=
@@ -1793,17 +1770,13 @@ bool Init(void)
 	}
 
 	// Synchronization barrier, count is number of threads+main thread
-	cnd_init(&threadCondition);
-	mtx_init(&threadMutex, mtx_plain);
-	atomic_store(&threadBarrier, NUM_THREADS);
+	ThreadBarrier_Init(&threadBarrier, NUM_THREADS);
 
 	// Thread for physics, and sync barrier
 	Thread_Init(&threadPhysics);
 	Thread_Start(&threadPhysics);
 
-	cnd_init(&physicsThreadCondition);
-	mtx_init(&physicsThreadMutex, mtx_plain);
-	atomic_store(&physicsThreadBarrier, 1);
+	ThreadBarrier_Init(&physicsThreadBarrier, 2);
 
 	//ClientNetwork_Init();
 
@@ -1852,12 +1825,12 @@ bool CreateFramebuffers(uint32_t eye)
 	vkCreateFramebuffer(vkContext.device, &(VkFramebufferCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-			.renderPass=renderPass,
-			.attachmentCount=3,
-			.pAttachments=(VkImageView[]){ colorImage[eye].imageView, depthImage[eye].imageView, colorResolve[eye].imageView },
-			.width=renderWidth,
-			.height=renderHeight,
-			.layers=1,
+		.renderPass=renderPass,
+		.attachmentCount=3,
+		.pAttachments=(VkImageView[]){ colorImage[eye].imageView, depthImage[eye].imageView, colorResolve[eye].imageView },
+		.width=renderWidth,
+		.height=renderHeight,
+		.layers=1,
 	}, 0, &framebuffer[eye]);
 
 	return true;
@@ -1866,7 +1839,7 @@ bool CreateFramebuffers(uint32_t eye)
 // Rebuild Vulkan swapchain and related data
 void RecreateSwapchain(void)
 {
-	cnd_broadcast(&physicsThreadCondition);
+	cnd_broadcast(&physicsThreadBarrier.cond);
 
 	// Wait for the device to complete any pending work
 	vkDeviceWaitIdle(vkContext.device);
@@ -1996,11 +1969,8 @@ void Destroy(void)
 	//////////
 
 	// Asteroid instance buffer destruction
-	for(uint32_t i=0;i<swapchain.numImages;i++)
-	{
-		vkUnmapMemory(vkContext.device, perFrame[i].asteroidInstance.deviceMemory);
-		vkuDestroyBuffer(&vkContext, &perFrame[i].asteroidInstance);
-	}
+	vkUnmapMemory(vkContext.device, asteroidInstance.deviceMemory);
+	vkuDestroyBuffer(&vkContext, &asteroidInstance);
 	//////////
 
 	// Textures destruction

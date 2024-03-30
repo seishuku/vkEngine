@@ -38,6 +38,8 @@ extern uint32_t cursorID;
 extern Console_t console;
 
 extern bool isControlPressed;
+extern bool pausePhysics;
+
 //////////////////////////////
 
 // Emitter callback for the launched emitter's particles
@@ -159,6 +161,7 @@ bool Event_Trigger(EventID ID, void *arg)
 					FireParticleEmitter(Vec3_Addv(camera.position, Vec3_Muls(camera.forward, camera.radius)), camera.forward);
 					break;
 				case KB_P:		GenerateSkyParams();	break;
+				case KB_O:		pausePhysics=!pausePhysics; break;
 				case KB_W:		camera.key_w=true;		break;
 				case KB_S:		camera.key_s=true;		break;
 				case KB_A:		camera.key_a=true;		break;
@@ -246,7 +249,7 @@ bool Event_Trigger(EventID ID, void *arg)
 			break;
 		}
 
-		if(ID==EVENT_MOUSEMOVE)
+		case EVENT_MOUSEMOVE:
 		{
 #ifndef ANDROID
 			// Calculate relative movement

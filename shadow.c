@@ -12,12 +12,11 @@
 #include "perframe.h"
 
 #define NUM_ASTEROIDS 1000
+extern VkuBuffer_t asteroidInstance;
 
 extern VkuContext_t vkContext;
-
-extern float fTime;
-
 extern Camera_t camera;
+extern VkuSwapchain_t swapchain;
 
 matrix shadowMVP;
 
@@ -190,7 +189,7 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 
 	// Multiply matrices together, so we can just send one matrix as a push constant.
 
-	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[frameIndex].asteroidInstance.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &asteroidInstance.buffer, &(VkDeviceSize) { 0 });
 
 	shadowMVP=MatrixMult(modelview, projection);
 	vkCmdPushConstants(commandBuffer, shadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(matrix), &shadowMVP);
@@ -214,10 +213,9 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 void DestroyShadow(void)
 {
 	vkuDestroyImageBuffer(&vkContext, &shadowDepth);
+	vkDestroyFramebuffer(vkContext.device, shadowFrameBuffer, VK_NULL_HANDLE);
 
 	vkDestroyPipeline(vkContext.device, shadowPipeline.pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(vkContext.device, shadowPipelineLayout, VK_NULL_HANDLE);
 	vkDestroyRenderPass(vkContext.device, shadowRenderPass, VK_NULL_HANDLE);
-
-	vkDestroyFramebuffer(vkContext.device, shadowFrameBuffer, VK_NULL_HANDLE);
 }

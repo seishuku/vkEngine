@@ -143,7 +143,7 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 		.pNext=VK_NULL_HANDLE,
 		.flags=0,
 		.surface=context->surface,
-		.minImageCount=surfaceCaps.minImageCount,
+		.minImageCount=max(3, surfaceCaps.minImageCount),
 		.imageFormat=swapchain->surfaceFormat.format,
 		.imageColorSpace=swapchain->surfaceFormat.colorSpace,
 		.imageExtent=swapchain->extent,

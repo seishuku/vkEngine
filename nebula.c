@@ -189,9 +189,9 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *image)
 	// Delete staging buffers
 	vkuDestroyBuffer(Context, &stagingBuffer);
 #endif
-	image->width=1024;
-	image->height=1024;
-	image->depth=1024; // Slight abuse of image struct, depth is supposed to be color depth, not image depth.
+	image->width=256;
+	image->height=256;
+	image->depth=256; // Slight abuse of image struct, depth is supposed to be color depth, not image depth.
 
 	if(!vkuCreateImageBuffer(Context, image,
 							 VK_IMAGE_TYPE_3D, VK_FORMAT_R8_UNORM, 1, 1, image->width, image->height, image->depth,

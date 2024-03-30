@@ -4,6 +4,7 @@
 #include <threads.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 
 #define THREAD_MAXJOBS 128
 
@@ -37,6 +38,14 @@ typedef struct
 	void *destructorArg;
 } ThreadWorker_t;
 
+typedef struct
+{
+    mtx_t mutex;
+    cnd_t cond;
+    uint32_t count, threshold;
+	uint32_t generation;
+} ThreadBarrier_t;
+
 uint32_t Thread_GetJobCount(ThreadWorker_t *worker);
 bool Thread_AddJob(ThreadWorker_t *worker, ThreadFunction_t jobFunc, void *arg);
 void Thread_AddConstructor(ThreadWorker_t *worker, ThreadFunction_t constructorFunc, void *arg);
@@ -46,5 +55,9 @@ bool Thread_Start(ThreadWorker_t *worker);
 void Thread_Pause(ThreadWorker_t *worker);
 void Thread_Resume(ThreadWorker_t *worker);
 bool Thread_Destroy(ThreadWorker_t *worker);
+
+bool ThreadBarrier_Init(ThreadBarrier_t *barrier, uint32_t count);
+void ThreadBarrier_Reset(ThreadBarrier_t *barrier);
+bool ThreadBarrier_Wait(ThreadBarrier_t *barrier);
 
 #endif
