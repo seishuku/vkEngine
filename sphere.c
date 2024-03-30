@@ -60,6 +60,12 @@ bool CreateSpherePipeline(void)
 	return true;
 }
 
+void DestroySphere(void)
+{
+	vkDestroyPipeline(vkContext.device, spherePipeline.pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.device, spherePipelineLayout, VK_NULL_HANDLE);
+}
+
 void DrawSphere(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, vec3 position, float radius, vec4 color)
 {
 	struct

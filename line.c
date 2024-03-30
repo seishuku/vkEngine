@@ -60,6 +60,12 @@ bool CreateLinePipeline(void)
 	return true;
 }
 
+void DestroyLine(void)
+{
+	vkDestroyPipeline(vkContext.device, linePipeline.pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.device, linePipelineLayout, VK_NULL_HANDLE);
+}
+
 void DrawLine(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, vec3 start, vec3 end, vec4 color)
 {
 	struct

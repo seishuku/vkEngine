@@ -1572,6 +1572,14 @@ bool Init(void)
 
 		if(vkWaitForFences(vkContext.device, 1, &fence, VK_TRUE, UINT64_MAX)!=VK_SUCCESS)
 			return VK_FALSE;
+
+		vkDestroyFence(vkContext.device, fence, VK_NULL_HANDLE);
+
+		vkDestroyCommandPool(vkContext.device, computeCommandPool, VK_NULL_HANDLE);
+		vkDestroyDescriptorPool(vkContext.device, computeDescriptorPool, VK_NULL_HANDLE);
+		vkDestroyPipelineLayout(vkContext.device, compute.pipelineLayout, VK_NULL_HANDLE);
+		vkDestroyPipeline(vkContext.device, compute.pipeline, VK_NULL_HANDLE);
+		vkDestroyDescriptorSetLayout(vkContext.device, computeDescriptor.descriptorSetLayout, VK_NULL_HANDLE);
 	}
 
 	// Create primary pipeline
@@ -1958,6 +1966,11 @@ void Destroy(void)
 
 	// Lighting pipeline destruction
 	DestroyLighting();
+	//////////
+
+	// Debug object pipeline destruction
+	DestroyLine();
+	DestroySphere();
 	//////////
 
 	// UI destruction
