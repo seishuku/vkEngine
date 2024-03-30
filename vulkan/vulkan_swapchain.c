@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "../system/system.h"
+#include "../math/math.h"
 #include "vulkan.h"
 
 VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, VkBool32 vSync)

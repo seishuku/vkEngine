@@ -116,27 +116,64 @@ static float nebula(vec3 p)
 }
 #endif
 
-VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *image)
+VkBool32 GenNebulaVolume(VkuImage_t *image)
 {
+	image->width=128;
+	image->height=128;
+	image->depth=128; // Slight abuse of image struct, depth is supposed to be color depth, not image depth.
+
+	if(!vkuCreateImageBuffer(&vkContext, image,
+							 VK_IMAGE_TYPE_3D, VK_FORMAT_R8_UNORM, 1, 1, image->width, image->height, image->depth,
+							 VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
+							 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_STORAGE_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
+		return VK_FALSE;
+
+	// Create texture sampler object
+	vkCreateSampler(vkContext.device, &(VkSamplerCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+			.magFilter=VK_FILTER_LINEAR,
+			.minFilter=VK_FILTER_LINEAR,
+			.mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST,
+			.addressModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			.mipLodBias=0.0f,
+			.compareOp=VK_COMPARE_OP_NEVER,
+			.minLod=0.0f,
+			.maxLod=VK_LOD_CLAMP_NONE,
+			.maxAnisotropy=1.0f,
+			.anisotropyEnable=VK_FALSE,
+			.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+	}, VK_NULL_HANDLE, &image->sampler);
+
+	// Create texture image view object
+	vkCreateImageView(vkContext.device, &(VkImageViewCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.image=image->image,
+			.viewType=VK_IMAGE_VIEW_TYPE_3D,
+			.format=VK_FORMAT_R8_UNORM,
+			.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
+			.subresourceRange={ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
+	}, VK_NULL_HANDLE, &image->imageView);
+
 #if 0
 	VkCommandBuffer commandBuffer;
 	VkuBuffer_t stagingBuffer;
 	void *data=NULL;
 
-	image->width=512;
-	image->height=512;
-	image->depth=512; // Slight abuse of image struct, depth is supposed to be color depth, not image depth.
-
 	// Byte size of image data
 	uint32_t size=image->width*image->height*image->depth;
 
 	// Create staging buffer
-	vkuCreateHostBuffer(Context, &stagingBuffer, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+	vkuCreateHostBuffer(&vkContext, &stagingBuffer, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 	// Map image memory and copy data
-	vkMapMemory(Context->device, stagingBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
+	vkMapMemory(vkContext.device, stagingBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
 
-	const float Scale=2.0f;
+	const float Scale=16.0f;
 
 	for(uint32_t i=0;i<size;i++)
 	{
@@ -156,17 +193,10 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *image)
 		((uint8_t *)data)[i]=(uint8_t)(p*255.0f);
 	}
 
-	vkUnmapMemory(Context->device, stagingBuffer.deviceMemory);
-
-	if(!vkuCreateImageBuffer(Context, image,
-		VK_IMAGE_TYPE_3D, VK_FORMAT_R8_UNORM, 1, 1, image->width, image->height, image->depth,
-		VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
-		return VK_FALSE;
+	vkUnmapMemory(vkContext.device, stagingBuffer.deviceMemory);
 
 	// Start a one shot command buffer
-	commandBuffer=vkuOneShotCommandBufferBegin(Context);
+	commandBuffer=vkuOneShotCommandBufferBegin(&vkContext);
 
 	// Change image layout from undefined to destination optimal, so we can copy from the staging buffer to the texture.
 	vkuTransitionLayout(commandBuffer, image->image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -184,51 +214,116 @@ VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *image)
 	vkuTransitionLayout(commandBuffer, image->image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	// End one shot command buffer and submit
-	vkuOneShotCommandBufferEnd(Context, commandBuffer);
+	vkuOneShotCommandBufferEnd(&vkContext, commandBuffer);
 
 	// Delete staging buffers
-	vkuDestroyBuffer(Context, &stagingBuffer);
-#endif
-	image->width=256;
-	image->height=256;
-	image->depth=256; // Slight abuse of image struct, depth is supposed to be color depth, not image depth.
+	vkuDestroyBuffer(&vkContext, &stagingBuffer);
+#else
+	VkCommandPool computeCommandPool;
+	VkCommandBuffer computeCommand;
+	VkDescriptorPool computeDescriptorPool;
+	VkuDescriptorSet_t computeDescriptor;
+	VkuPipeline_t compute;
+	VkPipelineLayout computeLayout;
 
-	if(!vkuCreateImageBuffer(Context, image,
-							 VK_IMAGE_TYPE_3D, VK_FORMAT_R8_UNORM, 1, 1, image->width, image->height, image->depth,
-							 VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
-							 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_STORAGE_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
+	vkuInitDescriptorSet(&computeDescriptor, vkContext.device);
+	vkuDescriptorSet_AddBinding(&computeDescriptor, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
+	vkuAssembleDescriptorSetLayout(&computeDescriptor);
+
+	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+		.setLayoutCount=1,
+		.pSetLayouts=&computeDescriptor.descriptorSetLayout,
+	}, 0, &computeLayout);
+
+	vkuInitPipeline(&compute, vkContext.device, VK_NULL_HANDLE);
+	vkuPipeline_SetPipelineLayout(&compute, computeLayout);
+	vkuPipeline_AddStage(&compute, "shaders/test.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
+	vkuAssembleComputePipeline(&compute, VK_NULL_HANDLE);
+
+	vkCreateDescriptorPool(vkContext.device, &(VkDescriptorPoolCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+		.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
+		.poolSizeCount=1,
+		.pPoolSizes=(VkDescriptorPoolSize[]){ {.type=VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount=1, }, },
+	}, VK_NULL_HANDLE, &computeDescriptorPool);
+	VkResult result=VK_ERROR_UNKNOWN;
+
+	if(vkCreateCommandPool(vkContext.device, &(VkCommandPoolCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+		.flags=0,
+		.queueFamilyIndex=vkContext.computeQueueIndex,
+	}, VK_NULL_HANDLE, &computeCommandPool)!=VK_SUCCESS)
 		return VK_FALSE;
 
-	// Create texture sampler object
-	vkCreateSampler(Context->device, &(VkSamplerCreateInfo)
+	if((result=vkAllocateCommandBuffers(vkContext.device, &(VkCommandBufferAllocateInfo)
 	{
-		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-		.magFilter=VK_FILTER_LINEAR,
-		.minFilter=VK_FILTER_LINEAR,
-		.mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST,
-		.addressModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.mipLodBias=0.0f,
-		.compareOp=VK_COMPARE_OP_NEVER,
-		.minLod=0.0f,
-		.maxLod=VK_LOD_CLAMP_NONE,
-		.maxAnisotropy=1.0f,
-		.anisotropyEnable=VK_FALSE,
-		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-	}, VK_NULL_HANDLE, &image->sampler);
+		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool=computeCommandPool,
+		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount=1,
+	}, &computeCommand))!=VK_SUCCESS)
+		return false;
 
-	// Create texture image view object
-	vkCreateImageView(Context->device, &(VkImageViewCreateInfo)
+	vkBeginCommandBuffer(computeCommand, &(VkCommandBufferBeginInfo) {.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, });
+
+	VkImageMemoryBarrier imageMemoryBarrier={ 0 };
+	imageMemoryBarrier.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	imageMemoryBarrier.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED;
+	imageMemoryBarrier.newLayout=VK_IMAGE_LAYOUT_GENERAL;
+	imageMemoryBarrier.image=image->image;
+	imageMemoryBarrier.subresourceRange=(VkImageSubresourceRange){ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	imageMemoryBarrier.srcAccessMask=VK_ACCESS_SHADER_WRITE_BIT;
+	imageMemoryBarrier.dstAccessMask=VK_ACCESS_SHADER_READ_BIT;
+	imageMemoryBarrier.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
+	imageMemoryBarrier.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
+
+	vkCmdBindPipeline(computeCommand, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipeline);
+
+	vkuDescriptorSet_UpdateBindingImageInfo(&computeDescriptor, 0, VK_NULL_HANDLE, image->imageView, VK_IMAGE_LAYOUT_GENERAL);
+	vkuAllocateUpdateDescriptorSet(&computeDescriptor, computeDescriptorPool);
+
+	vkCmdBindDescriptorSets(computeCommand, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipelineLayout, 0, 1, &computeDescriptor.descriptorSet, 0, 0);
+
+	vkCmdDispatch(computeCommand, image->width/8, image->height/8, image->depth/8);
+
+	imageMemoryBarrier.oldLayout=VK_IMAGE_LAYOUT_GENERAL;
+	imageMemoryBarrier.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
+
+	// End command buffer and submit
+	if(vkEndCommandBuffer(computeCommand)!=VK_SUCCESS)
+		return VK_FALSE;
+
+	VkFence fence=VK_NULL_HANDLE;
+
+	if(vkCreateFence(vkContext.device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &fence)!=VK_SUCCESS)
+		return VK_FALSE;
+
+	VkSubmitInfo submitInfo=
 	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.image=image->image,
-		.viewType=VK_IMAGE_VIEW_TYPE_3D,
-		.format=VK_FORMAT_R8_UNORM,
-		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
-		.subresourceRange={ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
-	}, VK_NULL_HANDLE, &image->imageView);
+		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.commandBufferCount=1,
+		.pCommandBuffers=&computeCommand,
+	};
+
+	vkQueueSubmit(vkContext.computeQueue, 1, &submitInfo, fence);
+
+	if(vkWaitForFences(vkContext.device, 1, &fence, VK_TRUE, UINT64_MAX)!=VK_SUCCESS)
+		return VK_FALSE;
+
+	vkDestroyFence(vkContext.device, fence, VK_NULL_HANDLE);
+
+	vkDestroyCommandPool(vkContext.device, computeCommandPool, VK_NULL_HANDLE);
+	vkDestroyDescriptorPool(vkContext.device, computeDescriptorPool, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.device, compute.pipelineLayout, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.device, compute.pipeline, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(vkContext.device, computeDescriptor.descriptorSetLayout, VK_NULL_HANDLE);
+#endif
 
 	return VK_TRUE;
 }

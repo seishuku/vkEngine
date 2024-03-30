@@ -90,7 +90,6 @@ OBJS+=system/threads.o
 OBJS+=system/memzone.o
 
 OBJS+=font/font.o
-OBJS+=utils/input.o
 OBJS+=utils/event.o
 OBJS+=utils/list.o
 OBJS+=perframe.o

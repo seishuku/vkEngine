@@ -8,7 +8,7 @@ extern VkuPipeline_t volumePipeline;
 extern VkRenderPass volumeRenderPass;
 //////
 
-VkBool32 GenNebulaVolume(VkuContext_t *Context, VkuImage_t *image);
+VkBool32 GenNebulaVolume(VkuImage_t *image);
 bool CreateVolumePipeline(void);
 
 #endif
