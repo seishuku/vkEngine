@@ -9,7 +9,7 @@
 VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, VkBool32 vSync)
 {
 	VkResult result=VK_SUCCESS;
-	VkFormat preferredFormats[]=
+	const VkFormat preferredFormats[]=
 	{
 		VK_FORMAT_B8G8R8A8_SRGB,
 		VK_FORMAT_B8G8R8A8_UNORM,
@@ -79,25 +79,36 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 
 	// Select a present mode for the swapchain
 
-	// The VK_PRESENT_MODE_FIFO_KHR mode must always be present as per spec
-	// This mode waits for the vertical blank ("v-sync")
-
-	// If v-sync is not requested, try to find a mailbox mode
-	// It's the lowest latency non-tearing present mode available
+	// The VK_PRESENT_MODE_FIFO_KHR mode must always be present as per spec,
+	//     this mode waits for the vertical blank ("v-sync").
 	VkPresentModeKHR swapchainPresentMode=VK_PRESENT_MODE_FIFO_KHR;
 
+	// If v-sync is not requested, try to find a preferred mode
 	if(!vSync)
 	{
-		for(uint32_t i=0;i<presentModeCount;i++)
+		const VkPresentModeKHR preferredPresentMode[]=
 		{
-			if(presentModes[i]==VK_PRESENT_MODE_MAILBOX_KHR)
+			VK_PRESENT_MODE_MAILBOX_KHR,
+			VK_PRESENT_MODE_IMMEDIATE_KHR,
+			VK_PRESENT_MODE_FIFO_RELAXED_KHR,
+			VK_PRESENT_MODE_FIFO_KHR,
+		};
+		bool foundPresentMode=false;
+
+		for(uint32_t i=0;i<sizeof(preferredPresentMode);i++)
+		{
+			for(uint32_t j=0;j<presentModeCount;j++)
 			{
-				swapchainPresentMode=VK_PRESENT_MODE_MAILBOX_KHR;
-				break;
+				if(presentModes[j]==preferredPresentMode[i])
+				{
+					swapchainPresentMode=presentModes[j];
+					foundPresentMode=true;
+					break;
+				}
 			}
 
-			if((swapchainPresentMode!=VK_PRESENT_MODE_MAILBOX_KHR)&&(presentModes[i]==VK_PRESENT_MODE_IMMEDIATE_KHR))
-				swapchainPresentMode=VK_PRESENT_MODE_IMMEDIATE_KHR;
+			if(foundPresentMode)
+				break;
 		}
 	}
 
