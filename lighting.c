@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include "vulkan/vulkan.h"
 #include "math/math.h"
+#include "utils/pipeline.h"
 
 #include "perframe.h"
 #include "models.h"
@@ -19,9 +20,7 @@ extern VkFormat depthFormat;
 extern VkRenderPass renderPass;
 
 
-VkuDescriptorSet_t mainDescriptorSet;
-VkPipelineLayout mainPipelineLayout;
-VkuPipeline_t mainPipeline;
+Pipeline_t mainPipeline;
 
 bool CreateLightingPipeline(void)
 {
@@ -147,6 +146,7 @@ bool CreateLightingPipeline(void)
 		vkMapMemory(vkContext.device, perFrame[i].mainUBOBuffer[1].deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].mainUBO[1]);
 	}
 
+#if 0
 	vkuInitDescriptorSet(&mainDescriptorSet, vkContext.device);
 
 	vkuDescriptorSet_AddBinding(&mainDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -203,6 +203,10 @@ bool CreateLightingPipeline(void)
 
 	if(!vkuAssemblePipeline(&mainPipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
 		return false;
+#endif
+
+	if(!CreatePipeline(&vkContext, &mainPipeline, renderPass, "lighting.pipeline"))
+		return false;
 
 	return true;
 }
@@ -218,27 +222,27 @@ void DestroyLighting(void)
 		vkuDestroyBuffer(&vkContext, &perFrame[i].mainUBOBuffer[1]);
 	}
 
-	vkDestroyDescriptorSetLayout(vkContext.device, mainDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
-	vkDestroyPipeline(vkContext.device, mainPipeline.pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.device, mainPipelineLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(vkContext.device, mainPipeline.descriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.device, mainPipeline.pipeline.pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.device, mainPipeline.pipelineLayout, VK_NULL_HANDLE);
 }
 
 void DrawLighting(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool)
 {
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipeline);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipeline.pipeline);
 
 	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &asteroidInstance.buffer, &(VkDeviceSize) { 0 });
 
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
-		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 0, textures[2*i+0].sampler, textures[2*i+0].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 1, textures[2*i+1].sampler, textures[2*i+1].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		vkuDescriptorSet_UpdateBindingImageInfo(&mainDescriptorSet, 2, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		vkuDescriptorSet_UpdateBindingBufferInfo(&mainDescriptorSet, 3, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
-		vkuDescriptorSet_UpdateBindingBufferInfo(&mainDescriptorSet, 4, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
-		vkuAllocateUpdateDescriptorSet(&mainDescriptorSet, descriptorPool);
+		vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 0, textures[2*i+0].sampler, textures[2*i+0].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 1, textures[2*i+1].sampler, textures[2*i+1].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 2, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 3, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 4, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+		vkuAllocateUpdateDescriptorSet(&mainPipeline.descriptorSet, descriptorPool);
 
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipelineLayout, 0, 1, &mainDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipelineLayout, 0, 1, &mainPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &models[i].vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 

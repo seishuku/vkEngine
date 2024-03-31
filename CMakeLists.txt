@@ -100,6 +100,8 @@ set(PROJECT_SOURCES
 	ui/ui.c
 	utils/event.c
 	utils/list.c
+	utils/tokenizer.c
+	utils/pipeline.c
 	vr/vr.c
 	vulkan/vulkan_buffer.c
 	vulkan/vulkan_context.c

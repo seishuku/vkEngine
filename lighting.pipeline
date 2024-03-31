@@ -1,0 +1,31 @@
+descriptorSet {
+	addBinding(0, combinedSampler, fragment)
+	addBinding(1, combinedSampler, fragment)
+	addBinding(2, combinedSampler, fragment)
+	addBinding(3, uniformBuffer, vertex|fragment)
+	addBinding(4, uniformBuffer, vertex|fragment)
+}
+
+pipeline {
+	addStage("shaders/lighting.vert.spv", vertex)
+	addStage("shaders/lighting.frag.spv", fragment)
+
+	subpass(0)
+	depthTest(true)
+	cullMode(back)
+	depthCompareOp(greaterOrEqual)
+	rasterizationSamples(4)
+
+	addVertexBinding(0, 80, perVertex)
+	addVertexAttribute(0, 0, RGBA32_SFLOAT, 0)
+	addVertexAttribute(1, 0, RGBA32_SFLOAT, 16)
+	addVertexAttribute(2, 0, RGBA32_SFLOAT, 32)
+	addVertexAttribute(3, 0, RGBA32_SFLOAT, 48)
+	addVertexAttribute(4, 0, RGBA32_SFLOAT, 64)
+
+	addVertexBinding(1, 64, perInstance)
+	addVertexAttribute(5, 1, RGBA32_SFLOAT, 0)
+	addVertexAttribute(6, 1, RGBA32_SFLOAT, 16)
+	addVertexAttribute(7, 1, RGBA32_SFLOAT, 32)
+	addVertexAttribute(8, 1, RGBA32_SFLOAT, 48)
+}
