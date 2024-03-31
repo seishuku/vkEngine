@@ -375,7 +375,228 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							return false;
 						}
 					}
-					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "addVertexAttribute")==0) { }
+					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "addVertexAttribute")==0)
+					{
+						uint32_t param=0;
+						uint32_t location=0;
+						uint32_t binding=0;
+						VkFormat format=VK_FORMAT_UNDEFINED;
+						uint32_t offset=0;
+
+						token=Token_GetNext(&string);
+
+						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
+						{
+							token=Token_GetNext(&string);
+
+							if(token.type==TOKEN_INT&&param==0)
+								location=(uint32_t)token.ival;
+							else if(token.type==TOKEN_INT&&param==1)
+								binding=(uint32_t)token.ival;
+							else if(token.type==TOKEN_STRING)
+							{
+								if(strcmp(token.string, "r8_unorm")==0&&param==2)
+									format=VK_FORMAT_R8_UNORM;
+								else if(strcmp(token.string, "r8_snorm")==0&&param==2)
+									format=VK_FORMAT_R8_SNORM;
+								else if(strcmp(token.string, "r8_uint")==0&&param==2)
+									format=VK_FORMAT_R8_UINT;
+								else if(strcmp(token.string, "r8_sint")==0&&param==2)
+									format=VK_FORMAT_R8_SINT;
+								else if(strcmp(token.string, "rg8_unorm")==0&&param==2)
+									format=VK_FORMAT_R8G8_UNORM;
+								else if(strcmp(token.string, "rg8_snorm")==0&&param==2)
+									format=VK_FORMAT_R8G8_SNORM;
+								else if(strcmp(token.string, "rg8_uint")==0&&param==2)
+									format=VK_FORMAT_R8G8_UINT;
+								else if(strcmp(token.string, "rg8_sint")==0&&param==2)
+									format=VK_FORMAT_R8G8_SINT;
+								else if(strcmp(token.string, "rgb8_unorm")==0&&param==2)
+									format=VK_FORMAT_R8G8B8_UNORM;
+								else if(strcmp(token.string, "rgb8_snorm")==0&&param==2)
+									format=VK_FORMAT_R8G8B8_SNORM;
+								else if(strcmp(token.string, "rgb8_uint")==0&&param==2)
+									format=VK_FORMAT_R8G8B8_UINT;
+								else if(strcmp(token.string, "rgb8_sint")==0&&param==2)
+									format=VK_FORMAT_R8G8B8_SINT;
+								else if(strcmp(token.string, "bgr8_unorm")==0&&param==2)
+									format=VK_FORMAT_B8G8R8_UNORM;
+								else if(strcmp(token.string, "bgr8_snorm")==0&&param==2)
+									format=VK_FORMAT_B8G8R8_SNORM;
+								else if(strcmp(token.string, "bgr8_uint")==0&&param==2)
+									format=VK_FORMAT_B8G8R8_UINT;
+								else if(strcmp(token.string, "bgr8_sint")==0&&param==2)
+									format=VK_FORMAT_B8G8R8_SINT;
+								else if(strcmp(token.string, "rgba8_unorm")==0&&param==2)
+									format=VK_FORMAT_R8G8B8A8_UNORM;
+								else if(strcmp(token.string, "rgba8_snorm")==0&&param==2)
+									format=VK_FORMAT_R8G8B8A8_SNORM;
+								else if(strcmp(token.string, "rgba8_uint")==0&&param==2)
+									format=VK_FORMAT_R8G8B8A8_UINT;
+								else if(strcmp(token.string, "rgba8_sint")==0&&param==2)
+									format=VK_FORMAT_R8G8B8A8_SINT;
+								else if(strcmp(token.string, "bgra8_unorm")==0&&param==2)
+									format=VK_FORMAT_B8G8R8A8_UNORM;
+								else if(strcmp(token.string, "bgra8_snorm")==0&&param==2)
+									format=VK_FORMAT_B8G8R8A8_SNORM;
+								else if(strcmp(token.string, "bgra8_uint")==0&&param==2)
+									format=VK_FORMAT_B8G8R8A8_UINT;
+								else if(strcmp(token.string, "bgra8_sint")==0&&param==2)
+									format=VK_FORMAT_B8G8R8A8_SINT;
+								else if(strcmp(token.string, "abgr8_unorm")==0&&param==2)
+									format=VK_FORMAT_A8B8G8R8_UNORM_PACK32;
+								else if(strcmp(token.string, "abgr8_uint")==0&&param==2)
+									format=VK_FORMAT_A8B8G8R8_SNORM_PACK32;
+								else if(strcmp(token.string, "abgr8_uint")==0&&param==2)
+									format=VK_FORMAT_A8B8G8R8_UINT_PACK32;
+								else if(strcmp(token.string, "abgr8_sint")==0&&param==2)
+									format=VK_FORMAT_A8B8G8R8_SINT_PACK32;
+								else if(strcmp(token.string, "a2r10g10b10_unorm")==0&&param==2)
+									format=VK_FORMAT_A2R10G10B10_UNORM_PACK32;
+								else if(strcmp(token.string, "a2r10g10b10_snorm")==0&&param==2)
+									format=VK_FORMAT_A2R10G10B10_SNORM_PACK32;
+								else if(strcmp(token.string, "a2r10g10b10_uint")==0&&param==2)
+									format=VK_FORMAT_A2R10G10B10_UINT_PACK32;
+								else if(strcmp(token.string, "a2r10g10b10_sint")==0&&param==2)
+									format=VK_FORMAT_A2R10G10B10_SINT_PACK32;
+								else if(strcmp(token.string, "a2b10g10r10_unorm")==0&&param==2)
+									format=VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+								else if(strcmp(token.string, "a2b10g10r10_snorm")==0&&param==2)
+									format=VK_FORMAT_A2B10G10R10_SNORM_PACK32;
+								else if(strcmp(token.string, "a2b10g10r10_uint")==0&&param==2)
+									format=VK_FORMAT_A2B10G10R10_UINT_PACK32;
+								else if(strcmp(token.string, "a2b10g10r10_sint")==0&&param==2)
+									format=VK_FORMAT_A2B10G10R10_SINT_PACK32;
+								else if(strcmp(token.string, "r16_unorm")==0&&param==2)
+									format=VK_FORMAT_R16_UNORM;
+								else if(strcmp(token.string, "r16_snorm")==0&&param==2)
+									format=VK_FORMAT_R16_SNORM;
+								else if(strcmp(token.string, "r16_uint")==0&&param==2)
+									format=VK_FORMAT_R16_UINT;
+								else if(strcmp(token.string, "r16_sint")==0&&param==2)
+									format=VK_FORMAT_R16_SINT;
+								else if(strcmp(token.string, "r16_sfloat")==0&&param==2)
+									format=VK_FORMAT_R16_SFLOAT;
+								else if(strcmp(token.string, "rg16_unorm")==0&&param==2)
+									format=VK_FORMAT_R16G16_UNORM;
+								else if(strcmp(token.string, "rg16_snorm")==0&&param==2)
+									format=VK_FORMAT_R16G16_SNORM;
+								else if(strcmp(token.string, "rg16_uint")==0&&param==2)
+									format=VK_FORMAT_R16G16_UINT;
+								else if(strcmp(token.string, "rg16_sint")==0&&param==2)
+									format=VK_FORMAT_R16G16_SINT;
+								else if(strcmp(token.string, "rg16_sfloat")==0&&param==2)
+									format=VK_FORMAT_R16G16_SFLOAT;
+								else if(strcmp(token.string, "rgb16_unorm")==0&&param==2)
+									format=VK_FORMAT_R16G16B16_UNORM;
+								else if(strcmp(token.string, "rgb16_snorm")==0&&param==2)
+									format=VK_FORMAT_R16G16B16_SNORM;
+								else if(strcmp(token.string, "rgb16_uint")==0&&param==2)
+									format=VK_FORMAT_R16G16B16_UINT;
+								else if(strcmp(token.string, "rgb16_sint")==0&&param==2)
+									format=VK_FORMAT_R16G16B16_SINT;
+								else if(strcmp(token.string, "rgb16_sfloat")==0&&param==2)
+									format=VK_FORMAT_R16G16B16_SFLOAT;
+								else if(strcmp(token.string, "rgba16_unorm")==0&&param==2)
+									format=VK_FORMAT_R16G16B16A16_UNORM;
+								else if(strcmp(token.string, "rgba16_snorm")==0&&param==2)
+									format=VK_FORMAT_R16G16B16A16_SNORM;
+								else if(strcmp(token.string, "rgba16_uint")==0&&param==2)
+									format=VK_FORMAT_R16G16B16A16_UINT;
+								else if(strcmp(token.string, "rgba16_sint")==0&&param==2)
+									format=VK_FORMAT_R16G16B16A16_SINT;
+								else if(strcmp(token.string, "rgba16_sfloat")==0&&param==2)
+									format=VK_FORMAT_R16G16B16A16_SFLOAT;
+								else if(strcmp(token.string, "r32_uint")==0&&param==2)
+									format=VK_FORMAT_R32_UINT;
+								else if(strcmp(token.string, "r32_sint")==0&&param==2)
+									format=VK_FORMAT_R32_SINT;
+								else if(strcmp(token.string, "r32_sfloat")==0&&param==2)
+									format=VK_FORMAT_R32_SFLOAT;
+								else if(strcmp(token.string, "rg32_uint")==0&&param==2)
+									format=VK_FORMAT_R32G32_UINT;
+								else if(strcmp(token.string, "rg32_sint")==0&&param==2)
+									format=VK_FORMAT_R32G32_SINT;
+								else if(strcmp(token.string, "rg32_sfloat")==0&&param==2)
+									format=VK_FORMAT_R32G32_SFLOAT;
+								else if(strcmp(token.string, "rgb32_uint")==0&&param==2)
+									format=VK_FORMAT_R32G32B32_UINT;
+								else if(strcmp(token.string, "rgb32_sint")==0&&param==2)
+									format=VK_FORMAT_R32G32B32_SINT;
+								else if(strcmp(token.string, "rgb32_sfloat")==0&&param==2)
+									format=VK_FORMAT_R32G32B32_SFLOAT;
+								else if(strcmp(token.string, "rgba32_uint")==0&&param==2)
+									format=VK_FORMAT_R32G32B32A32_UINT;
+								else if(strcmp(token.string, "rgba32_sint")==0&&param==2)
+									format=VK_FORMAT_R32G32B32A32_SINT;
+								else if(strcmp(token.string, "rgba32_sfloat")==0&&param==2)
+									format=VK_FORMAT_R32G32B32A32_SFLOAT;
+								else if(strcmp(token.string, "r64_uint")==0&&param==2)
+									format=VK_FORMAT_R64_UINT;
+								else if(strcmp(token.string, "r64_sint")==0&&param==2)
+									format=VK_FORMAT_R64_SINT;
+								else if(strcmp(token.string, "r64_sfloat")==0&&param==2)
+									format=VK_FORMAT_R64_SFLOAT;
+								else if(strcmp(token.string, "rg64_uint")==0&&param==2)
+									format=VK_FORMAT_R64G64_UINT;
+								else if(strcmp(token.string, "rg64_sint")==0&&param==2)
+									format=VK_FORMAT_R64G64_SINT;
+								else if(strcmp(token.string, "rg64_sfloat")==0&&param==2)
+									format=VK_FORMAT_R64G64_SFLOAT;
+								else if(strcmp(token.string, "rgb64_uint")==0&&param==2)
+									format=VK_FORMAT_R64G64B64_UINT;
+								else if(strcmp(token.string, "rgb64_sint")==0&&param==2)
+									format=VK_FORMAT_R64G64B64_SINT;
+								else if(strcmp(token.string, "rgb64_sfloat")==0&&param==2)
+									format=VK_FORMAT_R64G64B64_SFLOAT;
+								else if(strcmp(token.string, "rgba64_uint")==0&&param==2)
+									format=VK_FORMAT_R64G64B64A64_UINT;
+								else if(strcmp(token.string, "rgba64_sint")==0&&param==2)
+									format=VK_FORMAT_R64G64B64A64_SINT;
+								else if(strcmp(token.string, "rgba64_sfloat")==0&&param==2)
+									format=VK_FORMAT_R64G64B64A64_SFLOAT;
+								else
+								{
+									printToken("Unknown format parameter ", token);
+									return false;
+								}
+							}
+							else if(token.type==TOKEN_INT&&param==3)
+								offset=(uint32_t)token.ival;
+							else
+							{
+								printToken("Unexpected token ", token);
+								return false;
+							}
+
+							token=Token_GetNext(&string);
+
+							if(token.type==TOKEN_DELIMITER)
+							{
+								if(token.string[0]!=','&&param<3)
+								{
+									DBGPRINTF(DEBUG_ERROR, "Missing comma\n");
+									return false;
+								}
+								else if(token.string[0]==')'&&param==3)
+									break;
+								else
+									param++;
+							}
+
+							if(param>3)
+							{
+								DBGPRINTF(DEBUG_ERROR, "Too many params addVertexAttribute(location, binding, format, offset)\n");
+								return false;
+							}
+						}
+
+						if(!vkuPipeline_AddVertexAttribute(&pipeline->pipeline, location, binding, format, offset))
+						{
+							DBGPRINTF(DEBUG_ERROR, "Unable to add vertex binding.\n");
+							return false;
+						}
+					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "subpass")==0)
 					{
 						token=Token_GetNext(&string);

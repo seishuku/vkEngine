@@ -106,10 +106,11 @@ Token_t Token_GetNext(char **string)
 		if(IsWord(token.string, booleans, sizeof(booleans)/sizeof(booleans[0])))
 		{
 			token.type=TOKEN_BOOLEAN;
-			token.boolean=false;
 
 			if(strcmp(token.string, "true")==0)
 				token.boolean=true;
+			else
+				token.boolean=false;
 		}
 
 		if(IsWord(token.string, descriptors, sizeof(descriptors)/sizeof(descriptors[0])))
