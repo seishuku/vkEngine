@@ -1,10 +1,15 @@
 #ifndef __PIPELINE_H__
 #define __PIPELINE_H__
 
+#include "../vulkan/vulkan.h"
+
 typedef struct
 {
 	VkuDescriptorSet_t descriptorSet;
+
+	VkPushConstantRange pushConstant;
 	VkPipelineLayout pipelineLayout;
+
 	VkuPipeline_t pipeline;
 } Pipeline_t;
 

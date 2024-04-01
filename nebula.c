@@ -1,16 +1,26 @@
 #include "vulkan/vulkan.h"
 #include "math/math.h"
+#include "utils/pipeline.h"
+#include "ui/ui.h"
+#include "perframe.h"
+#include "textures.h"
+#include "shadow.h"
 
 extern VkuContext_t vkContext;
 extern VkSampleCountFlags MSAA;
 extern VkFormat colorFormat;
 extern VkFormat depthFormat;
+extern VkuImage_t depthImage[2];
 extern VkRenderPass renderPass;
 
+extern UI_t UI;
+extern uint32_t colorShiftID;
+
+extern uint32_t renderWidth;
+extern uint32_t renderHeight;
+
 // Volume rendering vulkan stuff
-VkuDescriptorSet_t volumeDescriptorSet;
-VkPipelineLayout volumePipelineLayout;
-VkuPipeline_t volumePipeline;
+Pipeline_t volumePipeline;
 //////
 
 // Nebula volume texture generation
@@ -332,6 +342,7 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 // Create functions for volume rendering
 bool CreateVolumePipeline(void)
 {
+#if 0
 	vkuInitDescriptorSet(&volumeDescriptorSet, vkContext.device);
 	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -389,7 +400,51 @@ bool CreateVolumePipeline(void)
 
 	if(!vkuAssemblePipeline(&volumePipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
 		return false;
+#endif
+
+	if(!CreatePipeline(&vkContext, &volumePipeline, renderPass, "volume.pipeline"))
+		return false;
 
 	return true;
 }
-//////
+
+void DestroyVolume(void)
+{
+	vkDestroyDescriptorSetLayout(vkContext.device, volumePipeline.descriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.device, volumePipeline.pipeline.pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.device, volumePipeline.pipelineLayout, VK_NULL_HANDLE);
+}
+
+void DrawVolume(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool)
+{
+	// Volumetric rendering is broken on Android when rendering at half resolution for some reason.
+	static uint32_t uFrame=0;
+
+	struct
+	{
+		uint32_t uFrame;
+		uint32_t uWidth;
+		uint32_t uHeight;
+		float fShift;
+	} PC;
+
+	PC.uFrame=uFrame++;
+	PC.uWidth=renderWidth;
+	PC.uHeight=renderHeight;
+	PC.fShift=UI_GetBarGraphValue(&UI, colorShiftID);
+
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipeline.pipeline.pipeline);
+
+	vkCmdPushConstants(commandBuffer, volumePipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PC), &PC);
+
+	vkuDescriptorSet_UpdateBindingImageInfo(&volumePipeline.descriptorSet, 0, textures[TEXTURE_VOLUME].sampler, textures[TEXTURE_VOLUME].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&volumePipeline.descriptorSet, 1, depthImage[eye].sampler, depthImage[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&volumePipeline.descriptorSet, 2, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&volumePipeline.descriptorSet, 3, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&volumePipeline.descriptorSet, 4, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuAllocateUpdateDescriptorSet(&volumePipeline.descriptorSet, perFrame[index].descriptorPool);
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipeline.pipelineLayout, 0, 1, &volumePipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+
+	// No vertex data, it's baked into the vertex shader
+	vkCmdDraw(commandBuffer, 36, 1, 0, 0);
+}

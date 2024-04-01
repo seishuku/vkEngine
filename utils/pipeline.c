@@ -85,7 +85,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 
 					if(token.type==TOKEN_KEYWORD)
 					{
-						// Handle "AddBinding" keyword
+						// Handle "addBinding" keyword
 						if(strcmp(token.string, "addBinding")==0)
 						{
 							int32_t param=0;
@@ -243,6 +243,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					// Multisample state: "rasterizationSamples", "sampleShading", "minSampleShading", "sampleMask", "alphaToCoverage", "alphaToOne",
 					// blend state: "blendLogicOp", "blendLogicOpState", "blend", "srcColorBlendFactor", "dstColorBlendFactor", "colorBlendOp",
 					//				"srcAlphaBlendFactor", "dstAlphaBlendFactor", "alphaBlendOp", "colorWriteMask"
+					// Pipeline push constants: pushConstant
 
 					if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "addStage")==0)
 					{
@@ -871,7 +872,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							{
 								if(strcmp(token.string, "ccw")==0)
 									pipeline->pipeline.cullMode=VK_FRONT_FACE_COUNTER_CLOCKWISE;
-								if(strcmp(token.string, "cw")==0)
+								else if(strcmp(token.string, "cw")==0)
 									pipeline->pipeline.cullMode=VK_FRONT_FACE_CLOCKWISE;
 								else
 								{
@@ -2340,8 +2341,6 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
-
 							pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ZERO;
 							token=Token_GetNext(&string);
 
@@ -2558,11 +2557,84 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 
 							token=Token_GetNext(&string);
 
-							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
-								break;
+							if(token.type==TOKEN_DELIMITER)
+							{
+								if(token.string[0]==')')
+									break;
+								else if(token.string[0]=='|')
+									continue;
+							}
 							else
 							{
 								printToken("Unexpected token ", token);
+								return false;
+							}
+						}
+					}
+					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "pushConstant")==0)
+					{
+						uint32_t param=0;
+						pipeline->pushConstant.offset=0;
+						pipeline->pushConstant.size=0;
+						pipeline->pushConstant.stageFlags=0;
+
+						token=Token_GetNext(&string);
+
+						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
+						{
+							token=Token_GetNext(&string);
+
+							if(token.type==TOKEN_INT&&param==0)
+								pipeline->pushConstant.offset=(uint32_t)token.ival;
+							else if(token.type==TOKEN_INT&&param==1)
+								pipeline->pushConstant.size=(uint32_t)token.ival;
+							else if(token.type==TOKEN_STRING)
+							{
+								if(strcmp(token.string, "vertex")==0&&param==2)
+									pipeline->pushConstant.stageFlags|=VK_SHADER_STAGE_VERTEX_BIT;
+								else if(strcmp(token.string, "tessellationControl")==0&&param==2)
+									pipeline->pushConstant.stageFlags|=VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+								else if(strcmp(token.string, "tessellationEvaluation")==0&&param==2)
+									pipeline->pushConstant.stageFlags|=VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+								else if(strcmp(token.string, "geometry")==0&&param==2)
+									pipeline->pushConstant.stageFlags|=VK_SHADER_STAGE_GEOMETRY_BIT;
+								else if(strcmp(token.string, "fragment")==0&&param==2)
+									pipeline->pushConstant.stageFlags|=VK_SHADER_STAGE_FRAGMENT_BIT;
+								else if(strcmp(token.string, "compute")==0&&param==2)
+									pipeline->pushConstant.stageFlags|=VK_SHADER_STAGE_COMPUTE_BIT;
+								else
+								{
+									printToken("Unknown parameter ", token);
+									return false;
+								}
+							}
+							else
+							{
+								printToken("Unexpected token ", token);
+								return false;
+							}
+
+							token=Token_GetNext(&string);
+
+							if(token.type==TOKEN_DELIMITER)
+							{
+								// Still expecting more parameters, error.
+								if(token.string[0]!=','&&param<2)
+								{
+									DBGPRINTF(DEBUG_ERROR, "Missing comma\n");
+									return false;
+								}
+								// End of expected parameters, end.
+								else if(token.string[0]==')'&&param==2)
+									break;
+								// Special case for 3rd parameter, because multiple stages can be specified.
+								else if(token.string[0]!='|'&&param<2)
+									param++;
+							}
+
+							if(param>2)
+							{
+								DBGPRINTF(DEBUG_ERROR, "Too many params pushConstant(offset, size, stage)\n");
 								return false;
 							}
 						}
@@ -2585,6 +2657,8 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount=1,
 		.pSetLayouts=&pipeline->descriptorSet.descriptorSetLayout,
+		.pushConstantRangeCount=pipeline->pushConstant.size?1:0,
+		.pPushConstantRanges=&pipeline->pushConstant,
 	}, 0, &pipeline->pipelineLayout)!=VK_SUCCESS)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Unable to create pipeline layout.\n");

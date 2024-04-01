@@ -1,0 +1,27 @@
+descriptorSet {
+	addBinding(0, combinedSampler, fragment)
+	addBinding(1, combinedSampler, fragment)
+	addBinding(2, combinedSampler, fragment)
+	addBinding(3, uniformBuffer, vertex|fragment)
+	addBinding(4, uniformBuffer, vertex|fragment)
+}
+pipeline {
+	addStage("shaders/volume.vert.spv", vertex)
+	addStage("shaders/volume.frag.spv", fragment)
+
+	pushConstant(0, 16, fragment)
+
+	subpass(1)
+
+	depthWrite(false)
+	cullMode(back)
+	rasterizationSamples(4)
+
+	blend(true)
+	srcColorBlendFactor(srcAlpha)
+	dstColorBlendFactor(oneMinusSrcAlpha)
+	colorBlendOp(add)
+	srcAlphaBlendFactor(srcAlpha)
+	dstAlphaBlendFactor(oneMinusSrcAlpha)
+	alphaBlendOp(add)
+}

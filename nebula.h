@@ -1,14 +1,9 @@
 #ifndef __NEBULA_H__
 #define __NEBULA_H__
 
-// Volume rendering vulkan stuff
-extern VkuDescriptorSet_t volumeDescriptorSet;
-extern VkPipelineLayout volumePipelineLayout;
-extern VkuPipeline_t volumePipeline;
-extern VkRenderPass volumeRenderPass;
-//////
-
 VkBool32 GenNebulaVolume(VkuImage_t *image);
 bool CreateVolumePipeline(void);
+void DestroyVolume(void);
+void DrawVolume(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool);
 
 #endif

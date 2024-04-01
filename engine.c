@@ -420,25 +420,25 @@ void Thread_Main(void *arg)
 	vkBeginCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye], &(VkCommandBufferBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-			.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
-			//.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
-			//{
-			//	.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-			//	.pNext=&(VkCommandBufferInheritanceRenderingInfo)
-			//	{
-			//		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-			//		.colorAttachmentCount=1,
-			//		.pColorAttachmentFormats=&ColorFormat,
-			//		.depthAttachmentFormat=DepthFormat,
-			//		.rasterizationSamples=MSAA
-			//	},
-			//}
-			.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
+		//.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
+		//{
+		//	.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+		//	.pNext=&(VkCommandBufferInheritanceRenderingInfo)
+		//	{
+		//		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
+		//		.colorAttachmentCount=1,
+		//		.pColorAttachmentFormats=&ColorFormat,
+		//		.depthAttachmentFormat=DepthFormat,
+		//		.rasterizationSamples=MSAA
+		//	},
+		//}
+		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-				.pNext=NULL,
-				.renderPass=renderPass,
-				.framebuffer=framebuffer[data->eye]
+			.pNext=NULL,
+			.renderPass=renderPass,
+			.framebuffer=framebuffer[data->eye]
 		}
 	});
 
@@ -746,37 +746,8 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 
 	vkCmdNextSubpass(perFrame[index].commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 
-	// Volumetric rendering is broken on Android when rendering at half resolution for some reason.
-	static uint32_t uFrame=0;
-
-	struct
-	{
-		uint32_t uFrame;
-		uint32_t uWidth;
-		uint32_t uHeight;
-		float fShift;
-	} PC;
-
-	PC.uFrame=uFrame++;
-	PC.uWidth=renderWidth;
-	PC.uHeight=renderHeight;
-	PC.fShift=UI_GetBarGraphValue(&UI, colorShiftID);
-
 	////// Volume cloud
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipeline.pipeline);
-
-	vkCmdPushConstants(perFrame[index].commandBuffer, volumePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PC), &PC);
-
-	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 0, textures[TEXTURE_VOLUME].sampler, textures[TEXTURE_VOLUME].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 1, depthImage[eye].sampler, depthImage[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingImageInfo(&volumeDescriptorSet, 2, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingBufferInfo(&volumeDescriptorSet, 3, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
-	vkuDescriptorSet_UpdateBindingBufferInfo(&volumeDescriptorSet, 4, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
-	vkuAllocateUpdateDescriptorSet(&volumeDescriptorSet, perFrame[index].descriptorPool);
-	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipelineLayout, 0, 1, &volumeDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
-
-	// No vertex data, it's baked into the vertex shader
-	vkCmdDraw(perFrame[index].commandBuffer, 36, 1, 0, 0);
+	DrawVolume(perFrame[index].commandBuffer, index, eye, perFrame[index].descriptorPool);
 	//////
 
 	matrix Modelview=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
@@ -1896,9 +1867,7 @@ void Destroy(void)
 	//////////
 
 	// Volume rendering
-	vkDestroyDescriptorSetLayout(vkContext.device, volumeDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
-	vkDestroyPipeline(vkContext.device, volumePipeline.pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.device, volumePipelineLayout, VK_NULL_HANDLE);
+	DestroyVolume();
 	//////////
 
 	vkDestroyRenderPass(vkContext.device, renderPass, VK_NULL_HANDLE);

@@ -14,7 +14,7 @@ static const char *keywords[]=
 	"addBinding", "addStage", "addVertexBinding", "addVertexAttribute",
 
 	// Pipeline state keywords:
-	"subpass",
+	"subpass", "pushConstant",
 	// Input assembly state
 	"topology", "primitiveRestart",
 	// Rasterization state
