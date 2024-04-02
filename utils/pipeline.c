@@ -2676,3 +2676,10 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 
 	return true;
 }
+
+void DestroyPipeline(VkuContext_t *context, Pipeline_t *pipeline)
+{
+	vkDestroyDescriptorSetLayout(context->device, pipeline->descriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyPipeline(context->device, pipeline->pipeline.pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(context->device, pipeline->pipelineLayout, VK_NULL_HANDLE);
+}

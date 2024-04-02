@@ -1,0 +1,9 @@
+descriptorSet {
+	addBinding(0, combinedSampler, fragment)
+}
+
+pipeline {
+	addStage("shaders/fullscreen.vert.spv", vertex)
+	addStage("shaders/threshold.frag.spv", fragment)
+	cullMode(front)
+}

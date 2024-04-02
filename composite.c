@@ -4,6 +4,7 @@
 #include "system/system.h"
 #include "vulkan/vulkan.h"
 #include "math/math.h"
+#include "utils/pipeline.h"
 #include "font/font.h"
 #include "camera/camera.h"
 #include "ui/ui.h"
@@ -35,15 +36,17 @@ VkPipelineLayout compositePipelineLayout;
 VkuPipeline_t compositePipeline;
 VkRenderPass compositeRenderPass;
 
-VkuDescriptorSet_t thresholdDescriptorSet;
-VkPipelineLayout thresholdPipelineLayout;
-VkuPipeline_t thresholdPipeline;
+//VkuDescriptorSet_t thresholdDescriptorSet;
+//VkPipelineLayout thresholdPipelineLayout;
+//VkuPipeline_t thresholdPipeline;
+Pipeline_t thresholdPipeline;
 VkRenderPass thresholdRenderPass;
 VkFramebuffer thresholdFramebuffer[2];
 
-VkuDescriptorSet_t gaussianDescriptorSet;
-VkPipelineLayout gaussianPipelineLayout;
-VkuPipeline_t gaussianPipeline;
+//VkuDescriptorSet_t gaussianDescriptorSet;
+//VkPipelineLayout gaussianPipelineLayout;
+//VkuPipeline_t gaussianPipeline;
+Pipeline_t gaussianPipeline;
 VkRenderPass gaussianRenderPass;
 VkFramebuffer gaussianFramebufferTemp[2];
 VkFramebuffer gaussianFramebufferBlur[2];
@@ -102,6 +105,7 @@ bool CreateThresholdPipeline(void)
 		},
 	}, 0, &thresholdRenderPass);
 
+#if 0
 	vkuInitDescriptorSet(&thresholdDescriptorSet, vkContext.device);
 	vkuDescriptorSet_AddBinding(&thresholdDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&thresholdDescriptorSet);
@@ -135,6 +139,9 @@ bool CreateThresholdPipeline(void)
 	//};
 
 	if(!vkuAssemblePipeline(&thresholdPipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
+		return false;
+#endif
+	if(!CreatePipeline(&vkContext, &thresholdPipeline, thresholdRenderPass, "threshold.pipeline"))
 		return false;
 
 	return true;
@@ -194,6 +201,7 @@ bool CreateGaussianPipeline(void)
 		},
 	}, 0, &gaussianRenderPass);
 
+#if 0
 	vkuInitDescriptorSet(&gaussianDescriptorSet, vkContext.device);
 	vkuDescriptorSet_AddBinding(&gaussianDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuAssembleDescriptorSetLayout(&gaussianDescriptorSet);
@@ -233,6 +241,9 @@ bool CreateGaussianPipeline(void)
 	//};
 
 	if(!vkuAssemblePipeline(&gaussianPipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
+		return false;
+#endif
+	if(!CreatePipeline(&vkContext, &gaussianPipeline, gaussianRenderPass, "gaussian.pipeline"))
 		return false;
 
 	return true;
@@ -469,20 +480,19 @@ bool CreateCompositePipeline(void)
 void DestroyComposite(void)
 {
 	// Thresholding pipeline
-	vkDestroyDescriptorSetLayout(vkContext.device, thresholdDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
-
 	vkDestroyFramebuffer(vkContext.device, thresholdFramebuffer[0], VK_NULL_HANDLE);
 
 	if(isVR)
 		vkDestroyFramebuffer(vkContext.device, thresholdFramebuffer[1], VK_NULL_HANDLE);
 
-	vkDestroyPipeline(vkContext.device, thresholdPipeline.pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.device, thresholdPipelineLayout, VK_NULL_HANDLE);
+	//vkDestroyDescriptorSetLayout(vkContext.device, thresholdDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
+	//vkDestroyPipeline(vkContext.device, thresholdPipeline.pipeline, VK_NULL_HANDLE);
+	//vkDestroyPipelineLayout(vkContext.device, thresholdPipelineLayout, VK_NULL_HANDLE);
+	DestroyPipeline(&vkContext, &thresholdPipeline);
 	vkDestroyRenderPass(vkContext.device, thresholdRenderPass, VK_NULL_HANDLE);
 	//////
 
 	// Gaussian blur pipeline
-	vkDestroyDescriptorSetLayout(vkContext.device, gaussianDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
 
 	vkDestroyFramebuffer(vkContext.device, gaussianFramebufferTemp[0], VK_NULL_HANDLE);
 	vkDestroyFramebuffer(vkContext.device, gaussianFramebufferBlur[0], VK_NULL_HANDLE);
@@ -493,8 +503,10 @@ void DestroyComposite(void)
 		vkDestroyFramebuffer(vkContext.device, gaussianFramebufferBlur[1], VK_NULL_HANDLE);
 	}
 
-	vkDestroyPipeline(vkContext.device, gaussianPipeline.pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.device, gaussianPipelineLayout, VK_NULL_HANDLE);
+	//vkDestroyDescriptorSetLayout(vkContext.device, gaussianDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
+	//vkDestroyPipeline(vkContext.device, gaussianPipeline.pipeline, VK_NULL_HANDLE);
+	//vkDestroyPipelineLayout(vkContext.device, gaussianPipelineLayout, VK_NULL_HANDLE);
+	DestroyPipeline(&vkContext, &gaussianPipeline);
 	vkDestroyRenderPass(vkContext.device, gaussianRenderPass, VK_NULL_HANDLE);
 	//////
 
@@ -565,12 +577,12 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)(width>>2), (float)(height>>2), 0.0f, 1.0f });
 	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { width>>2, height>>2 } });
 
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, thresholdPipeline.pipeline);
+	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, thresholdPipeline.pipeline.pipeline);
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&thresholdDescriptorSet, 0, colorResolve[eye].sampler, colorResolve[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&thresholdPipeline.descriptorSet, 0, colorResolve[eye].sampler, colorResolve[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-	vkuAllocateUpdateDescriptorSet(&thresholdDescriptorSet, perFrame[index].descriptorPool);
-	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, thresholdPipelineLayout, 0, 1, &thresholdDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+	vkuAllocateUpdateDescriptorSet(&thresholdPipeline.descriptorSet, perFrame[index].descriptorPool);
+	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, thresholdPipeline.pipelineLayout, 0, 1, &thresholdPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
 
@@ -612,14 +624,14 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)(width>>2), (float)(height>>2), 0.0f, 1.0f });
 	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { width>>2, height>>2 } });
 
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipeline);
+	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipeline.pipeline);
 
-	vkCmdPushConstants(perFrame[index].commandBuffer, gaussianPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*2, &(float[]){ 1.0f, 0.0 });
+	vkCmdPushConstants(perFrame[index].commandBuffer, gaussianPipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*2, &(float[]){ 1.0f, 0.0 });
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianDescriptorSet, 0, colorBlur[eye].sampler, colorBlur[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuAllocateUpdateDescriptorSet(&gaussianDescriptorSet, perFrame[index].descriptorPool);
+	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianPipeline.descriptorSet, 0, colorBlur[eye].sampler, colorBlur[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuAllocateUpdateDescriptorSet(&gaussianPipeline.descriptorSet, perFrame[index].descriptorPool);
 
-	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipelineLayout, 0, 1, &gaussianDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipelineLayout, 0, 1, &gaussianPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
 
@@ -662,14 +674,14 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)(width>>2), (float)(height>>2), 0.0f, 1.0f });
 	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { width>>2, height>>2 } });
 
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipeline);
+	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipeline.pipeline);
 
-	vkCmdPushConstants(perFrame[index].commandBuffer, gaussianPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*2, &(float[]){ 0.0f, 1.0 });
+	vkCmdPushConstants(perFrame[index].commandBuffer, gaussianPipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*2, &(float[]){ 0.0f, 1.0 });
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianDescriptorSet, 0, colorTemp[eye].sampler, colorTemp[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuAllocateUpdateDescriptorSet(&gaussianDescriptorSet, perFrame[index].descriptorPool);
+	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianPipeline.descriptorSet, 0, colorTemp[eye].sampler, colorTemp[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuAllocateUpdateDescriptorSet(&gaussianPipeline.descriptorSet, perFrame[index].descriptorPool);
 
-	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipelineLayout, 0, 1, &gaussianDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipelineLayout, 0, 1, &gaussianPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
 

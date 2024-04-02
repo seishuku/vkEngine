@@ -14,5 +14,6 @@ typedef struct
 } Pipeline_t;
 
 bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass renderPass, const char *filename);
+void DestroyPipeline(VkuContext_t *context, Pipeline_t *pipeline);
 
 #endif

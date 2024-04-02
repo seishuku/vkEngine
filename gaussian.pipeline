@@ -1,0 +1,12 @@
+descriptorSet {
+	addBinding(0, combinedSampler, fragment)
+}
+
+pipeline {
+	addStage("shaders/fullscreen.vert.spv", vertex)
+	addStage("shaders/gaussian.frag.spv", fragment)
+
+	pushConstant(0, 8, fragment)
+
+	cullMode(front)
+}

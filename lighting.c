@@ -222,9 +222,12 @@ void DestroyLighting(void)
 		vkuDestroyBuffer(&vkContext, &perFrame[i].mainUBOBuffer[1]);
 	}
 
+#if 0
 	vkDestroyDescriptorSetLayout(vkContext.device, mainPipeline.descriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
 	vkDestroyPipeline(vkContext.device, mainPipeline.pipeline.pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(vkContext.device, mainPipeline.pipelineLayout, VK_NULL_HANDLE);
+#endif
+	DestroyPipeline(&vkContext, &mainPipeline);
 }
 
 void DrawLighting(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool)

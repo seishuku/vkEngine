@@ -410,9 +410,7 @@ bool CreateVolumePipeline(void)
 
 void DestroyVolume(void)
 {
-	vkDestroyDescriptorSetLayout(vkContext.device, volumePipeline.descriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
-	vkDestroyPipeline(vkContext.device, volumePipeline.pipeline.pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.device, volumePipeline.pipelineLayout, VK_NULL_HANDLE);
+	DestroyPipeline(&vkContext, &volumePipeline);
 }
 
 void DrawVolume(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool)
