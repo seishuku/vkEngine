@@ -6,6 +6,40 @@
 #include "tokenizer.h"
 #include "pipeline.h"
 
+// These are keywords for the pipeline description script
+static const char *keywords[]=
+{
+	// Section decelations
+	"descriptorSet", "pipeline",
+
+	// Descriptor set definition
+	"addBinding",
+
+	// Pipeline defintions
+	"addStage", "addVertexBinding", "addVertexAttribute",
+
+	// Pipeline state keywords:
+	"subpass", "pushConstant",
+	// Input assembly state
+	"topology", "primitiveRestart",
+	// Rasterization state
+	"depthClamp", "rasterizerDiscard", "polygonMode", "cullMode", "frontFace",
+	"depthBias", "depthBiasConstantFactor", "depthBiasClamp", "depthBiasSlopeFactor", "lineWidth",
+	// Depth/stencil state
+	"depthTest", "depthWrite", "depthCompareOp", "depthBoundsTest", "stencilTest", "minDepthBounds", "maxDepthBounds",
+	// Front face stencil functions
+	"frontStencilFailOp", "frontStencilPassOp", "frontStencilDepthFailOp", "frontStencilCompareOp",
+	"frontStencilCompareMask", "frontStencilWriteMask", "frontStencilReference",
+	// Back face stencil functions
+	"backStencilFailOp", "backStencilPassOp", "backStencilDepthFailOp", "backStencilCompareOp",
+	"backStencilCompareMask", "backStencilWriteMask", "backStencilReference",
+	// Multisample state
+	"rasterizationSamples", "sampleShading", "minSampleShading", "sampleMask", "alphaToCoverage", "alphaToOne",
+	// blend state
+	"blendLogicOp", "blendLogicOpState", "blend", "srcColorBlendFactor", "dstColorBlendFactor", "colorBlendOp",
+	"srcAlphaBlendFactor", "dstAlphaBlendFactor", "alphaBlendOp", "colorWriteMask"
+};
+
 static void printToken(const char *msg, const Token_t token)
 {
 	if(token.type==TOKEN_STRING)
@@ -14,8 +48,6 @@ static void printToken(const char *msg, const Token_t token)
 		DBGPRINTF(DEBUG_ERROR, "%s quoted string: %s\n", msg, token.string);
 	else if(token.type==TOKEN_BOOLEAN)
 		DBGPRINTF(DEBUG_ERROR, "%s boolean string: %s\n", msg, token.string);
-	else if(token.type==TOKEN_DESCRIPTOR)
-		DBGPRINTF(DEBUG_ERROR, "%s descriptor string: %s\n", msg, token.string);
 	else if(token.type==TOKEN_KEYWORD)
 		DBGPRINTF(DEBUG_ERROR, "%s keyword string: %s\n", msg, token.string);
 	else if(token.type==TOKEN_FLOAT)
@@ -49,15 +81,16 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 	fread(buffer, 1, length, stream);
 	buffer[length]='\0';
 
-	char *string=buffer;
+	Tokenizer_t tokenizer;
+	Tokenizer_Init(&tokenizer, buffer, sizeof(keywords)/sizeof(keywords[0]), keywords);
 
 	Token_t token={ TOKEN_UNKNOWN };
 
 	while(token.type!=TOKEN_END)
 	{
-		token=Token_GetNext(&string);
+		token=Tokenizer_GetNext(&tokenizer);
 
-		if(token.type==TOKEN_DESCRIPTOR)
+		if(token.type==TOKEN_KEYWORD)
 		{
 			// Start building up descriptor set layout ("descriptorSet { }")
 			if(strcmp(token.string, "descriptorSet")==0)
@@ -69,7 +102,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 				}
 
 				// Next token must be a left brace '{'
-				token=Token_GetNext(&string);
+				token=Tokenizer_GetNext(&tokenizer);
 
 				if(token.type!=TOKEN_DELIMITER&&token.string[0]!='{')
 				{
@@ -81,7 +114,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 				while(!(token.type==TOKEN_DELIMITER&&token.string[0]=='}'))
 				{
 					// Look for keyword tokens
-					token=Token_GetNext(&string);
+					token=Tokenizer_GetNext(&tokenizer);
 
 					if(token.type==TOKEN_KEYWORD)
 					{
@@ -94,7 +127,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							VkShaderStageFlags stage=0;
 
 							// First token should be a left parenthesis '('
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type!=TOKEN_DELIMITER&&token.string[0]!='(')
 							{
@@ -106,7 +139,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								// Loop until right parenthesis ')' or until break condition
 								while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 								{
-									token=Token_GetNext(&string);
+									token=Tokenizer_GetNext(&tokenizer);
 
 									if(token.type==TOKEN_INT&&param==0)
 										binding=(uint32_t)token.ival;
@@ -161,7 +194,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 										return false;
 									}
 
-									token=Token_GetNext(&string);
+									token=Tokenizer_GetNext(&tokenizer);
 
 									if(token.type==TOKEN_DELIMITER)
 									{
@@ -217,7 +250,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					return false;
 				}
 
-				token=Token_GetNext(&string);
+				token=Tokenizer_GetNext(&tokenizer);
 
 				if(token.type!=TOKEN_DELIMITER&&token.string[0]!='{')
 				{
@@ -227,7 +260,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 
 				while(!(token.type==TOKEN_DELIMITER&&token.string[0]=='}'))
 				{
-					token=Token_GetNext(&string);
+					token=Tokenizer_GetNext(&tokenizer);
 
 					// Pipeline attribute keywords: "addStage", "addVertexBinding", "addVertexAttribute",
 					// Pipeline state keywords:
@@ -251,11 +284,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 						char shaderFilename[MAX_TOKEN_STRING_LENGTH+1]={ 0 };
 						VkShaderStageFlagBits stage=0;
 
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_QUOTED&&param==0)
 								strcpy(shaderFilename, token.string);
@@ -285,7 +318,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER)
 							{
@@ -320,11 +353,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 						uint32_t stride=0;
 						VkVertexInputRate inputRate=VK_VERTEX_INPUT_RATE_VERTEX;
 
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_INT&&param==0)
 								binding=(uint32_t)token.ival;
@@ -348,7 +381,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER)
 							{
@@ -384,11 +417,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 						VkFormat format=VK_FORMAT_UNDEFINED;
 						uint32_t offset=0;
 
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_INT&&param==0)
 								location=(uint32_t)token.ival;
@@ -570,7 +603,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER)
 							{
@@ -600,12 +633,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "subpass")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.subpass=0;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_INT)
 								pipeline->pipeline.subpass=(uint32_t)token.ival;
@@ -615,7 +648,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -628,11 +661,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "topology")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -670,7 +703,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 									break;
@@ -683,11 +716,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "primitiveRestart")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_BOOLEAN)
 							{
@@ -702,7 +735,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -715,11 +748,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "depthClamp")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_BOOLEAN)
 							{
@@ -734,7 +767,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -747,11 +780,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "rasterizerDiscard")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_BOOLEAN)
 							{
@@ -766,7 +799,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -779,12 +812,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "polygonMode")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.polygonMode=VK_POLYGON_MODE_FILL;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 								
 							if(token.type==TOKEN_STRING)
 							{
@@ -806,7 +839,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -819,12 +852,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "cullMode")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.cullMode=VK_CULL_MODE_NONE;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -848,7 +881,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -861,12 +894,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "frontFace")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.frontFace=VK_FRONT_FACE_COUNTER_CLOCKWISE;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -886,7 +919,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -899,11 +932,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "depthBias")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_BOOLEAN)
 							{
@@ -918,7 +951,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -931,12 +964,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "depthBiasConstantFactor")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.depthBiasConstantFactor=0.0f;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_FLOAT)
 								pipeline->pipeline.depthBiasConstantFactor=(float)token.fval;
@@ -946,7 +979,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -959,12 +992,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "depthBiasClamp")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.depthBiasClamp=0.0f;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_FLOAT)
 								pipeline->pipeline.depthBiasClamp=(float)token.fval;
@@ -974,7 +1007,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -987,12 +1020,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "depthBiasSlopeFactor")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.depthBiasSlopeFactor=0.0f;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_FLOAT)
 								pipeline->pipeline.depthBiasSlopeFactor=(float)token.fval;
@@ -1002,7 +1035,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1015,12 +1048,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "lineWidth")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.lineWidth=0.0f;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_FLOAT)
 								pipeline->pipeline.lineWidth=(float)token.fval;
@@ -1030,7 +1063,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1043,11 +1076,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "depthTest")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_BOOLEAN)
 							{
@@ -1062,7 +1095,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1075,11 +1108,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "depthWrite")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_BOOLEAN)
 							{
@@ -1094,7 +1127,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1107,12 +1140,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "depthCompareOp")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_NEVER;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -1144,7 +1177,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1157,11 +1190,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "depthBoundsTest")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_BOOLEAN)
 							{
@@ -1176,7 +1209,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1189,11 +1222,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "stencilTest")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_BOOLEAN)
 							{
@@ -1208,7 +1241,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1221,12 +1254,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "minDepthBounds")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.minDepthBounds=0.0f;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_FLOAT)
 								pipeline->pipeline.minDepthBounds=(float)token.fval;
@@ -1236,7 +1269,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1249,12 +1282,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "maxDepthBounds")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.maxDepthBounds=0.0f;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_FLOAT)
 								pipeline->pipeline.maxDepthBounds=(float)token.fval;
@@ -1264,7 +1297,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1277,12 +1310,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "frontStencilFailOp")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_KEEP;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -1314,7 +1347,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1327,12 +1360,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "frontStencilPassOp")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_KEEP;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -1364,7 +1397,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1377,12 +1410,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "frontStencilDepthFailOp")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_KEEP;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -1414,7 +1447,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1427,12 +1460,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "frontStencilCompareOp")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_NEVER;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -1464,7 +1497,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1477,12 +1510,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "frontStencilCompareMask")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.frontStencilCompareMask=0;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_INT)
 								pipeline->pipeline.frontStencilCompareMask=(uint32_t)token.ival;
@@ -1492,7 +1525,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1505,12 +1538,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "frontStencilWriteMask")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.frontStencilWriteMask=0;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_INT)
 								pipeline->pipeline.frontStencilWriteMask=(uint32_t)token.ival;
@@ -1520,7 +1553,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1533,12 +1566,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "frontStencilReference")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.frontStencilReference=0;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_INT)
 								pipeline->pipeline.frontStencilReference=(uint32_t)token.ival;
@@ -1548,7 +1581,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1561,12 +1594,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "backStencilFailOp")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_KEEP;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -1598,7 +1631,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1611,12 +1644,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "backStencilPassOp")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_KEEP;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -1648,7 +1681,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1661,12 +1694,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "backStencilDepthFailOp")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_KEEP;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -1698,7 +1731,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1711,12 +1744,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "backStencilCompareOp")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_NEVER;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -1748,7 +1781,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1761,12 +1794,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "backStencilCompareMask")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.backStencilCompareMask=0;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_INT)
 								pipeline->pipeline.backStencilCompareMask=(uint32_t)token.ival;
@@ -1776,7 +1809,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1789,12 +1822,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "backStencilWriteMask")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.backStencilWriteMask=0;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_INT)
 								pipeline->pipeline.backStencilWriteMask=(uint32_t)token.ival;
@@ -1804,7 +1837,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1817,12 +1850,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "backStencilReference")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.backStencilReference=0;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_INT)
 								pipeline->pipeline.backStencilReference=(uint32_t)token.ival;
@@ -1832,7 +1865,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1845,12 +1878,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "rasterizationSamples")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_INT)
 							{
@@ -1880,7 +1913,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1893,11 +1926,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "sampleShading")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_BOOLEAN)
 							{
@@ -1912,7 +1945,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1925,11 +1958,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "minSampleShading")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_FLOAT)
 								pipeline->pipeline.minSampleShading=(float)token.fval;
@@ -1939,7 +1972,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1952,17 +1985,17 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "sampleMask")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						printToken("sampleMask not implemented! ", token);
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "alphaToCoverage")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_BOOLEAN)
 							{
@@ -1977,7 +2010,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -1990,11 +2023,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "alphaToOne")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_BOOLEAN)
 							{
@@ -2009,7 +2042,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -2022,11 +2055,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "blendLogicOp")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_BOOLEAN)
 							{
@@ -2041,7 +2074,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -2054,12 +2087,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "blendLogicOpState")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_CLEAR;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -2105,7 +2138,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -2118,11 +2151,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "blend")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_BOOLEAN)
 							{
@@ -2137,7 +2170,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -2150,12 +2183,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "srcColorBlendFactor")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ZERO;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -2209,7 +2242,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -2222,12 +2255,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "dstColorBlendFactor")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ZERO;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -2281,7 +2314,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -2294,11 +2327,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "colorBlendOp")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -2324,7 +2357,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -2337,12 +2370,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "srcAlphaBlendFactor")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ZERO;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -2396,7 +2429,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -2409,12 +2442,12 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					}
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "dstAlphaBlendFactor")==0)
 					{
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
 							pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ZERO;
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -2468,7 +2501,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -2482,11 +2515,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					else if(token.type==TOKEN_KEYWORD&&strcmp(token.string, "alphaBlendOp")==0)
 					{
 						pipeline->pipeline.alphaBlendOp=VK_BLEND_OP_ADD;
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -2512,7 +2545,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER&&token.string[0]==')')
 								break;
@@ -2527,11 +2560,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 					{
 						pipeline->pipeline.colorWriteMask=0;
 
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_STRING)
 							{
@@ -2557,7 +2590,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER)
 							{
@@ -2580,11 +2613,11 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 						pipeline->pushConstant.size=0;
 						pipeline->pushConstant.stageFlags=0;
 
-						token=Token_GetNext(&string);
+						token=Tokenizer_GetNext(&tokenizer);
 
 						while(!(token.type==TOKEN_DELIMITER&&token.string[0]==')'))
 						{
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_INT&&param==0)
 								pipeline->pushConstant.offset=(uint32_t)token.ival;
@@ -2616,7 +2649,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								return false;
 							}
 
-							token=Token_GetNext(&string);
+							token=Tokenizer_GetNext(&tokenizer);
 
 							if(token.type==TOKEN_DELIMITER)
 							{
@@ -2641,15 +2674,9 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							}
 						}
 					}
-					else
-						printToken("Unknown token ", token);
 				}
 			}
-			else
-				printToken("Unknown token ", token);
 		}
-		else
-			printToken("Unknown token ", token);
 	}
 
 	Zone_Free(zone, buffer);

@@ -8,7 +8,6 @@ typedef enum
 	TOKEN_STRING=0,
 	TOKEN_QUOTED,
 	TOKEN_BOOLEAN,
-	TOKEN_DESCRIPTOR,
 	TOKEN_KEYWORD,
 	TOKEN_FLOAT,
 	TOKEN_INT,
@@ -32,7 +31,16 @@ typedef struct Token_s
 	};
 } Token_t;
 
-Token_t Token_GetNext(char **string);
-Token_t Token_PeekNext(char **string);
+typedef struct
+{
+	char *string;
+
+	size_t numKeywords;
+	const char **keywords;
+} Tokenizer_t;
+
+bool Tokenizer_Init(Tokenizer_t *context, char *string, size_t numKeywords, const char **keywords);
+Token_t Tokenizer_GetNext(Tokenizer_t *context);
+Token_t Tokenizer_PeekNext(Tokenizer_t *context);
 
 #endif
