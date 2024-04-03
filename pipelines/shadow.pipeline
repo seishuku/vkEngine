@@ -1,0 +1,23 @@
+pipeline {
+	addStage("shaders/shadow.vert.spv", vertex)
+
+	pushConstant(0, 64, vertex)
+
+	colorWriteMask(none)
+
+	cullMode(back)
+
+	depthTest(true)
+	depthBias(true)
+	depthBiasConstantFactor(1.25)
+	depthBiasSlopeFactor(1.75)
+
+	addVertexBinding(0, 80, perVertex)
+	addVertexAttribute(0, 0, rgba32_sfloat, 0)
+
+	addVertexBinding(1, 64, perInstance)
+	addVertexAttribute(1, 1, rgba32_sfloat, 0)
+	addVertexAttribute(2, 1, rgba32_sfloat, 16)
+	addVertexAttribute(3, 1, rgba32_sfloat, 32)
+	addVertexAttribute(4, 1, rgba32_sfloat, 48)
+}

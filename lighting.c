@@ -205,7 +205,7 @@ bool CreateLightingPipeline(void)
 		return false;
 #endif
 
-	if(!CreatePipeline(&vkContext, &mainPipeline, renderPass, "lighting.pipeline"))
+	if(!CreatePipeline(&vkContext, &mainPipeline, renderPass, "pipelines/lighting.pipeline"))
 		return false;
 
 	return true;

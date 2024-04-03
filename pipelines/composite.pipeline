@@ -1,0 +1,16 @@
+descriptorSet {
+	addBinding(0, combinedSampler, fragment)
+	addBinding(1, combinedSampler, fragment)
+	addBinding(2, combinedSampler, fragment)
+	addBinding(3, combinedSampler, fragment)
+	addBinding(4, uniformBuffer, fragment)
+}
+
+pipeline {
+	addStage("shaders/fullscreen.vert.spv", vertex)
+	addStage("shaders/composite.frag.spv", fragment)
+
+	pushConstant(0, 16, fragment)
+
+	cullMode(front)
+}

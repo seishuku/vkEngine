@@ -1,0 +1,12 @@
+pipeline {
+	addStage("shaders/line.vert.spv", vertex)
+	addStage("shaders/line.frag.spv", fragment)
+
+	pushConstant(0, 112, vertex|fragment)
+
+	topology(lineList)
+	depthTest(true)
+	cullMode(back)
+	depthCompareOp(greaterOrEqual)
+	rasterizationSamples(4)
+}

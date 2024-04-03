@@ -30,7 +30,7 @@
 #include "lighting.h"
 #include "skybox.h"
 #include "shadow.h"
-#include "nebula.h"
+#include "volume.h"
 #include "composite.h"
 #include "perframe.h"
 #include "sounds.h"
@@ -299,22 +299,17 @@ void DrawPlayer(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, Cam
 	linePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
 	linePC.start=position;
 
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.pipeline);
-
 	linePC.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
 	linePC.end=Vec4_Addv(position, Vec4_Muls(forward, 15.0f));
-	vkCmdPushConstants(commandBuffer, linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(linePC), &linePC);
-	vkCmdDraw(commandBuffer, 2, 1, 0, 0);
+	DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
 
 	linePC.color=Vec4(0.0f, 1.0f, 0.0f, 1.0f);
 	linePC.end=Vec4_Addv(position, Vec4_Muls(up, 15.0f));
-	vkCmdPushConstants(commandBuffer, linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(linePC), &linePC);
-	vkCmdDraw(commandBuffer, 2, 1, 0, 0);
+	DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
 
 	linePC.color=Vec4(0.0f, 0.0f, 1.0f, 1.0f);
 	linePC.end=Vec4_Addv(position, Vec4_Muls(right, 15.0f));
-	vkCmdPushConstants(commandBuffer, linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(linePC), &linePC);
-	vkCmdDraw(commandBuffer, 2, 1, 0, 0);
+	DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
 
 	struct
 	{
@@ -336,9 +331,7 @@ void DrawPlayer(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, Cam
 	else
 		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline.pipeline);
-	vkCmdPushConstants(commandBuffer, spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
-	vkCmdDraw(commandBuffer, 60, 1, 0, 0);
+	DrawSpherePushConstant(commandBuffer, index, sizeof(spherePC), &spherePC);
 }
 
 // General thread constructor for threads using Vulkan
@@ -503,16 +496,13 @@ void Thread_Main(void *arg)
 
 		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
-		vkCmdBindPipeline(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline.pipeline);
-
 		vec3 leftPos=Vec3(leftHand.position.x, leftHand.position.y, leftHand.position.z);
 		vec4 leftRot=Vec4(leftHand.orientation.x, leftHand.orientation.y, leftHand.orientation.z, leftHand.orientation.w);
 		matrix local=MatrixMult(MatrixMult(QuatMatrix(leftRot), MatrixScale(0.1f, 0.1f, 0.1f)), MatrixTranslatev(leftPos));
 		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
 		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
-		vkCmdPushConstants(data->perFrame[data->index].secCommandBuffer[data->eye], spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
-		vkCmdDraw(data->perFrame[data->index].secCommandBuffer[data->eye], 60, 1, 0, 0);
+		DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
 
 		vec3 rightPos=Vec3(rightHand.position.x, rightHand.position.y, rightHand.position.z);
 		vec4 rightRot=Vec4(rightHand.orientation.x, rightHand.orientation.y, rightHand.orientation.z, rightHand.orientation.w);
@@ -520,39 +510,34 @@ void Thread_Main(void *arg)
 		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
 		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
-		vkCmdPushConstants(data->perFrame[data->index].secCommandBuffer[data->eye], spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
-		vkCmdDraw(data->perFrame[data->index].secCommandBuffer[data->eye], 60, 1, 0, 0);
+		DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
 
 		struct
 		{
 			matrix mvp;
 			vec4 color;
 			vec4 Verts[2];
-		} LinePC;
+		} linePC;
 
-		LinePC.Verts[0]=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-		LinePC.Verts[1]=Vec4(0.0f, 0.0f, -1.0f, 1.0f);
+		linePC.Verts[0]=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		linePC.Verts[1]=Vec4(0.0f, 0.0f, -1.0f, 1.0f);
 
-		vkCmdBindPipeline(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.pipeline);
-
-		LinePC.color=Vec4(leftTrigger*100.0f+1.0f, 1.0f, leftGrip*100.0f+1.0f, 1.0f);
+		linePC.color=Vec4(leftTrigger*100.0f+1.0f, 1.0f, leftGrip*100.0f+1.0f, 1.0f);
 
 		local=MatrixMult(QuatMatrix(leftRot), MatrixTranslatev(leftPos));
 		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
-		LinePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
+		linePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
-		vkCmdPushConstants(data->perFrame[data->index].secCommandBuffer[data->eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(LinePC), &LinePC);
-		vkCmdDraw(data->perFrame[data->index].secCommandBuffer[data->eye], 2, 1, 0, 0);
+		DrawLinePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], sizeof(linePC), &linePC);
 
-		LinePC.color=Vec4(rightTrigger*100.0f+1.0f, 1.0f, rightGrip*100.0f+1.0f, 1.0f);
+		linePC.color=Vec4(rightTrigger*100.0f+1.0f, 1.0f, rightGrip*100.0f+1.0f, 1.0f);
 
 		local=MatrixMult(QuatMatrix(rightRot), MatrixTranslatev(rightPos));
 		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
-		LinePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
+		linePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
-		vkCmdPushConstants(data->perFrame[data->index].secCommandBuffer[data->eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(LinePC), &LinePC);
-		vkCmdDraw(data->perFrame[data->index].secCommandBuffer[data->eye], 2, 1, 0, 0);
-	}
+		DrawLinePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], sizeof(linePC), &linePC);
+		}
 
 	// Draw enemy
 	DrawPlayer(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, enemy);

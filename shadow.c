@@ -6,6 +6,7 @@
 #include "math/math.h"
 #include "camera/camera.h"
 #include "model/bmodel.h"
+#include "utils/pipeline.h"
 #include "models.h"
 #include "skybox.h"
 #include "shadow.h"
@@ -20,8 +21,7 @@ extern VkuSwapchain_t swapchain;
 
 matrix shadowMVP;
 
-static VkuPipeline_t shadowPipeline;
-static VkPipelineLayout shadowPipelineLayout;
+static Pipeline_t shadowPipeline;
 static VkRenderPass shadowRenderPass;
 
 static const uint32_t shadowSize=4096;
@@ -99,6 +99,7 @@ bool CreateShadowPipeline(void)
 		},
 	}, 0, &shadowRenderPass);
 
+#if 0
 	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -150,6 +151,10 @@ bool CreateShadowPipeline(void)
 	// Assemble the pipeline
 	if(!vkuAssemblePipeline(&shadowPipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
 		return false;
+#endif
+
+	if(!CreatePipeline(&vkContext, &shadowPipeline, shadowRenderPass, "pipelines/shadow.pipeline"))
+		return false;
 
 	return true;
 }
@@ -168,7 +173,7 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
 	// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline.pipeline);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline.pipeline.pipeline);
 
 	vkCmdSetViewport(commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)shadowSize, (float)shadowSize, 0.0f, 1.0f });
 	vkCmdSetScissor(commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { shadowSize, shadowSize } });
@@ -192,7 +197,7 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &asteroidInstance.buffer, &(VkDeviceSize) { 0 });
 
 	shadowMVP=MatrixMult(modelview, projection);
-	vkCmdPushConstants(commandBuffer, shadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(matrix), &shadowMVP);
+	vkCmdPushConstants(commandBuffer, shadowPipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(matrix), &shadowMVP);
 
 	// Draw the models
 	for(uint32_t j=0;j<NUM_MODELS;j++)
@@ -215,7 +220,6 @@ void DestroyShadow(void)
 	vkuDestroyImageBuffer(&vkContext, &shadowDepth);
 	vkDestroyFramebuffer(vkContext.device, shadowFrameBuffer, VK_NULL_HANDLE);
 
-	vkDestroyPipeline(vkContext.device, shadowPipeline.pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.device, shadowPipelineLayout, VK_NULL_HANDLE);
+	DestroyPipeline(&vkContext, &shadowPipeline);
 	vkDestroyRenderPass(vkContext.device, shadowRenderPass, VK_NULL_HANDLE);
 }

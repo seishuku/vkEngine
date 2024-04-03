@@ -118,7 +118,7 @@ set(PROJECT_SOURCES
 	lighting.c
 	line.c
 	music.c
-	nebula.c
+	volume.c
 	perframe.c
 	sfx.c
 	shadow.c

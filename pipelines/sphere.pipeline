@@ -1,0 +1,12 @@
+pipeline {
+	addStage("shaders/sphere.vert.spv", vertex)
+	addStage("shaders/sphere.frag.spv", fragment)
+
+	pushConstant(0, 80, vertex|fragment)
+
+	depthTest(true)
+	cullMode(back)
+	depthCompareOp(greaterOrEqual)
+	rasterizationSamples(4)
+	//polygonMode(line)
+}

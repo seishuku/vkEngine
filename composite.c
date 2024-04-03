@@ -31,9 +31,10 @@ extern VkuImage_t shadowDepth;
 extern UI_t UI;
 extern Font_t Fnt;
 
-VkuDescriptorSet_t compositeDescriptorSet;
-VkPipelineLayout compositePipelineLayout;
-VkuPipeline_t compositePipeline;
+//VkuDescriptorSet_t compositeDescriptorSet;
+//VkPipelineLayout compositePipelineLayout;
+//VkuPipeline_t compositePipeline;
+Pipeline_t compositePipeline;
 VkRenderPass compositeRenderPass;
 
 //VkuDescriptorSet_t thresholdDescriptorSet;
@@ -141,7 +142,7 @@ bool CreateThresholdPipeline(void)
 	if(!vkuAssemblePipeline(&thresholdPipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
 		return false;
 #endif
-	if(!CreatePipeline(&vkContext, &thresholdPipeline, thresholdRenderPass, "threshold.pipeline"))
+	if(!CreatePipeline(&vkContext, &thresholdPipeline, thresholdRenderPass, "pipelines/threshold.pipeline"))
 		return false;
 
 	return true;
@@ -243,7 +244,7 @@ bool CreateGaussianPipeline(void)
 	if(!vkuAssemblePipeline(&gaussianPipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
 		return false;
 #endif
-	if(!CreatePipeline(&vkContext, &gaussianPipeline, gaussianRenderPass, "gaussian.pipeline"))
+	if(!CreatePipeline(&vkContext, &gaussianPipeline, gaussianRenderPass, "pipelines/gaussian.pipeline"))
 		return false;
 
 	return true;
@@ -425,6 +426,7 @@ bool CreateCompositePipeline(void)
 		},
 	}, 0, &compositeRenderPass);
 
+#if 0
 	vkuInitDescriptorSet(&compositeDescriptorSet, vkContext.device);
 	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -470,6 +472,10 @@ bool CreateCompositePipeline(void)
 
 	if(!vkuAssemblePipeline(&compositePipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
 		return false;
+#endif
+
+	if(!CreatePipeline(&vkContext, &compositePipeline, compositeRenderPass, "pipelines/composite.pipeline"))
+		return false;
 
 	CreateThresholdPipeline();
 	CreateGaussianPipeline();
@@ -511,7 +517,6 @@ void DestroyComposite(void)
 	//////
 
 	// Compositing pipeline
-	vkDestroyDescriptorSetLayout(vkContext.device, compositeDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
 
 	for(uint32_t i=0;i<swapchain.numImages;i++)
 	{
@@ -521,8 +526,10 @@ void DestroyComposite(void)
 			vkDestroyFramebuffer(vkContext.device, perFrame[i].compositeFramebuffer[1], VK_NULL_HANDLE);
 	}
 
-	vkDestroyPipeline(vkContext.device, compositePipeline.pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.device, compositePipelineLayout, VK_NULL_HANDLE);
+	//vkDestroyDescriptorSetLayout(vkContext.device, compositeDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
+	//vkDestroyPipeline(vkContext.device, compositePipeline.pipeline, VK_NULL_HANDLE);
+	//vkDestroyPipelineLayout(vkContext.device, compositePipelineLayout, VK_NULL_HANDLE);
+	DestroyPipeline(&vkContext, &compositePipeline);
 	vkDestroyRenderPass(vkContext.device, compositeRenderPass, VK_NULL_HANDLE);
 	//////
 }
@@ -725,16 +732,16 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)width, (float)height, 0.0f, 1.0f });
 	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { width, height } });
 
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipeline.pipeline);
+	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipeline.pipeline.pipeline);
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&compositeDescriptorSet, 0, colorResolve[eye].sampler, colorResolve[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingImageInfo(&compositeDescriptorSet, 1, colorBlur[eye].sampler, colorBlur[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingImageInfo(&compositeDescriptorSet, 2, depthImage[eye].sampler, depthImage[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingImageInfo(&compositeDescriptorSet, 3, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingBufferInfo(&compositeDescriptorSet, 4, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 0, colorResolve[eye].sampler, colorResolve[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 1, colorBlur[eye].sampler, colorBlur[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 2, depthImage[eye].sampler, depthImage[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 3, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&compositePipeline.descriptorSet, 4, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
 
-	vkuAllocateUpdateDescriptorSet(&compositeDescriptorSet, perFrame[index].descriptorPool);
-	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipelineLayout, 0, 1, &compositeDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+	vkuAllocateUpdateDescriptorSet(&compositePipeline.descriptorSet, perFrame[index].descriptorPool);
+	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipeline.pipelineLayout, 0, 1, &compositePipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 	struct
 	{
@@ -747,7 +754,7 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	PC.uSize[0]=width;
 	PC.uSize[1]=height;
 
-	vkCmdPushConstants(perFrame[index].commandBuffer, compositePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PC), &PC);
+	vkCmdPushConstants(perFrame[index].commandBuffer, compositePipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PC), &PC);
 
 	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
 

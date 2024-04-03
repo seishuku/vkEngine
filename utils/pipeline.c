@@ -2535,7 +2535,9 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 
 							if(token.type==TOKEN_STRING)
 							{
-								if(strcmp(token.string, "colorR")==0)
+								if(strcmp(token.string, "none")==0)
+									pipeline->pipeline.colorWriteMask=0;
+								else if(strcmp(token.string, "colorR")==0)
 									pipeline->pipeline.colorWriteMask|=VK_COLOR_COMPONENT_R_BIT;
 								else if(strcmp(token.string, "colorG")==0)
 									pipeline->pipeline.colorWriteMask|=VK_COLOR_COMPONENT_G_BIT;
@@ -2655,7 +2657,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 	if(vkCreatePipelineLayout(context->device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=1,
+		.setLayoutCount=pipeline->descriptorSet.descriptorSetLayout?1:0,
 		.pSetLayouts=&pipeline->descriptorSet.descriptorSetLayout,
 		.pushConstantRangeCount=pipeline->pushConstant.size?1:0,
 		.pPushConstantRanges=&pipeline->pushConstant,
@@ -2679,7 +2681,9 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 
 void DestroyPipeline(VkuContext_t *context, Pipeline_t *pipeline)
 {
-	vkDestroyDescriptorSetLayout(context->device, pipeline->descriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
+	if(pipeline->descriptorSet.descriptorSetLayout)
+		vkDestroyDescriptorSetLayout(context->device, pipeline->descriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
+
 	vkDestroyPipeline(context->device, pipeline->pipeline.pipeline, VK_NULL_HANDLE);
 	vkDestroyPipelineLayout(context->device, pipeline->pipelineLayout, VK_NULL_HANDLE);
 }

@@ -40,10 +40,6 @@ typedef struct
 	vec4 uSunColor;
 } Skybox_UBO_t;
 
-extern VkuDescriptorSet_t skyboxDescriptorSet;
-extern VkPipelineLayout skyboxPipelineLayout;
-extern VkuPipeline_t skyboxPipeline;
-
 bool CreateSkyboxPipeline(void);
 void DestroySkybox(void);
 void DrawSkybox(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool);

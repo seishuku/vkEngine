@@ -1,0 +1,14 @@
+descriptorSet {
+	addBinding(0, uniformBuffer, vertex)
+	addBinding(1, uniformBuffer, fragment)
+}
+
+pipeline {
+	addStage("shaders/skybox.vert.spv", vertex)
+	addStage("shaders/skybox.frag.spv", fragment)
+
+	depthTest(true)
+	cullMode(back)
+	depthCompareOp(greaterOrEqual)
+	rasterizationSamples(4)
+}

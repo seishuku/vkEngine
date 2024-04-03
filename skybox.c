@@ -6,6 +6,7 @@
 #include "math/math.h"
 #include "vr/vr.h"
 #include "model/bmodel.h"
+#include "utils/pipeline.h"
 #include "skybox.h"
 #include "models.h"
 #include "perframe.h"
@@ -16,9 +17,9 @@ extern VkSampleCountFlags MSAA;
 extern VkuSwapchain_t swapchain;
 extern VkFormat colorFormat, depthFormat;
 
-VkuDescriptorSet_t skyboxDescriptorSet;
-VkPipelineLayout skyboxPipelineLayout;
-VkuPipeline_t skyboxPipeline;
+//VkuDescriptorSet_t skyboxDescriptorSet;
+//VkPipelineLayout skyboxPipelineLayout;
+Pipeline_t skyboxPipeline;
 
 bool CreateSkyboxPipeline(void)
 {
@@ -31,6 +32,7 @@ bool CreateSkyboxPipeline(void)
 		vkMapMemory(vkContext.device, perFrame[i].skyboxUBOBuffer[1].deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].skyboxUBO[1]);
 	}
 
+#if 0
 	vkuInitDescriptorSet(&skyboxDescriptorSet, vkContext.device);
 	vkuDescriptorSet_AddBinding(&skyboxDescriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
 	vkuDescriptorSet_AddBinding(&skyboxDescriptorSet, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -70,6 +72,10 @@ bool CreateSkyboxPipeline(void)
 
 	if(!vkuAssemblePipeline(&skyboxPipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
 		return false;
+#endif
+
+	if(!CreatePipeline(&vkContext, &skyboxPipeline, renderPass, "pipelines/skybox.pipeline"))
+		return false;
 
 	return true;
 }
@@ -85,20 +91,21 @@ void DestroySkybox(void)
 		vkuDestroyBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[1]);
 	}
 
-	vkDestroyDescriptorSetLayout(vkContext.device, skyboxDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
-	vkDestroyPipeline(vkContext.device, skyboxPipeline.pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.device, skyboxPipelineLayout, VK_NULL_HANDLE);
+	//vkDestroyDescriptorSetLayout(vkContext.device, skyboxDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
+	//vkDestroyPipeline(vkContext.device, skyboxPipeline.pipeline.pipeline, VK_NULL_HANDLE);
+	//vkDestroyPipelineLayout(vkContext.device, skyboxPipelineLayout, VK_NULL_HANDLE);
+	DestroyPipeline(&vkContext, &skyboxPipeline);
 }
 
 void DrawSkybox(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool)
 {
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipeline.pipeline);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipeline.pipeline.pipeline);
 
-	vkuDescriptorSet_UpdateBindingBufferInfo(&skyboxDescriptorSet, 0, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
-	vkuDescriptorSet_UpdateBindingBufferInfo(&skyboxDescriptorSet, 1, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
-	vkuAllocateUpdateDescriptorSet(&skyboxDescriptorSet, descriptorPool);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&skyboxPipeline.descriptorSet, 0, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&skyboxPipeline.descriptorSet, 1, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuAllocateUpdateDescriptorSet(&skyboxPipeline.descriptorSet, descriptorPool);
 
-	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipelineLayout, 0, 1, &skyboxDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipeline.pipelineLayout, 0, 1, &skyboxPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 	// This has no bound vertex data, it's baked into the vertex shader
 	vkCmdDraw(commandBuffer, 60, 1, 0, 0);

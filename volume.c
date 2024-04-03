@@ -402,7 +402,7 @@ bool CreateVolumePipeline(void)
 		return false;
 #endif
 
-	if(!CreatePipeline(&vkContext, &volumePipeline, renderPass, "volume.pipeline"))
+	if(!CreatePipeline(&vkContext, &volumePipeline, renderPass, "pipelines/volume.pipeline"))
 		return false;
 
 	return true;

@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include "vulkan/vulkan.h"
 #include "math/math.h"
+#include "utils/pipeline.h"
 
 #include "perframe.h"
 
@@ -12,11 +13,13 @@ extern VkFormat colorFormat;
 extern VkFormat depthFormat;
 extern VkRenderPass renderPass;
 
-VkPipelineLayout linePipelineLayout;
-VkuPipeline_t linePipeline;
+//VkPipelineLayout linePipelineLayout;
+//VkuPipeline_t linePipeline;
+Pipeline_t linePipeline;
 
 bool CreateLinePipeline(void)
 {
+#if 0
 	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -56,14 +59,19 @@ bool CreateLinePipeline(void)
 
 	if(!vkuAssemblePipeline(&linePipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
 		return false;
+#endif
+
+	if(!CreatePipeline(&vkContext, &linePipeline, renderPass, "pipelines/line.pipeline"))
+		return false;
 
 	return true;
 }
 
 void DestroyLine(void)
 {
-	vkDestroyPipeline(vkContext.device, linePipeline.pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.device, linePipelineLayout, VK_NULL_HANDLE);
+	DestroyPipeline(&vkContext, &linePipeline);
+	//vkDestroyPipeline(vkContext.device, linePipeline.pipeline, VK_NULL_HANDLE);
+	//vkDestroyPipelineLayout(vkContext.device, linePipelineLayout, VK_NULL_HANDLE);
 }
 
 void DrawLine(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, vec3 start, vec3 end, vec4 color)
@@ -81,7 +89,14 @@ void DrawLine(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, vec3 
 	linePC.verts[0]=Vec4_Vec3(start, 1.0f);
 	linePC.verts[1]=Vec4_Vec3(end, 1.0f);
 
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.pipeline);
-	vkCmdPushConstants(commandBuffer, linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(linePC), &linePC);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.pipeline.pipeline);
+	vkCmdPushConstants(commandBuffer, linePipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(linePC), &linePC);
+	vkCmdDraw(commandBuffer, 2, 1, 0, 0);
+}
+
+void DrawLinePushConstant(VkCommandBuffer commandBuffer, size_t constantSize, void *constant)
+{
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.pipeline.pipeline);
+	vkCmdPushConstants(commandBuffer, linePipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, constantSize, constant);
 	vkCmdDraw(commandBuffer, 2, 1, 0, 0);
 }

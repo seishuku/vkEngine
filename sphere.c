@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include "vulkan/vulkan.h"
 #include "math/math.h"
+#include "utils/pipeline.h"
 
 #include "perframe.h"
 
@@ -12,11 +13,12 @@ extern VkFormat colorFormat;
 extern VkFormat depthFormat;
 extern VkRenderPass renderPass;
 
-VkPipelineLayout spherePipelineLayout;
-VkuPipeline_t spherePipeline;
+//VkPipelineLayout spherePipelineLayout;
+Pipeline_t spherePipeline;
 
 bool CreateSpherePipeline(void)
 {
+#if 0
 	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -56,14 +58,19 @@ bool CreateSpherePipeline(void)
 
 	if(!vkuAssemblePipeline(&spherePipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
 		return false;
+#endif
+
+	if(!CreatePipeline(&vkContext, &spherePipeline, renderPass, "pipelines/sphere.pipeline"))
+		return false;
 
 	return true;
 }
 
 void DestroySphere(void)
 {
-	vkDestroyPipeline(vkContext.device, spherePipeline.pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.device, spherePipelineLayout, VK_NULL_HANDLE);
+	DestroyPipeline(&vkContext, &spherePipeline);
+	//vkDestroyPipeline(vkContext.device, spherePipeline.pipeline, VK_NULL_HANDLE);
+	//vkDestroyPipelineLayout(vkContext.device, spherePipelineLayout, VK_NULL_HANDLE);
 }
 
 void DrawSphere(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, vec3 position, float radius, vec4 color)
@@ -82,7 +89,14 @@ void DrawSphere(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, vec
 	spherePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
 	spherePC.color=color;
 
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline.pipeline);
-	vkCmdPushConstants(commandBuffer, spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline.pipeline.pipeline);
+	vkCmdPushConstants(commandBuffer, spherePipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(spherePC), &spherePC);
+	vkCmdDraw(commandBuffer, 60, 1, 0, 0);
+}
+
+void DrawSpherePushConstant(VkCommandBuffer commandBuffer, uint32_t index, size_t constantSize, void *constant)
+{
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline.pipeline.pipeline);
+	vkCmdPushConstants(commandBuffer, spherePipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, constantSize, constant);
 	vkCmdDraw(commandBuffer, 60, 1, 0, 0);
 }
