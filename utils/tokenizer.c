@@ -1,15 +1,17 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
+#include <stdio.h>
 #include "tokenizer.h"
 
-bool Tokenizer_Init(Tokenizer_t *context, char *string, size_t numKeywords, const char **keywords)
+bool Tokenizer_Init(Tokenizer_t *context, size_t stringLength, char *string, size_t numKeywords, const char **keywords)
 {
 	context->numKeywords=numKeywords;
 	context->keywords=keywords;
 
+	context->stringLength=stringLength;
+	context->stringPosition=0;
 	context->string=string;
 
 	return true;
@@ -56,10 +58,23 @@ static bool IsWord(const char *word, const char *stringArray[], size_t arraySize
 	return false;
 }
 
-static void SkipWhitespace(char **string)
+static char GetChar(Tokenizer_t *context, size_t offset)
 {
-	while(**string==' '||**string=='\t'||**string=='\n'||**string=='\r')
-		(*string)++;
+	if((context->stringPosition+offset)>=context->stringLength)
+		return 0;
+
+	return context->string[context->stringPosition+offset];
+}
+
+static void SkipWhitespace(Tokenizer_t *context)
+{
+	char c=GetChar(context, 0);
+
+	while(c==' '||c=='\t'||c=='\n'||c=='\r')
+	{
+		context->stringPosition++;
+		c=GetChar(context, 0);
+	}
 }
 
 // Pull a token from string stream, classify it and advance the string pointer.
@@ -67,17 +82,17 @@ Token_t Tokenizer_GetNext(Tokenizer_t *context)
 {
 	Token_t token={ TOKEN_UNKNOWN };
 
-	SkipWhitespace(&context->string);
+	SkipWhitespace(context);
 
 	// Handle comments
 	bool commentDone=true, singleLine=false;
 
-	if(*context->string=='/'&&(*context->string+1)=='*')
+	if(GetChar(context, 0)=='/'&&GetChar(context, 1)=='*')
 	{
 		singleLine=false;
 		commentDone=false;
 	}
-	else if((*context->string=='/'&&(*context->string+1)=='/')||*context->string=='#')
+	else if((GetChar(context, 0)=='/'&&GetChar(context, 1)=='/')||GetChar(context, 0)=='#')
 	{
 		singleLine=true;
 		commentDone=false;
@@ -85,18 +100,18 @@ Token_t Tokenizer_GetNext(Tokenizer_t *context)
 
 	while(!commentDone)
 	{
-		while((*context->string)++)
+		while(GetChar(context, 0), context->stringPosition++)
 		{
 			if(singleLine)
 			{
-				if(*context->string=='\n'||*context->string=='\r')
+				if(GetChar(context, 0)=='\n'||GetChar(context, 0)=='\r')
 				{
-					SkipWhitespace(&context->string);
+					SkipWhitespace(context);
 
 					// Check if there are more comments and switch modes if needed
-					if((*context->string=='/'&&(*context->string+1)=='/')||*context->string=='#')
+					if((GetChar(context, 0)=='/'&&GetChar(context, 1)=='/')||GetChar(context, 0)=='#')
 						commentDone=false;
-					else if(*context->string=='/'&&(*context->string+1)=='*')
+					else if(GetChar(context, 0)=='/'&&GetChar(context, 1)=='*')
 					{
 						commentDone=false;
 						singleLine=false;
@@ -108,19 +123,19 @@ Token_t Tokenizer_GetNext(Tokenizer_t *context)
 			}
 			else
 			{
-				if(*context->string=='*'&&(*context->string+1)=='/')
+				if(GetChar(context, 0)=='*'&&GetChar(context, 1)=='/')
 				{
 					// Eat the remaining '*' and '/'
-					(*context->string)+=2;
+					context->stringPosition+=2;
 
-					SkipWhitespace(&context->string);
+					SkipWhitespace(context);
 
-					if((*context->string=='/'&&(*context->string+1)=='/')||*context->string=='#')
+					if((GetChar(context, 0)=='/'&&GetChar(context, 1)=='/')||GetChar(context, 0)=='#')
 					{
 						commentDone=false;
 						singleLine=true;
 					}
-					else if(*context->string=='/'&&(*context->string+1)=='*')
+					else if(GetChar(context, 0)=='/'&&GetChar(context, 1)=='*')
 						commentDone=false;
 					else
 						commentDone=true;
@@ -131,26 +146,21 @@ Token_t Tokenizer_GetNext(Tokenizer_t *context)
 	}
 
 	// Process the token
-	if(IsAlpha(*context->string)) // Strings and special classification
+	if(IsAlpha(GetChar(context, 0))) // Strings and special classification
 	{
-		const char *start=context->string;
 		uint32_t count=0;
 
-		while(!IsDelimiter(*context->string))
-		{
-			if(*context->string=='\0')
-				break;
-
+		while(!IsDelimiter(GetChar(context, count))&&GetChar(context, count)!='\0')
 			count++;
-			context->string++;
-		}
 
 		if(count>MAX_TOKEN_STRING_LENGTH)
 			count=MAX_TOKEN_STRING_LENGTH;
 
 		token.type=TOKEN_STRING;
-		memcpy(token.string, start, count);
+		memcpy(token.string, &context->string[context->stringPosition], count);
 		token.string[count]='\0';
+
+		context->stringPosition+=count;
 
 		// Re-classify the string if it matches any of these:
 		if(IsWord(token.string, booleans, sizeof(booleans)/sizeof(booleans[0])))
@@ -166,88 +176,86 @@ Token_t Tokenizer_GetNext(Tokenizer_t *context)
 		if(IsWord(token.string, context->keywords, context->numKeywords))
 			token.type=TOKEN_KEYWORD;
 	}
-	else if(*context->string=='0'&&((*context->string+1)=='x'||(*context->string+1)=='X')) // Hexidecimal numbers
+	else if(GetChar(context, 0)=='0'&&(GetChar(context, 1)=='x'||GetChar(context, 1)=='X')) // Hexidecimal numbers
 	{
-		const char *start=context->string+2;
+		const char *start=context->string+context->stringPosition+2;
+		char *end=NULL;
 		token.type=TOKEN_INT;
-		token.ival=strtoll(start, &context->string, 16);
+		token.ival=strtoll(start, &end, 16);
+		context->stringPosition+=end-start;
 	}
-	else if(*context->string=='0'&&((*context->string+1)=='b'||(*context->string+1)=='B')) // Binary numbers
+	else if(GetChar(context, 0)=='0'&&(GetChar(context, 1)=='b'||GetChar(context, 1)=='B')) // Binary numbers
 	{
-		const char *start=context->string+2;
+		const char *start=context->string+context->stringPosition+2;
+		char *end=NULL;
 		token.type=TOKEN_INT;
-		token.ival=strtoll(start, &context->string, 2);
+		token.ival=strtoll(start, &end, 2);
+		context->stringPosition+=end-start;
 	}
-	else if((*context->string=='-'&&IsDigit((*context->string+1)))||IsDigit(*context->string)) // Whole numbers and floating point
+	else if((GetChar(context, 0)=='-'&&IsDigit(GetChar(context, 1)))||IsDigit(GetChar(context, 0))) // Whole numbers and floating point
 	{
-		const char *start=context->string;
+		const char *start=context->string+context->stringPosition;
+		char *end=NULL;
 		bool decimal=false;
+		size_t count=0;
 
-		while(!IsDelimiter(*context->string)||*context->string=='.')
+		while(!IsDelimiter(GetChar(context, count)))
 		{
-			if(*context->string=='\0')
+			if(GetChar(context, count)=='\0')
 				break;
 
-			if(*context->string=='.')
-				decimal=true;
-
-			context->string++;
+			count++;
 		}
 
-		if(decimal)
+		if(GetChar(context, count)=='.')
 		{
 			token.type=TOKEN_FLOAT;
-			token.fval=strtod(start, &context->string);
+			token.fval=strtod(start, &end);
 		}
 		else
 		{
 			token.type=TOKEN_INT;
-			token.ival=strtoll(start, &context->string, 10);
+			token.ival=strtoll(start, &end, 10);
 		}
+
+		context->stringPosition+=end-start;
 	}
-	else if(IsDelimiter(*context->string))
+	else if(IsDelimiter(GetChar(context, 0)))
 	{
 		// special case, treat quoted items as special whole string tokens
-		if(*context->string=='\"')
+		if(GetChar(context, 0)=='\"')
 		{
-			context->string++;
+			context->stringPosition++;
 
-			const char *start=context->string;
 			uint32_t count=0;
 
-			while(*context->string!='\"')
-			{
-				if(*context->string=='\0')
-					break;
-
+			while(GetChar(context, count)!='\"'&&GetChar(context, count)!='\0')
 				count++;
-				context->string++;
-			}
-
-			context->string++;
 
 			if(count>MAX_TOKEN_STRING_LENGTH)
 				count=MAX_TOKEN_STRING_LENGTH;
 
 			token.type=TOKEN_QUOTED;
-			memcpy(token.string, start, count);
+			memcpy(token.string, &context->string[context->stringPosition], count);
 			token.string[count]='\0';
+
+			context->stringPosition+=count+1;
 		}
 		else
 		{
 			token.type=TOKEN_DELIMITER;
-			token.string[0]=*context->string;
+			token.string[0]=GetChar(context, 0);
 
-			context->string++;
+			context->stringPosition++;
 		}
 	}
-	else if(*context->string=='\0')
+	else if(GetChar(context, 0)=='\0')
 	{
 		token.type=TOKEN_END;
-		context->string++;
+		context->stringPosition++;
 	}
 	else
-		context->string++;
+		context->stringPosition++;
 
 	return token;
 }

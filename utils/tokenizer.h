@@ -33,13 +33,15 @@ typedef struct Token_s
 
 typedef struct
 {
+	size_t stringLength;
+	size_t stringPosition;
 	char *string;
 
 	size_t numKeywords;
 	const char **keywords;
 } Tokenizer_t;
 
-bool Tokenizer_Init(Tokenizer_t *context, char *string, size_t numKeywords, const char **keywords);
+bool Tokenizer_Init(Tokenizer_t *context, size_t stringLength, char *string, size_t numKeywords, const char **keywords);
 Token_t Tokenizer_GetNext(Tokenizer_t *context);
 Token_t Tokenizer_PeekNext(Tokenizer_t *context);
 

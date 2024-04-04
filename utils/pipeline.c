@@ -82,7 +82,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 	buffer[length]='\0';
 
 	Tokenizer_t tokenizer;
-	Tokenizer_Init(&tokenizer, buffer, sizeof(keywords)/sizeof(keywords[0]), keywords);
+	Tokenizer_Init(&tokenizer, length, buffer, sizeof(keywords)/sizeof(keywords[0]), keywords);
 
 	Token_t token={ TOKEN_UNKNOWN };
 
