@@ -7,55 +7,63 @@
 #include "../math/math.h"
 #include "vulkan.h"
 
-VkuMemZone_t *vkuMem_Init(VkuContext_t *context, size_t size)
+bool vkuMem_Init(VkuContext_t *context, VkuMemZone_t *vkZone, uint32_t typeIndex, size_t size)
 {
-	VkuMemZone_t *vkZone=(VkuMemZone_t *)Zone_Malloc(zone, sizeof(VkuMemZone_t));
-
-	if(vkZone==NULL)
-	{
-		DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for vulkan memory zone.\n");
-		return false;
-	}
-
-	VkuMemBlock_t *block=(VkuMemBlock_t *)Zone_Malloc(zone, sizeof(VkuMemBlock_t));
-	block->offset=0;
-	block->size=size;
-	block->free=true;
-	block->prev=NULL;
-	block->next=NULL;
-
-	vkZone->blocks=block;
-
-	vkZone->size=size;
-
 	// Set up create info with slab size
 	VkMemoryAllocateInfo allocateInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.allocationSize=size,
+		.memoryTypeIndex=typeIndex,
 	};
-
-	// Search for the first memory type on the local memory heap and set it
-	for(uint32_t Index=0;Index<context->deviceMemProperties.memoryTypeCount;Index++)
-	{
-		if(context->deviceMemProperties.memoryTypes[Index].propertyFlags&VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
-		{
-			allocateInfo.memoryTypeIndex=Index;
-			break;
-		}
-	}
 
 	// Attempt to allocate it
 	VkResult result=vkAllocateMemory(context->device, &allocateInfo, VK_NULL_HANDLE, &vkZone->deviceMemory);
 
 	if(result!=VK_SUCCESS)
 	{
+#ifdef _DEBUG
 		DBGPRINTF(DEBUG_ERROR, "Failed to allocate vulakn memory zone (Result=%d).\n", result);
-		return NULL;
+#endif
+		return false;
 	}
 
+	vkZone->blocks=(VkuMemBlock_t *)Zone_Malloc(zone, sizeof(VkuMemBlock_t));
+
+	if(vkZone->blocks==NULL)
+	{
+		vkFreeMemory(context->device, vkZone->deviceMemory, VK_NULL_HANDLE);
+
+		DBGPRINTF(DEBUG_ERROR, "Failed to allocate memory for memory block.\n");
+		return false;
+	}
+
+	vkZone->blocks->offset=0;
+	vkZone->blocks->size=size;
+	vkZone->blocks->free=true;
+	vkZone->blocks->prev=NULL;
+	vkZone->blocks->next=NULL;
+	vkZone->blocks->deviceMemory=vkZone->deviceMemory;
+
+	vkZone->size=size;
+
+	// Attempt to map the memory (<<this will fail for device local memory>>)
+	result=vkMapMemory(context->device, vkZone->deviceMemory, 0, VK_WHOLE_SIZE, 0, &vkZone->mappedPointer);
+
+	if(result!=VK_SUCCESS)
+	{
+#ifdef _DEBUG
+		DBGPRINTF(DEBUG_ERROR, "Failed to map vulakn device memory (Result=%d).\n", result);
+#endif
+		vkZone->mappedPointer=NULL;
+	}
+
+	if(vkZone->mappedPointer!=NULL)
+		vkZone->blocks->mappedPointer=vkZone->mappedPointer;
+
 	DBGPRINTF(DEBUG_INFO, "Vulakn memory zone allocated (OBJ: 0x%p), size: %0.3fMB\n", vkZone->deviceMemory, (float)size/1000.0f/1000.0f);
-	return vkZone;
+
+	return true;
 }
 
 void vkuMem_Destroy(VkuContext_t *context, VkuMemZone_t *vkZone)
@@ -71,7 +79,6 @@ void vkuMem_Destroy(VkuContext_t *context, VkuMemZone_t *vkZone)
 		}
 
 		vkFreeMemory(context->device, vkZone->deviceMemory, VK_NULL_HANDLE);
-		Zone_Free(zone, vkZone);
 	}
 }
 
@@ -148,12 +155,21 @@ VkuMemBlock_t *vkuMem_Malloc(VkuMemZone_t *vkZone, VkMemoryRequirements memoryRe
 				newBlock->free=true;
 				newBlock->prev=baseBlock;
 				newBlock->next=baseBlock->next;
+				newBlock->deviceMemory=vkZone->deviceMemory;
+
+				if(vkZone->mappedPointer)
+					newBlock->mappedPointer=(void*)((uint8_t *)vkZone->mappedPointer+newBlock->offset);
 
 				baseBlock->next=newBlock;
 				baseBlock->size=size;
 
 				if(baseBlock->prev)
+				{
 					baseBlock->offset=(baseBlock->prev->size+baseBlock->prev->offset+(memoryRequirements.alignment-1))&~(memoryRequirements.alignment-1);
+
+					if(vkZone->mappedPointer)
+						baseBlock->mappedPointer=(void *)((uint8_t *)vkZone->mappedPointer+baseBlock->offset);
+				}
 			}
 
 			baseBlock->free=false;

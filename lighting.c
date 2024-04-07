@@ -24,6 +24,11 @@ Pipeline_t mainPipeline;
 
 bool CreateLightingPipeline(void)
 {
+/*
+renderPass {
+	addAttachment(
+}
+*/
 	vkCreateRenderPass(vkContext.device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
@@ -34,7 +39,7 @@ bool CreateLightingPipeline(void)
 				.format=colorFormat,
 				.samples=MSAA,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
+				.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
@@ -44,7 +49,7 @@ bool CreateLightingPipeline(void)
 				.format=depthFormat,
 				.samples=MSAA,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
+				.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,

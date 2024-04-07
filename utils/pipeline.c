@@ -2684,9 +2684,9 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 	if(vkCreatePipelineLayout(context->device, &(VkPipelineLayoutCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=pipeline->descriptorSet.descriptorSetLayout?1:0,
+		.setLayoutCount=pipeline->descriptorSet.descriptorSetLayout?1u:0u,
 		.pSetLayouts=&pipeline->descriptorSet.descriptorSetLayout,
-		.pushConstantRangeCount=pipeline->pushConstant.size?1:0,
+		.pushConstantRangeCount=pipeline->pushConstant.size?1u:0u,
 		.pPushConstantRanges=&pipeline->pushConstant,
 	}, 0, &pipeline->pipelineLayout)!=VK_SUCCESS)
 	{

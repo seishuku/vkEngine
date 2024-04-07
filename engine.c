@@ -55,7 +55,7 @@ VkInstance vkInstance;
 VkuContext_t vkContext;
 
 // Vulkan memory allocator zone
-VkuMemZone_t *vkZone;
+VkuMemZone_t vkZone;
 
 // Camera data
 Camera_t camera, enemy;
@@ -86,7 +86,7 @@ Sample_t sounds[NUM_SOUNDS];
 VkuSwapchain_t swapchain;
 
 // Multisample anti-alias sample count
-VkSampleCountFlags MSAA=VK_SAMPLE_COUNT_4_BIT;
+VkSampleCountFlagBits MSAA=VK_SAMPLE_COUNT_4_BIT;
 
 // Colorbuffer image and format
 VkFormat colorFormat=VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -1265,6 +1265,8 @@ void Console_CmdQuit(Console_t *Console, const char *Param)
 	isDone=true;
 }
 
+bool vkuMemAllocator_Init(VkuContext_t *context);
+
 // Initialization call from system main
 bool Init(void)
 {
@@ -1280,9 +1282,7 @@ bool Init(void)
 	Console_Init(&console, 80, 25);
 	Console_AddCommand(&console, "quit", Console_CmdQuit);
 
-	vkZone=vkuMem_Init(&vkContext, (size_t)(vkContext.deviceProperties2.maxMemoryAllocationSize*0.8f));
-
-	if(vkZone==NULL)
+	if(!vkuMem_Init(&vkContext, &vkZone, vkContext.localMemIndex, vkContext.deviceProperties2.maxMemoryAllocationSize))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: vkuMem_Init failed.\n");
 		return false;
@@ -1896,6 +1896,9 @@ void Destroy(void)
 	//////////
 
 	DBGPRINTF(DEBUG_INFO, "Remaining Vulkan memory blocks:\n");
-	vkuMem_Print(vkZone);
-	vkuMem_Destroy(&vkContext, vkZone);
+	vkuMem_Print(&vkZone);
+	vkuMem_Destroy(&vkContext, &vkZone);
+
+	void VkuMemAllocator_Destroy(void);
+	VkuMemAllocator_Destroy();
 }

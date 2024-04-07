@@ -9,6 +9,60 @@
 
 PFN_vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR=VK_NULL_HANDLE;
 
+void PrintMemoryTypeFlags(VkMemoryPropertyFlags propertyFlags)
+{
+	if(propertyFlags&VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+	{
+		fprintf(stderr, "<DEVICE LOCAL>");
+		propertyFlags&=~VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	}
+	if(propertyFlags&VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+	{
+		fprintf(stderr, "<HOST VISIBLE>");
+		propertyFlags&=~VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+	}
+	if(propertyFlags&VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+	{
+		fprintf(stderr, "<HOST COHERENT>");
+		propertyFlags&=~VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+	}
+	if(propertyFlags&VK_MEMORY_PROPERTY_HOST_CACHED_BIT)
+	{
+		fprintf(stderr, "<HOST CACHED>");
+		propertyFlags&=~VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+	}
+	if(propertyFlags&VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT)
+	{
+		fprintf(stderr, "<LAZILY ALLOCATED>");
+		propertyFlags&=~VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
+	}
+	if(propertyFlags&VK_MEMORY_PROPERTY_PROTECTED_BIT)
+	{
+		fprintf(stderr, "<PROTECTED>");
+		propertyFlags&=~VK_MEMORY_PROPERTY_PROTECTED_BIT;
+	}
+	if(propertyFlags&VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD)
+	{
+		fprintf(stderr, "<DEVICE COHERENT>");
+		propertyFlags&=~VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD;
+	}
+	if(propertyFlags&VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD)
+	{
+		fprintf(stderr, "<DEVICE UNCACHED>");
+		propertyFlags&=~VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD;
+	}
+	if(propertyFlags&VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV)
+	{
+		fprintf(stderr, "<RDMA CAPABLE>");
+		propertyFlags&=~VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV;
+	}
+
+	if(propertyFlags)
+		fprintf(stderr, "<UNKNOWN: %X>", propertyFlags);
+
+	fprintf(stderr, "\n");
+}
+
 // Creates a Vulkan Context
 VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 {
@@ -236,13 +290,35 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 	// Get device physical memory properties
 	vkGetPhysicalDeviceMemoryProperties(context->physicalDevice, &context->deviceMemProperties);
 
-	DBGPRINTF(DEBUG_INFO, "Vulkan memory heaps: \n");
-	for(uint32_t i=0;i<context->deviceMemProperties.memoryHeapCount;i++)
-		DBGPRINTF(DEBUG_INFO, "\t#%d: Size: %0.3fGB\n", i, (float)context->deviceMemProperties.memoryHeaps[i].size/1000.0f/1000.0f/1000.0f);
+	DBGPRINTF(DEBUG_INFO, "Vulkan memory information: \n");
 
-	DBGPRINTF(DEBUG_INFO, "Vulkan memory types: \n");
 	for(uint32_t i=0;i<context->deviceMemProperties.memoryTypeCount;i++)
-		DBGPRINTF(DEBUG_INFO, "\t#%d: Heap index: %d Flags: 0x%X\n", i, context->deviceMemProperties.memoryTypes[i].heapIndex, context->deviceMemProperties.memoryTypes[i].propertyFlags);
+	{
+		VkDeviceSize heapSize=context->deviceMemProperties.memoryHeaps[context->deviceMemProperties.memoryTypes[i].heapIndex].size;
+		VkMemoryPropertyFlags flags=context->deviceMemProperties.memoryTypes[i].propertyFlags;
+
+		if(flags&VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+		{
+			DBGPRINTF(DEBUG_INFO, "\t#%d: Heap index: %d\tSize: %0.3fGB (device local only)\n", i, context->deviceMemProperties.memoryTypes[i].heapIndex, (float)heapSize/1000.0f/1000.0f/1000.0f);
+			context->localMemSize=heapSize;
+			context->localMemIndex=i;
+			break;
+		}
+	}
+
+	for(uint32_t i=0;i<context->deviceMemProperties.memoryTypeCount;i++)
+	{
+		VkDeviceSize heapSize=context->deviceMemProperties.memoryHeaps[context->deviceMemProperties.memoryTypes[i].heapIndex].size;
+		VkMemoryPropertyFlags flags=context->deviceMemProperties.memoryTypes[i].propertyFlags;
+
+		if(flags&(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT|VK_MEMORY_PROPERTY_HOST_CACHED_BIT))
+		{
+			DBGPRINTF(DEBUG_INFO, "\t#%d: Heap index: %d\tSize: %0.3fGB (host visible/coherent/cached)\n", i, context->deviceMemProperties.memoryTypes[i].heapIndex, (float)heapSize/1000.0f/1000.0f/1000.0f);
+			context->hostMemSize=heapSize;
+			context->hostMemIndex=i;
+			break;
+		}
+	}
 
 	VkPhysicalDeviceFeatures features;
 	vkGetPhysicalDeviceFeatures(context->physicalDevice, &features);
@@ -286,7 +362,7 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 		pNext=&deviceDynamicRenderingFeatures;
 	}
 
-#if 1
+#if 0
 	extensions[numExtensions++]=VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME;
 	extensions[numExtensions++]=VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME;
 	extensions[numExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME;

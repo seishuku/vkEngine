@@ -33,7 +33,7 @@ extern XruContext_t xrContext;
 extern VkInstance vkInstance;
 extern VkuContext_t vkContext;
 
-extern VkuMemZone_t *vkZone;
+extern VkuMemZone_t vkZone;
 
 extern VkuSwapchain_t swapchain;
 

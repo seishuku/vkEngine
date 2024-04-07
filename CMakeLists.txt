@@ -107,6 +107,7 @@ set(PROJECT_SOURCES
 	vulkan/vulkan_context.c
 	vulkan/vulkan_descriptorset.c
 	vulkan/vulkan_framebuffer.c
+	vulkan/vulkan_heaps.c
 	vulkan/vulkan_instance.c
 	vulkan/vulkan_mem.c
 	vulkan/vulkan_pipeline.c

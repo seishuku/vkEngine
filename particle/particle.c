@@ -18,7 +18,7 @@ extern VkFormat ColorFormat, DepthFormat;
 
 extern VkRenderPass renderPass;
 
-extern VkuMemZone_t *vkZone;
+extern VkuMemZone_t vkZone;
 ////////////////////////////
 
 //static VkuDescriptorSet_t particleDescriptorSet;

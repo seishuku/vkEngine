@@ -196,7 +196,6 @@ Token_t Tokenizer_GetNext(Tokenizer_t *context)
 	{
 		const char *start=context->string+context->stringPosition;
 		char *end=NULL;
-		bool decimal=false;
 		size_t count=0;
 
 		while(!IsDelimiter(GetChar(context, count)))

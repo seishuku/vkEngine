@@ -40,6 +40,8 @@ extern PFN_vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR;
 #define VKU_MAX_RENDERPASS_ATTACHMENTS 8
 #define VKU_MAX_RENDERPASS_SUBPASS_DEPENDENCIES 8
 
+#define VKU_MIN_DEVICE_ALLOCATION_SIZE (256*1024)
+
 typedef struct
 {
 #ifdef WIN32
@@ -62,7 +64,10 @@ typedef struct
 
 	VkPhysicalDeviceProperties2 deviceProperties;
 	VkPhysicalDeviceMaintenance3Properties deviceProperties2;
+
 	VkPhysicalDeviceMemoryProperties deviceMemProperties;
+	VkDeviceSize hostMemSize, localMemSize;
+	uint32_t hostMemIndex, localMemIndex;
 
 	VkPhysicalDevice physicalDevice;
 	VkDevice device;
@@ -189,6 +194,8 @@ typedef struct VkuMemBlock_s
 	size_t offset;
 	size_t size;
 	bool free;
+	VkDeviceMemory deviceMemory;
+	void *mappedPointer;
 	struct VkuMemBlock_s *next, *prev;
 } VkuMemBlock_t;
 
@@ -197,6 +204,7 @@ typedef struct
 	size_t size;
 	VkuMemBlock_t *blocks;
 	VkDeviceMemory deviceMemory;
+	void *mappedPointer;
 } VkuMemZone_t;
 
 typedef struct
@@ -307,7 +315,7 @@ VkBool32 vkuInitDescriptorSet(VkuDescriptorSet_t *descriptorSet, VkDevice device
 VkBool32 vkuAssembleDescriptorSetLayout(VkuDescriptorSet_t *descriptorSet);
 VkBool32 vkuAllocateUpdateDescriptorSet(VkuDescriptorSet_t *descriptorSet, VkDescriptorPool descriptorPool);
 
-VkuMemZone_t *vkuMem_Init(VkuContext_t *context, size_t size);
+bool vkuMem_Init(VkuContext_t *context, VkuMemZone_t *zone, uint32_t typeIndex, size_t size);
 void vkuMem_Destroy(VkuContext_t *context, VkuMemZone_t *vkZone);
 void vkuMem_Free(VkuMemZone_t *vkZone, VkuMemBlock_t *ptr);
 VkuMemBlock_t *vkuMem_Malloc(VkuMemZone_t *vkZone, VkMemoryRequirements requirements);

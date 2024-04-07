@@ -25,7 +25,7 @@ extern VkuContext_t vkContext;
 extern VkSampleCountFlags MSAA;
 extern VkuSwapchain_t swapchain;
 
-extern VkuMemZone_t *vkZone;
+extern VkuMemZone_t vkZone;
 
 extern VkRenderPass compositeRenderPass;
 
