@@ -100,6 +100,65 @@ void CameraSeekTarget(Camera_t *camera, const vec3 targetPos, const float target
 	camera->velocity=Vec3_Addv(Vec3_Muls(camera->velocity, 1.0f-positionDamping), Vec3_Muls(directionCamera, speed*positionDamping));
 }
 
+void CameraSeekTargetCamera(Camera_t *camera, Camera_t cameraTarget, RigidBody_t *obstacles, size_t numObstacles)
+{
+	const float maxSpeed=1.0f;
+	const float rotationDamping=0.01f;
+	const float positionDamping=0.0005f;
+	const float aimAheadFactor=1.0f;
+	const float seekRadius=(camera->radius+cameraTarget.radius)*1.5f;
+
+	vec3 futureTargetPos=Vec3_Addv(cameraTarget.position, Vec3_Muls(cameraTarget.velocity, aimAheadFactor));
+
+	// Find relative direction between camera and target
+	vec3 directionWorld=Vec3_Subv(futureTargetPos, camera->position);
+
+	// Calculate a relative distance for later speed reduction
+	const float relativeDistance=Vec3_Dot(directionWorld, directionWorld)-(seekRadius*seekRadius);
+
+	Vec3_Normalize(&directionWorld);
+
+	// Check for obstacles in the avoidance radius
+	for(size_t i=0;i<numObstacles;i++)
+	{
+		const float avoidanceRadius=(camera->radius+obstacles[i].radius)*1.1f;
+		const vec3 cameraToObstacle=Vec3_Subv(camera->position, obstacles[i].position);
+		const float cameraToObstacleDistanceSq=Vec3_Dot(cameraToObstacle, cameraToObstacle);
+
+		if(cameraToObstacleDistanceSq<=avoidanceRadius*avoidanceRadius)
+		{
+			if(cameraToObstacleDistanceSq>0.0f)
+			{
+				// Adjust the camera trajectory to avoid the obstacle
+				const float rMag=1.0f/sqrtf(cameraToObstacleDistanceSq);
+				const vec3 avoidanceDirection=Vec3_Muls(cameraToObstacle, rMag);
+
+				directionWorld=Vec3_Addv(directionWorld, avoidanceDirection);
+				Vec3_Normalize(&directionWorld);
+			}
+		}
+	}
+
+	// Build 3x3 matrix and transform worldspace direction to camera space
+	const matrix cameraOrientation=
+	{
+		.x=Vec4(camera->right.x, camera->up.x, camera->forward.x, 0.0f),
+		.y=Vec4(camera->right.y, camera->up.y, camera->forward.y, 0.0f),
+		.z=Vec4(camera->right.z, camera->up.z, camera->forward.z, 0.0f),
+		.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
+	};
+	const vec3 directionCamera=Matrix3x3MultVec3(directionWorld, cameraOrientation);
+
+	// Aim pitch and yaw
+	camera->yaw=atan2f(directionCamera.x, directionCamera.z);
+	camera->pitch=asinf(directionCamera.y);
+
+	// Slow down the speed as it gets closer
+	const float speed=maxSpeed*relativeDistance;
+
+	camera->velocity=Vec3_Addv(Vec3_Muls(camera->velocity, 1.0f-positionDamping), Vec3_Muls(directionCamera, speed*positionDamping));
+}
+
 // Camera collision stuff
 static int32_t ClassifySphere(const vec3 center, const vec3 normal, const vec3 point, const float radius, float *distance)
 {

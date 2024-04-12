@@ -1142,7 +1142,8 @@ void Render(void)
 
 	//////
 	// Do a simple dumb "seek out the player" thing
-	CameraSeekTarget(&enemy, camera.position, camera.radius, asteroids, NUM_ASTEROIDS);
+	//CameraSeekTarget(&enemy, camera.position, camera.radius, asteroids, NUM_ASTEROIDS);
+	CameraSeekTargetCamera(&enemy, camera, asteroids, NUM_ASTEROIDS);
 	isTargeted=CameraIsTargetInFOV(enemy, camera.position, deg2rad(15.0f));
 
 #if 0

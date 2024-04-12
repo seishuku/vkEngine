@@ -6,6 +6,8 @@
 #include "textures.h"
 #include "shadow.h"
 
+#define USE_COMPUTE_SHADER
+
 extern VkuContext_t vkContext;
 extern VkSampleCountFlags MSAA;
 extern VkFormat colorFormat;
@@ -24,7 +26,7 @@ Pipeline_t volumePipeline;
 //////
 
 // Nebula volume texture generation
-#if 0
+#ifndef USE_COMPUTE_SHADER
 static int p[512]=
 {
 	151, 160, 137, 91,  90,  15,  131, 13,  201, 95,  96,  53,  194, 233, 7,   225,
@@ -124,6 +126,28 @@ static float nebula(vec3 p)
 
 	return clampf(turb, 0.0f, 1.0f);
 }
+
+static float fbm(vec3 p)
+{
+	const int octaves=12;
+	const float gain=0.25;
+	const float lacunarity=4.0;
+
+	float amplitude=1.0;
+	float frequency=1.0;
+	float sum=0.0;
+	float q=0.0;
+
+	for(int i=0;i<octaves;i++)
+	{
+		sum+=amplitude*noise(p.x*frequency, p.y*frequency, p.z*frequency);
+		q+=amplitude;
+		amplitude*=gain;
+		frequency*=lacunarity;
+	}
+
+	return sum/q;
+}
 #endif
 
 VkBool32 GenNebulaVolume(VkuImage_t *image)
@@ -169,7 +193,7 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 			.subresourceRange={ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
 	}, VK_NULL_HANDLE, &image->imageView);
 
-#if 0
+#ifndef USE_COMPUTE_SHADER
 	VkCommandBuffer commandBuffer;
 	VkuBuffer_t stagingBuffer;
 	void *data=NULL;
@@ -183,7 +207,7 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 	// Map image memory and copy data
 	vkMapMemory(vkContext.device, stagingBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
 
-	const float Scale=16.0f;
+	const float Scale=12.0f;
 
 	for(uint32_t i=0;i<size;i++)
 	{

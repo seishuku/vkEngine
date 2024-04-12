@@ -68,7 +68,7 @@ bool vkuMem_Init(VkuContext_t *context, VkuMemZone_t *vkZone, uint32_t typeIndex
 
 void vkuMem_Destroy(VkuContext_t *context, VkuMemZone_t *vkZone)
 {
-	if(vkZone)
+	if(vkZone->blocks)
 	{
 		VkuMemBlock_t *block=vkZone->blocks;
 
