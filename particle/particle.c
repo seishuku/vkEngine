@@ -17,8 +17,6 @@ extern VkSampleCountFlags MSAA;
 extern VkFormat ColorFormat, DepthFormat;
 
 extern VkRenderPass renderPass;
-
-extern VkuMemZone_t vkZone;
 ////////////////////////////
 
 //static VkuDescriptorSet_t particleDescriptorSet;
@@ -397,17 +395,13 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 		vkDeviceWaitIdle(vkContext.device);
 
 		if(system->particleBuffer.buffer)
-		{
-			vkDestroyBuffer(vkContext.device, system->particleBuffer.buffer, VK_NULL_HANDLE);
-			vkFreeMemory(vkContext.device, system->particleBuffer.deviceMemory, VK_NULL_HANDLE);
-		}
+			vkuDestroyBuffer(&vkContext, &system->particleBuffer);
 
 		vkuCreateHostBuffer(&vkContext, &system->particleBuffer, sizeof(vec4)*2*count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 	}
 
 	count=0;
-	float *array=NULL;
-	vkMapMemory(vkContext.device, system->particleBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&array);
+	float *array=(float *)system->particleBuffer.memory->mappedPointer;
 
 	if(array==NULL)
 	{
@@ -438,8 +432,6 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 			}
 		}
 	}
-
-	vkUnmapMemory(vkContext.device, system->particleBuffer.deviceMemory);
 
 	mtx_unlock(&system->mutex);
 

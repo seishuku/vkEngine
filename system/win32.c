@@ -25,8 +25,6 @@ extern XruContext_t xrContext;
 extern VkInstance vkInstance;
 extern VkuContext_t vkContext;
 
-extern VkuMemZone_t vkZone;
-
 extern VkuSwapchain_t swapchain;
 
 uint32_t windowWidth=1920, windowHeight=1080;
@@ -494,9 +492,6 @@ int main(int argc, char **argv)
 
 	DBGPRINTF(DEBUG_INFO, "\nCurrent system zone memory allocations:\n");
 	Zone_Print(zone);
-
-	DBGPRINTF(DEBUG_INFO, "\nCurrent vulkan zone memory allocations:\n");
-	vkuMem_Print(&vkZone);
 
 #if 0
 	// RenderDoc frame capture for VR mode

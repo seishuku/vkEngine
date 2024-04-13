@@ -6,8 +6,11 @@
 // Max number of device local heap slices
 #define VKU_MAX_LOCAL_HEAPS 8
 
+// 2GB for each local device heap
+#define VKU_LOCAL_HEAP_SIZE (2048ull*1024*1024)
+
 // 1GB for host data (staging buffers, UBOs, etc)
-#define VKU_HOST_HEAP_SIZE (1024*1024*1024)
+#define VKU_HOST_HEAP_SIZE (1024ull*1024*1024)
 
 typedef struct
 {
@@ -19,7 +22,7 @@ typedef struct
 	VkuMemZone_t hostLocal;
 } VkuMemAllocator_t;
 
-VkuMemAllocator_t vkHeaps;
+static VkuMemAllocator_t vkHeaps;
 
 bool vkuMemAllocator_Init(VkuContext_t *context)
 {
@@ -33,7 +36,7 @@ bool vkuMemAllocator_Init(VkuContext_t *context)
 
 	DBGPRINTF(DEBUG_INFO, "Host heap size: %0.3fGB\n", (float)VKU_HOST_HEAP_SIZE/1000.0f/1000.0f/1000.0f);
 
-	vkHeaps.localHeapSize=context->localMemSize/VKU_MAX_LOCAL_HEAPS;
+	vkHeaps.localHeapSize=VKU_LOCAL_HEAP_SIZE;//context->localMemSize/VKU_MAX_LOCAL_HEAPS;
 
 	if(vkHeaps.localHeapSize>context->deviceProperties2.maxMemoryAllocationSize)
 		vkHeaps.localHeapSize=context->deviceProperties2.maxMemoryAllocationSize;
@@ -44,14 +47,14 @@ bool vkuMemAllocator_Init(VkuContext_t *context)
 		return false;
 	}
 	
-	vkHeaps.numDeviceLocal++;
+	vkHeaps.numDeviceLocal=1;
 
 	DBGPRINTF(DEBUG_INFO, "Local heap size: %0.3fGB\n", (float)(vkHeaps.localHeapSize*vkHeaps.numDeviceLocal)/1000.0f/1000.0f/1000.0f);
 
 	return true;
 }
 
-void VkuMemAllocator_Destroy(void)
+void vkuMemAllocator_Destroy(void)
 {
 	vkuMem_Destroy(vkHeaps.context, &vkHeaps.hostLocal);
 
@@ -59,7 +62,7 @@ void VkuMemAllocator_Destroy(void)
 		vkuMem_Destroy(vkHeaps.context, &vkHeaps.deviceLocal[i]);
 }
 
-VkuMemBlock_t *VkuMemAllocator_Malloc(VkMemoryRequirements memoryRequirements)
+VkuMemBlock_t *vkuMemAllocator_Malloc(VkMemoryRequirements memoryRequirements)
 {
 	VkuMemBlock_t *block=NULL;
 
@@ -107,7 +110,7 @@ VkuMemBlock_t *VkuMemAllocator_Malloc(VkMemoryRequirements memoryRequirements)
 	return block;
 }
 
-void VkuMemAllocator_Free(VkuMemBlock_t *block)
+void vkuMemAllocator_Free(VkuMemBlock_t *block)
 {
 	// Search device local heaps for the block
 	for(uint32_t i=0;i<vkHeaps.numDeviceLocal;i++)
@@ -128,4 +131,14 @@ void VkuMemAllocator_Free(VkuMemBlock_t *block)
 
 	// Didn't find it in device local, try host local:
 	vkuMem_Free(&vkHeaps.hostLocal, block);
+}
+
+void vkuMemAllocator_Print(void)
+{
+	DBGPRINTF(DEBUG_INFO, "Host vulkan allocations:\n");
+	vkuMem_Print(&vkHeaps.hostLocal);
+
+	DBGPRINTF(DEBUG_INFO, "Device local vulkan allocations:\n");
+	for(uint32_t i=0;i<vkHeaps.numDeviceLocal;i++)
+		vkuMem_Print(&vkHeaps.deviceLocal[i]);
 }

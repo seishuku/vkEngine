@@ -26,10 +26,10 @@ bool CreateSkyboxPipeline(void)
 	for(uint32_t i=0;i<swapchain.numImages;i++)
 	{
 		vkuCreateHostBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[0], sizeof(Skybox_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		vkMapMemory(vkContext.device, perFrame[i].skyboxUBOBuffer[0].deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].skyboxUBO[0]);
+		perFrame[i].skyboxUBO[0]=(Skybox_UBO_t *)perFrame[i].skyboxUBOBuffer[0].memory->mappedPointer;
 
 		vkuCreateHostBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[1], sizeof(Skybox_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		vkMapMemory(vkContext.device, perFrame[i].skyboxUBOBuffer[1].deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].skyboxUBO[1]);
+		perFrame[i].skyboxUBO[1]=(Skybox_UBO_t *)perFrame[i].skyboxUBOBuffer[1].memory->mappedPointer;
 	}
 
 #if 0
@@ -84,10 +84,7 @@ void DestroySkybox(void)
 {
 	for(uint32_t i=0;i<swapchain.numImages;i++)
 	{
-		vkUnmapMemory(vkContext.device, perFrame[i].skyboxUBOBuffer[0].deviceMemory);
 		vkuDestroyBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[0]);
-
-		vkUnmapMemory(vkContext.device, perFrame[i].skyboxUBOBuffer[1].deviceMemory);
 		vkuDestroyBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[1]);
 	}
 

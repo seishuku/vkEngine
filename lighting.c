@@ -145,10 +145,10 @@ renderPass {
 	for(uint32_t i=0;i<swapchain.numImages;i++)
 	{
 		vkuCreateHostBuffer(&vkContext, &perFrame[i].mainUBOBuffer[0], sizeof(Main_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		vkMapMemory(vkContext.device, perFrame[i].mainUBOBuffer[0].deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].mainUBO[0]);
+		perFrame[i].mainUBO[0]=perFrame[i].mainUBOBuffer[0].memory->mappedPointer;
 
 		vkuCreateHostBuffer(&vkContext, &perFrame[i].mainUBOBuffer[1], sizeof(Main_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		vkMapMemory(vkContext.device, perFrame[i].mainUBOBuffer[1].deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&perFrame[i].mainUBO[1]);
+		perFrame[i].mainUBO[1]=perFrame[i].mainUBOBuffer[1].memory->mappedPointer;
 	}
 
 #if 0
@@ -220,10 +220,7 @@ void DestroyLighting(void)
 {
 	for(uint32_t i=0;i<swapchain.numImages;i++)
 	{
-		vkUnmapMemory(vkContext.device, perFrame[i].mainUBOBuffer[0].deviceMemory);
 		vkuDestroyBuffer(&vkContext, &perFrame[i].mainUBOBuffer[0]);
-
-		vkUnmapMemory(vkContext.device, perFrame[i].mainUBOBuffer[1].deviceMemory);
 		vkuDestroyBuffer(&vkContext, &perFrame[i].mainUBOBuffer[1]);
 	}
 

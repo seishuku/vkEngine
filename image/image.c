@@ -912,7 +912,7 @@ VkBool32 Image_Upload(VkuContext_t *context, VkuImage_t *image, const char *file
 		vkuCreateHostBuffer(context, &stagingBuffer, size*6, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 		// Map image memory and copy data for each cube face
-		vkMapMemory(context->device, stagingBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
+		data=stagingBuffer.memory->mappedPointer;
 		for(uint32_t i=0;i<6;i++)
 		{
 			// Extract the cubemap face from the angular map lightprobe
@@ -925,7 +925,6 @@ VkBool32 Image_Upload(VkuContext_t *context, VkuImage_t *image, const char *file
 			// Free the output data for the next face
 			Zone_Free(zone, Out.data);
 		}
-		vkUnmapMemory(context->device, stagingBuffer.deviceMemory);
 
 		// All faces are copied, free the original image data
 		Zone_Free(zone, image->data);
@@ -982,8 +981,7 @@ VkBool32 Image_Upload(VkuContext_t *context, VkuImage_t *image, const char *file
 		vkuOneShotCommandBufferEnd(context, commandBuffer);
 
 		// Delete staging buffers
-		vkDestroyBuffer(context->device, stagingBuffer.buffer, VK_NULL_HANDLE);
-		vkFreeMemory(context->device, stagingBuffer.deviceMemory, VK_NULL_HANDLE);
+		vkuDestroyBuffer(context, &stagingBuffer);
 	}
 	else // Otherwise it's a 2D texture
 	{
@@ -994,9 +992,8 @@ VkBool32 Image_Upload(VkuContext_t *context, VkuImage_t *image, const char *file
 		vkuCreateHostBuffer(context, &stagingBuffer, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 		// Map image memory and copy data
-		vkMapMemory(context->device, stagingBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
+		data=stagingBuffer.memory->mappedPointer;
 		memcpy(data, image->data, size);
-		vkUnmapMemory(context->device, stagingBuffer.deviceMemory);
 
 		// Original image data is now in a Vulkan memory object, so no longer need the original data.
 		Zone_Free(zone, image->data);
@@ -1034,8 +1031,7 @@ VkBool32 Image_Upload(VkuContext_t *context, VkuImage_t *image, const char *file
 		vkuOneShotCommandBufferEnd(context, commandBuffer);
 
 		// Delete staging buffers
-		vkDestroyBuffer(context->device, stagingBuffer.buffer, VK_NULL_HANDLE);
-		vkFreeMemory(context->device, stagingBuffer.deviceMemory, VK_NULL_HANDLE);
+		vkuDestroyBuffer(context, &stagingBuffer);
 	}
 
 	// Create texture sampler object

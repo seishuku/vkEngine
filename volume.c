@@ -152,9 +152,9 @@ static float fbm(vec3 p)
 
 VkBool32 GenNebulaVolume(VkuImage_t *image)
 {
-	image->width=128;
-	image->height=128;
-	image->depth=128; // Slight abuse of image struct, depth is supposed to be color depth, not image depth.
+	image->width=512;
+	image->height=512;
+	image->depth=512; // Slight abuse of image struct, depth is supposed to be color depth, not image depth.
 
 	if(!vkuCreateImageBuffer(&vkContext, image,
 							 VK_IMAGE_TYPE_3D, VK_FORMAT_R8_UNORM, 1, 1, image->width, image->height, image->depth,

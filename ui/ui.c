@@ -86,20 +86,15 @@ static bool UI_VulkanVertex(UI_t *UI)
 		return false;
 
 	// Map it
-	if(vkMapMemory(vkContext.device, stagingBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, &data)!=VK_SUCCESS)
+	if(!stagingBuffer.memory->mappedPointer)
 		return false;
 
-	if(!data)
-		return false;
-
-	vec4 *vecPtr=data;
+	vec4 *vecPtr=(vec4 *)stagingBuffer.memory->mappedPointer;
 
 	*vecPtr++=Vec4(-0.5f, 0.5f, -1.0f, 1.0f);	// XYUV
 	*vecPtr++=Vec4(-0.5f, -0.5f, -1.0f, -1.0f);
 	*vecPtr++=Vec4(0.5f, 0.5f, 1.0f, 1.0f);
 	*vecPtr++=Vec4(0.5f, -0.5f, 1.0f, -1.0f);
-
-	vkUnmapMemory(vkContext.device, stagingBuffer.deviceMemory);
 
 	VkCommandBuffer CopyCommand=vkuOneShotCommandBufferBegin(&vkContext);
 	vkCmdCopyBuffer(CopyCommand, stagingBuffer.buffer, UI->vertexBuffer.buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(vec4)*4 });
@@ -112,7 +107,7 @@ static bool UI_VulkanVertex(UI_t *UI)
 	// Create instance buffer and map it
 	vkuCreateHostBuffer(&vkContext, &UI->instanceBuffer, sizeof(UI_Instance_t)*UI_HASHTABLE_MAX, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-	vkMapMemory(vkContext.device, UI->instanceBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void *)&UI->instanceBufferPtr);
+	UI->instanceBufferPtr=UI->instanceBuffer.memory->mappedPointer;
 	// ---
 
 	return true;
@@ -211,9 +206,6 @@ bool UI_Init(UI_t *UI, vec2 position, vec2 size)
 void UI_Destroy(UI_t *UI)
 {
 	List_Destroy(&UI->controls);
-
-	if(UI->instanceBuffer.deviceMemory)
-		vkUnmapMemory(vkContext.device, UI->instanceBuffer.deviceMemory);
 
 	vkuDestroyBuffer(&vkContext, &UI->instanceBuffer);
 
@@ -563,7 +555,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye)
 	{
 		VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
 		VK_NULL_HANDLE,
-		UI->instanceBuffer.deviceMemory,
+		UI->instanceBuffer.memory->deviceMemory,
 		0, VK_WHOLE_SIZE
 	});
 

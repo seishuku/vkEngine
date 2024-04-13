@@ -54,9 +54,6 @@ XruContext_t xrContext;
 VkInstance vkInstance;
 VkuContext_t vkContext;
 
-// Vulkan memory allocator zone
-VkuMemZone_t vkZone;
-
 // Camera data
 Camera_t camera, enemy;
 matrix modelView, projection[2], headPose;
@@ -245,7 +242,7 @@ void GenerateSkyParams(void)
 	if(!asteroidInstance.buffer)
 	{
 		vkuCreateHostBuffer(&vkContext, &asteroidInstance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-		vkMapMemory(vkContext.device, asteroidInstance.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void **)&asteroidInstancePtr);
+		asteroidInstancePtr=(matrix *)asteroidInstance.memory->mappedPointer;
 	}
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
@@ -706,9 +703,9 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=renderPass,
 		.framebuffer=framebuffer[eye],
+		.renderArea=(VkRect2D){ { 0, 0 }, { renderWidth, renderHeight } },
 		.clearValueCount=2,
 		.pClearValues=(VkClearValue[]){ {{{ 0.0f, 0.0f, 0.0f, 1.0f }}}, {{{ 0.0f, 0 }}} },
-		.renderArea=(VkRect2D){ { 0, 0 }, { renderWidth, renderHeight } },
 	}, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
 	// Set per thread data and add the job to that worker thread
@@ -1283,11 +1280,13 @@ bool Init(void)
 	Console_Init(&console, 80, 25);
 	Console_AddCommand(&console, "quit", Console_CmdQuit);
 
-	if(!vkuMem_Init(&vkContext, &vkZone, vkContext.localMemIndex, vkContext.deviceProperties2.maxMemoryAllocationSize))
-	{
-		DBGPRINTF(DEBUG_ERROR, "Init: vkuMem_Init failed.\n");
-		return false;
-	}
+	vkuMemAllocator_Init(&vkContext);
+
+	//if(!vkuMem_Init(&vkContext, &vkZone, vkContext.localMemIndex, vkContext.deviceProperties2.maxMemoryAllocationSize))
+	//{
+	//	DBGPRINTF(DEBUG_ERROR, "Init: vkuMem_Init failed.\n");
+	//	return false;
+	//}
 
 	CameraInit(&camera, Vec3(0.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 	CameraInit(&enemy, Vec3(0.0f, 0.0f, 1200.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
@@ -1636,6 +1635,9 @@ bool Init(void)
 	if(!Zone_VerifyHeap(zone))
 		exit(-1);
 
+	DBGPRINTF(DEBUG_WARNING, "\nCurrent vulkan zone memory allocations:\n");
+	vkuMemAllocator_Print();
+
 	return true;
 }
 
@@ -1827,7 +1829,6 @@ void Destroy(void)
 	//////////
 
 	// Asteroid instance buffer destruction
-	vkUnmapMemory(vkContext.device, asteroidInstance.deviceMemory);
 	vkuDestroyBuffer(&vkContext, &asteroidInstance);
 	//////////
 
@@ -1897,9 +1898,6 @@ void Destroy(void)
 	//////////
 
 	DBGPRINTF(DEBUG_INFO, "Remaining Vulkan memory blocks:\n");
-	vkuMem_Print(&vkZone);
-	vkuMem_Destroy(&vkContext, &vkZone);
-
-	void VkuMemAllocator_Destroy(void);
-	VkuMemAllocator_Destroy();
+	vkuMemAllocator_Print();
+	vkuMemAllocator_Destroy();
 }

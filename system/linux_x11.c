@@ -493,9 +493,6 @@ int main(int argc, char **argv)
 	DBGPRINTF(DEBUG_WARNING, "\nCurrent system zone memory allocations:\n");
 	Zone_Print(zone);
 
-	DBGPRINTF(DEBUG_WARNING, "\nCurrent vulkan zone memory allocations:\n");
-	vkuMem_Print(vkZone);
-
 	DBGPRINTF(DEBUG_INFO, "\nStarting main loop.\n");
 	EventLoop();
 

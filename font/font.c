@@ -25,8 +25,6 @@ extern VkuContext_t vkContext;
 extern VkSampleCountFlags MSAA;
 extern VkuSwapchain_t swapchain;
 
-extern VkuMemZone_t vkZone;
-
 extern VkRenderPass compositeRenderPass;
 
 extern bool isVR;
@@ -52,9 +50,9 @@ bool Font_Init(Font_t *font)
 		.pushConstantRangeCount=1,
 		.pPushConstantRanges=&(VkPushConstantRange)
 		{
-			.offset=0,
-			.size=(sizeof(uint32_t)*4)+sizeof(matrix),
 			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+			.size=(sizeof(uint32_t)*4)+sizeof(matrix),
+			.offset=0,
 		},
 	}, 0, &font->pipelineLayout);
 
@@ -106,19 +104,15 @@ bool Font_Init(Font_t *font)
 	vkuCreateHostBuffer(&vkContext, &stagingBuffer, sizeof(float)*4*4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 	// Map it
-	vkMapMemory(vkContext.device, stagingBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
-
-	if(data==NULL)
+	if(stagingBuffer.memory->mappedPointer==NULL)
 		return false;
 
-	vec4 *ptr=(vec4 *)data;
+	vec4 *ptr=(vec4 *)stagingBuffer.memory->mappedPointer;
 
 	*ptr++=Vec4(-0.5f, 1.0f, -1.0f, 1.0f);	// XYUV
 	*ptr++=Vec4(-0.5f, 0.0f, -1.0f, -1.0f);
 	*ptr++=Vec4(0.5f, 1.0f, 1.0f, 1.0f);
 	*ptr++=Vec4(0.5f, 0.0f, 1.0f, -1.0f);
-
-	vkUnmapMemory(vkContext.device, stagingBuffer.deviceMemory);
 
 	copyCommand=vkuOneShotCommandBufferBegin(&vkContext);
 	vkCmdCopyBuffer(copyCommand, stagingBuffer.buffer, font->vertexBuffer.buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(vec4)*4 });
@@ -129,7 +123,7 @@ bool Font_Init(Font_t *font)
 
 	// Create instance buffer and map it
 	vkuCreateHostBuffer(&vkContext, &font->instanceBuffer, sizeof(vec4)*2*8192, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	vkMapMemory(vkContext.device, font->instanceBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void *)&font->instanceBufferPtr);
+	font->instanceBufferPtr=font->instanceBuffer.memory->mappedPointer;
 
 	// Set initial instance data pointer
 	font->instance=(vec4 *)font->instanceBufferPtr;
@@ -268,10 +262,10 @@ float Font_StringBaseWidth(const char *string)
 }
 
 // Accumulates text to render
-void Font_Print(Font_t *font, float size, float x, float y, char *string, ...)
+void Font_Print(Font_t *font, float size, float x, float y, const char *string, ...)
 {
 	// Pointer and buffer for formatted text
-	char *ptr, text[255];
+	char *ptr, text[256];
 	// Variable arguments list
 	va_list	ap;
 	// Save starting x position
@@ -393,16 +387,13 @@ void Font_Draw(Font_t *font, uint32_t index, uint32_t eye)
 void Font_Reset(Font_t *font)
 {
 	// Reset instance data pointer and character count
-	font->instance=font->instanceBufferPtr;
+	font->instance=(vec4 *)font->instanceBufferPtr;
 	font->numChar=0;
 }
 
 void Font_Destroy(Font_t *font)
 {
 	// Instance buffer handles
-	if(font->instanceBuffer.deviceMemory)
-		vkUnmapMemory(vkContext.device, font->instanceBuffer.deviceMemory);
-
 	vkuDestroyBuffer(&vkContext, &font->instanceBuffer);
 
 	// Vertex data handles

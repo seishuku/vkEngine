@@ -347,7 +347,6 @@ void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 {
 	VkCommandBuffer copyCommand=VK_NULL_HANDLE;
 	VkuBuffer_t stagingBuffer;
-	void *data=NULL;
 
 	// Vertex data on device memory
 	vkuCreateGPUBuffer(context, &model->vertexBuffer, sizeof(float)*20*model->numVertex, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
@@ -355,12 +354,10 @@ void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 	// Create staging buffer to transfer from host memory to device memory
 	vkuCreateHostBuffer(context, &stagingBuffer, sizeof(float)*20*model->numVertex, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
-	vkMapMemory(context->device, stagingBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
-
-	if(!data)
+	if(!stagingBuffer.memory->mappedPointer)
 		return;
 
-	float *fPtr=data;
+	float *fPtr=(float *)stagingBuffer.memory->mappedPointer;
 
 	for(uint32_t j=0;j<model->numVertex;j++)
 	{
@@ -390,16 +387,13 @@ void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 		*fPtr++=0.0f;
 	}
 
-	vkUnmapMemory(context->device, stagingBuffer.deviceMemory);
-
 	// Copy to device memory
 	copyCommand=vkuOneShotCommandBufferBegin(context);
 	vkCmdCopyBuffer(copyCommand, stagingBuffer.buffer, model->vertexBuffer.buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(float)*20*model->numVertex });
 	vkuOneShotCommandBufferEnd(context, copyCommand);
 
 	// Delete staging data
-	vkDestroyBuffer(context->device, stagingBuffer.buffer, VK_NULL_HANDLE);
-	vkFreeMemory(context->device, stagingBuffer.deviceMemory, VK_NULL_HANDLE);
+	vkuDestroyBuffer(context, &stagingBuffer);
 
 	for(uint32_t i=0;i<model->numMesh;i++)
 	{
@@ -409,12 +403,10 @@ void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 		// Staging buffer
 		vkuCreateHostBuffer(context, &stagingBuffer, sizeof(uint32_t)*model->mesh[i].numFace*3, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
-		vkMapMemory(context->device, stagingBuffer.deviceMemory, 0, VK_WHOLE_SIZE, 0, &data);
-
-		if(!data)
+		if(!stagingBuffer.memory->mappedPointer)
 			return;
 
-		uint32_t *iPtr=data;
+		uint32_t *iPtr=(uint32_t *)stagingBuffer.memory->mappedPointer;
 
 		for(uint32_t j=0;j<model->mesh[i].numFace;j++)
 		{
@@ -423,14 +415,11 @@ void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 			*iPtr++=model->mesh[i].face[3*j+2];
 		}
 
-		vkUnmapMemory(context->device, stagingBuffer.deviceMemory);
-
 		copyCommand=vkuOneShotCommandBufferBegin(context);
 		vkCmdCopyBuffer(copyCommand, stagingBuffer.buffer, model->mesh[i].indexBuffer.buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(uint32_t)*model->mesh[i].numFace*3 });
 		vkuOneShotCommandBufferEnd(context, copyCommand);
 
 		// Delete staging data
-		vkDestroyBuffer(context->device, stagingBuffer.buffer, VK_NULL_HANDLE);
-		vkFreeMemory(context->device, stagingBuffer.deviceMemory, VK_NULL_HANDLE);
+		vkuDestroyBuffer(context, &stagingBuffer);
 	}
 }

@@ -24,8 +24,6 @@ extern XruContext_t xrContext;
 extern VkInstance vkInstance;
 extern VkuContext_t vkContext;
 
-extern VkuMemZone_t vkZone;
-
 extern VkuSwapchain_t swapchain;
 
 uint32_t winWidth, winHeight;
@@ -255,9 +253,6 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 
 			DBGPRINTF(DEBUG_WARNING, "\nCurrent system zone memory allocations:\n");
 			Zone_Print(zone);
-
-			DBGPRINTF(DEBUG_WARNING, "\nCurrent vulkan zone memory allocations:\n");
-			vkuMem_Print(vkZone);
 
 			DBGPRINTF(DEBUG_INFO, "\nStarting main loop.\n");
 			appState.running=true;

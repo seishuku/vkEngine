@@ -9,8 +9,6 @@
 #include "../image/image.h"
 #include "../math/math.h"
 
-extern VkuMemZone_t vkZone;
-
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memoryProperties, uint32_t typeBits, VkFlags requirementsMask)
 {
 	// Search memtypes to find first index with those properties
@@ -61,13 +59,14 @@ VkBool32 vkuCreateImageBuffer(VkuContext_t *context, VkuImage_t *image,
 	VkMemoryRequirements memoryRequirements;
 	vkGetImageMemoryRequirements(context->device, image->image, &memoryRequirements);
 
-	// Quick hack: getting it to use the vulkan memory allocator
-	image->deviceMemory=vkuMem_Malloc(&vkZone, memoryRequirements);
+	memoryRequirements.memoryTypeBits=requirementsMask;
 
-	if(image->deviceMemory==NULL)
+	image->memory=vkuMemAllocator_Malloc(memoryRequirements);
+
+	if(image->memory==NULL)
 		return VK_FALSE;
 
-	if(vkBindImageMemory(context->device, image->image, vkZone.deviceMemory, image->deviceMemory->offset)!=VK_SUCCESS)
+	if(vkBindImageMemory(context->device, image->image, image->memory->deviceMemory, image->memory->offset)!=VK_SUCCESS)
 		return VK_FALSE;
 
 	return VK_TRUE;
@@ -141,16 +140,28 @@ void vkuDestroyImageBuffer(VkuContext_t *context, VkuImage_t *image)
 		return;
 
 	if(image->sampler)
+	{
 		vkDestroySampler(context->device, image->sampler, VK_NULL_HANDLE);
+		image->sampler=VK_NULL_HANDLE;
+	}
 
 	if(image->imageView)
+	{
 		vkDestroyImageView(context->device, image->imageView, VK_NULL_HANDLE);
+		image->imageView=VK_NULL_HANDLE;
+	}
 
 	if(image->image)
+	{
 		vkDestroyImage(context->device, image->image, VK_NULL_HANDLE);
+		image->image=VK_NULL_HANDLE;
+	}
 
-	if(image->deviceMemory)
-		vkuMem_Free(&vkZone, image->deviceMemory);
+	if(image->memory)
+	{
+		vkuMemAllocator_Free(image->memory);
+		image->memory=NULL;
+	}
 }
 
 void PrintMemoryTypeFlags(VkMemoryPropertyFlags propertyFlags);
@@ -179,21 +190,18 @@ VkBool32 vkuCreateHostBuffer(VkuContext_t *context, VkuBuffer_t *buffer, uint32_
 
 	vkGetBufferMemoryRequirements(context->device, buffer->buffer, &memoryRequirements);
 
+	memoryRequirements.memoryTypeBits=(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT|VK_MEMORY_PROPERTY_HOST_CACHED_BIT);
+
 	// Clamp to a minimum size
-	if(memoryRequirements.size<VKU_MIN_DEVICE_ALLOCATION_SIZE)
-		memoryRequirements.size=VKU_MIN_DEVICE_ALLOCATION_SIZE;
+	//if(memoryRequirements.size<VKU_MIN_DEVICE_ALLOCATION_SIZE)
+	//	memoryRequirements.size=VKU_MIN_DEVICE_ALLOCATION_SIZE;
 
-	VkMemoryAllocateInfo AllocateInfo=
-	{
-		.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.allocationSize=memoryRequirements.size,
-		.memoryTypeIndex=context->hostMemIndex,
-	};
+	buffer->memory=vkuMemAllocator_Malloc(memoryRequirements);
 
-	if(vkAllocateMemory(context->device, &AllocateInfo, NULL, &buffer->deviceMemory)!=VK_SUCCESS)
+	if(buffer->memory==NULL)
 		return VK_FALSE;
 
-	if(vkBindBufferMemory(context->device, buffer->buffer, buffer->deviceMemory, 0)!=VK_SUCCESS)
+	if(vkBindBufferMemory(context->device, buffer->buffer, buffer->memory->deviceMemory, buffer->memory->offset)!=VK_SUCCESS)
 			return VK_FALSE;
 
 	return VK_TRUE;
@@ -223,12 +231,14 @@ VkBool32 vkuCreateGPUBuffer(VkuContext_t *context, VkuBuffer_t *buffer, uint32_t
 
 	vkGetBufferMemoryRequirements(context->device, buffer->buffer, &memoryRequirements);
 
-	buffer->memory=vkuMem_Malloc(&vkZone, memoryRequirements);
+	memoryRequirements.memoryTypeBits=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+	buffer->memory=vkuMemAllocator_Malloc(memoryRequirements);
 
 	if(buffer->memory==NULL)
 		return VK_FALSE;
 
-	if(vkBindBufferMemory(context->device, buffer->buffer, vkZone.deviceMemory, buffer->memory->offset)!=VK_SUCCESS)
+	if(vkBindBufferMemory(context->device, buffer->buffer, buffer->memory->deviceMemory, buffer->memory->offset)!=VK_SUCCESS)
 		return VK_FALSE;
 
 	return VK_TRUE;
@@ -240,13 +250,16 @@ void vkuDestroyBuffer(VkuContext_t *context, VkuBuffer_t *buffer)
 		return;
 
 	if(buffer->buffer)
+	{
 		vkDestroyBuffer(context->device, buffer->buffer, VK_NULL_HANDLE);
-
-	if(buffer->deviceMemory)
-		vkFreeMemory(context->device, buffer->deviceMemory, VK_NULL_HANDLE);
+		buffer->buffer=VK_NULL_HANDLE;
+	}
 
 	if(buffer->memory)
-		vkuMem_Free(&vkZone, buffer->memory);
+	{
+		vkuMemAllocator_Free(buffer->memory);
+		buffer->memory=NULL;
+	}
 }
 
 void vkuTransitionLayout(VkCommandBuffer commandBuffer, VkImage image, uint32_t levelCount, uint32_t baseLevel, uint32_t layerCount, uint32_t baseLayer, VkImageAspectFlags aspectMask, VkImageLayout oldLayout, VkImageLayout newLayout)

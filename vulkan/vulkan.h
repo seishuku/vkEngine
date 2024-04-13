@@ -211,7 +211,6 @@ typedef struct
 {
 	size_t size;
 	VkBuffer buffer;
-	VkDeviceMemory deviceMemory;
 	VkuMemBlock_t *memory;
 } VkuBuffer_t;
 
@@ -222,7 +221,7 @@ typedef struct
 
 	VkSampler sampler;
 	VkImage image;
-	VkuMemBlock_t *deviceMemory;
+	VkuMemBlock_t *memory;
 	VkImageView imageView;
 } VkuImage_t;
 
@@ -336,5 +335,11 @@ VkBool32 vkuRenderPass_AddAttachment(VkuRenderPass_t *renderPass, VkuRenderPassA
 VkBool32 vkuRenderPass_AddSubpassDependency(VkuRenderPass_t *renderPass, uint32_t sourceSubpass, uint32_t destinationSubpass, VkPipelineStageFlags sourceStageMask, VkPipelineStageFlags destinationStageMask, VkAccessFlags sourceAccessMask, VkAccessFlags destinationAccessMask, VkDependencyFlags dependencyFlags);
 VkBool32 vkuInitRenderPass(VkuContext_t *context, VkuRenderPass_t *renderPass);
 VkBool32 vkuCreateRenderPass(VkuRenderPass_t *renderPass);
+
+bool vkuMemAllocator_Init(VkuContext_t *context);
+void vkuMemAllocator_Destroy(void);
+VkuMemBlock_t *vkuMemAllocator_Malloc(VkMemoryRequirements memoryRequirements);
+void vkuMemAllocator_Free(VkuMemBlock_t *block);
+void vkuMemAllocator_Print(void);
 
 #endif
