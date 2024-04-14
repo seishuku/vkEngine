@@ -7,6 +7,37 @@
 #include "../camera/camera.h"
 #include "../physics/physics.h"
 
+RigidBody_t CameraGetRigidBody(Camera_t camera)
+{
+	RigidBody_t body;
+
+	body.position=camera.position;
+	body.force=Vec3b(0.0f);
+
+	// Transform camera space velocity to world space
+	const matrix cameraOrientation=
+	{
+		.x=Vec4(camera.right.x, camera.up.x, camera.forward.x, 0.0f),
+		.y=Vec4(camera.right.y, camera.up.y, camera.forward.y, 0.0f),
+		.z=Vec4(camera.right.z, camera.up.z, camera.forward.z, 0.0f),
+		.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
+	};
+	body.velocity=Matrix3x3MultVec3(camera.velocity, MatrixTranspose(cameraOrientation));
+
+	body.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	body.angularVelocity=Vec3b(0.0f);
+
+	body.radius=camera.radius;
+
+	body.mass=(1.0f/6000.0f)*(1.33333333f*PI*body.radius);
+	body.invMass=1.0f/body.mass;
+
+	body.inertia=0.4f*body.mass*(body.radius*body.radius);
+	body.invInertia=1.0f/body.inertia;
+
+	return body;
+}
+
 static vec4 calculatePlane(vec3 p, vec3 norm)
 {
 	Vec3_Normalize(&norm);

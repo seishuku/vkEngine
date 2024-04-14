@@ -832,12 +832,16 @@ void Thread_Physics(void *arg)
 					Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, mag/50.0f, &asteroids[i].position);
 			}
 
-			// Check asteroids against the camera
-			RigidBody_t cameraBody;
+			// Get a rigid body from the camera
+			RigidBody_t cameraBody=CameraGetRigidBody(camera);
 
-			cameraBody.position=camera.position;
-			cameraBody.force=Vec3b(0.0f);
+			// Check asteroids against the camera rigid body rep
+			const float mag=PhysicsSphereToSphereCollisionResponse(&cameraBody, &asteroids[i]);
 
+			// Set camera position from result of collision
+			camera.position=cameraBody.position;
+
+			// Transform resulting world space velocity back into camera space and set it back into the camera
 			const matrix cameraOrientation=
 			{
 				.x=Vec4(camera.right.x, camera.up.x, camera.forward.x, 0.0f),
@@ -845,26 +849,11 @@ void Thread_Physics(void *arg)
 				.z=Vec4(camera.right.z, camera.up.z, camera.forward.z, 0.0f),
 				.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
 			};
-			cameraBody.velocity=Matrix3x3MultVec3(camera.velocity, MatrixTranspose(cameraOrientation));
-
-			cameraBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-			cameraBody.angularVelocity=Vec3b(0.0f);
-
-			cameraBody.radius=camera.radius;
-
-			cameraBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*cameraBody.radius);
-			cameraBody.invMass=1.0f/cameraBody.mass;
-
-			cameraBody.inertia=0.4f*cameraBody.mass*(cameraBody.radius*cameraBody.radius);
-			cameraBody.invInertia=1.0f/cameraBody.inertia;
-
-			const float mag=PhysicsSphereToSphereCollisionResponse(&cameraBody, &asteroids[i]);
-
-			//camera.position=cameraBody.position;
-			//camera.velocity=cameraBody.velocity;
+			camera.velocity=Matrix3x3MultVec3(cameraBody.velocity, cameraOrientation);
 
 			if(mag>1.0f)
 				Audio_PlaySample(&sounds[SOUND_CRASH], false, mag/50.0f, &camera.position);
+			//////////
 
 #if 0
 			for(uint32_t j=0;j<connectedClients;j++)
