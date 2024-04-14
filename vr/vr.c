@@ -264,7 +264,7 @@ matrix VR_GetHeadPose(XruContext_t *xrContext)
 	XrPosef Pose=xrContext->projViews[0].pose;
 
 	// Get a matrix from the orientation quaternion
-	matrix PoseMat=QuatMatrix(Vec4(
+	matrix PoseMat=QuatToMatrix(Vec4(
 		Pose.orientation.x,
 		Pose.orientation.y,
 		Pose.orientation.z,

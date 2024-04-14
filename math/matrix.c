@@ -81,14 +81,14 @@ matrix MatrixRotate(const float angle, const float x, const float y, const float
 	float c=cosf(angle);
 	float s=sinf(angle);
 
-	float temp[3]={ (1.0f-c)*x, (1.0f-c)*y, (1.0f-c)*z };
+	float invCos[3]={ (1.0f-c)*x, (1.0f-c)*y, (1.0f-c)*z };
 
 	return (matrix)
 	{
-		{ c+temp[0]*x, temp[0]*y+s*z, temp[0]*z-s*y, 0.0f },
-		{ temp[1]*x-s*z, c+temp[1]*y, temp[1]*z+s*x, 0.0f },
-		{ temp[2]*x+s*y, temp[2]*y-s*x, c+temp[2]*z, 0.0f },
-		{ 0.0f, 0.0f, 0.0f, 1.0f }
+		{ c+invCos[0]*x,       invCos[0]*y+s*z,   invCos[0]*z-s*y, 0.0f },
+		{   invCos[1]*x-s*z, c+invCos[1]*y,       invCos[1]*z+s*x, 0.0f },
+		{   invCos[2]*x+s*y,   invCos[2]*y-s*x, c+invCos[2]*z,     0.0f },
+		{   0.0f,              0.0f,              0.0f,            1.0f }
 	};
 }
 

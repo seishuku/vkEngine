@@ -105,13 +105,10 @@ void CameraSeekTargetCamera(Camera_t *camera, Camera_t cameraTarget, RigidBody_t
 	const float maxSpeed=1.0f;
 	const float rotationDamping=0.01f;
 	const float positionDamping=0.0005f;
-	const float aimAheadFactor=1.0f;
 	const float seekRadius=(camera->radius+cameraTarget.radius)*1.5f;
 
-	vec3 futureTargetPos=Vec3_Addv(cameraTarget.position, Vec3_Muls(cameraTarget.velocity, aimAheadFactor));
-
 	// Find relative direction between camera and target
-	vec3 directionWorld=Vec3_Subv(futureTargetPos, camera->position);
+	vec3 directionWorld=Vec3_Subv(cameraTarget.position, camera->position);
 
 	// Calculate a relative distance for later speed reduction
 	const float relativeDistance=Vec3_Dot(directionWorld, directionWorld)-(seekRadius*seekRadius);
@@ -150,8 +147,8 @@ void CameraSeekTargetCamera(Camera_t *camera, Camera_t cameraTarget, RigidBody_t
 	const vec3 directionCamera=Matrix3x3MultVec3(directionWorld, cameraOrientation);
 
 	// Aim pitch and yaw
-	camera->yaw=atan2f(directionCamera.x, directionCamera.z);
-	camera->pitch=asinf(directionCamera.y);
+	camera->yaw=atan2f(directionCamera.x, directionCamera.z)*rotationDamping;
+	camera->pitch=asinf(directionCamera.y)*rotationDamping;
 
 	// Slow down the speed as it gets closer
 	const float speed=maxSpeed*relativeDistance;
@@ -397,10 +394,14 @@ matrix CameraUpdate(Camera_t *camera, float dt)
 	CameraRotate(camera);
 
 	// Combine the velocity with the 3 directional vectors to give overall directional velocity
-	vec3 velocity=Vec3b(0.0f);
-	velocity=Vec3_Addv(velocity, Vec3_Muls(camera->right, camera->velocity.x));
-	velocity=Vec3_Addv(velocity, Vec3_Muls(camera->up, camera->velocity.y));
-	velocity=Vec3_Addv(velocity, Vec3_Muls(camera->forward, camera->velocity.z));
+	const matrix cameraOrientation=
+	{
+		.x=Vec4(camera->right.x, camera->up.x, camera->forward.x, 0.0f),
+		.y=Vec4(camera->right.y, camera->up.y, camera->forward.y, 0.0f),
+		.z=Vec4(camera->right.z, camera->up.z, camera->forward.z, 0.0f),
+		.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
+	};
+	const vec3 velocity=Matrix3x3MultVec3(camera->velocity, MatrixTranspose(cameraOrientation));
 
 	// Integrate the velocity over time to give positional change
 	camera->position=Vec3_Addv(camera->position, Vec3_Muls(velocity, dt));

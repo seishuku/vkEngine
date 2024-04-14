@@ -126,7 +126,7 @@ vec4 QuatSlerp(const vec4 qa, const vec4 qb, const float t)
 	return Vec4_Addv(Vec4_Muls(qa, k0), Vec4_Muls(q1, k1));
 }
 
-matrix QuatMatrix(const vec4 q)
+matrix QuatToMatrix(const vec4 q)
 {
 	float norm=sqrtf(Vec4_Dot(q, q)), s=0.0f;
 
@@ -150,4 +150,50 @@ matrix QuatMatrix(const vec4 q)
 		{ xz+wy, yz-wx, 1.0f-xx-yy, 0.0f },
 		{ 0.0f, 0.0f, 0.0f, 1.0f }
 	};
+}
+
+vec4 MatrixToQuat(const matrix m)
+{
+	vec4 q;
+
+	float tr=m.x.x+m.y.y+m.z.z;
+
+	if(tr>0.0f)
+	{
+		float S=sqrtf(tr+1.0f)*2.0f;
+
+		q.x=(m.z.y-m.y.z)/S;
+		q.y=(m.x.z-m.z.x)/S;
+		q.z=(m.y.x-m.x.y)/S;
+		q.w=0.25f*S;
+	}
+	else if((m.x.x>m.y.y)&(m.x.x>m.z.z))
+	{
+		float S=sqrtf(1.0f+m.x.x-m.y.y-m.z.z)*2.0f;
+
+		q.x=0.25f*S;
+		q.y=(m.x.y+m.y.x)/S;
+		q.z=(m.x.z+m.z.x)/S;
+		q.w=(m.z.y-m.y.z)/S;
+	}
+	else if(m.y.y>m.z.z)
+	{
+		float S=sqrtf(1.0f+m.y.y-m.x.x-m.z.z)*2.0f;
+
+		q.x=(m.x.y+m.y.x)/S;
+		q.y=0.25f*S;
+		q.z=(m.y.z+m.z.y)/S;
+		q.w=(m.x.z-m.z.x)/S;
+	}
+	else
+	{
+		float S=sqrtf(1.0f+m.z.z-m.x.x-m.y.y)*2.0f;
+
+		q.x=(m.x.z+m.z.x)/S;
+		q.y=(m.y.z+m.z.y)/S;
+		q.z=0.25f*S;
+		q.w=(m.y.x-m.x.y)/S;
+	}
+
+	return q;
 }

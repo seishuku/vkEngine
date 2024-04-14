@@ -495,7 +495,7 @@ void Thread_Main(void *arg)
 
 		vec3 leftPos=Vec3(leftHand.position.x, leftHand.position.y, leftHand.position.z);
 		vec4 leftRot=Vec4(leftHand.orientation.x, leftHand.orientation.y, leftHand.orientation.z, leftHand.orientation.w);
-		matrix local=MatrixMult(MatrixMult(QuatMatrix(leftRot), MatrixScale(0.1f, 0.1f, 0.1f)), MatrixTranslatev(leftPos));
+		matrix local=MatrixMult(MatrixMult(QuatToMatrix(leftRot), MatrixScale(0.1f, 0.1f, 0.1f)), MatrixTranslatev(leftPos));
 		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
 		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
@@ -503,7 +503,7 @@ void Thread_Main(void *arg)
 
 		vec3 rightPos=Vec3(rightHand.position.x, rightHand.position.y, rightHand.position.z);
 		vec4 rightRot=Vec4(rightHand.orientation.x, rightHand.orientation.y, rightHand.orientation.z, rightHand.orientation.w);
-		local=MatrixMult(MatrixMult(QuatMatrix(rightRot), MatrixScale(0.1f, 0.1f, 0.1f)), MatrixTranslatev(rightPos));
+		local=MatrixMult(MatrixMult(QuatToMatrix(rightRot), MatrixScale(0.1f, 0.1f, 0.1f)), MatrixTranslatev(rightPos));
 		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
 		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
@@ -521,7 +521,7 @@ void Thread_Main(void *arg)
 
 		linePC.color=Vec4(leftTrigger*100.0f+1.0f, 1.0f, leftGrip*100.0f+1.0f, 1.0f);
 
-		local=MatrixMult(QuatMatrix(leftRot), MatrixTranslatev(leftPos));
+		local=MatrixMult(QuatToMatrix(leftRot), MatrixTranslatev(leftPos));
 		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
 		linePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
@@ -529,7 +529,7 @@ void Thread_Main(void *arg)
 
 		linePC.color=Vec4(rightTrigger*100.0f+1.0f, 1.0f, rightGrip*100.0f+1.0f, 1.0f);
 
-		local=MatrixMult(QuatMatrix(rightRot), MatrixTranslatev(rightPos));
+		local=MatrixMult(QuatToMatrix(rightRot), MatrixTranslatev(rightPos));
 		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
 		linePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
@@ -836,8 +836,16 @@ void Thread_Physics(void *arg)
 			RigidBody_t cameraBody;
 
 			cameraBody.position=camera.position;
-			cameraBody.velocity=camera.velocity;
 			cameraBody.force=Vec3b(0.0f);
+
+			const matrix cameraOrientation=
+			{
+				.x=Vec4(camera.right.x, camera.up.x, camera.forward.x, 0.0f),
+				.y=Vec4(camera.right.y, camera.up.y, camera.forward.y, 0.0f),
+				.z=Vec4(camera.right.z, camera.up.z, camera.forward.z, 0.0f),
+				.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
+			};
+			cameraBody.velocity=Matrix3x3MultVec3(camera.velocity, MatrixTranspose(cameraOrientation));
 
 			cameraBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
 			cameraBody.angularVelocity=Vec3b(0.0f);
@@ -852,7 +860,8 @@ void Thread_Physics(void *arg)
 
 			const float mag=PhysicsSphereToSphereCollisionResponse(&cameraBody, &asteroids[i]);
 
-			camera.velocity=cameraBody.velocity;
+			//camera.position=cameraBody.position;
+			//camera.velocity=cameraBody.velocity;
 
 			if(mag>1.0f)
 				Audio_PlaySample(&sounds[SOUND_CRASH], false, mag/50.0f, &camera.position);
@@ -1011,7 +1020,7 @@ void Thread_Physics(void *arg)
 			float radiusScale=0.666667f;
 
 			matrix local=MatrixScale(asteroids[i].radius*radiusScale, asteroids[i].radius*radiusScale, asteroids[i].radius*radiusScale);
-			local=MatrixMult(local, QuatMatrix(asteroids[i].orientation));
+			local=MatrixMult(local, QuatToMatrix(asteroids[i].orientation));
 			asteroidInstancePtr[i]=MatrixMult(local, MatrixTranslatev(asteroids[i].position));
 		}
 		//////
@@ -1108,7 +1117,7 @@ void Render(void)
 			rightTriggerOnce=false;
 
 			vec4 rightOrientation=Vec4(rightHand.orientation.x, rightHand.orientation.y, rightHand.orientation.z, rightHand.orientation.w);
-			vec3 direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatMatrix(rightOrientation), MatrixInverse(modelView)));
+			vec3 direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatToMatrix(rightOrientation), MatrixInverse(modelView)));
 
 			FireParticleEmitter(Vec3_Addv(camera.position, Vec3_Muls(direction, camera.radius)), direction);
 			Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &camera.position);
@@ -1281,12 +1290,6 @@ bool Init(void)
 	Console_AddCommand(&console, "quit", Console_CmdQuit);
 
 	vkuMemAllocator_Init(&vkContext);
-
-	//if(!vkuMem_Init(&vkContext, &vkZone, vkContext.localMemIndex, vkContext.deviceProperties2.maxMemoryAllocationSize))
-	//{
-	//	DBGPRINTF(DEBUG_ERROR, "Init: vkuMem_Init failed.\n");
-	//	return false;
-	//}
 
 	CameraInit(&camera, Vec3(0.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 	CameraInit(&enemy, Vec3(0.0f, 0.0f, 1200.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
