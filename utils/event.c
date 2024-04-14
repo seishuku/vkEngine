@@ -18,7 +18,7 @@
 // External data from engine.c
 extern uint32_t renderWidth, renderHeight;
 
-void GenerateSkyParams(void);
+void GenerateWorld(void);
 
 extern Camera_t camera;
 
@@ -160,7 +160,7 @@ bool Event_Trigger(EventID ID, void *arg)
 					Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &camera.position);
 					FireParticleEmitter(Vec3_Addv(camera.position, Vec3_Muls(camera.forward, camera.radius)), camera.forward);
 					break;
-				case KB_P:		GenerateSkyParams();	break;
+				case KB_P:		GenerateWorld();		break;
 				case KB_O:		pausePhysics=!pausePhysics; break;
 				case KB_W:		camera.key_w=true;		break;
 				case KB_S:		camera.key_s=true;		break;
@@ -232,6 +232,7 @@ bool Event_Trigger(EventID ID, void *arg)
 					UI_ProcessControl(&UI, activeID, mousePosition);
 			}
 #endif
+			break;
 		}
 
 		case EVENT_MOUSEUP:

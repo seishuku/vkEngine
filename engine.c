@@ -152,7 +152,7 @@ void RecreateSwapchain(void);
 bool CreateFramebuffers(uint32_t eye);
 
 // Build up random data for skybox and asteroid field
-void GenerateSkyParams(void)
+void GenerateWorld(void)
 {
 	// Build a skybox param struct with random values
 	Skybox_UBO_t Skybox_UBO={ 0 };
@@ -834,22 +834,15 @@ void Thread_Physics(void *arg)
 
 			// Get a rigid body from the camera
 			RigidBody_t cameraBody=CameraGetRigidBody(camera);
+			RigidBody_t enemyBody=CameraGetRigidBody(enemy);
 
 			// Check asteroids against the camera rigid body rep
-			const float mag=PhysicsSphereToSphereCollisionResponse(&cameraBody, &asteroids[i]);
+			float mag=PhysicsSphereToSphereCollisionResponse(&cameraBody, &asteroids[i]);
+			mag+=PhysicsSphereToSphereCollisionResponse(&enemyBody, &asteroids[i]);
 
-			// Set camera position from result of collision
-			camera.position=cameraBody.position;
-
-			// Transform resulting world space velocity back into camera space and set it back into the camera
-			const matrix cameraOrientation=
-			{
-				.x=Vec4(camera.right.x, camera.up.x, camera.forward.x, 0.0f),
-				.y=Vec4(camera.right.y, camera.up.y, camera.forward.y, 0.0f),
-				.z=Vec4(camera.right.z, camera.up.z, camera.forward.z, 0.0f),
-				.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
-			};
-			camera.velocity=Matrix3x3MultVec3(cameraBody.velocity, cameraOrientation);
+			// Set camera position/velocity from result of collision
+			CameraSetFromRigidBody(&camera, cameraBody);
+			CameraSetFromRigidBody(&enemy, enemyBody);
 
 			if(mag>1.0f)
 				Audio_PlaySample(&sounds[SOUND_CRASH], false, mag/50.0f, &camera.position);
@@ -860,7 +853,7 @@ void Thread_Physics(void *arg)
 			{
 				// Don't check for collision with our own net camera
 				if(j!=clientID)
-					PhysicsCameraToSphereCollisionResponse(&netCameras[j], &asteroids[i]);
+					PhysicsSphereToSphereCollisionResponse(&netCameras[j], &asteroids[i]);
 			}
 #endif
 
@@ -993,6 +986,20 @@ void Thread_Physics(void *arg)
 #endif
 		}
 
+		// Camera<->Camera collisions
+		RigidBody_t cameraBody=CameraGetRigidBody(camera);
+		RigidBody_t enemyBody=CameraGetRigidBody(enemy);
+
+		// Check asteroids against the camera rigid body rep
+		float mag=PhysicsSphereToSphereCollisionResponse(&cameraBody, &enemyBody);
+
+		// Set camera position/velocity from result of collision
+		CameraSetFromRigidBody(&camera, cameraBody);
+		CameraSetFromRigidBody(&enemy, enemyBody);
+
+		if(mag>1.0f)
+			Audio_PlaySample(&sounds[SOUND_CRASH], false, mag/50.0f, &camera.position);
+
 #if 0
 		for(uint32_t i=0;i<connectedClients;i++)
 		{
@@ -1000,8 +1007,42 @@ void Thread_Physics(void *arg)
 			if(i!=clientID)
 				PhysicsCameraToCameraCollisionResponse(&camera, &netCameras[i]);
 		}
-		//////
 #endif
+		////////
+
+		// Emitters<->Camera collision
+		for(uint32_t j=0;j<MAX_EMITTERS;j++)
+		{
+			RigidBody_t enemyBody=CameraGetRigidBody(enemy);
+
+			if(particleEmittersLife[j]>0.0f)
+			{
+				if(PhysicsSphereToSphereCollisionResponse(&particleEmitters[j], &enemyBody)>1.0f)
+				{
+					// It collided, kill it.
+					// Setting this directly to <0.0 seems to cause emitters that won't get removed,
+					//     so setting it to nearly 0.0 allows the natural progression kill it off.
+					particleEmittersLife[j]=0.001f;
+
+					Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particleEmitters[j].position);
+
+					ParticleSystem_AddEmitter(&particleSystem,
+											  particleEmitters[j].position,	// Position
+											  Vec3(100.0f, 12.0f, 5.0f),		// Start color
+											  Vec3(0.0f, 0.0f, 0.0f),			// End color
+											  5.0f,							// Radius of particles
+											  1000,							// Number of particles in system
+											  PARTICLE_EMITTER_ONCE,			// Type?
+											  ExplodeEmitterCallback			// Callback for particle generation
+					);
+
+					// Silly radius reduction on hit
+					//body->radius=fmaxf(body->radius-10.0f, 0.0f);
+				}
+			}
+
+			CameraSetFromRigidBody(&enemy, enemyBody);
+		}
 
 		// Update instance matrix data
 		for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
@@ -1423,7 +1464,7 @@ bool Init(void)
 
 	// Create skybox pipeline
 	CreateSkyboxPipeline();
-	GenerateSkyParams();
+	GenerateWorld();
 
 	CreateSpherePipeline();
 	CreateLinePipeline();

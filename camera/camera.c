@@ -7,7 +7,7 @@
 #include "../camera/camera.h"
 #include "../physics/physics.h"
 
-RigidBody_t CameraGetRigidBody(Camera_t camera)
+RigidBody_t CameraGetRigidBody(const Camera_t camera)
 {
 	RigidBody_t body;
 
@@ -36,6 +36,21 @@ RigidBody_t CameraGetRigidBody(Camera_t camera)
 	body.invInertia=1.0f/body.inertia;
 
 	return body;
+}
+
+void CameraSetFromRigidBody(Camera_t *camera, const RigidBody_t body)
+{
+	camera->position=body.position;
+
+	const matrix cameraOrientation=
+	{
+		.x=Vec4(camera->right.x, camera->up.x, camera->forward.x, 0.0f),
+		.y=Vec4(camera->right.y, camera->up.y, camera->forward.y, 0.0f),
+		.z=Vec4(camera->right.z, camera->up.z, camera->forward.z, 0.0f),
+		.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
+	};
+
+	camera->velocity=Matrix3x3MultVec3(body.velocity, cameraOrientation);
 }
 
 static vec4 calculatePlane(vec3 p, vec3 norm)

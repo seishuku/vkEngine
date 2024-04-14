@@ -40,7 +40,8 @@ typedef struct
 	int32_t *knots;
 } CameraPath_t;
 
-RigidBody_t CameraGetRigidBody(Camera_t camera);
+RigidBody_t CameraGetRigidBody(const Camera_t camera);
+void CameraSetFromRigidBody(Camera_t *camera, const RigidBody_t body);
 bool CameraIsTargetInFOV(Camera_t camera, vec3 targetPos, float FOV);
 void CameraSeekTarget(Camera_t *camera, const vec3 targetPos, const float targetRadius, RigidBody_t *obstacles, size_t numObstacles);
 void CameraSeekTargetCamera(Camera_t *camera, Camera_t cameraTarget, RigidBody_t *obstacles, size_t numObstacles);
