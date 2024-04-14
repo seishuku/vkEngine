@@ -38,28 +38,31 @@ bool vkuMem_Init(VkuContext_t *context, VkuMemZone_t *vkZone, uint32_t typeIndex
 		return false;
 	}
 
+	// Set up the initial free block
 	vkZone->blocks->offset=0;
 	vkZone->blocks->size=size;
 	vkZone->blocks->free=true;
+	vkZone->blocks->deviceMemory=vkZone->deviceMemory;
+	vkZone->blocks->mappedPointer=NULL;
 	vkZone->blocks->prev=NULL;
 	vkZone->blocks->next=NULL;
-	vkZone->blocks->deviceMemory=vkZone->deviceMemory;
 
 	vkZone->size=size;
 
-	// Attempt to map the memory (<<this will fail for device local memory>>)
-	result=vkMapMemory(context->device, vkZone->deviceMemory, 0, VK_WHOLE_SIZE, 0, &vkZone->mappedPointer);
-
-	if(result!=VK_SUCCESS)
+	// If this is a host memory heap, map a pointer to it
+	if(context->deviceMemProperties.memoryTypes[typeIndex].propertyFlags&(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT|VK_MEMORY_PROPERTY_HOST_CACHED_BIT))
 	{
-#ifdef _DEBUG
-		DBGPRINTF(DEBUG_ERROR, "Failed to map vulakn device memory (Result=%d).\n", result);
-#endif
-		vkZone->mappedPointer=NULL;
-	}
+		result=vkMapMemory(context->device, vkZone->deviceMemory, 0, VK_WHOLE_SIZE, 0, &vkZone->mappedPointer);
 
-	if(vkZone->mappedPointer!=NULL)
-		vkZone->blocks->mappedPointer=vkZone->mappedPointer;
+		if(result!=VK_SUCCESS)
+		{
+			DBGPRINTF(DEBUG_ERROR, "Failed to map vulakn device memory (Result=%d).\n", result);
+			vkZone->mappedPointer=NULL;
+		}
+
+		if(vkZone->mappedPointer!=NULL)
+			vkZone->blocks->mappedPointer=vkZone->mappedPointer;
+	}
 
 	DBGPRINTF(DEBUG_INFO, "Vulakn memory zone allocated (OBJ: 0x%p), size: %0.3fMB\n", vkZone->deviceMemory, (float)size/1000.0f/1000.0f);
 
@@ -77,6 +80,9 @@ void vkuMem_Destroy(VkuContext_t *context, VkuMemZone_t *vkZone)
 			Zone_Free(zone, block);
 			block=block->next;
 		}
+
+		if(vkZone->mappedPointer)
+			vkUnmapMemory(context->device, vkZone->deviceMemory);
 
 		vkFreeMemory(context->device, vkZone->deviceMemory, VK_NULL_HANDLE);
 	}
