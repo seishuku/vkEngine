@@ -1,0 +1,7 @@
+descriptorSet {
+	addBinding(0, storageImage, compute)
+}
+
+pipeline {
+	addStage("shaders/volume_gen.comp.spv", compute)
+}

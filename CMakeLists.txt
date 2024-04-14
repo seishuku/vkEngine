@@ -47,12 +47,12 @@ set(SHADER_SOURCES
 	shaders/skybox.frag shaders/skybox.vert
 	shaders/lighting.frag shaders/lighting.vert
 	shaders/particle.frag shaders/particle.geom shaders/particle.vert
+	shaders/volume_gen.comp
 	shaders/volume.frag shaders/volume.vert
 	shaders/line.frag shaders/line.vert
 	shaders/sphere.frag shaders/sphere.vert
 	shaders/font.frag shaders/font.vert
 	shaders/ui_sdf.frag shaders/ui_sdf.vert
-	shaders/test.comp
 )
 
 find_package(Vulkan COMPONENTS glslc)

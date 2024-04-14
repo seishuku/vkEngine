@@ -81,6 +81,8 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 	fread(buffer, 1, length, stream);
 	buffer[length]='\0';
 
+	memset(pipeline, 0, sizeof(Pipeline_t));
+
 	Tokenizer_t tokenizer;
 	Tokenizer_Init(&tokenizer, length, buffer, sizeof(keywords)/sizeof(keywords[0]), keywords);
 
@@ -2697,10 +2699,22 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 	vkuPipeline_SetPipelineLayout(&pipeline->pipeline, pipeline->pipelineLayout);
 	vkuPipeline_SetRenderPass(&pipeline->pipeline, renderPass);
 
-	if(!vkuAssemblePipeline(&pipeline->pipeline, VK_NULL_HANDLE))
+	// If the first stage shader is compute, then this must be a compute pipeline
+	if(pipeline->pipeline.stages[0].stage&VK_SHADER_STAGE_COMPUTE_BIT)
 	{
-		DBGPRINTF(DEBUG_ERROR, "Unable to assemble pipe: %s", filename);
-		return false;
+		if(!vkuAssembleComputePipeline(&pipeline->pipeline, VK_NULL_HANDLE))
+		{
+			DBGPRINTF(DEBUG_ERROR, "Unable to assemble compute pipe: %s", filename);
+			return false;
+		}
+	}
+	else
+	{
+		if(!vkuAssemblePipeline(&pipeline->pipeline, VK_NULL_HANDLE))
+		{
+			DBGPRINTF(DEBUG_ERROR, "Unable to assemble pipe: %s", filename);
+			return false;
+		}
 	}
 
 	return true;

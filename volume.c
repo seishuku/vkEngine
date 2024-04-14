@@ -256,25 +256,10 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 	VkCommandPool computeCommandPool;
 	VkCommandBuffer computeCommand;
 	VkDescriptorPool computeDescriptorPool;
-	VkuDescriptorSet_t computeDescriptor;
-	VkuPipeline_t compute;
-	VkPipelineLayout computeLayout;
+	Pipeline_t computePipeline;
 
-	vkuInitDescriptorSet(&computeDescriptor, vkContext.device);
-	vkuDescriptorSet_AddBinding(&computeDescriptor, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
-	vkuAssembleDescriptorSetLayout(&computeDescriptor);
-
-	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=1,
-		.pSetLayouts=&computeDescriptor.descriptorSetLayout,
-	}, 0, &computeLayout);
-
-	vkuInitPipeline(&compute, vkContext.device, VK_NULL_HANDLE);
-	vkuPipeline_SetPipelineLayout(&compute, computeLayout);
-	vkuPipeline_AddStage(&compute, "shaders/test.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
-	vkuAssembleComputePipeline(&compute, VK_NULL_HANDLE);
+	if(!CreatePipeline(&vkContext, &computePipeline, VK_NULL_HANDLE, "pipelines/volume_gen.pipeline"))
+		return VK_FALSE;
 
 	vkCreateDescriptorPool(vkContext.device, &(VkDescriptorPoolCreateInfo)
 	{
@@ -283,6 +268,7 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 		.poolSizeCount=1,
 		.pPoolSizes=(VkDescriptorPoolSize[]){ {.type=VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount=1, }, },
 	}, VK_NULL_HANDLE, &computeDescriptorPool);
+
 	VkResult result=VK_ERROR_UNKNOWN;
 
 	if(vkCreateCommandPool(vkContext.device, &(VkCommandPoolCreateInfo)
@@ -300,7 +286,7 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount=1,
 	}, &computeCommand))!=VK_SUCCESS)
-		return false;
+		return VK_FALSE;
 
 	vkBeginCommandBuffer(computeCommand, &(VkCommandBufferBeginInfo) {.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, });
 
@@ -316,12 +302,12 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 	imageMemoryBarrier.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
 	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
 
-	vkCmdBindPipeline(computeCommand, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipeline);
+	vkCmdBindPipeline(computeCommand, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline.pipeline.pipeline);
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&computeDescriptor, 0, VK_NULL_HANDLE, image->imageView, VK_IMAGE_LAYOUT_GENERAL);
-	vkuAllocateUpdateDescriptorSet(&computeDescriptor, computeDescriptorPool);
+	vkuDescriptorSet_UpdateBindingImageInfo(&computePipeline.descriptorSet, 0, VK_NULL_HANDLE, image->imageView, VK_IMAGE_LAYOUT_GENERAL);
+	vkuAllocateUpdateDescriptorSet(&computePipeline.descriptorSet, computeDescriptorPool);
 
-	vkCmdBindDescriptorSets(computeCommand, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipelineLayout, 0, 1, &computeDescriptor.descriptorSet, 0, 0);
+	vkCmdBindDescriptorSets(computeCommand, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline.pipelineLayout, 0, 1, &computePipeline.descriptorSet.descriptorSet, 0, 0);
 
 	vkCmdDispatch(computeCommand, image->width/8, image->height/8, image->depth/8);
 
@@ -354,9 +340,7 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 
 	vkDestroyCommandPool(vkContext.device, computeCommandPool, VK_NULL_HANDLE);
 	vkDestroyDescriptorPool(vkContext.device, computeDescriptorPool, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.device, compute.pipelineLayout, VK_NULL_HANDLE);
-	vkDestroyPipeline(vkContext.device, compute.pipeline, VK_NULL_HANDLE);
-	vkDestroyDescriptorSetLayout(vkContext.device, computeDescriptor.descriptorSetLayout, VK_NULL_HANDLE);
+	DestroyPipeline(&vkContext, &computePipeline);
 #endif
 
 	return VK_TRUE;

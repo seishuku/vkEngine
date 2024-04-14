@@ -185,6 +185,10 @@ void Music_Init(void)
 
 	if(musicList!=NULL)
 	{
+		DBGPRINTF(DEBUG_INFO, "\nFound music files in \"%s\":\n", musicPath);
+		for(uint32_t i=0;i<numMusic;i++)
+			DBGPRINTF(DEBUG_WARNING, "%s\n", musicList[i].string);
+
 		char filePath[1024]={ 0 };
 
 		currentMusic=RandRange(0, numMusic-1);
