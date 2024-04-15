@@ -22,7 +22,6 @@
 #include "physics/physics.h"
 #include "ui/ui.h"
 #include "console/console.h"
-
 #include "models.h"
 #include "textures.h"
 #include "line.h"
@@ -36,10 +35,6 @@
 #include "sounds.h"
 #include "sfx.h"
 #include "music.h"
-
-//#include <cvmarkers.h>
-//PCV_PROVIDER provider;
-//PCV_MARKERSERIES flagSeries;
 
 extern bool isDone;
 
@@ -779,8 +774,6 @@ void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *p
 // Runs anything physics related
 void Thread_Physics(void *arg)
 {
-	//CvWriteFlag(flagSeries, "physics start");
-
 	if(!pausePhysics)
 	{
 		ParticleSystem_Step(&particleSystem, fTimeStep);
@@ -1063,8 +1056,6 @@ void Thread_Physics(void *arg)
 	CameraUpdate(&enemy, fTimeStep);
 	//////
 
-	//CvWriteFlag(flagSeries, "physics end");
-
 	// Barrier now that we're done here
 	ThreadBarrier_Wait(&physicsThreadBarrier);
 }
@@ -1082,8 +1073,6 @@ static vec3 lastLeftPosition={ 0.0f, 0.0f, 0.0f };
 void Render(void)
 {
 	static uint32_t index=0, lastImageIndex=0, imageIndex=2;
-
-	//CvWriteFlag(flagSeries, "frame start");
 
 	Thread_AddJob(&threadPhysics, Thread_Physics, NULL);
 	//Thread_Physics(NULL);
@@ -1308,9 +1297,6 @@ bool vkuMemAllocator_Init(VkuContext_t *context);
 bool Init(void)
 {
 	RandomSeed(42069);
-
-	//CvInitProvider(&CvDefaultProviderGuid, &provider);
-	//CvCreateMarkerSeries(provider, "flag series", &flagSeries);
 
 	// TODO: This is a hack, fix it proper.
 	if(isVR)
