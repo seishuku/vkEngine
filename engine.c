@@ -61,9 +61,9 @@ ParticleSystem_t particleSystem;
 
 // Particle system emitters as rigid bodies with life and ID hashmaps
 #define MAX_EMITTERS 1000
-RigidBody_t particleEmitters[MAX_EMITTERS];
-uint32_t particleEmittersID[MAX_EMITTERS];
-float particleEmittersLife[MAX_EMITTERS];
+RigidBody_t particleEmitters[MAX_EMITTERS]={ 0 };
+uint32_t particleEmittersID[MAX_EMITTERS]={ 0 };
+float particleEmittersLife[MAX_EMITTERS]={ 0 };
 
 // 3D Model data
 BModel_t models[NUM_MODELS];
@@ -774,6 +774,10 @@ void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *p
 // Runs anything physics related
 void Thread_Physics(void *arg)
 {
+	// Get a rigid body rep for the camera(s)
+	RigidBody_t cameraBody=CameraGetRigidBody(camera);
+	RigidBody_t enemyBody=CameraGetRigidBody(enemy);
+
 	if(!pausePhysics)
 	{
 		ParticleSystem_Step(&particleSystem, fTimeStep);
@@ -786,11 +790,11 @@ void Thread_Physics(void *arg)
 			if(particleEmittersLife[i]>0.0f)
 			{
 				particleEmittersLife[i]-=fTimeStep;
-				PhysicsIntegrate(&particleEmitters[i], fTimeStep);
 
 				for(uint32_t j=0;j<List_GetCount(&particleSystem.emitters);j++)
 				{
 					ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&particleSystem.emitters, j);
+					PhysicsIntegrate(&particleEmitters[i], fTimeStep);
 
 					if(emitter->ID==particleEmittersID[i])
 					{
@@ -819,36 +823,15 @@ void Thread_Physics(void *arg)
 			// Check asteroids against other asteroids
 			for(uint32_t j=i+1;j<NUM_ASTEROIDS;j++)
 			{
-				const float mag=PhysicsSphereToSphereCollisionResponse(&asteroids[i], &asteroids[j]);
-
-				if(mag>1.0f)
-					Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, mag/50.0f, &asteroids[i].position);
+				if(PhysicsSphereToSphereCollisionResponse(&asteroids[i], &asteroids[j])>1.0f)
+					Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, &asteroids[i].position);
 			}
-
-			// Get a rigid body from the camera
-			RigidBody_t cameraBody=CameraGetRigidBody(camera);
-			RigidBody_t enemyBody=CameraGetRigidBody(enemy);
 
 			// Check asteroids against the camera rigid body rep
-			float mag=PhysicsSphereToSphereCollisionResponse(&cameraBody, &asteroids[i]);
-			mag+=PhysicsSphereToSphereCollisionResponse(&enemyBody, &asteroids[i]);
-
-			// Set camera position/velocity from result of collision
-			CameraSetFromRigidBody(&camera, cameraBody);
-			CameraSetFromRigidBody(&enemy, enemyBody);
-
-			if(mag>1.0f)
-				Audio_PlaySample(&sounds[SOUND_CRASH], false, mag/50.0f, &camera.position);
+			if(PhysicsSphereToSphereCollisionResponse(&cameraBody, &asteroids[i])||
+			   PhysicsSphereToSphereCollisionResponse(&enemyBody, &asteroids[i])>1.0f)
+				Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, &camera.position);
 			//////////
-
-#if 0
-			for(uint32_t j=0;j<connectedClients;j++)
-			{
-				// Don't check for collision with our own net camera
-				if(j!=clientID)
-					PhysicsSphereToSphereCollisionResponse(&netCameras[j], &asteroids[i]);
-			}
-#endif
 
 			// Check asteroids against projectile emitters
 			for(uint32_t j=0;j<MAX_EMITTERS;j++)
@@ -953,7 +936,8 @@ void Thread_Physics(void *arg)
 					particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
 					particleBody.invInertia=1.0f/particleBody.inertia;
 
-					if(PhysicsSphereToSphereCollisionResponse(&particleBody, &asteroids[i])>1.0f)
+					if(
+						PhysicsSphereToSphereCollisionResponse(&particleBody, &asteroids[i])>1.0f)
 					{
 						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particleBody.position);
 
@@ -979,19 +963,18 @@ void Thread_Physics(void *arg)
 #endif
 		}
 
-		// Camera<->Camera collisions
-		RigidBody_t cameraBody=CameraGetRigidBody(camera);
-		RigidBody_t enemyBody=CameraGetRigidBody(enemy);
+#if 0
+		for(uint32_t j=0;j<connectedClients;j++)
+		{
+			// Don't check for collision with our own net camera
+			if(j!=clientID)
+				PhysicsSphereToSphereCollisionResponse(&netCameras[j], &asteroids[i]);
+		}
+#endif
 
-		// Check asteroids against the camera rigid body rep
-		float mag=PhysicsSphereToSphereCollisionResponse(&cameraBody, &enemyBody);
-
-		// Set camera position/velocity from result of collision
-		CameraSetFromRigidBody(&camera, cameraBody);
-		CameraSetFromRigidBody(&enemy, enemyBody);
-
-		if(mag>1.0f)
-			Audio_PlaySample(&sounds[SOUND_CRASH], false, mag/50.0f, &camera.position);
+		// Check camera against the enemy camera rigid body rep
+		if(PhysicsSphereToSphereCollisionResponse(&cameraBody, &enemyBody)>1.0f)
+			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, &camera.position);
 
 #if 0
 		for(uint32_t i=0;i<connectedClients;i++)
@@ -1006,11 +989,11 @@ void Thread_Physics(void *arg)
 		// Emitters<->Camera collision
 		for(uint32_t j=0;j<MAX_EMITTERS;j++)
 		{
-			RigidBody_t enemyBody=CameraGetRigidBody(enemy);
-
 			if(particleEmittersLife[j]>0.0f)
 			{
-				if(PhysicsSphereToSphereCollisionResponse(&particleEmitters[j], &enemyBody)>1.0f)
+				if(
+					PhysicsSphereToSphereCollisionResponse(&particleEmitters[j], &enemyBody)||
+					PhysicsSphereToSphereCollisionResponse(&particleEmitters[j], &cameraBody)>1.0f)
 				{
 					// It collided, kill it.
 					// Setting this directly to <0.0 seems to cause emitters that won't get removed,
@@ -1033,9 +1016,12 @@ void Thread_Physics(void *arg)
 					//body->radius=fmaxf(body->radius-10.0f, 0.0f);
 				}
 			}
-
-			CameraSetFromRigidBody(&enemy, enemyBody);
 		}
+
+		// Only run physics on enemy camera when physics are running
+		PhysicsIntegrate(&enemyBody, fTimeStep);
+
+		CameraSetFromRigidBody(&enemy, enemyBody);
 
 		// Update instance matrix data
 		for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
@@ -1050,6 +1036,12 @@ void Thread_Physics(void *arg)
 
 		//ClientNetwork_SendStatus();
 	}
+
+	// Always run physics on the camera's body
+	PhysicsIntegrate(&cameraBody, fTimeStep);
+
+	// Set camera position/velocity from result of collision
+	CameraSetFromRigidBody(&camera, cameraBody);
 
 	// Update camera and modelview matrix
 	modelView=CameraUpdate(&camera, fTimeStep);

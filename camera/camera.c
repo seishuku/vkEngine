@@ -379,47 +379,47 @@ static void CameraRotate(Camera_t *camera)
 
 matrix CameraUpdate(Camera_t *camera, float dt)
 {
-	float speed=240.0f;
-	float rotation=0.0625f;
+	float speed=240.0f*dt;
+	float rotation=0.0625f*dt;
 
 	if(camera->shift)
 		speed*=2.0f;
 
 	if(camera->key_a)
-		camera->velocity.x+=speed*dt;
+		camera->velocity.x+=speed;
 
 	if(camera->key_d)
-		camera->velocity.x-=speed*dt;
+		camera->velocity.x-=speed;
 
 	if(camera->key_v)
-		camera->velocity.y+=speed*dt;
+		camera->velocity.y+=speed;
 
 	if(camera->key_c)
-		camera->velocity.y-=speed*dt;
+		camera->velocity.y-=speed;
 
 	if(camera->key_w)
-		camera->velocity.z+=speed*dt;
+		camera->velocity.z+=speed;
 
 	if(camera->key_s)
-		camera->velocity.z-=speed*dt;
+		camera->velocity.z-=speed;
 
 	if(camera->key_q)
-		camera->roll+=rotation*dt;
+		camera->roll+=rotation;
 
 	if(camera->key_e)
-		camera->roll-=rotation*dt;
+		camera->roll-=rotation;
 
 	if(camera->key_left)
-		camera->yaw+=rotation*dt;
+		camera->yaw+=rotation;
 
 	if(camera->key_right)
-		camera->yaw-=rotation*dt;
+		camera->yaw-=rotation;
 
 	if(camera->key_up)
-		camera->pitch+=rotation*dt;
+		camera->pitch+=rotation;
 
 	if(camera->key_down)
-		camera->pitch-=rotation*dt;
+		camera->pitch-=rotation;
 
 	const float maxVelocity=100.0f;
 	const float magnitude=Vec3_Length(camera->velocity);
@@ -440,17 +440,17 @@ matrix CameraUpdate(Camera_t *camera, float dt)
 	CameraRotate(camera);
 
 	// Combine the velocity with the 3 directional vectors to give overall directional velocity
-	const matrix cameraOrientation=
-	{
-		.x=Vec4(camera->right.x, camera->up.x, camera->forward.x, 0.0f),
-		.y=Vec4(camera->right.y, camera->up.y, camera->forward.y, 0.0f),
-		.z=Vec4(camera->right.z, camera->up.z, camera->forward.z, 0.0f),
-		.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
-	};
-	const vec3 velocity=Matrix3x3MultVec3(camera->velocity, MatrixTranspose(cameraOrientation));
+	//const matrix cameraOrientation=
+	//{
+	//	.x=Vec4(camera->right.x, camera->up.x, camera->forward.x, 0.0f),
+	//	.y=Vec4(camera->right.y, camera->up.y, camera->forward.y, 0.0f),
+	//	.z=Vec4(camera->right.z, camera->up.z, camera->forward.z, 0.0f),
+	//	.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
+	//};
+	//const vec3 velocity=Matrix3x3MultVec3(camera->velocity, MatrixTranspose(cameraOrientation));
 
 	// Integrate the velocity over time to give positional change
-	camera->position=Vec3_Addv(camera->position, Vec3_Muls(velocity, dt));
+	//camera->position=Vec3_Addv(camera->position, Vec3_Muls(velocity, dt));
 
 	return MatrixLookAt(camera->position, Vec3_Addv(camera->position, camera->forward), camera->up);
 }
