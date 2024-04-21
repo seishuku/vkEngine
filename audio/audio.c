@@ -113,7 +113,7 @@ static void HRIRInterpolate(vec3 xyz)
 	);
 
 	// Calculate distance fall-off
-	float falloffDist=fmaxf(0.0f, 1.0f-Vec3_Length(Vec3_Muls(position, invRadius)));
+	float falloffDist=fmaxf(0.0f, 1.0f-Vec3_Length(Vec3_Muls(relPosition, invRadius)));
 
 	// Normalize also returns the length of the vector...
 	Vec3_Normalize(&position);

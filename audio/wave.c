@@ -1,3 +1,6 @@
+// This handles Microsoft wave file loading and SFX waveform generation
+// Wave files supported are 8, 16, 24, 32bit PCM, and 32 and 64bit float.
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -10,7 +13,7 @@
 // Chunk magic markers
 #define RIFF_MAGIC ('R'|('I'<<8)|('F'<<16)|('F'<<24))
 #define WAVE_MAGIC ('W'|('A'<<8)|('V'<<16)|('E'<<24))
-#define FMT_MAGIC ('f'|('m'<<8)|('t'<<16)|(' '<<24))
+#define FMT_MAGIC  ('f'|('m'<<8)|('t'<<16)|(' '<<24))
 #define DATA_MAGIC ('d'|('a'<<8)|('t'<<16)|('a'<<24))
 
 typedef struct RIFFChunk_s
@@ -36,13 +39,16 @@ typedef struct WaveFormat_s
 // Based off of what id Software used in Quake, seems to work well enough.
 static void ConvertAndResample(const void *in, const uint32_t inLength, const WaveFormat_t waveFormat, int16_t *out)
 {
-    const float stepScale=(float)waveFormat.samplesPerSec/AUDIO_SAMPLE_RATE;
-    const uint32_t outCount=(uint32_t)(inLength/stepScale);
+	if(in==NULL||out==NULL)
+		return;
 
-    for(uint32_t i=0, sampleFrac=0;i<outCount;i++, sampleFrac+=(int32_t)(stepScale*256))
-    {
-        const int32_t srcSample=sampleFrac>>8;
-        int32_t sampleL=0, sampleR=0;
+	const float stepScale=(float)waveFormat.samplesPerSec/AUDIO_SAMPLE_RATE;
+	const uint32_t outCount=(uint32_t)(inLength/stepScale);
+
+	for(uint32_t i=0, sampleFrac=0;i<outCount;i++, sampleFrac+=(int32_t)(stepScale*256))
+	{
+		const int32_t srcSample=sampleFrac>>8;
+		int32_t sampleL=0, sampleR=0;
 
 		// Input conversion/resample
 		if(waveFormat.formatTag==WAVE_FORMAT_PCM)
@@ -113,71 +119,75 @@ static void ConvertAndResample(const void *in, const uint32_t inLength, const Wa
 		}
 
 		// Output (16bit signed int)
-        if(waveFormat.channels==2)
-        {
-            out[2*i+0]=(int16_t)sampleL;
-            out[2*i+1]=(int16_t)sampleR;
-        }
+		if(waveFormat.channels==2)
+		{
+			out[2*i+0]=(int16_t)sampleL;
+			out[2*i+1]=(int16_t)sampleR;
+		}
 		else if(waveFormat.channels==1)
 			out[i]=(int16_t)sampleL;
-    }
+	}
 }
 
 // Load a WAVE sound file.
 bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 {
-    FILE *stream=NULL;
+	FILE *stream=NULL;
 	RIFFChunk_t riff={ 0 }, chunk={ 0 };
-    uint32_t waveMagic=0;
+	uint32_t waveMagic=0;
 	WaveFormat_t waveFormat={ 0 };
 	int32_t fileSize=0;
-	
+	uint8_t *buffer=NULL;
+
 	stream=fopen(filename, "rb");
    
 	if(stream==NULL)
-        return false;
+	{
+		DBGPRINTF(DEBUG_ERROR, "Unable to open file %s.\n", filename);
+		return false;
+	}
 
 	if(fseek(stream, 0, SEEK_END))
 	{
-		fclose(stream);
-		return false;
+		DBGPRINTF(DEBUG_ERROR, "Unable to seek to end of file %s.\n", filename);
+		goto error;
 	}
 
 	fileSize=ftell(stream);
 
 	if(fileSize==-1)
 	{
-		fclose(stream);
-		return false;
+		DBGPRINTF(DEBUG_ERROR, "Unable to tell position of file %s.\n", filename);
+		goto error;
 	}
 
 	if(fseek(stream, 0, SEEK_SET))
 	{
-		fclose(stream);
-		return false;
+		DBGPRINTF(DEBUG_ERROR, "Unable to seek beginning of file %s.\n", filename);
+		goto error;
 	}
 
 	// RIFF header chunk, check chunk magic marker and make sure file size matches the chunk size
 	if(fread(&riff, sizeof(RIFFChunk_t), 1, stream)!=1||riff.magic!=RIFF_MAGIC)
-    {
-        fclose(stream);
-        return false;
-    }
+	{
+		DBGPRINTF(DEBUG_ERROR, "Invalid RIFF chunk in file %s.\n", filename);
+		goto error;
+	}
 
-    // WAVE magic marker ("WAVE") should follow after the RIFF chunk
-    if(fread(&waveMagic, sizeof(uint32_t), 1, stream)!=1&&waveMagic!=WAVE_MAGIC)
-    {
-        fclose(stream);
-        return false;
-    }
+	// WAVE magic marker ("WAVE") should follow after the RIFF chunk
+	if(fread(&waveMagic, sizeof(uint32_t), 1, stream)!=1&&waveMagic!=WAVE_MAGIC)
+	{
+		DBGPRINTF(DEBUG_ERROR, "Invalid wave magic in file %s.\n", filename);
+		goto error;
+	}
 
 	while(!feof(stream))
 	{
 		// Read in a chunk to process
 		if(!fread(&chunk, sizeof(RIFFChunk_t), 1, stream))
 		{
-			fclose(stream);
-			return false;
+			DBGPRINTF(DEBUG_ERROR, "Unable to read chunk in file %s.\n", filename);
+			goto error;
 		}
 
 		switch(chunk.magic)
@@ -186,38 +196,39 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 			{
 				if(fread(&waveFormat, sizeof(WaveFormat_t), 1, stream)!=1)
 				{
-					fclose(stream);
-					return false;
+					DBGPRINTF(DEBUG_ERROR, "Unable to read wave format chunk in file %s.\n", filename);
+					goto error;
 				}
 
 				// Only support PCM streams and up to 2 channels
 				if(!(waveFormat.formatTag==WAVE_FORMAT_PCM||waveFormat.formatTag==WAVE_FORMAT_IEEE_FLOAT)||waveFormat.channels>2)
 				{
-					fclose(stream);
-					return false;
+					DBGPRINTF(DEBUG_ERROR, "Unsupported wave format in file %s.\n", filename);
+					goto error;
 				}
+
 				break;
 			}
 
 			case DATA_MAGIC:
 			{
-				uint8_t *buffer=(uint8_t *)Zone_Malloc(zone, chunk.size);
+				buffer=(uint8_t *)Zone_Malloc(zone, chunk.size);
 
 				if(buffer==NULL)
 				{
-					fclose(stream);
-					return false;
+					DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for file %s.\n", filename);
+					goto error;
 				}
 
 				// Read in audio data
 				if(fread(buffer, 1, chunk.size, stream)!=chunk.size)
 				{
-					Zone_Free(zone, buffer);
-					fclose(stream);
-					return false;
+					DBGPRINTF(DEBUG_ERROR, "Unable to read audio data in file %s.\n", filename);
+					goto error;
 				}
 
 				fclose(stream);
+				stream=NULL;
 
 				// Convert data byte size to number of samples
 				const uint32_t numSamples=chunk.size/(waveFormat.bitsPerSample>>3)/waveFormat.channels;
@@ -225,20 +236,29 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 				// Covert to match primary buffer sampling rate
 				const uint32_t outputSize=(uint32_t)(numSamples/((float)waveFormat.samplesPerSec/AUDIO_SAMPLE_RATE));
 
-				int16_t *resampledAndConverted=(int16_t *)Zone_Malloc(zone, sizeof(int16_t)*outputSize*waveFormat.channels);
-
-				if(resampledAndConverted==NULL)
+				if(outputSize!=numSamples)
 				{
+#ifdef _DEBUG
+					DBGPRINTF(DEBUG_INFO, "Converting %s wave format from %dHz/%dbit to %d/16bit.\n", filename, waveFormat.samplesPerSec, waveFormat.bitsPerSample, AUDIO_SAMPLE_RATE);
+#endif
+					int16_t *resampledAndConverted=(int16_t *)Zone_Malloc(zone, sizeof(int16_t)*outputSize*waveFormat.channels);
+
+					if(resampledAndConverted==NULL)
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for conversion buffer for file %s.\n", filename);
+						goto error;
+					}
+
+					// Resample PCM data to our common sample rate
+					ConvertAndResample(buffer, numSamples, waveFormat, resampledAndConverted);
+
 					Zone_Free(zone, buffer);
-					return false;
+
+					sample->data=resampledAndConverted;
 				}
+				else
+					sample->data=(int16_t *)buffer;
 
-				// Resample PCM data to our common sample rate
-				ConvertAndResample(buffer, numSamples, waveFormat, resampledAndConverted);
-
-				Zone_Free(zone, buffer);
-
-				sample->data=resampledAndConverted;
 				sample->length=outputSize;
 				sample->position=0;
 				sample->channels=(uint8_t)waveFormat.channels;
@@ -253,6 +273,13 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 				break;
 		}
 	}
+
+error:
+	if(stream)
+		fclose(stream);
+
+	if(buffer)
+		Zone_Free(zone, buffer);
 
 	return false;
 }
