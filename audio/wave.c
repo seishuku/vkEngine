@@ -7,15 +7,36 @@
 #include "../math/math.h"
 #include "audio.h"
 
+// Chunk magic markers
 #define RIFF_MAGIC ('R'|('I'<<8)|('F'<<16)|('F'<<24))
 #define WAVE_MAGIC ('W'|('A'<<8)|('V'<<16)|('E'<<24))
 #define FMT_MAGIC ('f'|('m'<<8)|('t'<<16)|(' '<<24))
 #define DATA_MAGIC ('d'|('a'<<8)|('t'<<16)|('a'<<24))
 
-// Simple resampling function, based off of what id Software used in Quake, seems to work well enough.
-static void Resample(const void *in, const int inWidth, const int inRate, const int inChannel, const int inLength, int16_t *out)
+typedef struct RIFFChunk_s
 {
-    const float stepScale=(float)inRate/AUDIO_SAMPLE_RATE;
+	uint32_t magic;
+	uint32_t size;
+} RIFFChunk_t;
+
+#define WAVE_FORMAT_PCM			0x0001
+#define WAVE_FORMAT_IEEE_FLOAT	0x0003
+
+typedef struct WaveFormat_s
+{
+	uint16_t formatTag;			// format type (PCM, float, etc)
+	uint16_t channels;			// number of channels (mono, stereo, quad, etc)
+	uint32_t samplesPerSec;		// sample rate
+	uint32_t bytesPerSec;		// for buffer estimation
+	uint16_t blockAlign;		// block size of data
+	uint16_t bitsPerSample;		// number of bits per sample of mono data
+} WaveFormat_t;
+
+// Simple resample and conversion function to the audio engine's common format (44.1KHz/16bit).
+// Based off of what id Software used in Quake, seems to work well enough.
+static void ConvertAndResample(const void *in, const uint32_t inLength, const WaveFormat_t waveFormat, int16_t *out)
+{
+    const float stepScale=(float)waveFormat.samplesPerSec/AUDIO_SAMPLE_RATE;
     const uint32_t outCount=(uint32_t)(inLength/stepScale);
 
     for(uint32_t i=0, sampleFrac=0;i<outCount;i++, sampleFrac+=(int32_t)(stepScale*256))
@@ -23,147 +44,217 @@ static void Resample(const void *in, const int inWidth, const int inRate, const 
         const int32_t srcSample=sampleFrac>>8;
         int32_t sampleL=0, sampleR=0;
 
-        if(inWidth==2)
-        {
-            if(inChannel==2)
-            {
-                sampleL=((int16_t *)in)[2*srcSample+0];
-                sampleR=((int16_t *)in)[2*srcSample+1];
-            }
-            else
-                sampleL=((int16_t *)in)[srcSample];
-        }
-        else
-        {
-            if(inChannel==2)
-            {
-                sampleL=(int16_t)(((int8_t *)in)[2*srcSample+0]-128)<<8;
-                sampleR=(int16_t)(((int8_t *)in)[2*srcSample+1]-128)<<8;
-            }
-            else
-                sampleL=(int16_t)(((int8_t *)in)[srcSample]-128)<<8;
-        }
+		// Input conversion/resample
+		if(waveFormat.formatTag==WAVE_FORMAT_PCM)
+		{
+			if(waveFormat.bitsPerSample==32) // 32bit signed integer PCM
+			{
+				if(waveFormat.channels==2)
+				{
+					sampleL=((int32_t *)in)[2*srcSample+0]>>16;
+					sampleR=((int32_t *)in)[2*srcSample+1]>>16;
+				}
+				else if(waveFormat.channels==1)
+					sampleL=((int32_t *)in)[srcSample]>>16;
+			}
+			else if(waveFormat.bitsPerSample==24) // 24bit signed integer PCM
+			{
+				if(waveFormat.channels==2)
+				{
+					sampleL=(((uint8_t *)in)[i*6+0]|(((uint8_t *)in)[i*6+1]<<8)|(((uint8_t *)in)[i*6+2]<<16))>>8;
+					sampleR=(((uint8_t *)in)[i*6+3]|(((uint8_t *)in)[i*6+4]<<8)|(((uint8_t *)in)[i*6+5]<<16))>>8;
+				}
+				else if(waveFormat.channels==1)
+					sampleL=(((uint8_t *)in)[i*3+0]|(((uint8_t *)in)[i*3+1]<<8)|(((uint8_t *)in)[i*3+2]<<16))>>8;
+			}
+			else if(waveFormat.bitsPerSample==16) // 16bit signed integer PCM
+			{
+				if(waveFormat.channels==2)
+				{
+					sampleL=((int16_t *)in)[2*srcSample+0];
+					sampleR=((int16_t *)in)[2*srcSample+1];
+				}
+				else if(waveFormat.channels==1)
+					sampleL=((int16_t *)in)[srcSample];
+			}
+			else if(waveFormat.bitsPerSample==8) // 8bit unsigned integer PCM
+			{
+				if(waveFormat.channels==2)
+				{
+					sampleL=(((int8_t *)in)[2*srcSample+0]-128)<<8;
+					sampleR=(((int8_t *)in)[2*srcSample+1]-128)<<8;
+				}
+				else if(waveFormat.channels==1)
+					sampleL=(((int8_t *)in)[srcSample]-128)<<8;
+			}
+		}
+		else if(waveFormat.formatTag==WAVE_FORMAT_IEEE_FLOAT)
+		{
+			if(waveFormat.bitsPerSample==64) // 64bit float
+			{
+				if(waveFormat.channels==2)
+				{
+					sampleL=(((double *)in)[2*srcSample+0]*INT16_MAX);
+					sampleR=(((double *)in)[2*srcSample+1]*INT16_MAX);
+				}
+				else
+					sampleL=(((double *)in)[srcSample]*INT16_MAX);
+			}
+			else if(waveFormat.bitsPerSample==32) // 32bit float
+			{
+				if(waveFormat.channels==2)
+				{
+					sampleL=(((float *)in)[2*srcSample+0]*INT16_MAX);
+					sampleR=(((float *)in)[2*srcSample+1]*INT16_MAX);
+				}
+				else
+					sampleL=(((float *)in)[srcSample]*INT16_MAX);
+			}
+		}
 
-        if(inChannel==2)
+		// Output (16bit signed int)
+        if(waveFormat.channels==2)
         {
-            out[2*i+0]=sampleL;
-            out[2*i+1]=sampleR;
+            out[2*i+0]=(int16_t)sampleL;
+            out[2*i+1]=(int16_t)sampleR;
         }
-        else
-            out[i]=sampleL;
+		else if(waveFormat.channels==1)
+			out[i]=(int16_t)sampleL;
     }
 }
 
-// Load a WAVE sound file, this should search for chunks, not blindly load.
-// This also will only accept PCM audio streams and stereo, ideally stereo isn't needed
-// because most sound effcts will be panned/spatialized into stereo for "3D" audio,
-// but stereo is needed for the HRTF samples.
+// Load a WAVE sound file.
 bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 {
     FILE *stream=NULL;
-    uint32_t riffMagic, waveMagic, fmtMagic, dataMagic;
-    uint16_t format;
-    uint16_t channels;
-    uint32_t samplesPerSec;
-    uint16_t bitPerSample;
-    uint32_t length;
+	RIFFChunk_t riff={ 0 }, chunk={ 0 };
+    uint32_t waveMagic=0;
+	WaveFormat_t waveFormat={ 0 };
+	int32_t fileSize=0;
+	
+	stream=fopen(filename, "rb");
+   
+	if(stream==NULL)
+        return false;
 
-    if((stream=fopen(filename, "rb"))==NULL)
-        return 0;
+	if(fseek(stream, 0, SEEK_END))
+	{
+		fclose(stream);
+		return false;
+	}
 
-    // Header
-    fread(&riffMagic, sizeof(uint32_t), 1, stream);    // RIFF magic marker ("RIFF")
-    fseek(stream, sizeof(uint32_t), SEEK_CUR);          // File size
+	fileSize=ftell(stream);
 
-    if(riffMagic!=RIFF_MAGIC)
+	if(fileSize==-1)
+	{
+		fclose(stream);
+		return false;
+	}
+
+	if(fseek(stream, 0, SEEK_SET))
+	{
+		fclose(stream);
+		return false;
+	}
+
+	// RIFF header chunk, check chunk magic marker and make sure file size matches the chunk size
+	if(fread(&riff, sizeof(RIFFChunk_t), 1, stream)!=1||riff.magic!=RIFF_MAGIC)
     {
         fclose(stream);
-        return 0;
+        return false;
     }
 
-    // WAVE magic marker ("WAVE")
-    fread(&waveMagic, sizeof(uint32_t), 1, stream);
-
-    if(waveMagic!=WAVE_MAGIC)
+    // WAVE magic marker ("WAVE") should follow after the RIFF chunk
+    if(fread(&waveMagic, sizeof(uint32_t), 1, stream)!=1&&waveMagic!=WAVE_MAGIC)
     {
         fclose(stream);
-        return 0;
+        return false;
     }
 
-    // Wave format header magic marker ("fmt ")
-    fread(&fmtMagic, sizeof(uint32_t), 1, stream);
+	while(!feof(stream))
+	{
+		// Read in a chunk to process
+		if(!fread(&chunk, sizeof(RIFFChunk_t), 1, stream))
+		{
+			fclose(stream);
+			return false;
+		}
 
-    if(fmtMagic!=FMT_MAGIC)
-    {
-        fclose(stream);
-        return 0;
-    }
+		switch(chunk.magic)
+		{
+			case FMT_MAGIC:
+			{
+				if(fread(&waveFormat, sizeof(WaveFormat_t), 1, stream)!=1)
+				{
+					fclose(stream);
+					return false;
+				}
 
-    fseek(stream, sizeof(uint32_t), SEEK_CUR);          // Format header size?
+				// Only support PCM streams and up to 2 channels
+				if(!(waveFormat.formatTag==WAVE_FORMAT_PCM||waveFormat.formatTag==WAVE_FORMAT_IEEE_FLOAT)||waveFormat.channels>2)
+				{
+					fclose(stream);
+					return false;
+				}
+				break;
+			}
 
-    fread(&format, sizeof(uint16_t), 1, stream);        // wFormatTag
-    fread(&channels, sizeof(uint16_t), 1, stream);      // nChannels
-    fread(&samplesPerSec, sizeof(uint32_t), 1, stream);     // nSamplesPerSec
-    fseek(stream, sizeof(uint32_t), SEEK_CUR);          // nAvgBytesPerSec
-    fseek(stream, sizeof(uint16_t), SEEK_CUR);          // nBlockAlign
-    fread(&bitPerSample, sizeof(uint16_t), 1, stream);  // wBitsPerSample
+			case DATA_MAGIC:
+			{
+				uint8_t *buffer=(uint8_t *)Zone_Malloc(zone, chunk.size);
 
-    // Only support PCM streams and stereo
-    if(format!=1&&channels>2)
-    {
-        fclose(stream);
-        return 0;
-    }
+				if(buffer==NULL)
+				{
+					fclose(stream);
+					return false;
+				}
 
-    // Data block magic marker ("data")
-    fread(&dataMagic, sizeof(uint32_t), 1, stream);
+				// Read in audio data
+				if(fread(buffer, 1, chunk.size, stream)!=chunk.size)
+				{
+					Zone_Free(zone, buffer);
+					fclose(stream);
+					return false;
+				}
 
-    if(dataMagic!=DATA_MAGIC)
-    {
-        fclose(stream);
-        return 0;
-    }
+				fclose(stream);
 
-    // Length of data block
-    fread(&length, sizeof(uint32_t), 1, stream);
+				// Convert data byte size to number of samples
+				const uint32_t numSamples=chunk.size/(waveFormat.bitsPerSample>>3)/waveFormat.channels;
 
-    int16_t *buffer=(int16_t *)Zone_Malloc(zone, length);
+				// Covert to match primary buffer sampling rate
+				const uint32_t outputSize=(uint32_t)(numSamples/((float)waveFormat.samplesPerSec/AUDIO_SAMPLE_RATE));
 
-    if(buffer==NULL)
-    {
-        fclose(stream);
-        return 0;
-    }
+				int16_t *resampledAndConverted=(int16_t *)Zone_Malloc(zone, sizeof(int16_t)*outputSize*waveFormat.channels);
 
-    fread(buffer, 1, length, stream);
+				if(resampledAndConverted==NULL)
+				{
+					Zone_Free(zone, buffer);
+					return false;
+				}
 
-    fclose(stream);
+				// Resample PCM data to our common sample rate
+				ConvertAndResample(buffer, numSamples, waveFormat, resampledAndConverted);
 
-    length/=bitPerSample>>3;
-    length/=channels;
+				Zone_Free(zone, buffer);
 
-    // Covert to match primary buffer sampling rate
-    const uint32_t outputSize=(uint32_t)(length/((float)samplesPerSec/AUDIO_SAMPLE_RATE));
+				sample->data=resampledAndConverted;
+				sample->length=outputSize;
+				sample->position=0;
+				sample->channels=(uint8_t)waveFormat.channels;
+				sample->xyz=Vec3b(0.0f);
 
-    int16_t *resampled=(int16_t *)Zone_Malloc(zone, sizeof(int16_t)*outputSize*channels);
+				// Done, return out
+				return true;
+			}
 
-    if(resampled==NULL)
-    {
-        Zone_Free(zone, buffer);
-        return 0;
-    }
+			default:
+				fseek(stream, chunk.size, SEEK_CUR);
+				break;
+		}
+	}
 
-    Resample(buffer, bitPerSample>>3, samplesPerSec, channels, length, resampled);
-
-    Zone_Free(zone, buffer);
-
-    sample->data=resampled;
-    sample->length=outputSize;
-    sample->position=0;
-    sample->channels=(uint8_t)channels;
-    sample->xyz=Vec3b(0.0f);
-
-    return 1;
+	return false;
 }
 
 static const float speedRatio=100.0f;

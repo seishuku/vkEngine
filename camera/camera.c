@@ -365,16 +365,15 @@ void CameraInit(Camera_t *camera, const vec3 position, const vec3 right, const v
 
 static void CameraRotate(Camera_t *camera)
 {
-	const vec4 pitchYaw=QuatMultiply(QuatAnglev(-camera->pitch, camera->right), QuatAnglev(camera->yaw, camera->up));
-	camera->forward=QuatRotate(pitchYaw, camera->forward);
-	Vec3_Normalize(&camera->forward);
+	const vec4 qPitch=QuatAnglev(-camera->pitch, camera->right);
+	const vec4 qYaw=QuatAnglev(camera->yaw, camera->up);
+	const vec4 qRoll=QuatAnglev(-camera->roll, camera->forward);
 
-	camera->right=Vec3_Cross(camera->up, camera->forward);
+	const vec4 qOrientation=QuatMultiply(QuatMultiply(qPitch, qYaw), qRoll);
 
-	camera->right=QuatRotate(QuatAnglev(-camera->roll, camera->forward), camera->right);
-	Vec3_Normalize(&camera->right);
-
-	camera->up=Vec3_Cross(camera->forward, camera->right);
+	camera->right=QuatRotate(qOrientation, camera->right);
+	camera->up=QuatRotate(qOrientation, camera->up);
+	camera->forward=Vec3_Cross(camera->right, camera->up);
 }
 
 matrix CameraUpdate(Camera_t *camera, float dt)

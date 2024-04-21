@@ -1314,13 +1314,13 @@ bool Init(void)
 		return false;
 	}
 
-	if(!Audio_LoadStatic("assets/pew2.wav", &sounds[SOUND_PEW2]))
+	if(!Audio_LoadStatic("assets/pew1.wav", &sounds[SOUND_PEW2]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/pew2.wav\n");
 		return false;
 	}
 
-	if(!Audio_LoadStatic("assets/pew3.wav", &sounds[SOUND_PEW3]))
+	if(!Audio_LoadStatic("assets/pew1.wav", &sounds[SOUND_PEW3]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/pew3.wav\n");
 		return false;

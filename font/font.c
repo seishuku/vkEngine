@@ -36,7 +36,6 @@ bool Font_Init(Font_t *font)
 {
 	VkuBuffer_t stagingBuffer;
 	VkCommandBuffer copyCommand;
-	void *data=NULL;
 
 	// Create descriptors and pipeline
 	vkuInitDescriptorSet(&font->descriptorSet, vkContext.device);
