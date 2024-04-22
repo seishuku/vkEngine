@@ -196,23 +196,40 @@ static void MixAudio(int16_t *dst, const int16_t *src, const size_t length, cons
 	if(volume==0)
 		return;
 
-	for(size_t i=0;i<length*2;i+=2)
+	for(size_t i=0;i<length*2;i+=4)
 	{
-		int32_t sampleL=((src[i+0]*volume)/MAX_VOLUME)+dst[i+0];
-		int32_t sampleR=((src[i+1]*volume)/MAX_VOLUME)+dst[i+1];
+		const int16_t src0=*src++, src1=*src++, src2=*src++, src3=*src++;
+		const int16_t dst0=*dst+0, dst1=*dst+1, dst2=*dst+2, dst3=*dst+3;
 
-		if(sampleL<INT16_MIN)
-			sampleL=INT16_MIN;
-		else if(sampleL>INT16_MAX)
-			sampleL=INT16_MAX;
+		int32_t mix0=((src0*volume)/MAX_VOLUME)+dst0;
+		int32_t mix1=((src1*volume)/MAX_VOLUME)+dst1;
+		int32_t mix2=((src2*volume)/MAX_VOLUME)+dst2;
+		int32_t mix3=((src3*volume)/MAX_VOLUME)+dst3;
 
-		if(sampleR<INT16_MIN)
-			sampleR=INT16_MIN;
-		else if(sampleR>INT16_MAX)
-			sampleR=INT16_MAX;
+		if(mix0<INT16_MIN)
+			mix0=INT16_MIN;
+		else if(mix0>INT16_MAX)
+			mix0=INT16_MAX;
 
-		dst[i+0]=sampleL;
-		dst[i+1]=sampleR;
+		if(mix1<INT16_MIN)
+			mix1=INT16_MIN;
+		else if(mix1>INT16_MAX)
+			mix1=INT16_MAX;
+
+		if(mix2<INT16_MIN)
+			mix2=INT16_MIN;
+		else if(mix2>INT16_MAX)
+			mix2=INT16_MAX;
+
+		if(mix3<INT16_MIN)
+			mix3=INT16_MIN;
+		else if(mix3>INT16_MAX)
+			mix3=INT16_MAX;
+
+		*dst++=mix0;
+		*dst++=mix1;
+		*dst++=mix2;
+		*dst++=mix3;
 	}
 }
 
