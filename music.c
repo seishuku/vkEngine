@@ -8,6 +8,8 @@
 #include "audio/audio.h"
 #include "music.h"
 
+static mtx_t musicMutex;
+
 static OggVorbis_File oggStream;
 
 #ifdef ANDROID
@@ -109,11 +111,13 @@ String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFi
 
 void MusicStreamData(void *buffer, size_t length)
 {
-	int size=0;
+	mtx_lock(&musicMutex);
 
 	// Callback param length is in frames, ov_read needs bytes:
 	size_t lengthBytes=length*2*sizeof(int16_t);
 	char *bufferBytePtr=buffer;
+
+	int size=0;
 
 	do
 	{
@@ -121,6 +125,8 @@ void MusicStreamData(void *buffer, size_t length)
 		bufferBytePtr+=size;
 		lengthBytes-=size;
 	} while(lengthBytes&&size);
+
+	mtx_unlock(&musicMutex);
 
 	// Out of OGG audio, get a new track
 	if(size==0)
@@ -141,6 +147,7 @@ void PrevTrackCallback(void *arg)
 {
 	if(musicList!=NULL)
 	{
+		mtx_lock(&musicMutex);
 		ov_clear(&oggStream);
 
 		char filePath[1024]={ 0 };
@@ -153,8 +160,11 @@ void PrevTrackCallback(void *arg)
 		if(result<0)
 		{
 			ov_clear(&oggStream);
+			mtx_unlock(&musicMutex);
 			return;
 		}
+
+		mtx_unlock(&musicMutex);
 	}
 }
 
@@ -162,6 +172,7 @@ void NextTrackCallback(void *arg)
 {
 	if(musicList!=NULL)
 	{
+		mtx_lock(&musicMutex);
 		ov_clear(&oggStream);
 
 		char filePath[1024]={ 0 };
@@ -174,13 +185,18 @@ void NextTrackCallback(void *arg)
 		if(result<0)
 		{
 			ov_clear(&oggStream);
+			mtx_unlock(&musicMutex);
 			return;
 		}
+
+		mtx_unlock(&musicMutex);
 	}
 }
 
 void Music_Init(void)
 {
+	mtx_init(&musicMutex, mtx_plain);
+
 	musicList=BuildFileList(musicPath, ".ogg", &numMusic);
 
 	if(musicList!=NULL)
