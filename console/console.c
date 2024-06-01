@@ -11,7 +11,7 @@
 #include <strings.h>
 #endif
 
-extern Font_t Fnt;
+extern Font_t font;
 
 // Standard/basic console commands
 void Console_CmdClear(Console_t *console, const char *param)
@@ -299,7 +299,7 @@ void Console_Draw(Console_t *console)
 
 	for(uint32_t i=0;i<console->height;i++)
 	{
-		Font_Print(&Fnt, 16.0f, 0.0f, (float)i*16.0f, "%s", console->buffer[temp].text);
+		Font_Print(&font, 16.0f, 0.0f, (float)i*16.0f, "%s", console->buffer[temp].text);
 		temp=(temp+1)%CONSOLE_MAX_ROW;
 	}
 }

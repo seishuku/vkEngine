@@ -17,9 +17,8 @@ extern VkuSwapchain_t swapchain;
 extern VkSampleCountFlags MSAA;
 extern VkFormat colorFormat;
 extern VkFormat depthFormat;
-extern VkRenderPass renderPass;
 
-
+VkRenderPass renderPass;
 Pipeline_t mainPipeline;
 
 bool CreateLightingPipeline(void)

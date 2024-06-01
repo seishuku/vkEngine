@@ -88,8 +88,6 @@ VkuImage_t colorImage[2];		// left and right eye color buffer
 VkFormat depthFormat=VK_FORMAT_D32_SFLOAT;
 VkuImage_t depthImage[2];		// left and right eye depth buffers
 
-// Renderpass for primary renderer
-VkRenderPass renderPass;
 // Framebuffers, per-eye
 VkFramebuffer framebuffer[2];
 
@@ -122,7 +120,7 @@ ThreadBarrier_t physicsThreadBarrier;
 //////
 
 // UI Stuff
-Font_t Fnt; // Fnt instead of Font, because Xlib is dumb and declares a type Font *rolley-eyes*
+Font_t font;
 UI_t UI;
 
 uint32_t volumeID=UINT32_MAX;
@@ -1140,7 +1138,7 @@ void Render(void)
 
 	Audio_SetStreamVolume(0, UI_GetBarGraphValue(&UI, volumeID));
 
-	Font_Print(&Fnt, 16.0f, renderWidth-400.0f, renderHeight-50.0f-16.0f, "Current track: %s", musicList[currentMusic].string);
+	Font_Print(&font, 16.0f, renderWidth-400.0f, renderHeight-50.0f-16.0f, "Current track: %s", musicList[currentMusic].string);
 
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
@@ -1179,7 +1177,7 @@ void Render(void)
 	}
 
 	// Reset the font text collection for the next frame
-	Font_Reset(&Fnt);
+	Font_Reset(&font);
 
 	vkEndCommandBuffer(perFrame[index].commandBuffer);
 
@@ -1471,7 +1469,7 @@ bool Init(void)
 		particleEmitters[i]=particleBody;
 	}
 
-	Font_Init(&Fnt);
+	Font_Init(&font);
 
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)renderWidth, (float)renderHeight));
 
@@ -1812,7 +1810,7 @@ void Destroy(void)
 	//////////
 
 	// Font destruction
-	Font_Destroy(&Fnt);
+	Font_Destroy(&font);
 	//////////
 
 	// Asteroid instance buffer destruction

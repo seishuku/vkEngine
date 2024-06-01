@@ -16,7 +16,7 @@ extern VkSampleCountFlags MSAA;
 extern VkuSwapchain_t swapchain;
 extern VkRenderPass compositeRenderPass;
 
-extern Font_t Fnt;
+extern Font_t font;
 
 extern bool isVR;
 extern VkuSwapchain_t swapchain;
@@ -34,7 +34,6 @@ typedef struct
 static bool UI_VulkanVertex(UI_t *UI)
 {
 	VkuBuffer_t stagingBuffer;
-	void *data=NULL;
 
 	// Create a dummy blank image for binding to descriptor sets when no texture is needed
 	if(!vkuCreateImageBuffer(&vkContext, &UI->blankImage,
@@ -386,7 +385,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 				float textSize=fminf(control->button.size.x/textLength*0.8f, control->button.size.y*0.8f);
 
 				// Print the text centered
-				Font_Print(&Fnt,
+				Font_Print(&font,
 						   textSize,
 						   control->position.x-(textLength*textSize)*0.5f+control->barGraph.size.x*0.5f,
 						   control->position.y-(textSize*0.5f)+(control->barGraph.size.y*0.5f),
@@ -427,7 +426,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 			case UI_CONTROL_CHECKBOX:
 			{
 				// Text size is the radius of the checkbox, placed radius length away horizontally, centered vertically
-				Font_Print(&Fnt,
+				Font_Print(&font,
 						   control->checkBox.radius,
 						   control->position.x+control->checkBox.radius,
 						   control->position.y-(control->checkBox.radius/2.0f),
@@ -462,7 +461,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 				float textSize=fminf(control->barGraph.size.x/textLength*0.8f, control->barGraph.size.y*0.8f);
 
 				// Print the text centered
-				Font_Print(&Fnt,
+				Font_Print(&font,
 						   textSize,
 						   control->position.x-(textLength*textSize)*0.5f+control->barGraph.size.x*0.5f,
 						   control->position.y-(textSize*0.5f)+(control->barGraph.size.y*0.5f),

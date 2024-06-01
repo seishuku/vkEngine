@@ -28,7 +28,7 @@ extern VkuImage_t depthImage[2];
 extern VkuImage_t shadowDepth;
 
 extern UI_t UI;
-extern Font_t Fnt;
+extern Font_t font;
 
 Pipeline_t compositePipeline;
 VkRenderPass compositeRenderPass;
@@ -576,9 +576,9 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	UI_Draw(&UI, index, eye, fTimeStep);
 
 	// Draw text in the compositing renderpass
-	Font_Print(&Fnt, 16.0f, 0.0f, 0.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep*1000.0f);
+	Font_Print(&font, 16.0f, 0.0f, 0.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep*1000.0f);
 
-	Font_Draw(&Fnt, index, eye);
+	Font_Draw(&font, index, eye);
 
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 }

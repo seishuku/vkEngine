@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include "vulkan/vulkan.h"
 
+extern VkRenderPass renderPass;
+
 bool CreateLightingPipeline(void);
 void DestroyLighting(void);
 void DrawLighting(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool);
