@@ -17,7 +17,6 @@ extern XruContext_t xrContext;
 extern bool isVR;
 
 extern float fps, fTimeStep;
-extern double physicsTime;
 
 extern VkFormat colorFormat;
 
@@ -31,22 +30,13 @@ extern VkuImage_t shadowDepth;
 extern UI_t UI;
 extern Font_t Fnt;
 
-//VkuDescriptorSet_t compositeDescriptorSet;
-//VkPipelineLayout compositePipelineLayout;
-//VkuPipeline_t compositePipeline;
 Pipeline_t compositePipeline;
 VkRenderPass compositeRenderPass;
 
-//VkuDescriptorSet_t thresholdDescriptorSet;
-//VkPipelineLayout thresholdPipelineLayout;
-//VkuPipeline_t thresholdPipeline;
 Pipeline_t thresholdPipeline;
 VkRenderPass thresholdRenderPass;
 VkFramebuffer thresholdFramebuffer[2];
 
-//VkuDescriptorSet_t gaussianDescriptorSet;
-//VkPipelineLayout gaussianPipelineLayout;
-//VkuPipeline_t gaussianPipeline;
 Pipeline_t gaussianPipeline;
 VkRenderPass gaussianRenderPass;
 VkFramebuffer gaussianFramebufferTemp[2];
@@ -82,7 +72,7 @@ bool CreateThresholdPipeline(void)
 				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			}
 		},
-		.dependencyCount=2,
+		.dependencyCount=3,
 		.pDependencies=(VkSubpassDependency[])
 		{
 			{
@@ -102,46 +92,19 @@ bool CreateThresholdPipeline(void)
 				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
 				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
-			}
+			},
+			{
+				.srcSubpass=VK_SUBPASS_EXTERNAL,
+				.dstSubpass=0,
+				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
+			},
 		},
 	}, 0, &thresholdRenderPass);
 
-#if 0
-	vkuInitDescriptorSet(&thresholdDescriptorSet, vkContext.device);
-	vkuDescriptorSet_AddBinding(&thresholdDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuAssembleDescriptorSetLayout(&thresholdDescriptorSet);
-
-	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=1,
-		.pSetLayouts=&thresholdDescriptorSet.descriptorSetLayout,
-	}, 0, &thresholdPipelineLayout);
-
-	vkuInitPipeline(&thresholdPipeline, vkContext.device, vkContext.pipelineCache);
-
-	vkuPipeline_SetPipelineLayout(&thresholdPipeline, thresholdPipelineLayout);
-	vkuPipeline_SetRenderPass(&thresholdPipeline, thresholdRenderPass);
-
-	thresholdPipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	thresholdPipeline.cullMode=VK_CULL_MODE_FRONT_BIT;
-
-	if(!vkuPipeline_AddStage(&thresholdPipeline, "shaders/fullscreen.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
-		return false;
-
-	if(!vkuPipeline_AddStage(&thresholdPipeline, "shaders/threshold.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-		return false;
-
-	//VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo=
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-	//	.colorAttachmentCount=1,
-	//	.pColorAttachmentFormats=&ColorFormat,
-	//};
-
-	if(!vkuAssemblePipeline(&thresholdPipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
-		return false;
-#endif
 	if(!CreatePipeline(&vkContext, &thresholdPipeline, thresholdRenderPass, "pipelines/threshold.pipeline"))
 		return false;
 
@@ -202,48 +165,6 @@ bool CreateGaussianPipeline(void)
 		},
 	}, 0, &gaussianRenderPass);
 
-#if 0
-	vkuInitDescriptorSet(&gaussianDescriptorSet, vkContext.device);
-	vkuDescriptorSet_AddBinding(&gaussianDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuAssembleDescriptorSetLayout(&gaussianDescriptorSet);
-
-	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=1,
-		.pSetLayouts=&gaussianDescriptorSet.descriptorSetLayout,
-		.pushConstantRangeCount=1,
-		.pPushConstantRanges=&(VkPushConstantRange)
-		{
-			.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
-			.offset=0, .size=sizeof(float)*2,
-		},
-	}, 0, &gaussianPipelineLayout);
-
-	vkuInitPipeline(&gaussianPipeline, vkContext.device, vkContext.pipelineCache);
-
-	vkuPipeline_SetPipelineLayout(&gaussianPipeline, gaussianPipelineLayout);
-	vkuPipeline_SetRenderPass(&gaussianPipeline, gaussianRenderPass);
-
-	gaussianPipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	gaussianPipeline.cullMode=VK_CULL_MODE_FRONT_BIT;
-
-	if(!vkuPipeline_AddStage(&gaussianPipeline, "shaders/fullscreen.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
-		return false;
-
-	if(!vkuPipeline_AddStage(&gaussianPipeline, "shaders/gaussian.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-		return false;
-
-	//VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo=
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-	//	.colorAttachmentCount=1,
-	//	.pColorAttachmentFormats=&ColorFormat,
-	//};
-
-	if(!vkuAssemblePipeline(&gaussianPipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
-		return false;
-#endif
 	if(!CreatePipeline(&vkContext, &gaussianPipeline, gaussianRenderPass, "pipelines/gaussian.pipeline"))
 		return false;
 
@@ -286,7 +207,7 @@ void CreateCompositeFramebuffers(uint32_t eye)
 		.layers=1,
 	}, 0, &thresholdFramebuffer[eye]);
 
-	// Gussian temp frame buffer takes output of thresholding pipeline and does the first gaussian blur pass, outputs to ColorTemp
+	// Gaussian temp frame buffer takes output of thresholding pipeline and does the first gaussian blur pass, outputs to ColorTemp
 	vkCreateFramebuffer(vkContext.device, &(VkFramebufferCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -298,7 +219,7 @@ void CreateCompositeFramebuffers(uint32_t eye)
 		.layers=1,
 	}, 0, &gaussianFramebufferTemp[eye]);
 
-	// Gussian blur frame buffer takes output of first pass gaussian blur and does the second gaussian blur pass, outputs to ColorBlur
+	// Gaussian blur frame buffer takes output of first pass gaussian blur and does the second gaussian blur pass, outputs to ColorBlur
 	vkCreateFramebuffer(vkContext.device, &(VkFramebufferCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -402,7 +323,7 @@ bool CreateCompositePipeline(void)
 				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			}
 		},
-		.dependencyCount=2,
+		.dependencyCount=3,
 		.pDependencies=(VkSubpassDependency[])
 		{
 			{
@@ -412,6 +333,15 @@ bool CreateCompositePipeline(void)
 				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
 				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
+			},
+			{
+				.srcSubpass=VK_SUBPASS_EXTERNAL,
+				.dstSubpass=0,
+				.srcStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT|VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
 				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
 			},
 			{
@@ -426,54 +356,6 @@ bool CreateCompositePipeline(void)
 		},
 	}, 0, &compositeRenderPass);
 
-#if 0
-	vkuInitDescriptorSet(&compositeDescriptorSet, vkContext.device);
-	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&compositeDescriptorSet, 4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
-
-	vkuAssembleDescriptorSetLayout(&compositeDescriptorSet);
-
-	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=1,
-		.pSetLayouts=&compositeDescriptorSet.descriptorSetLayout,
-		.pushConstantRangeCount=1,
-		.pPushConstantRanges=&(VkPushConstantRange)
-		{
-			.offset=0,
-			.size=sizeof(uint32_t)*4,
-			.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
-		},
-	}, 0, &compositePipelineLayout);
-
-	vkuInitPipeline(&compositePipeline, vkContext.device, vkContext.pipelineCache);
-
-	vkuPipeline_SetPipelineLayout(&compositePipeline, compositePipelineLayout);
-	vkuPipeline_SetRenderPass(&compositePipeline, compositeRenderPass);
-
-	compositePipeline.cullMode=VK_CULL_MODE_FRONT_BIT;
-
-	if(!vkuPipeline_AddStage(&compositePipeline, "shaders/fullscreen.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
-		return false;
-
-	if(!vkuPipeline_AddStage(&compositePipeline, "shaders/composite.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-		return false;
-
-	//VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo=
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-	//	.colorAttachmentCount=1,
-	//	.pColorAttachmentFormats=&swapchain.surfaceFormat.format,
-	//};
-
-	if(!vkuAssemblePipeline(&compositePipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
-		return false;
-#endif
-
 	if(!CreatePipeline(&vkContext, &compositePipeline, compositeRenderPass, "pipelines/composite.pipeline"))
 		return false;
 
@@ -483,23 +365,25 @@ bool CreateCompositePipeline(void)
 	return true;
 }
 
-void DestroyComposite(void)
+void DestroyCompositeFramebuffers(void)
 {
-	// Thresholding pipeline
+	vkuDestroyImageBuffer(&vkContext, &colorBlur[0]);
+	vkuDestroyImageBuffer(&vkContext, &colorTemp[0]);
+
+	if(isVR)
+	{
+		vkuDestroyImageBuffer(&vkContext, &colorBlur[1]);
+		vkuDestroyImageBuffer(&vkContext, &colorTemp[1]);
+	}
+
+	// Thresholding
 	vkDestroyFramebuffer(vkContext.device, thresholdFramebuffer[0], VK_NULL_HANDLE);
 
 	if(isVR)
 		vkDestroyFramebuffer(vkContext.device, thresholdFramebuffer[1], VK_NULL_HANDLE);
-
-	//vkDestroyDescriptorSetLayout(vkContext.device, thresholdDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
-	//vkDestroyPipeline(vkContext.device, thresholdPipeline.pipeline, VK_NULL_HANDLE);
-	//vkDestroyPipelineLayout(vkContext.device, thresholdPipelineLayout, VK_NULL_HANDLE);
-	DestroyPipeline(&vkContext, &thresholdPipeline);
-	vkDestroyRenderPass(vkContext.device, thresholdRenderPass, VK_NULL_HANDLE);
 	//////
 
-	// Gaussian blur pipeline
-
+	// Gaussian blur
 	vkDestroyFramebuffer(vkContext.device, gaussianFramebufferTemp[0], VK_NULL_HANDLE);
 	vkDestroyFramebuffer(vkContext.device, gaussianFramebufferBlur[0], VK_NULL_HANDLE);
 
@@ -508,16 +392,9 @@ void DestroyComposite(void)
 		vkDestroyFramebuffer(vkContext.device, gaussianFramebufferTemp[1], VK_NULL_HANDLE);
 		vkDestroyFramebuffer(vkContext.device, gaussianFramebufferBlur[1], VK_NULL_HANDLE);
 	}
-
-	//vkDestroyDescriptorSetLayout(vkContext.device, gaussianDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
-	//vkDestroyPipeline(vkContext.device, gaussianPipeline.pipeline, VK_NULL_HANDLE);
-	//vkDestroyPipelineLayout(vkContext.device, gaussianPipelineLayout, VK_NULL_HANDLE);
-	DestroyPipeline(&vkContext, &gaussianPipeline);
-	vkDestroyRenderPass(vkContext.device, gaussianRenderPass, VK_NULL_HANDLE);
 	//////
 
-	// Compositing pipeline
-
+	// Compositing
 	for(uint32_t i=0;i<swapchain.numImages;i++)
 	{
 		vkDestroyFramebuffer(vkContext.device, perFrame[i].compositeFramebuffer[0], VK_NULL_HANDLE);
@@ -525,10 +402,24 @@ void DestroyComposite(void)
 		if(isVR)
 			vkDestroyFramebuffer(vkContext.device, perFrame[i].compositeFramebuffer[1], VK_NULL_HANDLE);
 	}
+	//////
+}
 
-	//vkDestroyDescriptorSetLayout(vkContext.device, compositeDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
-	//vkDestroyPipeline(vkContext.device, compositePipeline.pipeline, VK_NULL_HANDLE);
-	//vkDestroyPipelineLayout(vkContext.device, compositePipelineLayout, VK_NULL_HANDLE);
+void DestroyComposite(void)
+{
+	DestroyCompositeFramebuffers();
+
+	// Thresholding pipeline
+	DestroyPipeline(&vkContext, &thresholdPipeline);
+	vkDestroyRenderPass(vkContext.device, thresholdRenderPass, VK_NULL_HANDLE);
+	//////
+
+	// Gaussian blur pipeline
+	DestroyPipeline(&vkContext, &gaussianPipeline);
+	vkDestroyRenderPass(vkContext.device, gaussianRenderPass, VK_NULL_HANDLE);
+	//////
+
+	// Compositing pipeline
 	DestroyPipeline(&vkContext, &compositePipeline);
 	vkDestroyRenderPass(vkContext.device, compositeRenderPass, VK_NULL_HANDLE);
 	//////
@@ -553,24 +444,6 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	// Threshold and down sample to 1/4 original image size
 	// Input = colorResolve
 	// Output = colorBlur
-	//vkuTransitionLayout(perFrame[index].commandBuffer, colorResolve[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	//vkuTransitionLayout(perFrame[index].commandBuffer, colorBlur[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-	//vkCmdBeginRendering(perFrame[index].commandBuffer, &(VkRenderingInfo)
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_RENDERING_INFO,
-	//	.renderArea=(VkRect2D){ { 0, 0 }, { renderWidth>>2, renderHeight>>2 } },
-	//	.layerCount=1,
-	//	.colorAttachmentCount=1,
-	//	.pColorAttachments=&(VkRenderingAttachmentInfo)
-	//	{
-	//		.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-	//		.imageView=colorBlur[Eye].imageView,
-	//		.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-	//		.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-	//		.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-	//	},
-	//});
 	vkCmdBeginRenderPass(perFrame[index].commandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -593,31 +466,12 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 
 	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
 
-	//vkCmdEndRendering(perFrame[index].commandBuffer);
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 	//////
 
 	// Gaussian blur (vertical)
 	// Input = colorBlur
 	// Output = colorTemp
-	//vkuTransitionLayout(perFrame[index].commandBuffer, colorBlur[eye] .image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	//vkuTransitionLayout(perFrame[index].commandBuffer, colorTemp[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-	//vkCmdBeginRendering(perFrame[index].commandBuffer, &(VkRenderingInfo)
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_RENDERING_INFO,
-	//	.renderArea=(VkRect2D){ { 0, 0 }, { renderWidth>>2, renderHeight>>2 } },
-	//	.layerCount=1,
-	//	.colorAttachmentCount=1,
-	//	.pColorAttachments=&(VkRenderingAttachmentInfo)
-	//	{
-	//		.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-	//		.imageView=colorTemp[Eye].imageView,
-	//		.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-	//		.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-	//		.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-	//	},
-	//});
 	vkCmdBeginRenderPass(perFrame[index].commandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -642,32 +496,12 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 
 	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
 
-	//vkCmdEndRendering(perFrame[index].commandBuffer);
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 	//////
 
 	// Gaussian blur (horizontal)
 	// Input = colorTemp
 	// Output = colorBlur
-	//vkuTransitionLayout(perFrame[index].commandBuffer, colorTemp[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	//vkuTransitionLayout(perFrame[index].commandBuffer, colorBlur[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-	//vkCmdBeginRendering(perFrame[index].commandBuffer, &(VkRenderingInfo)
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_RENDERING_INFO,
-	//	.renderArea=(VkRect2D){ { 0, 0 }, { renderWidth>>2, renderHeight>>2 } },
-	//	.layerCount=1,
-	//	.viewMask=0,
-	//	.colorAttachmentCount=1,
-	//	.pColorAttachments=&(VkRenderingAttachmentInfo)
-	//	{
-	//		.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-	//		.imageView=colorBlur[Eye].imageView,
-	//		.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-	//		.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-	//		.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-	//	},
-	//});
 	vkCmdBeginRenderPass(perFrame[index].commandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -692,7 +526,6 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 
 	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
 
-	//vkCmdEndRendering(perFrame[index].CommandBuffer);
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 	//////
 
@@ -700,25 +533,6 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	// Input = colorResolve, colorBlur
 	// Output = swapchain
 	// NOTE: ColorResolve should already be in shader read-only
-	//vkuTransitionLayout(perFrame[index].commandBuffer, colorBlur[eye].image, 1, 0, 1, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	//vkuTransitionLayout(perFrame[index].commandBuffer, swapchain.image[index], 1, 0, 1, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-	//vkCmdBeginRendering(perFrame[index].commandBuffer, &(VkRenderingInfo)
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_RENDERING_INFO,
-	//	.renderArea=(VkRect2D){ { 0, 0 }, { width, height } },
-	//	.layerCount=1,
-	//	.viewMask=0,
-	//	.colorAttachmentCount=1,
-	//	.pColorAttachments=&(VkRenderingAttachmentInfo)
-	//	{
-	//		.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-	//		.imageView=swapchain.imageView[index],
-	//		.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-	//		.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-	//		.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-	//	},
-	//});
 	vkCmdBeginRenderPass(perFrame[index].commandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -759,13 +573,12 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
 
 	// Draw UI controls
-	UI_Draw(&UI, index, eye);
+	UI_Draw(&UI, index, eye, fTimeStep);
 
 	// Draw text in the compositing renderpass
 	Font_Print(&Fnt, 16.0f, 0.0f, 0.0f, "FPS: %0.1f\n\x1B[91mFrame time: %0.5fms", fps, fTimeStep*1000.0f);
 
 	Font_Draw(&Fnt, index, eye);
 
-	//vkCmdEndRendering(perFrame[index].commandBuffer);
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 }

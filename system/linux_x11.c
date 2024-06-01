@@ -40,7 +40,7 @@ extern VkuSwapchain_t swapchain;
 uint32_t winWidth=1920, winHeight=1080;
 extern uint32_t renderWidth, renderHeight;
 
-float fps=0.0f, fTimeStep, fTime=0.0f;
+float fps=0.0f, fTimeStep=0.0f, fTime=0.0f;
 
 void Render(void);
 bool Init(void);

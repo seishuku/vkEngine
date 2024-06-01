@@ -360,7 +360,7 @@ bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 position)
 	return true;
 }
 
-bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye)
+bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 {
 	if(UI==NULL)
 		return false;
@@ -484,7 +484,9 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye)
 				//	"%s", control->barGraph.titleText
 				//);
 
-				float normalize_value=(control->barGraph.value-control->barGraph.Min)/(control->barGraph.Max-control->barGraph.Min);
+				const float speed=10.0f;
+				control->barGraph.curValue+=(control->barGraph.value-control->barGraph.curValue)*(1-exp(-speed*dt));
+				float normalize_value=(control->barGraph.curValue-control->barGraph.Min)/(control->barGraph.Max-control->barGraph.Min);
 
 				instance->positionSize.x=control->position.x+control->barGraph.size.x*0.5f;
 				instance->positionSize.y=control->position.y+control->barGraph.size.y*0.5f;

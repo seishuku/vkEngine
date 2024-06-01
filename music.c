@@ -115,7 +115,7 @@ void MusicStreamData(void *buffer, size_t length)
 
 	// Callback param length is in frames, ov_read needs bytes:
 	size_t lengthBytes=length*2*sizeof(int16_t);
-	char *bufferBytePtr=buffer;
+	char *bufferBytePtr=(char *)buffer;
 
 	int size=0;
 

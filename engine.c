@@ -406,18 +406,6 @@ void Thread_Main(void *arg)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
-		//.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
-		//{
-		//	.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-		//	.pNext=&(VkCommandBufferInheritanceRenderingInfo)
-		//	{
-		//		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-		//		.colorAttachmentCount=1,
-		//		.pColorAttachmentFormats=&ColorFormat,
-		//		.depthAttachmentFormat=DepthFormat,
-		//		.rasterizationSamples=MSAA
-		//	},
-		//}
 		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
@@ -614,18 +602,6 @@ void Thread_Particles(void *arg)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT|VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
-		//.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
-		//{
-		//	.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-		//	.pNext=&(VkCommandBufferInheritanceRenderingInfo)
-		//	{
-		//		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO,
-		//		.colorAttachmentCount=1,
-		//		.pColorAttachmentFormats=&ColorFormat,
-		//		.depthAttachmentFormat=DepthFormat,
-		//		.rasterizationSamples=MSAA
-		//	},
-		//}
 		.pInheritanceInfo=&(VkCommandBufferInheritanceInfo)
 		{
 			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
@@ -664,35 +640,6 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	perFrame[index].mainUBO[eye]->lightMVP=shadowMVP;
 
 	// Start a render pass and clear the frame/depth buffer
-	//vkCmdBeginRendering(perFrame[index]., &(VkRenderingInfo)
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_RENDERING_INFO,
-	//	.flags=VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT,
-	//	.renderArea=(VkRect2D){ { 0, 0 }, { renderWidth, renderHeight } },
-	//	.layerCount=1,
-	//	.colorAttachmentCount=1,
-	//	.pColorAttachments=&(VkRenderingAttachmentInfo)
-	//	{
-	//		.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-	//		.imageView=colorImage[Eye].imageView,
-	//		.imageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-	//		.resolveMode=VK_RESOLVE_MODE_AVERAGE_BIT,
-	//		.resolveImageView=colorResolve[Eye].imageView,
-	//		.resolveImageLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-	//		.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-	//		.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-	//		.clearValue=(VkClearValue){ .color.float32={ 0.0f, 0.0f, 0.0f, 1.0f } },
-	//	},
-	//	.pDepthAttachment=&(VkRenderingAttachmentInfo)
-	//	{
-	//		.sType=VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-	//		.imageView=depthImage[Eye].imageView,
-	//		.imageLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-	//		.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-	//		.storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-	//		.clearValue=(VkClearValue){ .depthStencil={ 0.0f, 0 } },
-	//	},
-	//});
 	vkCmdBeginRenderPass(perFrame[index].commandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -718,19 +665,18 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	vkCmdExecuteCommands(perFrame[index].commandBuffer, 1, (VkCommandBuffer[])
 	{
 		threadData[0].perFrame[index].secCommandBuffer[eye],
-		threadData[1].perFrame[index].secCommandBuffer[eye]
+		//threadData[1].perFrame[index].secCommandBuffer[eye]
 	});
 
 	vkCmdNextSubpass(perFrame[index].commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 
-	////// Volume cloud
+	//////// Volume cloud
 	DrawVolume(perFrame[index].commandBuffer, index, eye, perFrame[index].descriptorPool);
-	//////
+	////////
 
 	matrix Modelview=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
 	ParticleSystem_Draw(&particleSystem, perFrame[index].commandBuffer, perFrame[index].descriptorPool, Modelview, perFrame[index].mainUBO[eye]->projection);
 
-	//vkCmdEndRendering(perFrame[index].commandBuffer);
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 }
 
@@ -1075,7 +1021,14 @@ void Render(void)
 	if(isVR)
 	{
 		if(!VR_StartFrame(&xrContext))
+		{
+			// Wait for physics to finish, then dump the frame and start over
+			ThreadBarrier_Wait(&physicsThreadBarrier);
+
+			index=(index+1)%xrContext.swapchain[0].numImages;
+
 			return;
+		}
 
 		projection[0]=VR_GetEyeProjection(&xrContext, 0);
 		projection[1]=VR_GetEyeProjection(&xrContext, 1);
@@ -1148,8 +1101,14 @@ void Render(void)
 
 		if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
 		{
-			DBGPRINTF(DEBUG_WARNING, "Swapchain out of date... Rebuilding.\n");
+			DBGPRINTF(DEBUG_WARNING, "Swapchain out of date or suboptimal... Rebuilding.\n");
 			RecreateSwapchain();
+
+			// Wait for physics to finish, then dump the frame and start over
+			ThreadBarrier_Wait(&physicsThreadBarrier);
+
+			index=(index+1)%swapchain.numImages;
+
 			return;
 		}
 
@@ -1159,7 +1118,6 @@ void Render(void)
 
 	//////
 	// Do a simple dumb "seek out the player" thing
-	//CameraSeekTarget(&enemy, camera.position, camera.radius, asteroids, NUM_ASTEROIDS);
 	CameraSeekTargetCamera(&enemy, camera, asteroids, NUM_ASTEROIDS);
 	isTargeted=CameraIsTargetInFOV(enemy, camera.position, deg2rad(15.0f));
 
@@ -1209,12 +1167,16 @@ void Render(void)
 	}
 
 	// Final drawing compositing
+	//vkuTransitionLayout(perFrame[index].commandBuffer, colorResolve[0].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	CompositeDraw(index, 0);
 	//////
 
 	// Other eye compositing
 	if(isVR)
+	{
+		//vkuTransitionLayout(perFrame[index].commandBuffer, colorResolve[1].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		CompositeDraw(index, 1);
+	}
 
 	// Reset the font text collection for the next frame
 	Font_Reset(&Fnt);
@@ -1268,11 +1230,7 @@ void Render(void)
 		});
 
 		if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
-		{
-			DBGPRINTF(DEBUG_WARNING, "Swapchain out of date... Rebuilding.\n");
-			RecreateSwapchain();
-			return;
-		}
+			DBGPRINTF(DEBUG_WARNING, "vkQueuePresent out of date or suboptimal...\n");
 
 		index=(index+1)%swapchain.numImages;
 	}
@@ -1281,6 +1239,14 @@ void Render(void)
 void Console_CmdQuit(Console_t *Console, const char *Param)
 {
 	isDone=true;
+}
+
+void Fire(void *arg)
+{
+	uint32_t key=KB_SPACE;
+
+	Event_Trigger(EVENT_KEYDOWN, (void *)&key);
+	Event_Trigger(EVENT_KEYUP, (void *)&key);
 }
 
 bool vkuMemAllocator_Init(VkuContext_t *context);
@@ -1510,7 +1476,8 @@ bool Init(void)
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)renderWidth, (float)renderHeight));
 
 #ifdef ANDROID
-	UI_AddButton(&UI, Vec2(0.0f, renderHeight-50.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), "Random", (UIControlCallback)GenerateSkyParams);
+	UI_AddButton(&UI, Vec2(0.0f, renderHeight-50.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), "Random", (UIControlCallback)GenerateWorld);
+	UI_AddButton(&UI, Vec2(0.0f, renderHeight-100.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), "Fire", (UIControlCallback)Fire);
 #endif
 
 	UI_AddButton(&UI,
@@ -1684,8 +1651,8 @@ bool CreateFramebuffers(uint32_t eye)
 
 	VkCommandBuffer commandBuffer=vkuOneShotCommandBufferBegin(&vkContext);
 	vkuTransitionLayout(commandBuffer, colorImage[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-	vkuTransitionLayout(commandBuffer, depthImage[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuTransitionLayout(commandBuffer, colorResolve[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, depthImage[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, colorResolve[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	vkuOneShotCommandBufferEnd(&vkContext, commandBuffer);
 
 	vkCreateFramebuffer(vkContext.device, &(VkFramebufferCreateInfo)
@@ -1702,36 +1669,45 @@ bool CreateFramebuffers(uint32_t eye)
 	return true;
 }
 
-// Rebuild Vulkan swapchain and related data
-void RecreateSwapchain(void)
+void DestroyFramebuffers(void)
 {
-	cnd_broadcast(&physicsThreadBarrier.cond);
-
-	// Wait for the device to complete any pending work
-	vkDeviceWaitIdle(vkContext.device);
-
-	// To resize a surface, we need to destroy and recreate anything that's tied to the surface.
-	// This is basically just the swapchain, framebuffers, and depth buffer.
-
-	// swapchain, framebuffer, and depth buffer destruction
 	vkuDestroyImageBuffer(&vkContext, &colorImage[0]);
-	vkuDestroyImageBuffer(&vkContext, &colorResolve[0]);
-	vkuDestroyImageBuffer(&vkContext, &colorBlur[0]);
-	vkuDestroyImageBuffer(&vkContext, &colorTemp[0]);
 	vkuDestroyImageBuffer(&vkContext, &depthImage[0]);
+	vkuDestroyImageBuffer(&vkContext, &colorResolve[0]);
 
 	vkDestroyFramebuffer(vkContext.device, framebuffer[0], VK_NULL_HANDLE);
 
 	if(isVR)
 	{
 		vkuDestroyImageBuffer(&vkContext, &colorImage[1]);
-		vkuDestroyImageBuffer(&vkContext, &colorResolve[1]);
-		vkuDestroyImageBuffer(&vkContext, &colorBlur[1]);
-		vkuDestroyImageBuffer(&vkContext, &colorTemp[1]);
 		vkuDestroyImageBuffer(&vkContext, &depthImage[1]);
+		vkuDestroyImageBuffer(&vkContext, &colorResolve[1]);
 
 		vkDestroyFramebuffer(vkContext.device, framebuffer[1], VK_NULL_HANDLE);
 	}
+}
+
+// Rebuild Vulkan swapchain and related data
+void RecreateSwapchain(void)
+{
+	// Wait for the device to complete any pending work
+	vkDeviceWaitIdle(vkContext.device);
+
+	// To resize a surface, we need to destroy and recreate anything that's tied to the surface.
+	// This is basically just the swapchain, framebuffers, depth buffers, and semaphores (since they can't be just reset like fences).
+
+	for(uint32_t i=0;i<swapchain.numImages;i++)
+	{
+		vkDestroySemaphore(vkContext.device, perFrame[i].presentCompleteSemaphore, VK_NULL_HANDLE);
+		vkDestroySemaphore(vkContext.device, perFrame[i].renderCompleteSemaphore, VK_NULL_HANDLE);
+
+		vkCreateSemaphore(vkContext.device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &perFrame[i].presentCompleteSemaphore);
+		vkCreateSemaphore(vkContext.device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &perFrame[i].renderCompleteSemaphore);
+	}
+
+	// swapchain, framebuffer, and depth buffer destruction
+	DestroyFramebuffers();
+	DestroyCompositeFramebuffers();
 
 	// Recreate the swapchain, vkuCreateSwapchain will see that there is an existing swapchain and deal accordingly.
 	vkuCreateSwapchain(&vkContext, &swapchain, VK_TRUE);

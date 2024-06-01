@@ -296,11 +296,11 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 	imageMemoryBarrier.newLayout=VK_IMAGE_LAYOUT_GENERAL;
 	imageMemoryBarrier.image=image->image;
 	imageMemoryBarrier.subresourceRange=(VkImageSubresourceRange){ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-	imageMemoryBarrier.srcAccessMask=VK_ACCESS_SHADER_WRITE_BIT;
-	imageMemoryBarrier.dstAccessMask=VK_ACCESS_SHADER_READ_BIT;
+	imageMemoryBarrier.srcAccessMask=0;
+	imageMemoryBarrier.dstAccessMask=VK_ACCESS_SHADER_WRITE_BIT;
 	imageMemoryBarrier.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
 	imageMemoryBarrier.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
-	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
 
 	vkCmdBindPipeline(computeCommand, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline.pipeline.pipeline);
 
@@ -313,7 +313,9 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 
 	imageMemoryBarrier.oldLayout=VK_IMAGE_LAYOUT_GENERAL;
 	imageMemoryBarrier.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
+	imageMemoryBarrier.srcAccessMask=VK_ACCESS_SHADER_WRITE_BIT;
+	imageMemoryBarrier.dstAccessMask=0;
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
 
 	// End command buffer and submit
 	if(vkEndCommandBuffer(computeCommand)!=VK_SUCCESS)

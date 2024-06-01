@@ -63,6 +63,7 @@ OBJS+=vulkan/vulkan_buffer.o
 OBJS+=vulkan/vulkan_context.o
 OBJS+=vulkan/vulkan_descriptorset.o
 OBJS+=vulkan/vulkan_framebuffer.o
+OBJS+=vulkan/vulkan_heaps.o
 OBJS+=vulkan/vulkan_instance.o
 OBJS+=vulkan/vulkan_mem.o
 OBJS+=vulkan/vulkan_pipeline.o
@@ -92,13 +93,15 @@ OBJS+=system/memzone.o
 OBJS+=font/font.o
 OBJS+=utils/event.o
 OBJS+=utils/list.o
+OBJS+=utils/pipeline.o
+OBJS+=utils/tokenizer.o
 OBJS+=perframe.o
 OBJS+=shadow.o
 OBJS+=skybox.o
 OBJS+=lighting.o
 OBJS+=line.o
 OBJS+=sphere.o
-OBJS+=nebula.o
+OBJS+=volume.o
 OBJS+=composite.o
 OBJS+=engine.o
 
@@ -182,6 +185,8 @@ $(APKFILE): $(SHADERS) apk/lib/armeabi-v7a/lib$(TARGET).so apk/lib/arm64-v8a/lib
 
 	mkdir -p apk/assets/shaders
 	cp $(SHADERS) apk/assets/shaders/
+	mkdir -p apk/assets/pipelines
+	cp pipelines/*.* apk/assets/pipelines/
 	mkdir -p apk/assets/assets
 	cp assets/*.* apk/assets/assets
 

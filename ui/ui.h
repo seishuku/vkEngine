@@ -55,7 +55,7 @@ typedef struct
 			char titleText[UI_CONTROL_TITLETEXT_MAX];
 			vec2 size;
 			bool Readonly;
-			float Min, Max, value;
+			float Min, Max, value, curValue;
 		} barGraph;
 
 		// Sprite type
@@ -66,7 +66,7 @@ typedef struct
 			float rotation;
 		} sprite;
 
-		// Cursur type
+		// Cursor type
 		struct
 		{
 			float radius;
@@ -163,6 +163,6 @@ bool UI_UpdateCursorColor(UI_t *UI, uint32_t ID, vec3 color);
 
 uint32_t UI_TestHit(UI_t *UI, vec2 position);
 bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 position);
-bool UI_Draw(UI_t *UI, uint32_t Index, uint32_t Eye);
+bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt);
 
 #endif

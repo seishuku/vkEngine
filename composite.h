@@ -12,6 +12,7 @@ extern VkuPipeline_t compositePipeline;
 
 bool CreateCompositePipeline(void);
 void CreateCompositeFramebuffers(uint32_t eye);
+void DestroyCompositeFramebuffers(void);
 void DestroyComposite(void);
 void CompositeDraw(uint32_t index, uint32_t eye);
 

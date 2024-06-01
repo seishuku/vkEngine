@@ -109,7 +109,7 @@ renderPass {
 				},
 			},
 		},
-		.dependencyCount=3,
+		.dependencyCount=6,
 		.pDependencies=(VkSubpassDependency[])
 		{
 			{
@@ -127,6 +127,33 @@ renderPass {
 				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
+			},
+			{
+				.srcSubpass=VK_SUBPASS_EXTERNAL,
+				.dstSubpass=1,
+				.srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
+			},
+			{
+				.srcSubpass=1,
+				.dstSubpass=VK_SUBPASS_EXTERNAL,
+				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
+			},
+			{
+				.srcSubpass=1,
+				.dstSubpass=VK_SUBPASS_EXTERNAL,
+				.srcStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT|VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
 				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
 				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
 			},

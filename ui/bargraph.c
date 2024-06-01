@@ -23,7 +23,8 @@ uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, const ch
 		.barGraph.Readonly=Readonly,
 		.barGraph.Min=Min,
 		.barGraph.Max=Max,
-		.barGraph.value=value
+		.barGraph.value=value,
+		.barGraph.curValue=value
 	};
 
 	snprintf(Control.barGraph.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);

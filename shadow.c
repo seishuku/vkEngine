@@ -35,6 +35,10 @@ void CreateShadowMap(void)
 	// Depth render target
 	vkuCreateTexture2D(&vkContext, &shadowDepth, shadowSize, shadowSize, shadowDepthFormat, VK_SAMPLE_COUNT_1_BIT);
 
+	VkCommandBuffer commandBuffer=vkuOneShotCommandBufferBegin(&vkContext);
+	vkuTransitionLayout(commandBuffer, shadowDepth.image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuOneShotCommandBufferEnd(&vkContext, commandBuffer);
+
 	// Need compare ops, so recreate the sampler
 	vkDestroySampler(vkContext.device, shadowDepth.sampler, VK_NULL_HANDLE);
 	vkCreateSampler(vkContext.device, &(VkSamplerCreateInfo)
@@ -97,6 +101,28 @@ bool CreateShadowPipeline(void)
 				.layout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 			},
 		},
+		.dependencyCount=2,
+		.pDependencies=(VkSubpassDependency[])
+		{
+			{
+				.srcSubpass=VK_SUBPASS_EXTERNAL,
+				.dstSubpass=0,
+				.srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
+			},
+			{
+				.srcSubpass=0,
+				.dstSubpass=VK_SUBPASS_EXTERNAL,
+				.srcStageMask=VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
+			},
+		}
 	}, 0, &shadowRenderPass);
 
 #if 0

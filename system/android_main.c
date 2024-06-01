@@ -29,7 +29,7 @@ extern VkuSwapchain_t swapchain;
 uint32_t winWidth, winHeight;
 extern uint32_t renderWidth, renderHeight;
 
-float fps=0.0f, fTimeStep, fTime=0.0;
+float fps=0.0f, fTimeStep=0.0f, fTime=0.0;
 
 struct
 {
@@ -181,8 +181,8 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 	switch(cmd)
 	{
 		case APP_CMD_INIT_WINDOW:
-			winWidth=ANativeWindow_getWidth(app->window);
-			winHeight=ANativeWindow_getHeight(app->window);
+			winWidth=ANativeWindow_getWidth(app->window)/2;
+			winHeight=ANativeWindow_getHeight(app->window)/2;
 			ANativeWindow_setBuffersGeometry(app->window, winWidth, winHeight, 0);
 
 			vkContext.window=app->window;

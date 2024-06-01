@@ -84,9 +84,12 @@ bool CameraIsTargetInFOV(const Camera_t camera, const vec3 targetPos, const floa
 	vec3 directionToTarget=Vec3_Subv(targetPos, camera.position);
 	Vec3_Normalize(&directionToTarget);
 
+	const float sqMag=Vec3_Dot(camera.forward, directionToTarget);
+	const float angle=acosf(fminf(sqMag, 1.0f));
+
 	// Calculate the angle between the camera's forward vector and the direction to the target
 	// Check if the angle is within half of the FOV angle
-	return acosf(Vec3_Dot(camera.forward, directionToTarget))<=halfFOVAngle;
+	return angle<halfFOVAngle;
 }
 
 // Move camera to targetPos while avoiding rigid body obstacles.
@@ -379,7 +382,7 @@ static void CameraRotate(Camera_t *camera)
 matrix CameraUpdate(Camera_t *camera, float dt)
 {
 	float speed=240.0f*dt;
-	float rotation=0.0625f*dt;
+	float rotation=0.03125f*dt;
 
 	if(camera->shift)
 		speed*=2.0f;
@@ -428,12 +431,13 @@ matrix CameraUpdate(Camera_t *camera, float dt)
 		camera->velocity=Vec3_Muls(camera->velocity, (1.0f/magnitude)*maxVelocity);
 
 	// Dampen velocity
-	const float damp=powf(0.9f, dt*60.0f);
+	const float lambda=2.0f;
+	const float decay=expf(-lambda*dt);
 
-	camera->velocity=Vec3_Muls(camera->velocity, damp);
-	camera->pitch*=damp;
-	camera->yaw*=damp;
-	camera->roll*=damp;
+	camera->velocity=Vec3_Muls(camera->velocity, decay);
+	camera->pitch*=decay;
+	camera->yaw*=decay;
+	camera->roll*=decay;
 
 	// Apply pitch/yaw/roll rotations
 	CameraRotate(camera);
@@ -448,7 +452,7 @@ matrix CameraUpdate(Camera_t *camera, float dt)
 	//};
 	//const vec3 velocity=Matrix3x3MultVec3(camera->velocity, MatrixTranspose(cameraOrientation));
 
-	// Integrate the velocity over time to give positional change
+	// Integrate the velocity over time
 	//camera->position=Vec3_Addv(camera->position, Vec3_Muls(velocity, dt));
 
 	return MatrixLookAt(camera->position, Vec3_Addv(camera->position, camera->forward), camera->up);

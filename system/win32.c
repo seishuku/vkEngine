@@ -30,7 +30,7 @@ extern VkuSwapchain_t swapchain;
 uint32_t windowWidth=1920, windowHeight=1080;
 extern uint32_t renderWidth, renderHeight;
 
-float fps=0.0f, fTimeStep, fTime=0.0f;
+float fps=0.0f, fTimeStep=0.0f, fTime=0.0f;
 
 void Render(void);
 bool Init(void);
@@ -360,9 +360,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					}
 
 					if(Mouse.usButtonFlags&(RI_MOUSE_BUTTON_1_DOWN|RI_MOUSE_BUTTON_2_DOWN|RI_MOUSE_BUTTON_3_DOWN|RI_MOUSE_BUTTON_4_DOWN|RI_MOUSE_BUTTON_5_DOWN))
+					{
 						Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
+						Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
+					}
 					else if(Mouse.usButtonFlags&(RI_MOUSE_BUTTON_1_UP|RI_MOUSE_BUTTON_2_UP|RI_MOUSE_BUTTON_3_UP|RI_MOUSE_BUTTON_4_UP|RI_MOUSE_BUTTON_5_UP))
+					{
 						Event_Trigger(EVENT_MOUSEUP, &MouseEvent);
+						Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
+					}
 					break;
 				}
 
