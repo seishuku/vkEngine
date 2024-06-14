@@ -734,11 +734,11 @@ void Thread_Physics(void *arg)
 			if(particleEmittersLife[i]>0.0f)
 			{
 				particleEmittersLife[i]-=fTimeStep;
+				PhysicsIntegrate(&particleEmitters[i], fTimeStep);
 
 				for(uint32_t j=0;j<List_GetCount(&particleSystem.emitters);j++)
 				{
 					ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&particleSystem.emitters, j);
-					PhysicsIntegrate(&particleEmitters[i], fTimeStep);
 
 					if(emitter->ID==particleEmittersID[i])
 					{
@@ -755,6 +755,7 @@ void Thread_Physics(void *arg)
 			{
 				ParticleSystem_DeleteEmitter(&particleSystem, particleEmittersID[i]);
 				particleEmittersID[i]=UINT32_MAX;
+				memset(&particleEmitters[i], 0, sizeof(RigidBody_t));
 			}
 		}
 
