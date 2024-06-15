@@ -157,7 +157,7 @@ bool Event_Trigger(EventID ID, void *arg)
 					break;
 
 				case KB_SPACE:
-					Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &camera.position);
+					Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, camera.position);
 					FireParticleEmitter(Vec3_Addv(camera.position, Vec3_Muls(camera.forward, camera.radius)), camera.forward);
 					break;
 				case KB_P:		GenerateWorld();		break;

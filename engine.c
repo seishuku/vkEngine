@@ -56,6 +56,8 @@ matrix modelView, projection[2], headPose;
 // extern timing data from system main
 extern float fps, fTimeStep, fTime;
 
+float physicsTime=0.0f;
+
 // Main particle system struct
 ParticleSystem_t particleSystem;
 
@@ -718,6 +720,8 @@ void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *p
 // Runs anything physics related
 void Thread_Physics(void *arg)
 {
+	double startTime=GetClock();
+
 	// Get a rigid body rep for the camera(s)
 	RigidBody_t cameraBody=CameraGetRigidBody(camera);
 	RigidBody_t enemyBody=CameraGetRigidBody(enemy);
@@ -755,7 +759,6 @@ void Thread_Physics(void *arg)
 			{
 				ParticleSystem_DeleteEmitter(&particleSystem, particleEmittersID[i]);
 				particleEmittersID[i]=UINT32_MAX;
-				memset(&particleEmitters[i], 0, sizeof(RigidBody_t));
 			}
 		}
 
@@ -769,13 +772,13 @@ void Thread_Physics(void *arg)
 			for(uint32_t j=i+1;j<NUM_ASTEROIDS;j++)
 			{
 				if(PhysicsSphereToSphereCollisionResponse(&asteroids[i], &asteroids[j])>1.0f)
-					Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, &asteroids[i].position);
+					Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, asteroids[i].position);
 			}
 
 			// Check asteroids against the camera rigid body rep
 			if(PhysicsSphereToSphereCollisionResponse(&cameraBody, &asteroids[i])||
 			   PhysicsSphereToSphereCollisionResponse(&enemyBody, &asteroids[i])>1.0f)
-				Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, &camera.position);
+				Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, camera.position);
 			//////////
 
 			// Check asteroids against projectile emitters
@@ -790,7 +793,7 @@ void Thread_Physics(void *arg)
 						//     so setting it to nearly 0.0 allows the natural progression kill it off.
 						particleEmittersLife[j]=0.001f;
 
-						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particleEmitters[j].position);
+						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, asteroids[i].position);
 
 						ParticleSystem_AddEmitter(&particleSystem,
 												  particleEmitters[j].position,	// Position
@@ -884,7 +887,7 @@ void Thread_Physics(void *arg)
 					if(
 						PhysicsSphereToSphereCollisionResponse(&particleBody, &asteroids[i])>1.0f)
 					{
-						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particleBody.position);
+						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, particleBody.position);
 
 						// FIXME: Is this causing derelict emitters that never go away?
 						//			I don't think it is, but need to check.
@@ -919,7 +922,7 @@ void Thread_Physics(void *arg)
 
 		// Check camera against the enemy camera rigid body rep
 		if(PhysicsSphereToSphereCollisionResponse(&cameraBody, &enemyBody)>1.0f)
-			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, &camera.position);
+			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, camera.position);
 
 #if 0
 		for(uint32_t i=0;i<connectedClients;i++)
@@ -945,7 +948,7 @@ void Thread_Physics(void *arg)
 					//     so setting it to nearly 0.0 allows the natural progression kill it off.
 					particleEmittersLife[j]=0.001f;
 
-					Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particleEmitters[j].position);
+					Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, particleEmitters[j].position);
 
 					ParticleSystem_AddEmitter(&particleSystem,
 											  particleEmitters[j].position,	// Position
@@ -992,6 +995,8 @@ void Thread_Physics(void *arg)
 	modelView=CameraUpdate(&camera, fTimeStep);
 	CameraUpdate(&enemy, fTimeStep);
 	//////
+
+	physicsTime=(float)(GetClock()-startTime);
 
 	// Barrier now that we're done here
 	ThreadBarrier_Wait(&physicsThreadBarrier);
@@ -1083,7 +1088,7 @@ void Render(void)
 			vec3 direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatToMatrix(rightOrientation), MatrixInverse(modelView)));
 
 			FireParticleEmitter(Vec3_Addv(camera.position, Vec3_Muls(direction, camera.radius)), direction);
-			Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &camera.position);
+			Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, camera.position);
 		}
 
 		if(rightTrigger<0.25f&&!rightTriggerOnce)

@@ -14,9 +14,8 @@
 typedef struct
 {
     int16_t *data;
-    uint32_t position, length;
+    uint32_t length;
     uint8_t channels;
-    vec3 xyz;
 } Sample_t;
 
 typedef struct
@@ -97,8 +96,9 @@ typedef struct
 } WaveParams_t;
 
 bool Audio_LoadStatic(const char *filename, Sample_t *sample);
-void Audio_PlaySample(Sample_t *sample, const bool looping, const float volume, vec3 *position);
-void Audio_StopSample(Sample_t *sample);
+uint32_t Audio_PlaySample(Sample_t *sample, const bool looping, const float volume, vec3 position);
+void Audio_UpdateXYZPosition(uint32_t slot, vec3 position);
+void Audio_StopSample(uint32_t slot);
 bool Audio_SetStreamCallback(uint32_t stream, void (*streamCallback)(void *buffer, size_t length));
 bool Audio_SetStreamVolume(uint32_t stream, const float volume);
 bool Audio_StartStream(uint32_t stream);

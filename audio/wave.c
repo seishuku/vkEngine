@@ -260,9 +260,7 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 					sample->data=(int16_t *)buffer;
 
 				sample->length=outputSize;
-				sample->position=0;
 				sample->channels=(uint8_t)waveFormat.channels;
-				sample->xyz=Vec3b(0.0f);
 
 				// Done, return out
 				return true;
