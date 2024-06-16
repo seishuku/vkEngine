@@ -100,8 +100,9 @@ set(PROJECT_SOURCES
 	ui/ui.c
 	utils/event.c
 	utils/list.c
-	utils/tokenizer.c
 	utils/pipeline.c
+	utils/spvparse.c
+	utils/tokenizer.c
 	vr/vr.c
 	vulkan/vulkan_buffer.c
 	vulkan/vulkan_context.c
@@ -148,7 +149,12 @@ endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
-        add_compile_options("-march=x86-64-v3")
+        add_compile_options(
+			"-march=x86-64-v3"
+			"-ggdb3"
+			"-fprofile-instr-generate"
+			"/PROFILE"
+		)
     else()
         message(WARNING "Unknown CPU architecture ${CMAKE_SYSTEM_PROCESSOR} not targeted.")
     endif()

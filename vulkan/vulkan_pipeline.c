@@ -7,6 +7,7 @@
 #include "../system/system.h"
 #include "../math/math.h"
 #include "vulkan.h"
+#include "../utils/spvparse.h"
 
 // Loads a binary shader file and creates a shader module
 VkShaderModule vkuCreateShaderModule(VkDevice device, const char *shaderFile)
@@ -33,6 +34,9 @@ VkShaderModule vkuCreateShaderModule(VkDevice device, const char *shaderFile)
 
 	VkShaderModuleCreateInfo CreateInfo={ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, NULL, 0, size, data };
 	VkResult Result=vkCreateShaderModule(device, &CreateInfo, VK_NULL_HANDLE, &shaderModule);
+
+	DBGPRINTF(DEBUG_INFO, "Shader file: %s\n", shaderFile);
+	parseSpv(data, size);
 
 	Zone_Free(zone, data);
 
