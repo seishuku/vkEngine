@@ -650,7 +650,7 @@ bool parseSpv(const uint32_t *opCodes, const uint32_t codeSize)
 {
 	if(opCodes==NULL)
 		return false;
-	
+
 	uint32_t offset=5;
 	const uint32_t codeEnd=codeSize/sizeof(uint32_t);
 
@@ -731,6 +731,12 @@ bool parseSpv(const uint32_t *opCodes, const uint32_t codeSize)
 				IDs[targetID].decoration.targetID=targetID;
 				const uint32_t decorationCount=IDs[targetID].decoration.decorationCount;
 
+				if(decorationCount>SPV_MAX_MEMBER_DECORATIONS)
+				{
+					DBGPRINTF(DEBUG_WARNING, "WARNING: targetID %d has more decorations than code supports (%d), more will *not* be added.\n", targetID, SPV_MAX_MEMBER_DECORATIONS);
+					break;
+				}
+
 				IDs[targetID].decoration.decorations[decorationCount].decoration=(SpvDecoration)opCodes[offset+2];
 
 				if(wordCount>3)
@@ -751,6 +757,12 @@ bool parseSpv(const uint32_t *opCodes, const uint32_t codeSize)
 				const uint32_t targetID=opCodes[offset+1];
 				const uint32_t member=opCodes[offset+2];
 				const uint32_t decorationCount=IDs[targetID].memberDecoration.member[member].decorationCount;
+
+				if(decorationCount>SPV_MAX_MEMBER_DECORATIONS)
+				{
+					DBGPRINTF(DEBUG_WARNING, "WARNING: targetID %d has more decorations than code supports (%d), more will *not* be added.\n", targetID, SPV_MAX_MEMBER_DECORATIONS);
+					break;
+				}
 
 				IDs[targetID].memberDecoration.structTypeID=targetID;
 				IDs[targetID].memberDecoration.member[member].decorations[decorationCount].decoration=(SpvDecoration)opCodes[offset+3];
@@ -933,7 +945,7 @@ bool parseSpv(const uint32_t *opCodes, const uint32_t codeSize)
 				const uint32_t memberCount=wordCount-2;
 
 				if(memberCount>SPV_MAX_MEMBERS)
-					DBGPRINTF(DEBUG_WARNING, "WARNING: targetID %d has more members than code supports (%d), clamping to max supported.\n", targetID, SPV_MAX_MEMBERS);
+					DBGPRINTF(DEBUG_WARNING, "WARNING: targetID %d has more members than code supports (%d), more will *not* be added.\n", targetID, SPV_MAX_MEMBERS);
 
 				IDs[targetID].type.structMemberCount=min(SPV_MAX_MEMBERS, memberCount);
 
@@ -1045,7 +1057,7 @@ bool parseSpv(const uint32_t *opCodes, const uint32_t codeSize)
 				// TODO: This is typically through a pointer ID to the actual ID, but might not be? Should do checking.
 				SpvID_t *resultTypeKind=&IDs[IDs[id->variable.resultTypeID].type.pointerTypeID];
 
-				// Some decorations that we want that are assocated with this variable.
+				// Some decorations that we want that are associated with this variable.
 				// These are in the decorations list for this ID, so extract them.
 				uint32_t descriptorSet=0, binding=0;
 
@@ -1074,7 +1086,7 @@ bool parseSpv(const uint32_t *opCodes, const uint32_t codeSize)
 						// Get the pointer to the member type ID from the struct member type IDs list.
 						SpvID_t *memberType=&IDs[resultTypeKind->type.structMemberTypeIDs[j]];
 
-						// Decoration assocated with most members, search for them just like other decorations.
+						// Decoration associated with most members, search for them just like other decorations.
 						uint32_t offset=0;
 
 						for(uint32_t k=0;k<resultTypeKind->memberDecoration.member[j].decorationCount;k++)
