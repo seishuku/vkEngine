@@ -1,12 +1,12 @@
 #include "math.h"
 
 #ifndef VEC_INLINE
-vec2 Vec2(const float x, const float y)
+const vec2 Vec2(const float x, const float y)
 {
 	return (vec2) { x, y };
 }
 
-vec2 Vec2b(const float b)
+const vec2 Vec2b(const float b)
 {
 	return (vec2) { b, b };
 }
@@ -86,8 +86,8 @@ vec2 Vec2_Clamp(const vec2 v, const float min, const float max)
 {
 	return (vec2)
 	{
-		min(max(v.x, min), max),
-			min(max(v.y, min), max)
+		fminf(fmaxf(v.x, min), max),
+		fminf(fmaxf(v.y, min), max)
 	};
 }
 #endif

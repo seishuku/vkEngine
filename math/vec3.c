@@ -1,12 +1,17 @@
 #include "math.h"
 
 #ifndef VEC_INLINE
-vec3 Vec3(const float x, const float y, const float z)
+const vec3 Vec3(const float x, const float y, const float z)
 {
 	return (vec3) { x, y, z };
 }
 
-vec3 Vec3b(const float b)
+const vec3 Vec3_Vec2(const vec2 a, const float z)
+{
+	return (vec3) { .x=a.x, .y=a.y, .z=z };
+}
+
+const vec3 Vec3b(const float b)
 {
 	return (vec3) { b, b, b };
 }
@@ -101,9 +106,9 @@ vec3 Vec3_Clamp(const vec3 v, const float min, const float max)
 {
 	return (vec3)
 	{
-		min(max(v.x, min), max),
-			min(max(v.y, min), max),
-			min(max(v.z, min), max)
+		fminf(fmaxf(v.x, min), max),
+		fminf(fmaxf(v.y, min), max),
+		fminf(fmaxf(v.z, min), max)
 	};
 }
 #endif

@@ -73,6 +73,7 @@ float Vec2_Normalize(vec2 *v);
 
 #ifdef VEC_INLINE
 inline static const vec3 Vec3(const float x, const float y, const float z) { return (vec3) { .x=x, .y=y, .z=z }; }
+inline static const vec3 Vec3_Vec2(const vec2 a, const float z) { return (vec3) { .x=a.x, .y=a.y, .z=z }; }
 inline static const vec3 Vec3b(const float b) { return (vec3) { .x=b, .y=b, .z=b }; }
 inline static vec3 Vec3_Add(const vec3 a, const float x, const float y, const float z) { return (vec3) { .x=a.x+x, .y=a.y+y, .z=a.z+z }; }
 inline static vec3 Vec3_Addv(const vec3 a, const vec3 b) { return (vec3) { .x=a.x+b.x, .y=a.y+b.y, .z=a.z+b.z }; }

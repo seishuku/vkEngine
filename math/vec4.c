@@ -1,22 +1,22 @@
 #include "math.h"
 
 #ifndef VEC_INLINE
-vec4 Vec4(const float x, const float y, const float z, const float w)
+const vec4 Vec4(const float x, const float y, const float z, const float w)
 {
 	return (vec4) { x, y, z, w };
 }
 
-vec4 Vec4_Vec3(const vec3 a, const float w)
+const vec4 Vec4_Vec3(const vec3 a, const float w)
 {
 	return (vec4) { .x=a.x, .y=a.y, .z=a.z, .w=w };
 }
 
-vec4 Vec4_Vec2(const vec2 a, const float z, const float w)
+const vec4 Vec4_Vec2(const vec2 a, const float z, const float w)
 {
 	return (vec4) { .x=a.x, .y=a.y, .z=z, .w=w };
 }
 
-vec4 Vec4b(const float b)
+const vec4 Vec4b(const float b)
 {
 	return (vec4) { b, b, b, b };
 }
@@ -96,10 +96,10 @@ vec4 Vec4_Clamp(const vec4 v, const float min, const float max)
 {
 	return (vec4)
 	{
-		min(max(v.x, min), max),
-			min(max(v.y, min), max),
-			min(max(v.z, min), max),
-			min(max(v.w, min), max)
+		fminf(fmaxf(v.x, min), max),
+		fminf(fmaxf(v.y, min), max),
+		fminf(fmaxf(v.z, min), max),
+		fminf(fmaxf(v.w, min), max)
 	};
 }
 #endif
