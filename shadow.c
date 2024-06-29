@@ -15,6 +15,8 @@
 #define NUM_ASTEROIDS 1000
 extern VkuBuffer_t asteroidInstance;
 
+extern VkuBuffer_t fighterInstance;
+
 extern VkuContext_t vkContext;
 extern Camera_t camera;
 extern VkuSwapchain_t swapchain;
@@ -220,10 +222,10 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 
 	// Multiply matrices together, so we can just send one matrix as a push constant.
 
-	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &asteroidInstance.buffer, &(VkDeviceSize) { 0 });
-
 	shadowMVP=MatrixMult(modelview, projection);
 	vkCmdPushConstants(commandBuffer, shadowPipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(matrix), &shadowMVP);
+
+	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &asteroidInstance.buffer, &(VkDeviceSize) { 0 });
 
 	// Draw the models
 	for(uint32_t j=0;j<NUM_MODELS;j++)
@@ -236,6 +238,16 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 			vkCmdBindIndexBuffer(commandBuffer, models[j].mesh[k].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(commandBuffer, models[j].mesh[k].numFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*j);
 		}
+	}
+
+	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &fighterInstance.buffer, &(VkDeviceSize) { 0 });
+
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &fighter.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+
+	for(uint32_t j=0;j<fighter.numMesh;j++)
+	{
+		vkCmdBindIndexBuffer(commandBuffer, fighter.mesh[j].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(commandBuffer, fighter.mesh[j].numFace*3, 2, 0, 0, 0);
 	}
 
 	vkCmdEndRenderPass(commandBuffer);

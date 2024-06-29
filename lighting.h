@@ -3,8 +3,10 @@
 
 #include <stdint.h>
 #include "vulkan/vulkan.h"
+#include "utils/pipeline.h"
 
 extern VkRenderPass renderPass;
+extern Pipeline_t mainPipeline;
 
 bool CreateLightingPipeline(void);
 void DestroyLighting(void);

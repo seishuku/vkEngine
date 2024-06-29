@@ -24,7 +24,7 @@ RigidBody_t CameraGetRigidBody(const Camera_t camera)
 	};
 	body.velocity=Matrix3x3MultVec3(camera.velocity, MatrixTranspose(cameraOrientation));
 
-	body.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	body.orientation=MatrixToQuat(cameraOrientation);//Vec4(0.0f, 0.0f, 0.0f, 1.0f);
 	body.angularVelocity=Vec3b(0.0f);
 
 	body.radius=camera.radius;
@@ -42,13 +42,23 @@ void CameraSetFromRigidBody(Camera_t *camera, const RigidBody_t body)
 {
 	camera->position=body.position;
 
-	const matrix cameraOrientation=
-	{
-		.x=Vec4(camera->right.x, camera->up.x, camera->forward.x, 0.0f),
-		.y=Vec4(camera->right.y, camera->up.y, camera->forward.y, 0.0f),
-		.z=Vec4(camera->right.z, camera->up.z, camera->forward.z, 0.0f),
-		.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
-	};
+	//const matrix cameraOrientation=
+	//{
+	//	.x=Vec4(camera->right.x, camera->up.x, camera->forward.x, 0.0f),
+	//	.y=Vec4(camera->right.y, camera->up.y, camera->forward.y, 0.0f),
+	//	.z=Vec4(camera->right.z, camera->up.z, camera->forward.z, 0.0f),
+	//	.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
+	//};
+	const matrix cameraOrientation=MatrixTranspose(QuatToMatrix(body.orientation));
+	camera->right.x=cameraOrientation.x.x;
+	camera->right.y=cameraOrientation.y.x;
+	camera->right.z=cameraOrientation.z.x;
+	camera->up.x=cameraOrientation.x.y;
+	camera->up.y=cameraOrientation.y.y;
+	camera->up.z=cameraOrientation.z.y;
+	camera->forward.x=cameraOrientation.x.z;
+	camera->forward.y=cameraOrientation.y.z;
+	camera->forward.z=cameraOrientation.z.z;
 
 	camera->velocity=Matrix3x3MultVec3(body.velocity, cameraOrientation);
 }

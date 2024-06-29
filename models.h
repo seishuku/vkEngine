@@ -13,5 +13,6 @@ enum
 };
 
 extern BModel_t models[NUM_MODELS];
+extern BModel_t fighter;
 
 #endif

@@ -70,6 +70,12 @@ float particleEmittersLife[MAX_EMITTERS]={ 0 };
 // 3D Model data
 BModel_t models[NUM_MODELS];
 
+// Player model
+BModel_t fighter;
+VkuBuffer_t fighterInstance;
+matrix *fighterInstancePtr;
+uint32_t fighterTexture=0;
+
 // Texture images
 VkuImage_t textures[NUM_TEXTURES];
 
@@ -270,11 +276,19 @@ void GenerateWorld(void)
 	);
 	Vec3_Normalize(&randomDirection);
 
+	fighterTexture=RandRange(0, 7);
+
+	if(!fighterInstance.buffer)
+	{
+		vkuCreateHostBuffer(&vkContext, &fighterInstance, sizeof(matrix)*2, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+		fighterInstancePtr=(matrix *)fighterInstance.memory->mappedPointer;
+	}
+
 	CameraInit(&enemy, Vec3_Muls(randomDirection, 1200.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 }
 //////
 
-void DrawPlayer(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, Camera_t player)
+void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, uint32_t index, uint32_t eye, Camera_t player)
 {
 	struct
 	{
@@ -303,27 +317,47 @@ void DrawPlayer(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, Cam
 	linePC.end=Vec4_Addv(position, Vec4_Muls(right, 15.0f));
 	DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
 
-	struct
+	//struct
+	//{
+	//	matrix mvp;
+	//	vec4 color;
+	//} spherePC;
+
+	//local=MatrixMult(
+	//	MatrixScale(player.radius, player.radius, player.radius),
+	//	MatrixInverse(MatrixLookAt(player.position, Vec3_Addv(player.position, player.forward), player.up))
+	//);
+
+	//local=MatrixMult(local, perFrame[index].mainUBO[eye]->modelView);
+	//local=MatrixMult(local, perFrame[index].mainUBO[eye]->HMD);
+	//spherePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
+
+	//if(isTargeted)
+	//	spherePC.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
+	//else
+	//	spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+	//DrawSpherePushConstant(commandBuffer, index, sizeof(spherePC), &spherePC);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipeline.pipeline);
+
+	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &fighterInstance.buffer, &(VkDeviceSize) { 0 });
+
+	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 0, textures[TEXTURE_FIGHTER1+fighterTexture].sampler, textures[TEXTURE_FIGHTER1+fighterTexture].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 1, textures[TEXTURE_FIGHTER1_NORMAL+fighterTexture].sampler, textures[TEXTURE_FIGHTER1_NORMAL+fighterTexture].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 2, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 3, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 4, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuAllocateUpdateDescriptorSet(&mainPipeline.descriptorSet, descriptorPool);
+
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipelineLayout, 0, 1, &mainPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &fighter.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+
+	for(uint32_t j=0;j<fighter.numMesh;j++)
 	{
-		matrix mvp;
-		vec4 color;
-	} spherePC;
-
-	local=MatrixMult(
-		MatrixScale(player.radius, player.radius, player.radius),
-		MatrixInverse(MatrixLookAt(player.position, Vec3_Addv(player.position, player.forward), player.up))
-	);
-
-	local=MatrixMult(local, perFrame[index].mainUBO[eye]->modelView);
-	local=MatrixMult(local, perFrame[index].mainUBO[eye]->HMD);
-	spherePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
-
-	if(isTargeted)
-		spherePC.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
-	else
-		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
-
-	DrawSpherePushConstant(commandBuffer, index, sizeof(spherePC), &spherePC);
+		vkCmdBindIndexBuffer(commandBuffer, fighter.mesh[j].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(commandBuffer, fighter.mesh[j].numFace*3, 1, 0, 0, 1);
+	}
 }
 
 // General thread constructor for threads using Vulkan
@@ -517,10 +551,10 @@ void Thread_Main(void *arg)
 		linePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
 		DrawLinePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], sizeof(linePC), &linePC);
-		}
+	}
 
 	// Draw enemy
-	DrawPlayer(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, enemy);
+	DrawPlayer(data->perFrame[data->index].secCommandBuffer[data->eye], data->perFrame[data->index].descriptorPool[data->eye], data->index, data->eye, enemy);
 
 #if 0
 	// Draw some simple geometry to represent other client cameras
@@ -970,6 +1004,10 @@ void Thread_Physics(void *arg)
 		PhysicsIntegrate(&enemyBody, fTimeStep);
 
 		CameraSetFromRigidBody(&enemy, enemyBody);
+		matrix local=MatrixScale(enemyBody.radius*6.0f, enemyBody.radius*6.0f, enemyBody.radius*6.0f);
+		local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
+		local=MatrixMult(local, QuatToMatrix(enemyBody.orientation));
+		fighterInstancePtr[1]=MatrixMult(local, MatrixTranslatev(enemyBody.position));
 
 		// Update instance matrix data
 		for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
@@ -990,6 +1028,10 @@ void Thread_Physics(void *arg)
 
 	// Set camera position/velocity from result of collision
 	CameraSetFromRigidBody(&camera, cameraBody);
+	matrix local=MatrixScale(cameraBody.radius*6.0f, cameraBody.radius*6.0f, cameraBody.radius*6.0f);
+	local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
+	local=MatrixMult(local, QuatToMatrix(cameraBody.orientation));
+	fighterInstancePtr[0]=MatrixMult(local, MatrixTranslatev(cameraBody.position));
 
 	// Update camera and modelview matrix
 	modelView=CameraUpdate(&camera, fTimeStep);
@@ -1374,6 +1416,14 @@ bool Init(void)
 		return false;
 	}
 
+	if(LoadBModel(&fighter, "assets/fighter1.bmodel"))
+		BuildMemoryBuffersBModel(&vkContext, &fighter);
+	else
+	{
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/fighter1.bmodel\n");
+		return false;
+	}
+
 	uint32_t TriangleCount=0;
 
 	for(uint32_t i=0;i<NUM_MODELS;i++)
@@ -1402,6 +1452,23 @@ bool Init(void)
 	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID4], "assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID4_NORMAL], "assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 	Image_Upload(&vkContext, &textures[TEXTURE_CROSSHAIR], "assets/crosshair.qoi", IMAGE_NONE);
+
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER1], "assets/crono782.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER1_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER2], "assets/cubik.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER2_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER3], "assets/freelancer.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER3_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER4], "assets/idolknight.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER4_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER5], "assets/krulspeld1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER5_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER6], "assets/psionic.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER6_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER7], "assets/thor.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER7_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER8], "assets/wilko.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER8_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 
 	vkuDestroyImageBuffer(&vkContext, &temp);
 
@@ -1838,6 +1905,13 @@ void Destroy(void)
 
 		FreeBModel(&models[i]);
 	}
+
+	vkuDestroyBuffer(&vkContext, &fighter.vertexBuffer);
+
+	for(uint32_t j=0;j<fighter.numMesh;j++)
+		vkuDestroyBuffer(&vkContext, &fighter.mesh[j].indexBuffer);
+
+	FreeBModel(&fighter);
 	//////////
 
 	// Shadow map destruction
