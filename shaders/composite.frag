@@ -52,6 +52,7 @@ float randomFloat()
 
 float ShadowPCF(vec4 Coords)
 {
+#if 1
 	vec2 delta=(lightDirection.w*300.0)*(1.0/vec2(textureSize(shadowDepth, 0)));
 
 	float shadow=0.0;
@@ -68,6 +69,9 @@ float ShadowPCF(vec4 Coords)
 	}
 
 	return shadow/count;
+#else
+	return texture(shadowDepth, Coords.xyz/Coords.w);
+#endif
 }
 
 float MiePhase(float cosTheta, float g)
@@ -85,17 +89,21 @@ float volumetricLightScattering(const vec3 lightPos, const vec3 rayOrigin, const
 	const float rayLength=length(rayVector);
 	const vec3 rayDirection=rayVector/rayLength;
     const vec3 rayStep=rayDirection*rayLength*fNumSteps;
+	const float decay=0.98;
 	const float cosTheta=dot(rayDirection, normalize(lightPos));
 
 	const float miePhase=MiePhase(cosTheta, g);
 	const float scattering=mieCoefficient/(1.0-g*g);
 
 	float L=0.0;
+	float lDecay=1.0;
 	vec4 rayPos=vec4(rayOrigin+rayStep*randomFloat(), 1.0);
 
 	for(int i=0;i<numSteps;i++)
 	{
-		L+=ShadowPCF(biasMat*lightMVP*rayPos)*scattering;
+		// TODO: Is there a better way to cap the rays from going off into infinity than multiplying with clamped cosTheta?
+		L+=(ShadowPCF(biasMat*lightMVP*rayPos)*max(0.0, cosTheta))*scattering*lDecay;
+		lDecay*=decay;
 		rayPos.xyz+=rayStep;
 	}
 
