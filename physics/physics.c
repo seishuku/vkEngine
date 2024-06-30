@@ -84,16 +84,14 @@ void PhysicsIntegrate(RigidBody_t *body, float dt)
 
 	// Apply damping force
 	// Force+=Velocity*-damping
-	body->force=Vec3_Addv(body->force, Vec3_Muls(body->velocity, -damping));
+	const vec3 force=Vec3_Muls(body->velocity, -damping);
 
-	// Euler integration of position and velocity
-	// Position+=Velocity*dt+0.5f*Force/Mass*dt*dt
+	// Implicit Euler integration of position and velocity
 	// Velocity+=Force/Mass*dt
+	// Position+=Velocity*dt+0.5f*Force/Mass*dt*dt
 	const float massDeltaTimeSq=0.5f*body->invMass*dt*dt;
-	body->position=Vec3_Addv(body->position, Vec3_Addv(Vec3_Muls(body->velocity, dt), Vec3_Muls(body->force, massDeltaTimeSq)));
-	body->velocity=Vec3_Addv(body->velocity, Vec3_Muls(body->force, body->invMass*dt));
-
-	body->force=Vec3b(0.0f);
+	body->velocity=Vec3_Addv(body->velocity, Vec3_Muls(force, body->invMass*dt));
+	body->position=Vec3_Addv(body->position, Vec3_Addv(Vec3_Muls(body->velocity, dt), Vec3_Muls(force, massDeltaTimeSq)));
 
 	// Integrate angular velocity using quaternions
 	body->orientation=integrateAngularVelocity(body->orientation, body->angularVelocity, dt);

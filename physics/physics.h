@@ -14,7 +14,6 @@ typedef struct RigidBody_s
 {
 	vec3 position;
 	vec3 velocity;
-	vec3 force;
 
 	vec4 orientation;
 	vec3 angularVelocity;
