@@ -108,6 +108,8 @@ void NetUpdate(void *arg)
 				memcpy(&netCameras[clientID].velocity, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
 				memcpy(&netCameras[clientID].forward, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
 				memcpy(&netCameras[clientID].up, pBuffer, sizeof(float)*3);			pBuffer+=sizeof(float)*3;
+				netCameras[clientID].right=Vec3_Cross(netCameras[clientID].up, netCameras[clientID].forward);
+				netCameras[clientID].radius=10.0f;
 
 				//DBGPRINTF(DEBUG_INFO, "\033[%d;0H\033[KID %d Pos: %0.1f %0.1f %0.1f", clientID+1, clientID, NetCameras[clientID].position.x, NetCameras[clientID].position.y, NetCameras[clientID].position.z);
 			}
@@ -200,6 +202,9 @@ void ClientNetwork_Destroy(void)
 			.packetMagic=DISCONNECT_PACKETMAGIC, .clientID=clientID
 		}, sizeof(NetworkPacket_t), serverAddress, serverPort);
 		Network_SocketClose(clientSocket);
+
+		clientSocket=-1;
+		connectedClients=0;
 	}
 
 	Network_Destroy();

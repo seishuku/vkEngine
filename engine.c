@@ -22,6 +22,7 @@
 #include "physics/physics.h"
 #include "ui/ui.h"
 #include "console/console.h"
+#include "client_network.h"
 #include "models.h"
 #include "textures.h"
 #include "line.h"
@@ -279,7 +280,7 @@ void GenerateWorld(void)
 
 	if(!fighterInstance.buffer)
 	{
-		vkuCreateHostBuffer(&vkContext, &fighterInstance, sizeof(matrix)*2, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+		vkuCreateHostBuffer(&vkContext, &fighterInstance, sizeof(matrix)*(2+MAX_CLIENTS), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 		fighterInstancePtr=(matrix *)fighterInstance.memory->mappedPointer;
 	}
 
@@ -287,34 +288,34 @@ void GenerateWorld(void)
 }
 //////
 
-void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, uint32_t index, uint32_t eye, Camera_t player)
+void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, uint32_t index, uint32_t eye)
 {
-	struct
-	{
-		matrix mvp;
-		vec4 color, start, end;
-	} linePC;
+	//struct
+	//{
+	//	matrix mvp;
+	//	vec4 color, start, end;
+	//} linePC;
 
-	vec4 position=Vec4_Vec3(player.position, 1.0f);
-	vec4 forward=Vec4_Vec3(player.forward, 1.0f);
-	vec4 up=Vec4_Vec3(player.up, 1.0f);
-	vec4 right=Vec4_Vec3(player.right, 1.0f);
+	//vec4 position=Vec4_Vec3(player.position, 1.0f);
+	//vec4 forward=Vec4_Vec3(player.forward, 1.0f);
+	//vec4 up=Vec4_Vec3(player.up, 1.0f);
+	//vec4 right=Vec4_Vec3(player.right, 1.0f);
 
-	matrix local=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
-	linePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
-	linePC.start=position;
+	//matrix local=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
+	//linePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
+	//linePC.start=position;
 
-	linePC.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
-	linePC.end=Vec4_Addv(position, Vec4_Muls(forward, 15.0f));
-	DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
+	//linePC.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
+	//linePC.end=Vec4_Addv(position, Vec4_Muls(forward, 15.0f));
+	//DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
 
-	linePC.color=Vec4(0.0f, 1.0f, 0.0f, 1.0f);
-	linePC.end=Vec4_Addv(position, Vec4_Muls(up, 15.0f));
-	DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
+	//linePC.color=Vec4(0.0f, 1.0f, 0.0f, 1.0f);
+	//linePC.end=Vec4_Addv(position, Vec4_Muls(up, 15.0f));
+	//DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
 
-	linePC.color=Vec4(0.0f, 0.0f, 1.0f, 1.0f);
-	linePC.end=Vec4_Addv(position, Vec4_Muls(right, 15.0f));
-	DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
+	//linePC.color=Vec4(0.0f, 0.0f, 1.0f, 1.0f);
+	//linePC.end=Vec4_Addv(position, Vec4_Muls(right, 15.0f));
+	//DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
 
 	//struct
 	//{
@@ -337,6 +338,7 @@ void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, 
 	//	spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
 	//DrawSpherePushConstant(commandBuffer, index, sizeof(spherePC), &spherePC);
+
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipeline.pipeline);
 
 	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &fighterInstance.buffer, &(VkDeviceSize) { 0 });
@@ -355,7 +357,11 @@ void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, 
 	for(uint32_t j=0;j<fighter.numMesh;j++)
 	{
 		vkCmdBindIndexBuffer(commandBuffer, fighter.mesh[j].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-		vkCmdDrawIndexed(commandBuffer, fighter.mesh[j].numFace*3, 1, 0, 0, 1);
+
+		if(clientSocket!=-1)
+			vkCmdDrawIndexed(commandBuffer, fighter.mesh[j].numFace*3, connectedClients, 0, 0, 0);
+		else
+			vkCmdDrawIndexed(commandBuffer, fighter.mesh[j].numFace*3, 1, 0, 0, 1);
 	}
 }
 
@@ -552,72 +558,8 @@ void Thread_Main(void *arg)
 		DrawLinePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], sizeof(linePC), &linePC);
 	}
 
-	// Draw enemy
-	DrawPlayer(data->perFrame[data->index].secCommandBuffer[data->eye], data->perFrame[data->index].descriptorPool[data->eye], data->index, data->eye, enemy);
-
-#if 0
-	// Draw some simple geometry to represent other client cameras
-	for(uint32_t i=0;i<connectedClients;i++)
-	{
-		// Only draw others, not ourselves
-		if(i==clientID)
-			continue;
-
-		// Note: These draw calls don't have any external geometry attached, it's in the vertex shader.
-
-		struct
-		{
-			matrix mvp;
-			vec4 color, start, end;
-		} line_ubo={ 0 };
-
-		vec4 position=Vec4(netCameras[i].position.x, netCameras[i].position.y, netCameras[i].position.z, 1.0f);
-		vec4 forward=Vec4(netCameras[i].forward.x, netCameras[i].forward.y, netCameras[i].forward.z, 1.0f);
-		vec4 up=Vec4(netCameras[i].up.x, netCameras[i].up.y, netCameras[i].up.z, 1.0f);
-		netCameras[i].Right=Vec3_Cross(netCameras[i].forward, netCameras[i].up);
-		vec4 right=Vec4(netCameras[i].Right.x, netCameras[i].Right.y, netCameras[i].Right.z, 1.0f);
-
-		line_ubo.mvp=MatrixMult(perFrame[data->index].Main_UBO[data->eye]->modelview, perFrame[data->index].Main_UBO[data->eye]->projection);
-		line_ubo.start=position;
-
-		vkCmdBindPipeline(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.mainPipeline);
-
-		line_ubo.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
-		line_ubo.end=Vec4_Addv(position, Vec4_Muls(forward, 15.0f));
-		vkCmdPushConstants(data->perFrame[data->index].secCommandBuffer[data->eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
-		vkCmdDraw(data->perFrame[data->index].secCommandBuffer[data->eye], 2, 1, 0, 0);
-
-		line_ubo.color=Vec4(0.0f, 1.0f, 0.0f, 1.0f);
-		line_ubo.end=Vec4_Addv(position, Vec4_Muls(up, 15.0f));
-		vkCmdPushConstants(data->perFrame[data->index].secCommandBuffer[data->eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
-		vkCmdDraw(data->perFrame[data->index].secCommandBuffer[data->eye], 2, 1, 0, 0);
-
-		line_ubo.color=Vec4(0.0f, 0.0f, 1.0f, 1.0f);
-		line_ubo.end=Vec4_Addv(position, Vec4_Muls(right, 15.0f));
-		vkCmdPushConstants(data->perFrame[data->index].secCommandBuffer[data->eye], linePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(line_ubo), &line_ubo);
-		vkCmdDraw(data->perFrame[data->index].secCommandBuffer[data->eye], 2, 1, 0, 0);
-
-		struct
-		{
-			matrix mvp;
-			vec4 color;
-		} sphere_ubo={ 0 };
-
-		matrix local=MatrixIdentity();
-		local=MatrixMult(local, MatrixScale(10.0f, 10.0f, 10.0f));
-		local=MatrixMult(local, MatrixInverse(MatrixLookAt(netCameras[i].position, Vec3_Addv(netCameras[i].position, netCameras[i].forward), netCameras[i].up)));
-
-		local=MatrixMult(local, perFrame[data->index].Main_UBO[data->eye]->modelview);
-		sphere_ubo.mvp=MatrixMult(local, perFrame[data->index].Main_UBO[data->eye]->projection);
-
-		sphere_ubo.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
-
-		vkCmdBindPipeline(data->perFrame[data->index].secCommandBuffer[data->eye], VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline.mainPipeline);
-		vkCmdPushConstants(data->perFrame[data->index].secCommandBuffer[data->eye], spherePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(sphere_ubo), &sphere_ubo);
-		vkCmdDraw(data->perFrame[data->index].secCommandBuffer[data->eye], 60, 1, 0, 0);
-	}
-	//////
-#endif
+	// Draw player models
+	DrawPlayer(data->perFrame[data->index].secCommandBuffer[data->eye], data->perFrame[data->index].descriptorPool[data->eye], data->index, data->eye);
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
@@ -1002,8 +944,11 @@ void Thread_Physics(void *arg)
 		PhysicsIntegrate(&enemyBody, fTimeStep);
 
 		CameraSetFromRigidBody(&enemy, enemyBody);
-		matrix local=MatrixScale(enemyBody.radius*6.0f, enemyBody.radius*6.0f, enemyBody.radius*6.0f);
+
+		const float scale=(1.0f/fighter.radius)*enemyBody.radius;
+		matrix local=MatrixScale(scale, scale, scale);
 		local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
+		local=MatrixMult(local, MatrixTranslatev(fighter.center));
 		local=MatrixMult(local, QuatToMatrix(enemyBody.orientation));
 		fighterInstancePtr[1]=MatrixMult(local, MatrixTranslatev(enemyBody.position));
 
@@ -1018,7 +963,7 @@ void Thread_Physics(void *arg)
 		}
 		//////
 
-		//ClientNetwork_SendStatus();
+		ClientNetwork_SendStatus();
 	}
 
 	// Always run physics on the camera's body
@@ -1026,8 +971,31 @@ void Thread_Physics(void *arg)
 
 	// Set camera position/velocity from result of collision
 	CameraSetFromRigidBody(&camera, cameraBody);
-	matrix local=MatrixScale(cameraBody.radius*6.0f, cameraBody.radius*6.0f, cameraBody.radius*6.0f);
+
+	if(clientSocket!=-1)
+	{
+		for(uint32_t i=0;i<connectedClients;i++)
+		{
+			if(i!=clientID)
+			{
+				RigidBody_t netBody=CameraGetRigidBody(netCameras[i]);
+
+				const float scale=(1.0f/fighter.radius)*netBody.radius;
+				matrix local=MatrixScale(scale, scale, scale);
+				local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
+				local=MatrixMult(local, MatrixTranslatev(fighter.center));
+				local=MatrixMult(local, QuatToMatrix(netBody.orientation));
+				fighterInstancePtr[i]=MatrixMult(local, MatrixTranslatev(netBody.position));
+			}
+			else
+				memset(&fighterInstancePtr[i], 0, sizeof(matrix));
+		}
+	}
+
+	const float scale=(1.0f/fighter.radius)*cameraBody.radius;
+	matrix local=MatrixScale(scale, scale, scale);
 	local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
+	local=MatrixMult(local, MatrixTranslatev(fighter.center));
 	local=MatrixMult(local, QuatToMatrix(cameraBody.orientation));
 	fighterInstancePtr[0]=MatrixMult(local, MatrixTranslatev(cameraBody.position));
 
@@ -1186,6 +1154,8 @@ void Render(void)
 
 	Font_Print(&font, 16.0f, renderWidth-400.0f, renderHeight-50.0f-16.0f, "Current track: %s", musicList[currentMusic].string);
 
+	Font_Print(&font, 16.0f, 0.0f, renderHeight/2, "Connected clients: %d", connectedClients);
+
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
 	vkResetDescriptorPool(vkContext.device, perFrame[index].descriptorPool, 0);
@@ -1280,9 +1250,19 @@ void Render(void)
 	}
 }
 
-void Console_CmdQuit(Console_t *Console, const char *Param)
+void Console_CmdQuit(Console_t *console, const char *param)
 {
 	isDone=true;
+}
+
+void Console_CmdConnect(Console_t *console, const char *param)
+{
+	ClientNetwork_Init();
+}
+
+void Console_CmdDisconnect(Console_t *console, const char *param)
+{
+	ClientNetwork_Destroy();
 }
 
 void Fire(void *arg)
@@ -1306,6 +1286,8 @@ bool Init(void)
 
 	Console_Init(&console, 80, 25);
 	Console_AddCommand(&console, "quit", Console_CmdQuit);
+	Console_AddCommand(&console, "connect", Console_CmdConnect);
+	Console_AddCommand(&console, "disconnect", Console_CmdDisconnect);
 
 	vkuMemAllocator_Init(&vkContext);
 
@@ -1802,7 +1784,7 @@ void Destroy(void)
 {
 	vkDeviceWaitIdle(vkContext.device);
 
-	//ClientNetwork_Destroy();
+	ClientNetwork_Destroy();
 
 	Audio_Destroy();
 	SFX_Destroy();

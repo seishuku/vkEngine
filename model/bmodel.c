@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <float.h>
 #include "../system/system.h"
 #include "../math/math.h"
 #include "../vulkan/vulkan.h"
@@ -112,6 +113,53 @@ static void CalculateTangent(BModel_t *model)
 			memcpy(&model->tangent[3*i], &t, sizeof(float)*3);
 			memcpy(&model->binormal[3*i], &b, sizeof(float)*3);
 			memcpy(&model->normal[3*i], &n, sizeof(float)*3);
+		}
+	}
+}
+
+static vec3 CalculateCenterMass(BModel_t *model)
+{
+	vec3 centerOfMass=Vec3b(0.0f);
+	uint32_t vertexCount=0;
+
+	for(uint32_t i=0;i<model->numMesh;i++)
+	{
+		for(uint32_t j=0;j<model->mesh[i].numFace*3;j++)
+		{
+			const vec3 vertex=Vec3(model->vertex[3*model->mesh[i].face[j]+0], model->vertex[3*model->mesh[i].face[j]+1], model->vertex[3*model->mesh[i].face[j]+2]);
+
+			centerOfMass=Vec3_Addv(centerOfMass, vertex);
+			vertexCount++;
+		}
+	}
+
+	return Vec3_Muls(centerOfMass, 1.0f/(float)vertexCount);
+}
+
+static void CalculateBounds(BModel_t *model)
+{
+	model->bBoxMin=Vec3b(FLT_MIN);
+	model->bBoxMax=Vec3b(-FLT_MAX);
+	model->center=CalculateCenterMass(model);
+	model->radius=0.0f;
+
+	for(uint32_t i=0;i<model->numMesh;i++)
+	{
+		for(uint32_t j=0;j<model->mesh[i].numFace*3;j++)
+		{
+			const vec3 vertex=Vec3(model->vertex[3*model->mesh[i].face[j]+0], model->vertex[3*model->mesh[i].face[j]+1], model->vertex[3*model->mesh[i].face[j]+2]);
+			float distance=Vec3_Distance(vertex, model->center);
+
+			if(distance>model->radius)
+				model->radius=distance;
+
+			if(vertex.x<model->bBoxMin.x)	model->bBoxMin.x=vertex.x;
+			if(vertex.y<model->bBoxMin.y)	model->bBoxMin.y=vertex.y;
+			if(vertex.z<model->bBoxMin.z)	model->bBoxMin.z=vertex.z;
+
+			if(vertex.x>model->bBoxMax.x)	model->bBoxMax.x=vertex.x;
+			if(vertex.y>model->bBoxMax.y)	model->bBoxMax.y=vertex.y;
+			if(vertex.z>model->bBoxMax.z)	model->bBoxMax.z=vertex.z;
 		}
 	}
 }
@@ -305,6 +353,10 @@ bool LoadBModel(BModel_t *model, const char *filename)
 
 	if(!model->tangent&&!model->binormal&&!model->normal&&model->UV)
 		CalculateTangent(model);
+
+	CalculateBounds(model);
+
+	DBGPRINTF(DEBUG_INFO, "Model: %s\n\tMin: %f %f %f Max: %f %f %f\n\tCenter: %f %f %f Radius: %f\n", model->mesh[0].name, model->bBoxMin.x, model->bBoxMin.y, model->bBoxMin.z, model->bBoxMax.x, model->bBoxMax.y, model->bBoxMax.z, model->center.x, model->center.y, model->center.z, model->radius);
 
 	// Match up material names with their meshes with an index number
 	if(model->numMaterial)

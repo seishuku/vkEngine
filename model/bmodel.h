@@ -53,6 +53,11 @@ typedef struct
 	float *normal;
 
 	VkuBuffer_t vertexBuffer;
+
+	vec3 bBoxMin;
+	vec3 bBoxMax;
+	vec3 center;
+	float radius;
 } BModel_t;
 
 bool LoadBModel(BModel_t *model, const char *filename);
