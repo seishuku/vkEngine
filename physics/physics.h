@@ -14,6 +14,7 @@ typedef struct RigidBody_s
 {
 	vec3 position;
 	vec3 velocity;
+	vec3 force;
 
 	vec4 orientation;
 	vec3 angularVelocity;
@@ -25,17 +26,9 @@ typedef struct RigidBody_s
 	vec3 size;		// bounding box if it's an AABB
 } RigidBody_t;
 
-typedef enum
-{
-	PHYSICS_OBJECT_SPHERE=0,
-	PHYSICS_OBJECT_AABB,
-	PHYSICS_OBJECT_CAMERA,
-	PHYSICS_OBJECT_PARTICLE,
-	NUM_PHYSICS_OBJECT_TYPE,
-} PhysicsObjectType;
-
-void PhysicsIntegrate(RigidBody_t *body, float dt);
-void PhysicsExplode(RigidBody_t *bodies);
+void PhysicsIntegrate(RigidBody_t *body, const float dt);
+void PhysicsExplode(RigidBody_t *body);
 float PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b);
+float PhysicsSphereToAABBCollisionResponse(RigidBody_t *sphere, RigidBody_t *aabb);
 
 #endif

@@ -102,6 +102,17 @@ vec4 Vec4_Clamp(const vec4 v, const float min, const float max)
 		fminf(fmaxf(v.w, min), max)
 	};
 }
+
+vec4 Vec4_Clampv(const vec4 v, const vec4 min, const vec4 max)
+{
+	return (vec4)
+	{
+		fminf(fmaxf(v.x, min.x), max.x),
+		fminf(fmaxf(v.y, min.y), max.y),
+		fminf(fmaxf(v.z, min.z), max.z),
+		fminf(fmaxf(v.w, min.w), max.w)
+	};
+}
 #endif
 
 float Vec4_Normalize(vec4 *v)

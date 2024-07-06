@@ -111,6 +111,16 @@ vec3 Vec3_Clamp(const vec3 v, const float min, const float max)
 		fminf(fmaxf(v.z, min), max)
 	};
 }
+
+vec3 Vec3_Clampv(const vec3 v, const vec3 min, const vec3 max)
+{
+	return (vec3)
+	{
+		fminf(fmaxf(v.x, min.x), max.x),
+		fminf(fmaxf(v.y, min.y), max.y),
+		fminf(fmaxf(v.z, min.z), max.z)
+	};
+}
 #endif
 
 float Vec3_Normalize(vec3 *v)

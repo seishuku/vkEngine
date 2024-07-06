@@ -9,8 +9,8 @@
 #undef max
 #endif
 
-inline static int32_t min(int32_t a, int32_t b) { return (a<b)?a:b; }
-inline static int32_t max(int32_t a, int32_t b) { return (a>b)?a:b; }
+inline static const int32_t min(const int32_t a, const int32_t b) { return (a<b)?a:b; }
+inline static const int32_t max(const int32_t a, const int32_t b) { return (a>b)?a:b; }
 
 #ifndef PI
 #define PI 3.1415926f
@@ -49,6 +49,7 @@ inline static float Vec2_Distance(const vec2 Vector1, const vec2 Vector2) { retu
 inline static vec2 Vec2_Reflect(const vec2 N, const vec2 I) { return Vec2_Subv(I, Vec2_Muls(N, 2.0f*Vec2_Dot(N, I))); }
 inline static vec2 Vec2_Lerp(const vec2 a, const vec2 b, const float t) { return Vec2_Addv(Vec2_Muls(Vec2_Subv(b, a), t), a); }
 inline static vec2 Vec2_Clamp(const vec2 v, const float min, const float max) { return (vec2) { .x=fminf(fmaxf(v.x, min), max), .y=fminf(fmaxf(v.y, min), max) }; }
+inline static vec2 Vec2_Clampv(const vec2 v, const vec2 min, const vec2 max) { return (vec2) { .x=fminf(fmaxf(v.x, min.x), max.x), .y=fminf(fmaxf(v.y, min.y), max.y) }; }
 #else
 const vec2 Vec2(const float x, const float y);
 const vec2 Vec2b(const float b);
@@ -67,6 +68,7 @@ float Vec2_Distance(const vec2 Vector1, const vec2 Vector2);
 vec2 Vec2_Reflect(const vec2 N, const vec2 I);
 vec2 Vec2_Lerp(const vec2 a, const vec2 b, const float t);
 vec2 Vec2_Clamp(const vec2 v, const float min, const float max);
+vec2 Vec2_Clampv(const vec2 v, const vec2 min, const vec2 max);
 #endif
 
 float Vec2_Normalize(vec2 *v);
@@ -92,6 +94,7 @@ inline static vec3 Vec3_Reflect(const vec3 N, const vec3 I) { return Vec3_Subv(I
 inline static vec3 Vec3_Cross(const vec3 v0, const vec3 v1) { return (vec3) { .x=v0.y*v1.z-v0.z*v1.y, .y=v0.z*v1.x-v0.x*v1.z, .z=v0.x*v1.y-v0.y*v1.x }; }
 inline static vec3 Vec3_Lerp(const vec3 a, const vec3 b, const float t) { return Vec3_Addv(Vec3_Muls(Vec3_Subv(b, a), t), a); }
 inline static vec3 Vec3_Clamp(const vec3 v, const float min, const float max) { return (vec3) { .x=fminf(fmaxf(v.x, min), max), .y=fminf(fmaxf(v.y, min), max), .z=fminf(fmaxf(v.z, min), max) }; }
+inline static vec3 Vec3_Clampv(const vec3 v, const vec3 min, const vec3 max) { return (vec3) { .x=fminf(fmaxf(v.x, min.x), max.x), .y=fminf(fmaxf(v.y, min.y), max.y), .z=fminf(fmaxf(v.z, min.z), max.z) }; }
 #else
 const vec3 Vec3(const float x, const float y, const float z);
 const vec3 Vec3b(const float b);
@@ -112,6 +115,7 @@ vec3 Vec3_Reflect(const vec3 N, const vec3 I);
 vec3 Vec3_Cross(const vec3 v0, const vec3 v1);
 vec3 Vec3_Lerp(const vec3 a, const vec3 b, const float t);
 vec3 Vec3_Clamp(const vec3 v, const float min, const float max);
+vec3 Vec3_Clampv(const vec3 v, const vec3 min, const vec3 max);
 #endif
 
 float Vec3_Normalize(vec3 *v);
@@ -136,6 +140,7 @@ inline static float Vec4_Distance(const vec4 Vector1, const vec4 Vector2) { retu
 inline static vec4 Vec4_Reflect(const vec4 N, const vec4 I) { return Vec4_Subv(I, Vec4_Muls(N, 2.0f*Vec4_Dot(N, I))); }
 inline static vec4 Vec4_Lerp(const vec4 a, const vec4 b, const float t) { return Vec4_Addv(Vec4_Muls(Vec4_Subv(b, a), t), a); }
 inline static vec4 Vec4_Clamp(const vec4 v, const float min, const float max) { return (vec4) { .x=fminf(fmaxf(v.x, min), max), .y=fminf(fmaxf(v.y, min), max), .z=fminf(fmaxf(v.z, min), max), .w=fminf(fmaxf(v.w, min), max) }; }
+inline static vec4 Vec4_Clampv(const vec4 v, const vec4 min, const vec4 max) { return (vec4) { .x=fminf(fmaxf(v.x, min.x), max.x), .y=fminf(fmaxf(v.y, min.y), max.y), .z=fminf(fmaxf(v.z, min.z), max.z), .w=fminf(fmaxf(v.w, min.w), max.w) }; }
 #else
 const vec4 Vec4(const float x, const float y, const float z, const float w);
 const vec4 Vec4_Vec3(const vec3 a, const float w);
@@ -156,6 +161,7 @@ float Vec4_Distance(const vec4 Vector1, const vec4 Vector2);
 vec4 Vec4_Reflect(const vec4 N, const vec4 I);
 vec4 Vec4_Lerp(const vec4 a, const vec4 b, const float t);
 vec4 Vec4_Clamp(const vec4 v, const float min, const float max);
+vec4 Vec4_Clampv(const vec4 v, const vec4 min, const vec4 max);
 #endif
 
 float Vec4_Normalize(vec4 *v);

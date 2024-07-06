@@ -90,6 +90,15 @@ vec2 Vec2_Clamp(const vec2 v, const float min, const float max)
 		fminf(fmaxf(v.y, min), max)
 	};
 }
+
+vec2 Vec2_Clampv(const vec2 v, const vec2 min, const vec2 max)
+{
+	return (vec2)
+	{
+		fminf(fmaxf(v.x, min.x), max.x),
+		fminf(fmaxf(v.y, min.y), max.y)
+	};
+}
 #endif
 
 float Vec2_Normalize(vec2 *v)

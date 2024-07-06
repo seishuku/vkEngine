@@ -22,6 +22,7 @@ RigidBody_t CameraGetRigidBody(const Camera_t camera)
 		.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
 	};
 	body.velocity=Matrix3x3MultVec3(camera.velocity, cameraOrientation);
+	body.force=Vec3b(0.0f);
 
 	body.orientation=MatrixToQuat(MatrixTranspose(cameraOrientation));
 	body.angularVelocity=Vec3b(0.0f);

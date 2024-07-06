@@ -257,6 +257,7 @@ void GenerateWorld(void)
 		Vec3_Normalize(&randomDirection);
 
 		asteroids[i].velocity=Vec3_Muls(randomDirection, RandFloat());
+		asteroids[i].force=Vec3b(0.0f);
 
 		asteroids[i].orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
 		asteroids[i].angularVelocity=Vec3_Muls(randomDirection, RandFloat());
@@ -1506,6 +1507,7 @@ bool Init(void)
 
 		particleBody.position=Vec3b(0.0f);
 		particleBody.velocity=Vec3b(0.0f);
+		particleBody.force=Vec3b(0.0f);
 
 		particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
 		particleBody.angularVelocity=Vec3b(0.0f);
