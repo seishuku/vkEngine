@@ -50,6 +50,7 @@ typedef struct ParticleSystem_s
 
 	uint32_t count;
 	VkuBuffer_t particleBuffer;
+	float *systemBuffer;
 } ParticleSystem_t;
 
 uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3 startColor, vec3 endColor, float particleSize, uint32_t numParticles, ParticleEmitterType_e type, ParticleInitCallback initCallback);

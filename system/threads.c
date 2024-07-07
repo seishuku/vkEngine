@@ -215,7 +215,8 @@ bool ThreadBarrier_Init(ThreadBarrier_t *barrier, uint32_t count)
 		return false;
 
 	barrier->count=count;
-	barrier->count_init=count;
+	barrier->initCount=count;
+	barrier->check=0;
 
 	return true;
 }
@@ -223,19 +224,21 @@ bool ThreadBarrier_Init(ThreadBarrier_t *barrier, uint32_t count)
 bool ThreadBarrier_Wait(ThreadBarrier_t *barrier)
 {
 	mtx_lock(&barrier->mutex);
+	uint32_t check=barrier->check;
 
 	if(--barrier->count==0)
 	{
+		barrier->check++;
+		barrier->count=barrier->initCount;
+
 		cnd_broadcast(&barrier->cond);
 		mtx_unlock(&barrier->mutex);
 
 		return false;
 	}
 
-	while(barrier->count!=0)
+	while(check==barrier->check)
 		cnd_wait(&barrier->cond, &barrier->mutex);
-
-	barrier->count=barrier->count_init;
 
 	mtx_unlock(&barrier->mutex);
 

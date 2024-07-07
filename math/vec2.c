@@ -72,6 +72,11 @@ float Vec2_Distance(const vec2 Vector1, const vec2 Vector2)
 	return Vec2_Length(Vec2_Subv(Vector2, Vector1));
 }
 
+float Vec2_DistanceSq(const vec2 v0, const vec2 v1)
+{
+	return (v0.x-v1.x)*(v0.x-v1.x)+(v0.y-v1.y)*(v0.y-v1.y);
+}
+
 vec2 Vec2_Reflect(const vec2 N, const vec2 I)
 {
 	return Vec2_Subv(I, Vec2_Muls(N, 2.0f*Vec2_Dot(N, I)));

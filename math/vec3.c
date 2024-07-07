@@ -77,6 +77,11 @@ float Vec3_Distance(const vec3 Vector1, const vec3 Vector2)
 	return Vec3_Length(Vec3_Subv(Vector2, Vector1));
 }
 
+float Vec3_DistanceSq(const vec3 v0, const vec3 v1)
+{
+	return (v0.x-v1.x)*(v0.x-v1.x)+(v0.y-v1.y)*(v0.y-v1.y)+(v0.z-v1.z)*(v0.z-v1.z);
+}
+
 float Vec3_GetAngle(const vec3 Vector1, const vec3 Vector2)
 {
 	return acosf(Vec3_Dot(Vector1, Vector2)/(Vec3_Length(Vector1)*Vec3_Length(Vector2)));

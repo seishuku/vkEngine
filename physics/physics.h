@@ -3,9 +3,6 @@
 
 #include "../math/math.h"
 
-typedef struct Particle_s Particle_t;
-typedef struct Camera_s Camera_t;
-
 // Define constants
 #define WORLD_SCALE 1000.0f
 #define EXPLOSION_POWER (50.0f*WORLD_SCALE)
@@ -13,14 +10,14 @@ typedef struct Camera_s Camera_t;
 typedef struct RigidBody_s
 {
 	vec3 position;
+
 	vec3 velocity;
 	vec3 force;
+	float mass, invMass;
 
 	vec4 orientation;
 	vec3 angularVelocity;
 	float inertia, invInertia;
-
-	float mass, invMass;
 
 	float radius;	// radius if it's a sphere
 	vec3 size;		// bounding box if it's an AABB

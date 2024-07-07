@@ -17,6 +17,8 @@ extern VkSampleCountFlags MSAA;
 extern VkFormat ColorFormat, DepthFormat;
 
 extern VkRenderPass renderPass;
+
+extern Camera_t camera;
 ////////////////////////////
 
 //static VkuDescriptorSet_t particleDescriptorSet;
@@ -31,6 +33,19 @@ struct
 	vec4 Right;
 	vec4 Up;
 } particlePC;
+
+inline static void emitterDefaultInit(Particle_t *particle)
+{
+	float seedRadius=30.0f;
+	float theta=RandFloat()*2.0f*PI;
+	float r=RandFloat()*seedRadius;
+
+	// Set particle start position to emitter position
+	particle->position=Vec3b(0.0f);
+	particle->velocity=Vec3(r*sinf(theta), RandFloat()*100.0f, r*cosf(theta));
+
+	particle->life=RandFloat()*0.999f+0.001f;
+}
 
 // Adds a particle emitter to the system
 uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3 startColor, vec3 endColor, float particleSize, uint32_t numParticles, ParticleEmitterType_e type, ParticleInitCallback initCallback)
@@ -83,24 +98,12 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3
 		if(emitter.type==PARTICLE_EMITTER_ONCE)
 		{
 			if(emitter.initCallback)
-			{
 				emitter.initCallback(i, emitter.numParticles, &emitter.particles[i]);
-
-				// Add particle emitter position to the calculated position
-				emitter.particles[i].position=Vec3_Addv(emitter.particles[i].position, emitter.position);
-			}
 			else
-			{
-				float seedRadius=30.0f;
-				float theta=RandFloat()*2.0f*PI;
-				float r=RandFloat()*seedRadius;
+				emitterDefaultInit(&emitter.particles[i]);
 
-				// Set particle start position to emitter position
-				emitter.particles[i].position=emitter.position;
-				emitter.particles[i].velocity=Vec3(r*sinf(theta), RandFloat()*100.0f, r*cosf(theta));
-
-				emitter.particles[i].life=RandFloat()*0.999f+0.001f;
-			}
+			// Add particle emitter position to the calculated position
+			emitter.particles[i].position=Vec3_Addv(emitter.particles[i].position, emitter.position);
 		}
 		else
 			emitter.particles[i].life=-1.0f;
@@ -165,24 +168,12 @@ void ParticleSystem_ResetEmitter(ParticleSystem_t *system, uint32_t ID)
 				{
 					// If a velocity/life callback was set, use it... Otherwise use default "fountain" style
 					if(emitter->initCallback)
-					{
 						emitter->initCallback(j, emitter->numParticles, &emitter->particles[j]);
-
-						// Add particle emitter position to the calculated position
-						emitter->particles[j].position=Vec3_Addv(emitter->particles[j].position, emitter->position);
-					}
 					else
-					{
-						float seedRadius=30.0f;
-						float theta=RandFloat()*2.0f*PI;
-						float r=RandFloat()*seedRadius;
+						emitterDefaultInit(&emitter->particles[j]);
 
-						// Set particle start position to emitter position
-						emitter->particles[j].position=emitter->position;
-						emitter->particles[j].velocity=Vec3(r*sinf(theta), RandFloat()*100.0f, r*cosf(theta));
-
-						emitter->particles[j].life=RandFloat()*0.999f+0.001f;
-					}
+					// Add particle emitter position to the calculated position
+					emitter->particles[j].position=Vec3_Addv(emitter->particles[j].position, emitter->position);
 				}
 			}
 
@@ -274,13 +265,13 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 	vkuPipeline_SetPipelineLayout(&particlePipeline, particlePipelineLayout);
 	vkuPipeline_SetRenderPass(&particlePipeline, renderPass);
 
-	particlePipeline.subpass=1;
+	particlePipeline.subpass=0;
 
 	particlePipeline.topology=VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
 	particlePipeline.cullMode=VK_CULL_MODE_BACK_BIT;
 	particlePipeline.depthTest=VK_TRUE;
 	particlePipeline.depthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
-	particlePipeline.depthWrite=VK_FALSE;
+	particlePipeline.depthWrite=VK_TRUE;
 	particlePipeline.rasterizationSamples=MSAA;
 
 	particlePipeline.blend=VK_TRUE;
@@ -340,24 +331,12 @@ void ParticleSystem_Step(ParticleSystem_t *system, float dt)
 			{
 				// If a velocity/life callback was set, use it... Otherwise use default "fountain" style
 				if(emitter->initCallback)
-				{
 					emitter->initCallback(j, emitter->numParticles, &emitter->particles[j]);
-
-					// Add particle emitter position to the calculated position
-					emitter->particles[j].position=Vec3_Addv(emitter->particles[j].position, emitter->position);
-				}
 				else
-				{
-					float seedRadius=30.0f;
-					float theta=RandFloat()*2.0f*PI;
-					float r=RandFloat()*seedRadius;
+					emitterDefaultInit(&emitter->particles[j]);
 
-					// Set particle start position to emitter position
-					emitter->particles[j].position=emitter->position;
-					emitter->particles[j].velocity=Vec3(r*sinf(theta), RandFloat()*100.0f, r*cosf(theta));
-
-					emitter->particles[j].life=RandFloat()*0.999f+0.001f;
-				}
+				// Add particle emitter position to the calculated position
+				emitter->particles[j].position=Vec3_Addv(emitter->particles[j].position, emitter->position);
 			}
 
 			emitter->particles[j].life-=dt*0.75f;
@@ -369,6 +348,23 @@ void ParticleSystem_Step(ParticleSystem_t *system, float dt)
 			ParticleSystem_DeleteEmitter(system, emitter->ID);
 		}
 	}
+}
+
+int compareParticles(const void *a, const void *b)
+{
+	vec3 *particleA=(vec3 *)a;
+	vec3 *particleB=(vec3 *)b;
+
+	float distA=Vec3_DistanceSq(*particleA, camera.position);
+	float distB=Vec3_DistanceSq(*particleB, camera.position);
+
+	if(distA>distB)
+		return -1;
+
+	if(distA<distB)
+		return 1;
+
+	return 0;
 }
 
 void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, matrix modelview, matrix projection)
@@ -395,13 +391,17 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 		vkDeviceWaitIdle(vkContext.device);
 
 		if(system->particleBuffer.buffer)
+		{
 			vkuDestroyBuffer(&vkContext, &system->particleBuffer);
+			Zone_Free(zone, system->systemBuffer);
+		}
 
 		vkuCreateHostBuffer(&vkContext, &system->particleBuffer, sizeof(vec4)*2*count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+		system->systemBuffer=(float *)Zone_Malloc(zone, sizeof(vec4)*2*count);
 	}
 
 	count=0;
-	float *array=(float *)system->particleBuffer.memory->mappedPointer;
+	float *array=system->systemBuffer;//(float *)system->particleBuffer.memory->mappedPointer;
 
 	if(array==NULL)
 	{
@@ -433,6 +433,10 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 		}
 	}
 
+	qsort(system->systemBuffer, count, sizeof(vec4)*2, compareParticles);
+
+	memcpy(system->particleBuffer.memory->mappedPointer, system->systemBuffer, sizeof(vec4)*2*count);
+
 	mtx_unlock(&system->mutex);
 
 	particlePC.mvp=MatrixMult(modelview, projection);
@@ -456,8 +460,8 @@ void ParticleSystem_Destroy(ParticleSystem_t *system)
 	if(system==NULL)
 		return;
 
-//	vkUnmapMemory(vkContext.device, system->particleBuffer.deviceMemory);
 	vkuDestroyBuffer(&vkContext, &system->particleBuffer);
+	Zone_Free(zone, system->systemBuffer);
 
 	//vkuDestroyImageBuffer(&Context, &particleTexture);
 

@@ -42,7 +42,9 @@ typedef struct
 {
     mtx_t mutex;
     cnd_t cond;
-	uint32_t count_init, count;
+	uint32_t initCount;
+	uint32_t count;
+	uint32_t check;
 } ThreadBarrier_t;
 
 uint32_t Thread_GetJobCount(ThreadWorker_t *worker);

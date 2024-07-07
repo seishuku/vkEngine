@@ -44,8 +44,9 @@ inline static vec2 Vec2_Mul(const vec2 a, const float x, const float y) { return
 inline static vec2 Vec2_Mulv(const vec2 a, const vec2 b) { return (vec2) { .x=a.x*b.x, .y=a.y*b.y }; }
 inline static vec2 Vec2_Muls(const vec2 a, const float b) { return (vec2) { .x=a.x*b, .y=a.y*b }; }
 inline static float Vec2_Dot(const vec2 a, const vec2 b) { return a.x*b.x+a.y*b.y; }
-inline static float Vec2_Length(const vec2 Vector) { return sqrtf(Vec2_Dot(Vector, Vector)); }
-inline static float Vec2_Distance(const vec2 Vector1, const vec2 Vector2) { return Vec2_Length(Vec2_Subv(Vector2, Vector1)); }
+inline static float Vec2_Length(const vec2 v) { return sqrtf(Vec2_Dot(v, v)); }
+inline static float Vec2_Distance(const vec2 v0, const vec2 v1) { return Vec2_Length(Vec2_Subv(v1, v0)); }
+inline static float Vec2_DistanceSq(const vec2 v0, const vec2 v1) { return (v0.x-v1.x)*(v0.x-v1.x)+(v0.y-v1.y)*(v0.y-v1.y); }
 inline static vec2 Vec2_Reflect(const vec2 N, const vec2 I) { return Vec2_Subv(I, Vec2_Muls(N, 2.0f*Vec2_Dot(N, I))); }
 inline static vec2 Vec2_Lerp(const vec2 a, const vec2 b, const float t) { return Vec2_Addv(Vec2_Muls(Vec2_Subv(b, a), t), a); }
 inline static vec2 Vec2_Clamp(const vec2 v, const float min, const float max) { return (vec2) { .x=fminf(fmaxf(v.x, min), max), .y=fminf(fmaxf(v.y, min), max) }; }
@@ -63,8 +64,9 @@ vec2 Vec2_Mul(const vec2 a, const float x, const float y);
 vec2 Vec2_Mulv(const vec2 a, const vec2 b);
 vec2 Vec2_Muls(const vec2 a, const float b);
 float Vec2_Dot(const vec2 a, const vec2 b);
-float Vec2_Length(const vec2 Vector);
-float Vec2_Distance(const vec2 Vector1, const vec2 Vector2);
+float Vec2_Length(const vec2 v);
+float Vec2_Distance(const vec2 v0, const vec2 v1);
+float Vec2_DistanceSq(const vec2 v0, const vec2 v1);
 vec2 Vec2_Reflect(const vec2 N, const vec2 I);
 vec2 Vec2_Lerp(const vec2 a, const vec2 b, const float t);
 vec2 Vec2_Clamp(const vec2 v, const float min, const float max);
@@ -87,9 +89,10 @@ inline static vec3 Vec3_Mul(const vec3 a, const float x, const float y, const fl
 inline static vec3 Vec3_Mulv(const vec3 a, const vec3 b) { return (vec3) { .x=a.x*b.x, .y=a.y*b.y, .z=a.z*b.z }; }
 inline static vec3 Vec3_Muls(const vec3 a, const float b) { return (vec3) { .x=a.x*b, .y=a.y*b, .z=a.z*b }; }
 inline static float Vec3_Dot(const vec3 a, const vec3 b) { return a.x*b.x+a.y*b.y+a.z*b.z; }
-inline static float Vec3_Length(const vec3 Vector) { return sqrtf(Vec3_Dot(Vector, Vector)); }
-inline static float Vec3_Distance(const vec3 Vector1, const vec3 Vector2) { return Vec3_Length(Vec3_Subv(Vector2, Vector1)); }
-inline static float Vec3_GetAngle(const vec3 Vector1, const vec3 Vector2) { return acosf(Vec3_Dot(Vector1, Vector2)/(Vec3_Length(Vector1)*Vec3_Length(Vector2))); }
+inline static float Vec3_Length(const vec3 v) { return sqrtf(Vec3_Dot(v, v)); }
+inline static float Vec3_Distance(const vec3 v0, const vec3 v1) { return Vec3_Length(Vec3_Subv(v1, v0)); }
+inline static float Vec3_DistanceSq(const vec3 v0, const vec3 v1) { return (v0.x-v1.x)*(v0.x-v1.x)+(v0.y-v1.y)*(v0.y-v1.y)+(v0.z-v1.z)*(v0.z-v1.z); }
+inline static float Vec3_GetAngle(const vec3 v0, const vec3 v1) { return acosf(Vec3_Dot(v0, v1)/(Vec3_Length(v0)*Vec3_Length(v1))); }
 inline static vec3 Vec3_Reflect(const vec3 N, const vec3 I) { return Vec3_Subv(I, Vec3_Muls(N, 2.0f*Vec3_Dot(N, I))); }
 inline static vec3 Vec3_Cross(const vec3 v0, const vec3 v1) { return (vec3) { .x=v0.y*v1.z-v0.z*v1.y, .y=v0.z*v1.x-v0.x*v1.z, .z=v0.x*v1.y-v0.y*v1.x }; }
 inline static vec3 Vec3_Lerp(const vec3 a, const vec3 b, const float t) { return Vec3_Addv(Vec3_Muls(Vec3_Subv(b, a), t), a); }
@@ -108,9 +111,10 @@ vec3 Vec3_Mul(const vec3 a, const float x, const float y, const float z);
 vec3 Vec3_Mulv(const vec3 a, const vec3 b);
 vec3 Vec3_Muls(const vec3 a, const float b);
 float Vec3_Dot(const vec3 a, const vec3 b);
-float Vec3_Length(const vec3 Vector);
-float Vec3_Distance(const vec3 Vector1, const vec3 Vector2);
-float Vec3_GetAngle(const vec3 Vector1, const vec3 Vector2);
+float Vec3_Length(const vec3 v);
+float Vec3_Distance(const vec3 v0, const vec3 v1);
+float Vec3_DistanceSq(const vec3 v0, const vec3 v1);
+float Vec3_GetAngle(const vec3 v0, const vec3 v1);
 vec3 Vec3_Reflect(const vec3 N, const vec3 I);
 vec3 Vec3_Cross(const vec3 v0, const vec3 v1);
 vec3 Vec3_Lerp(const vec3 a, const vec3 b, const float t);
@@ -135,8 +139,9 @@ inline static vec4 Vec4_Mul(const vec4 a, const float x, const float y, const fl
 inline static vec4 Vec4_Mulv(const vec4 a, const vec4 b) { return (vec4) { .x=a.x*b.x, .y=a.y*b.y, .z=a.z*b.z, .w=a.w*b.w }; }
 inline static vec4 Vec4_Muls(const vec4 a, const float b) { return (vec4) { .x=a.x*b, .y=a.y*b, .z=a.z*b, .w=a.w*b }; }
 inline static float Vec4_Dot(const vec4 a, const vec4 b) { return a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w; }
-inline static float Vec4_Length(const vec4 Vector) { return sqrtf(Vec4_Dot(Vector, Vector)); }
-inline static float Vec4_Distance(const vec4 Vector1, const vec4 Vector2) { return Vec4_Length(Vec4_Subv(Vector2, Vector1)); }
+inline static float Vec4_Length(const vec4 v) { return sqrtf(Vec4_Dot(v, v)); }
+inline static float Vec4_Distance(const vec4 v0, const vec4 v1) { return Vec4_Length(Vec4_Subv(v1, v0)); }
+inline static float Vec4_DistanceSq(const vec4 v0, const vec4 v1) { return (v0.x-v1.x)*(v0.x-v1.x)+(v0.y-v1.y)*(v0.y-v1.y)+(v0.z-v1.z)*(v0.z-v1.z)+(v0.w-v1.w)*(v0.w-v1.w); }
 inline static vec4 Vec4_Reflect(const vec4 N, const vec4 I) { return Vec4_Subv(I, Vec4_Muls(N, 2.0f*Vec4_Dot(N, I))); }
 inline static vec4 Vec4_Lerp(const vec4 a, const vec4 b, const float t) { return Vec4_Addv(Vec4_Muls(Vec4_Subv(b, a), t), a); }
 inline static vec4 Vec4_Clamp(const vec4 v, const float min, const float max) { return (vec4) { .x=fminf(fmaxf(v.x, min), max), .y=fminf(fmaxf(v.y, min), max), .z=fminf(fmaxf(v.z, min), max), .w=fminf(fmaxf(v.w, min), max) }; }
@@ -156,8 +161,9 @@ vec4 Vec4_Mul(const vec4 a, const float x, const float y, const float z, const f
 vec4 Vec4_Mulv(const vec4 a, const vec4 b);
 vec4 Vec4_Muls(const vec4 a, const float b);
 float Vec4_Dot(const vec4 a, const vec4 b);
-float Vec4_Length(const vec4 Vector);
-float Vec4_Distance(const vec4 Vector1, const vec4 Vector2);
+float Vec4_Length(const vec4 v);
+float Vec4_Distance(const vec4 v0, const vec4 v1);
+float Vec4_DistanceSq(const vec4 v0, const vec4 v1);
 vec4 Vec4_Reflect(const vec4 N, const vec4 I);
 vec4 Vec4_Lerp(const vec4 a, const vec4 b, const float t);
 vec4 Vec4_Clamp(const vec4 v, const float min, const float max);

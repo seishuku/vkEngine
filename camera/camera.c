@@ -443,19 +443,6 @@ matrix CameraUpdate(Camera_t *camera, float dt)
 	// Apply pitch/yaw/roll rotations
 	CameraRotate(camera);
 
-	// Combine the velocity with the 3 directional vectors to give overall directional velocity
-	//const matrix cameraOrientation=
-	//{
-	//	.x=Vec4(camera->right.x, camera->up.x, camera->forward.x, 0.0f),
-	//	.y=Vec4(camera->right.y, camera->up.y, camera->forward.y, 0.0f),
-	//	.z=Vec4(camera->right.z, camera->up.z, camera->forward.z, 0.0f),
-	//	.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
-	//};
-	//const vec3 velocity=Matrix3x3MultVec3(camera->velocity, MatrixTranspose(cameraOrientation));
-
-	// Integrate the velocity over time
-	//camera->position=Vec3_Addv(camera->position, Vec3_Muls(velocity, dt));
-
 	return MatrixLookAt(camera->position, Vec3_Addv(camera->position, camera->forward), camera->up);
 }
 

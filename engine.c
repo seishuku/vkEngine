@@ -120,7 +120,7 @@ typedef struct
 	} perFrame[VKU_MAX_FRAME_COUNT];
 } ThreadData_t;
 
-#define NUM_THREADS 1
+#define NUM_THREADS 2
 ThreadData_t threadData[NUM_THREADS];
 ThreadWorker_t thread[NUM_THREADS], threadPhysics;
 
@@ -291,55 +291,6 @@ void GenerateWorld(void)
 
 void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, uint32_t index, uint32_t eye)
 {
-	//struct
-	//{
-	//	matrix mvp;
-	//	vec4 color, start, end;
-	//} linePC;
-
-	//vec4 position=Vec4_Vec3(player.position, 1.0f);
-	//vec4 forward=Vec4_Vec3(player.forward, 1.0f);
-	//vec4 up=Vec4_Vec3(player.up, 1.0f);
-	//vec4 right=Vec4_Vec3(player.right, 1.0f);
-
-	//matrix local=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
-	//linePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
-	//linePC.start=position;
-
-	//linePC.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
-	//linePC.end=Vec4_Addv(position, Vec4_Muls(forward, 15.0f));
-	//DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
-
-	//linePC.color=Vec4(0.0f, 1.0f, 0.0f, 1.0f);
-	//linePC.end=Vec4_Addv(position, Vec4_Muls(up, 15.0f));
-	//DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
-
-	//linePC.color=Vec4(0.0f, 0.0f, 1.0f, 1.0f);
-	//linePC.end=Vec4_Addv(position, Vec4_Muls(right, 15.0f));
-	//DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
-
-	//struct
-	//{
-	//	matrix mvp;
-	//	vec4 color;
-	//} spherePC;
-
-	//local=MatrixMult(
-	//	MatrixScale(player.radius, player.radius, player.radius),
-	//	MatrixInverse(MatrixLookAt(player.position, Vec3_Addv(player.position, player.forward), player.up))
-	//);
-
-	//local=MatrixMult(local, perFrame[index].mainUBO[eye]->modelView);
-	//local=MatrixMult(local, perFrame[index].mainUBO[eye]->HMD);
-	//spherePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
-
-	//if(isTargeted)
-	//	spherePC.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
-	//else
-	//	spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
-
-	//DrawSpherePushConstant(commandBuffer, index, sizeof(spherePC), &spherePC);
-
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipeline.pipeline);
 
 	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &fighterInstance.buffer, &(VkDeviceSize) { 0 });
@@ -631,27 +582,27 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	threadData[0].eye=eye;
 	Thread_AddJob(&thread[0], Thread_Main, (void *)&threadData[0]);
 
-	//threadData[1].index=index;
-	//threadData[1].eye=eye;
-	//Thread_AddJob(&thread[1], Thread_Particles, (void *)&threadData[1]);
+	threadData[1].index=index;
+	threadData[1].eye=eye;
+	Thread_AddJob(&thread[1], Thread_Particles, (void *)&threadData[1]);
 
 	ThreadBarrier_Wait(&threadBarrier);
 
 	// Execute the secondary command buffers from the threads
-	vkCmdExecuteCommands(perFrame[index].commandBuffer, 1, (VkCommandBuffer[])
+	vkCmdExecuteCommands(perFrame[index].commandBuffer, 2, (VkCommandBuffer[])
 	{
 		threadData[0].perFrame[index].secCommandBuffer[eye],
-		//threadData[1].perFrame[index].secCommandBuffer[eye]
+		threadData[1].perFrame[index].secCommandBuffer[eye]
 	});
 
 	vkCmdNextSubpass(perFrame[index].commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 
+	//matrix Modelview=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
+	//ParticleSystem_Draw(&particleSystem, perFrame[index].commandBuffer, perFrame[index].descriptorPool, Modelview, perFrame[index].mainUBO[eye]->projection);
+	
 	//////// Volume cloud
 	DrawVolume(perFrame[index].commandBuffer, index, eye, perFrame[index].descriptorPool);
 	////////
-
-	matrix Modelview=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
-	ParticleSystem_Draw(&particleSystem, perFrame[index].commandBuffer, perFrame[index].descriptorPool, Modelview, perFrame[index].mainUBO[eye]->projection);
 
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 }
@@ -1870,6 +1821,8 @@ void Destroy(void)
 	// Asteroid instance buffer destruction
 	vkuDestroyBuffer(&vkContext, &asteroidInstance);
 	//////////
+
+	vkuDestroyBuffer(&vkContext, &fighterInstance);
 
 	// Textures destruction
 	for(uint32_t i=0;i<NUM_TEXTURES;i++)
