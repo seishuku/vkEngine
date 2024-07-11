@@ -1106,8 +1106,6 @@ void Render(void)
 
 	Font_Print(&font, 16.0f, renderWidth-400.0f, renderHeight-50.0f-16.0f, "Current track: %s", musicList[currentMusic].string);
 
-	Font_Print(&font, 16.0f, 0.0f, renderHeight/2, "Connected clients: %d", connectedClients);
-
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
 	vkResetDescriptorPool(vkContext.device, perFrame[index].descriptorPool, 0);

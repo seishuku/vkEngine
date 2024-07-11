@@ -11,6 +11,7 @@ typedef struct Camera_s
 	vec3 position;
 	vec3 velocity;
 
+	vec4 orientation;
 	vec3 right;
 	vec3 up;
 	vec3 forward;
@@ -43,7 +44,6 @@ typedef struct
 RigidBody_t CameraGetRigidBody(const Camera_t camera);
 void CameraSetFromRigidBody(Camera_t *camera, const RigidBody_t body);
 bool CameraIsTargetInFOV(Camera_t camera, vec3 targetPos, float FOV);
-void CameraSeekTarget(Camera_t *camera, const vec3 targetPos, const float targetRadius, RigidBody_t *obstacles, size_t numObstacles);
 void CameraSeekTargetCamera(Camera_t *camera, Camera_t cameraTarget, RigidBody_t *obstacles, size_t numObstacles);
 void CameraInit(Camera_t *camera, const vec3 position, const vec3 right, const vec3 up, const vec3 forward);
 matrix CameraUpdate(Camera_t *camera, float dt);

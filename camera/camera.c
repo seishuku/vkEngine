@@ -12,8 +12,9 @@ RigidBody_t CameraGetRigidBody(const Camera_t camera)
 	RigidBody_t body;
 
 	body.position=camera.position;
+	body.velocity=camera.velocity;
+	body.force=Vec3b(0.0f);
 
-	// Transform camera space velocity to world space
 	const matrix cameraOrientation=
 	{
 		.x=Vec4_Vec3(camera.right, 0.0f),
@@ -21,9 +22,6 @@ RigidBody_t CameraGetRigidBody(const Camera_t camera)
 		.z=Vec4_Vec3(camera.forward, 0.0f),
 		.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
 	};
-	body.velocity=Matrix3x3MultVec3(camera.velocity, cameraOrientation);
-	body.force=Vec3b(0.0f);
-
 	body.orientation=MatrixToQuat(MatrixTranspose(cameraOrientation));
 	body.angularVelocity=Vec3b(0.0f);
 
@@ -40,17 +38,7 @@ RigidBody_t CameraGetRigidBody(const Camera_t camera)
 
 void CameraSetFromRigidBody(Camera_t *camera, const RigidBody_t body)
 {
-	// Get updated orientation matrix from rigid body quaternion
-	const matrix cameraOrientation=QuatToMatrix(body.orientation);
-
-	// Set right/up/forward vectors from the matrix
-	camera->right  =Vec3(cameraOrientation.x.x, cameraOrientation.x.y, cameraOrientation.x.z);
-	camera->up     =Vec3(cameraOrientation.y.x, cameraOrientation.y.y, cameraOrientation.y.z);
-	camera->forward=Vec3(cameraOrientation.z.x, cameraOrientation.z.y, cameraOrientation.z.z);
-
-	// Transform velocity from world space back into camera space
-	camera->velocity=Matrix3x3MultVec3(body.velocity, MatrixTranspose(cameraOrientation));
-
+	camera->velocity=body.velocity;
 	camera->position=body.position;
 }
 
@@ -94,62 +82,6 @@ bool CameraIsTargetInFOV(const Camera_t camera, const vec3 targetPos, const floa
 }
 
 // Move camera to targetPos while avoiding rigid body obstacles.
-void CameraSeekTarget(Camera_t *camera, const vec3 targetPos, const float targetRadius, RigidBody_t *obstacles, size_t numObstacles)
-{
-	const float maxSpeed=1.0f;
-	const float rotationDamping=0.01f;
-	const float positionDamping=0.0005f;
-	const float seekRadius=(camera->radius+targetRadius)*1.5f;
-
-	// Find relative direction between camera and target
-	vec3 directionWorld=Vec3_Subv(targetPos, camera->position);
-
-	// Calculate a relative distance for later speed reduction
-	const float relativeDistance=Vec3_Dot(directionWorld, directionWorld)-(seekRadius*seekRadius);
-
-	Vec3_Normalize(&directionWorld);
-
-	// Check for obstacles in the avoidance radius
-	for(size_t i=0;i<numObstacles;i++)
-	{
-		const float avoidanceRadius=(camera->radius+obstacles[i].radius)*1.1f;
-		const vec3 cameraToObstacle=Vec3_Subv(camera->position, obstacles[i].position);
-		const float cameraToObstacleDistanceSq=Vec3_Dot(cameraToObstacle, cameraToObstacle);
-
-		if(cameraToObstacleDistanceSq<=avoidanceRadius*avoidanceRadius)
-		{
-			if(cameraToObstacleDistanceSq>0.0f)
-			{
-				// Adjust the camera trajectory to avoid the obstacle
-				const float rMag=1.0f/sqrtf(cameraToObstacleDistanceSq);
-				const vec3 avoidanceDirection=Vec3_Muls(cameraToObstacle, rMag);
-
-				directionWorld=Vec3_Addv(directionWorld, avoidanceDirection);
-				Vec3_Normalize(&directionWorld);
-			}
-		}
-	}
-
-	// Build 3x3 matrix and transform worldspace direction to camera space
-	const matrix cameraOrientation=
-	{
-		.x=Vec4(camera->right.x, camera->up.x, camera->forward.x, 0.0f),
-		.y=Vec4(camera->right.y, camera->up.y, camera->forward.y, 0.0f),
-		.z=Vec4(camera->right.z, camera->up.z, camera->forward.z, 0.0f),
-		.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
-	};
-	const vec3 directionCamera=Matrix3x3MultVec3(directionWorld, cameraOrientation);
-
-	// Aim pitch and yaw
-	camera->yaw=atan2f(directionCamera.x, directionCamera.z)*rotationDamping;
-	camera->pitch=asinf(directionCamera.y)*rotationDamping;
-
-	// Slow down the speed as it gets closer
-	const float speed=maxSpeed*relativeDistance;
-
-	camera->velocity=Vec3_Addv(Vec3_Muls(camera->velocity, 1.0f-positionDamping), Vec3_Muls(directionCamera, speed*positionDamping));
-}
-
 void CameraSeekTargetCamera(Camera_t *camera, Camera_t cameraTarget, RigidBody_t *obstacles, size_t numObstacles)
 {
 	const float maxSpeed=1.0f;
@@ -187,6 +119,7 @@ void CameraSeekTargetCamera(Camera_t *camera, Camera_t cameraTarget, RigidBody_t
 	}
 
 	// Build 3x3 matrix and transform worldspace direction to camera space
+	// (transpose)
 	const matrix cameraOrientation=
 	{
 		.x=Vec4(camera->right.x, camera->up.x, camera->forward.x, 0.0f),
@@ -203,7 +136,7 @@ void CameraSeekTargetCamera(Camera_t *camera, Camera_t cameraTarget, RigidBody_t
 	// Slow down the speed as it gets closer
 	const float speed=maxSpeed*relativeDistance;
 
-	camera->velocity=Vec3_Addv(Vec3_Muls(camera->velocity, 1.0f-positionDamping), Vec3_Muls(directionCamera, speed*positionDamping));
+	camera->velocity=Vec3_Addv(Vec3_Muls(camera->velocity, 1.0f-positionDamping), Vec3_Muls(directionWorld, speed*positionDamping));
 }
 
 // Camera collision stuff
@@ -367,19 +300,6 @@ void CameraInit(Camera_t *camera, const vec3 position, const vec3 right, const v
 	camera->key_down=false;
 }
 
-static void CameraRotate(Camera_t *camera)
-{
-	const vec4 qPitch=QuatAnglev(-camera->pitch, camera->right);
-	const vec4 qYaw=QuatAnglev(camera->yaw, camera->up);
-	const vec4 qRoll=QuatAnglev(-camera->roll, camera->forward);
-
-	const vec4 qOrientation=QuatMultiply(QuatMultiply(qPitch, qYaw), qRoll);
-
-	camera->right=QuatRotate(qOrientation, camera->right);
-	camera->up=QuatRotate(qOrientation, camera->up);
-	camera->forward=Vec3_Cross(camera->right, camera->up);
-}
-
 matrix CameraUpdate(Camera_t *camera, float dt)
 {
 	float speed=240.0f*dt;
@@ -389,22 +309,22 @@ matrix CameraUpdate(Camera_t *camera, float dt)
 		speed*=2.0f;
 
 	if(camera->key_a)
-		camera->velocity.x+=speed;
+		camera->velocity=Vec3_Addv(camera->velocity, Vec3_Muls(camera->right, speed));
 
 	if(camera->key_d)
-		camera->velocity.x-=speed;
+		camera->velocity=Vec3_Subv(camera->velocity, Vec3_Muls(camera->right, speed));
 
 	if(camera->key_v)
-		camera->velocity.y+=speed;
+		camera->velocity=Vec3_Addv(camera->velocity, Vec3_Muls(camera->up, speed));
 
 	if(camera->key_c)
-		camera->velocity.y-=speed;
+		camera->velocity=Vec3_Subv(camera->velocity, Vec3_Muls(camera->up, speed));
 
 	if(camera->key_w)
-		camera->velocity.z+=speed;
+		camera->velocity=Vec3_Addv(camera->velocity, Vec3_Muls(camera->forward, speed));
 
 	if(camera->key_s)
-		camera->velocity.z-=speed;
+		camera->velocity=Vec3_Subv(camera->velocity, Vec3_Muls(camera->forward, speed));
 
 	if(camera->key_q)
 		camera->roll+=rotation;
@@ -441,7 +361,14 @@ matrix CameraUpdate(Camera_t *camera, float dt)
 	camera->roll*=decay;
 
 	// Apply pitch/yaw/roll rotations
-	CameraRotate(camera);
+	const vec4 qPitch=QuatAnglev(-camera->pitch, camera->right);
+	const vec4 qYaw=QuatAnglev(camera->yaw, camera->up);
+	const vec4 qRoll=QuatAnglev(-camera->roll, camera->forward);
+
+	camera->orientation=QuatMultiply(QuatMultiply(qPitch, qYaw), qRoll);
+	camera->right=QuatRotate(camera->orientation, camera->right);
+	camera->up=QuatRotate(camera->orientation, camera->up);
+	camera->forward=Vec3_Cross(camera->right, camera->up);
 
 	return MatrixLookAt(camera->position, Vec3_Addv(camera->position, camera->forward), camera->up);
 }
