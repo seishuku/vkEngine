@@ -24,4 +24,5 @@ External dependencies for building this (versions as of this writing, newer *sho
  - OpenXR 1.2
  - portaudio 2.0
  - Vulkan 1.3.231.1
+
 (note: cmake should automatically fetch these dependencites)
