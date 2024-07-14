@@ -36,7 +36,7 @@ extern Camera_t camera;
 typedef struct
 {
 	vec3 position, velocity;
-	vec3 forward, up;
+	vec4 orientation;
 } NetCamera_t;
 
 // Connect data when connecting to server
@@ -104,12 +104,11 @@ void NetUpdate(void *arg)
 
 				memcpy(&clientID, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
 
+				CameraInit(&netCameras[clientID], Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f));
+
 				memcpy(&netCameras[clientID].body.position, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
 				memcpy(&netCameras[clientID].body.velocity, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-				memcpy(&netCameras[clientID].forward, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-				memcpy(&netCameras[clientID].up, pBuffer, sizeof(float)*3);			pBuffer+=sizeof(float)*3;
-				netCameras[clientID].right=Vec3_Cross(netCameras[clientID].up, netCameras[clientID].forward);
-				netCameras[clientID].body.radius=10.0f;
+				memcpy(&netCameras[clientID].body.orientation, pBuffer, sizeof(float)*4);	pBuffer+=sizeof(float)*4;
 
 				//DBGPRINTF(DEBUG_INFO, "\033[%d;0H\033[KID %d Pos: %0.1f %0.1f %0.1f", clientID+1, clientID, NetCameras[clientID].position.x, NetCameras[clientID].position.y, NetCameras[clientID].position.z);
 			}
@@ -224,8 +223,7 @@ void ClientNetwork_SendStatus(void)
 
 		StatusPacket.camera.position=camera.body.position;
 		StatusPacket.camera.velocity=camera.body.velocity;
-		StatusPacket.camera.forward=camera.forward;
-		StatusPacket.camera.up=camera.up;
+		StatusPacket.camera.orientation=camera.body.orientation;
 
 		Network_SocketSend(clientSocket, (uint8_t *)&StatusPacket, sizeof(NetworkPacket_t), serverAddress, serverPort);
 	}

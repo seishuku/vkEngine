@@ -952,17 +952,12 @@ void Thread_Physics(void *arg)
 	{
 		for(uint32_t i=0;i<connectedClients;i++)
 		{
-			if(i!=clientID)
-			{
-				const float scale=(1.0f/fighter.radius)*netCameras[i].body.radius;
-				matrix local=MatrixScale(scale, scale, scale);
-				local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
-				local=MatrixMult(local, MatrixTranslatev(fighter.center));
-				local=MatrixMult(local, QuatToMatrix(netCameras[i].body.orientation));
-				fighterInstancePtr[i]=MatrixMult(local, MatrixTranslatev(netCameras[i].body.position));
-			}
-			else
-				memset(&fighterInstancePtr[i], 0, sizeof(matrix));
+			const float scale=(1.0f/fighter.radius)*netCameras[i].body.radius;
+			matrix local=MatrixScale(scale, scale, scale);
+			local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
+			local=MatrixMult(local, MatrixTranslatev(fighter.center));
+			local=MatrixMult(local, QuatToMatrix(netCameras[i].body.orientation));
+			fighterInstancePtr[i]=MatrixMult(local, MatrixTranslatev(netCameras[i].body.position));
 		}
 	}
 
