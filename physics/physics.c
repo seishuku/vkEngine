@@ -29,8 +29,8 @@ static void applyConstraints(RigidBody_t *body)
 	//body->velocity=Vec3_Muls(body->velocity, linearDamping);
 
 	// Apply angular velocity damping
-	//const float angularDamping=0.998f;
-	//body->angularVelocity=Vec3_Muls(body->angularVelocity, angularDamping);
+	const float angularDamping=0.998f;
+	body->angularVelocity=Vec3_Muls(body->angularVelocity, angularDamping);
 }
 
 vec4 integrateAngularVelocity(const vec4 q, const vec3 w, const float dt)

@@ -289,8 +289,41 @@ void GenerateWorld(void)
 }
 //////
 
+void DrawCameraAxes(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, Camera_t camera)
+{
+	struct
+	{
+		matrix mvp;
+		vec4 color, start, end;
+	} linePC;
+
+	vec4 position=Vec4_Vec3(camera.body.position, 1.0f);
+	vec4 forward=Vec4_Vec3(camera.forward, 1.0f);
+	vec4 up=Vec4_Vec3(camera.up, 1.0f);
+	vec4 right=Vec4_Vec3(camera.right, 1.0f);
+
+	matrix local=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
+	linePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
+	linePC.start=position;
+
+	linePC.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
+	linePC.end=Vec4_Addv(position, Vec4_Muls(forward, 15.0f));
+	DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
+
+	linePC.color=Vec4(0.0f, 1.0f, 0.0f, 1.0f);
+	linePC.end=Vec4_Addv(position, Vec4_Muls(up, 15.0f));
+	DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
+
+	linePC.color=Vec4(0.0f, 0.0f, 1.0f, 1.0f);
+	linePC.end=Vec4_Addv(position, Vec4_Muls(right, 15.0f));
+	DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
+}
+
 void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, uint32_t index, uint32_t eye)
 {
+	//DrawCameraAxes(commandBuffer, index, eye, camera);
+	//DrawCameraAxes(commandBuffer, index, eye, enemy);
+
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipeline.pipeline);
 
 	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &fighterInstance.buffer, &(VkDeviceSize) { 0 });
@@ -427,13 +460,13 @@ void Thread_Main(void *arg)
 			const vec3 randVec=Vec3(RandFloatRange(-val, val), RandFloatRange(-val, val), RandFloatRange(-val, val));
 
 			DrawLine(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye,
-						Vec3_Subv(camera.position, Vec3_Subv(camera.up, camera.right)),
-						Vec3_Addv(camera.position, Vec3_Muls(Vec3_Addv(camera.forward, randVec), distance)),
+						Vec3_Subv(camera.body.position, Vec3_Subv(camera.up, camera.right)),
+						Vec3_Addv(camera.body.position, Vec3_Muls(Vec3_Addv(camera.forward, randVec), distance)),
 						Vec4(1.0f+RandFloatRange(10.0f, 500.0f), 1.0f, 1.0f, 1.0f));
 
 			DrawLine(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye,
-						Vec3_Subv(camera.position, Vec3_Addv(camera.up, camera.right)),
-						Vec3_Addv(camera.position, Vec3_Muls(Vec3_Subv(camera.forward, randVec), distance)),
+						Vec3_Subv(camera.body.position, Vec3_Addv(camera.up, camera.right)),
+						Vec3_Addv(camera.body.position, Vec3_Muls(Vec3_Subv(camera.forward, randVec), distance)),
 						Vec4(1.0f+RandFloatRange(10.0f, 500.0f), 1.0f, 1.0f, 1.0f));
 		}
 	}
@@ -649,10 +682,6 @@ void Thread_Physics(void *arg)
 {
 	double startTime=GetClock();
 
-	// Get a rigid body rep for the camera(s)
-	RigidBody_t cameraBody=CameraGetRigidBody(camera);
-	RigidBody_t enemyBody=CameraGetRigidBody(enemy);
-
 	if(!pausePhysics)
 	{
 		ParticleSystem_Step(&particleSystem, fTimeStep);
@@ -703,9 +732,9 @@ void Thread_Physics(void *arg)
 			}
 
 			// Check asteroids against the camera rigid body rep
-			if(PhysicsSphereToSphereCollisionResponse(&cameraBody, &asteroids[i])||
-			   PhysicsSphereToSphereCollisionResponse(&enemyBody, &asteroids[i])>1.0f)
-				Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, camera.position);
+			if(PhysicsSphereToSphereCollisionResponse(&camera.body, &asteroids[i])||
+			   PhysicsSphereToSphereCollisionResponse(&enemy.body, &asteroids[i])>1.0f)
+				Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, camera.body.position);
 			//////////
 
 			// Check asteroids against projectile emitters
@@ -790,13 +819,13 @@ void Thread_Physics(void *arg)
 #if 1
 			if(isControlPressed)
 			{
-				float distance=raySphereIntersect(camera.position, camera.forward, asteroids[i].position, asteroids[i].radius);
+				float distance=raySphereIntersect(camera.body.position, camera.forward, asteroids[i].position, asteroids[i].radius);
 
 				if(distance>0.0f)
 				{
 					RigidBody_t particleBody;
 
-					particleBody.position=Vec3_Addv(camera.position, Vec3_Muls(camera.forward, distance));
+					particleBody.position=Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, distance));
 					particleBody.velocity=Vec3_Muls(camera.forward, 300.0f);
 
 					particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -847,8 +876,8 @@ void Thread_Physics(void *arg)
 #endif
 
 		// Check camera against the enemy camera rigid body rep
-		if(PhysicsSphereToSphereCollisionResponse(&cameraBody, &enemyBody)>1.0f)
-			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, camera.position);
+		if(PhysicsSphereToSphereCollisionResponse(&camera.body, &enemy.body)>1.0f)
+			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, camera.body.position);
 
 #if 0
 		for(uint32_t i=0;i<connectedClients;i++)
@@ -866,8 +895,8 @@ void Thread_Physics(void *arg)
 			if(particleEmittersLife[j]>0.0f)
 			{
 				if(
-					PhysicsSphereToSphereCollisionResponse(&particleEmitters[j], &enemyBody)||
-					PhysicsSphereToSphereCollisionResponse(&particleEmitters[j], &cameraBody)>1.0f)
+					PhysicsSphereToSphereCollisionResponse(&particleEmitters[j], &enemy.body)||
+					PhysicsSphereToSphereCollisionResponse(&particleEmitters[j], &camera.body)>1.0f)
 				{
 					// It collided, kill it.
 					// Setting this directly to <0.0 seems to cause emitters that won't get removed,
@@ -893,16 +922,14 @@ void Thread_Physics(void *arg)
 		}
 
 		// Only run physics on enemy camera when physics are running
-		PhysicsIntegrate(&enemyBody, fTimeStep);
+		PhysicsIntegrate(&enemy.body, fTimeStep);
 
-		CameraSetFromRigidBody(&enemy, enemyBody);
-
-		const float scale=(1.0f/fighter.radius)*enemyBody.radius;
+		const float scale=(1.0f/fighter.radius)*enemy.body.radius;
 		matrix local=MatrixScale(scale, scale, scale);
 		local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
 		local=MatrixMult(local, MatrixTranslatev(fighter.center));
-		local=MatrixMult(local, QuatToMatrix(enemyBody.orientation));
-		fighterInstancePtr[1]=MatrixMult(local, MatrixTranslatev(enemyBody.position));
+		local=MatrixMult(local, QuatToMatrix(enemy.body.orientation));
+		fighterInstancePtr[1]=MatrixMult(local, MatrixTranslatev(enemy.body.position));
 
 		// Update instance matrix data
 		for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
@@ -919,10 +946,7 @@ void Thread_Physics(void *arg)
 	}
 
 	// Always run physics on the camera's body
-	PhysicsIntegrate(&cameraBody, fTimeStep);
-
-	// Set camera position/velocity from result of collision
-	CameraSetFromRigidBody(&camera, cameraBody);
+	PhysicsIntegrate(&camera.body, fTimeStep);
 
 	if(clientSocket!=-1)
 	{
@@ -930,30 +954,31 @@ void Thread_Physics(void *arg)
 		{
 			if(i!=clientID)
 			{
-				RigidBody_t netBody=CameraGetRigidBody(netCameras[i]);
-
-				const float scale=(1.0f/fighter.radius)*netBody.radius;
+				const float scale=(1.0f/fighter.radius)*netCameras[i].body.radius;
 				matrix local=MatrixScale(scale, scale, scale);
 				local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
 				local=MatrixMult(local, MatrixTranslatev(fighter.center));
-				local=MatrixMult(local, QuatToMatrix(netBody.orientation));
-				fighterInstancePtr[i]=MatrixMult(local, MatrixTranslatev(netBody.position));
+				local=MatrixMult(local, QuatToMatrix(netCameras[i].body.orientation));
+				fighterInstancePtr[i]=MatrixMult(local, MatrixTranslatev(netCameras[i].body.position));
 			}
 			else
 				memset(&fighterInstancePtr[i], 0, sizeof(matrix));
 		}
 	}
 
-	const float scale=(1.0f/fighter.radius)*cameraBody.radius;
+	const float scale=(1.0f/fighter.radius)*camera.body.radius;
 	matrix local=MatrixScale(scale, scale, scale);
 	local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
 	local=MatrixMult(local, MatrixTranslatev(fighter.center));
-	local=MatrixMult(local, QuatToMatrix(cameraBody.orientation));
-	fighterInstancePtr[0]=MatrixMult(local, MatrixTranslatev(cameraBody.position));
+	local=MatrixMult(local, QuatToMatrix(camera.body.orientation));
+	fighterInstancePtr[0]=MatrixMult(local, MatrixTranslatev(camera.body.position));
 
 	// Update camera and modelview matrix
 	modelView=CameraUpdate(&camera, fTimeStep);
 	CameraUpdate(&enemy, fTimeStep);
+
+	// View from enemy camera
+	//modelView=MatrixMult(CameraUpdate(&enemy, fTimeStep), MatrixTranslate(0.0f, -5.0f, -10.0f));
 	//////
 
 	physicsTime=(float)(GetClock()-startTime);
@@ -976,7 +1001,7 @@ void Render(void)
 {
 	static uint32_t index=0, lastImageIndex=0, imageIndex=2;
 
-	Thread_AddJob(&threadPhysics, Thread_Physics, NULL);
+	Thread_AddJob(&threadPhysics, Thread_Physics, &index);
 	//Thread_Physics(NULL);
 
 	vkWaitForFences(vkContext.device, 1, &perFrame[index].frameFence, VK_TRUE, UINT64_MAX);
@@ -1012,10 +1037,11 @@ void Render(void)
 		const float speed=400.0f;
 		const float rotation=0.1f;
 
-		camera.velocity.x-=leftThumbstick.x*speed*fTimeStep;
-		camera.velocity.z+=leftThumbstick.y*speed*fTimeStep;
-		camera.yaw-=rightThumbstick.x*rotation*fTimeStep;
-		camera.pitch+=rightThumbstick.y*rotation*fTimeStep;
+		camera.body.velocity.x-=leftThumbstick.x*speed*fTimeStep;
+		camera.body.velocity.z+=leftThumbstick.y*speed*fTimeStep;
+
+		camera.body.angularVelocity.x-=rightThumbstick.x*rotation*fTimeStep;
+		camera.body.angularVelocity.x+=rightThumbstick.y*rotation*fTimeStep;
 
 		if(leftTrigger>0.1f)
 		{
@@ -1047,8 +1073,8 @@ void Render(void)
 			vec4 rightOrientation=Vec4(rightHand.orientation.x, rightHand.orientation.y, rightHand.orientation.z, rightHand.orientation.w);
 			vec3 direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatToMatrix(rightOrientation), MatrixInverse(modelView)));
 
-			FireParticleEmitter(Vec3_Addv(camera.position, Vec3_Muls(direction, camera.radius)), direction);
-			Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, camera.position);
+			FireParticleEmitter(Vec3_Addv(camera.body.position, Vec3_Muls(direction, camera.body.radius)), direction);
+			Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, camera.body.position);
 		}
 
 		if(rightTrigger<0.25f&&!rightTriggerOnce)
@@ -1083,7 +1109,7 @@ void Render(void)
 	//////
 	// Do a simple dumb "seek out the player" thing
 	CameraSeekTargetCamera(&enemy, camera, asteroids, NUM_ASTEROIDS);
-	isTargeted=CameraIsTargetInFOV(enemy, camera.position, deg2rad(15.0f));
+	isTargeted=CameraIsTargetInFOV(enemy, camera.body.position, deg2rad(15.0f));
 
 #if 0
 	// Test for if the player is in a 10 degree view cone, if so fire at them once every 2 seconds.

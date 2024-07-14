@@ -157,8 +157,8 @@ bool Event_Trigger(EventID ID, void *arg)
 					break;
 
 				case KB_SPACE:
-					Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, camera.position);
-					FireParticleEmitter(Vec3_Addv(camera.position, Vec3_Muls(camera.forward, camera.radius)), camera.forward);
+					Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, camera.body.position);
+					FireParticleEmitter(Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, camera.body.radius)), camera.forward);
 					break;
 				case KB_P:		GenerateWorld();		break;
 				case KB_O:		pausePhysics=!pausePhysics; break;
@@ -265,8 +265,8 @@ bool Event_Trigger(EventID ID, void *arg)
 				UI_ProcessControl(&UI, activeID, mousePosition);
 			else if(mouseEvent->button&MOUSE_BUTTON_LEFT)
 			{
-				camera.yaw-=(float)mouseEvent->dx/8000.0f;
-				camera.pitch+=(float)mouseEvent->dy/8000.0f;
+				camera.body.angularVelocity.x-=(float)mouseEvent->dy/200.0f;
+				camera.body.angularVelocity.y-=(float)mouseEvent->dx/200.0f;
 			}
 #else
 			oldMousePosition=mousePosition;

@@ -355,8 +355,8 @@ int compareParticles(const void *a, const void *b)
 	vec3 *particleA=(vec3 *)a;
 	vec3 *particleB=(vec3 *)b;
 
-	float distA=Vec3_DistanceSq(*particleA, camera.position);
-	float distB=Vec3_DistanceSq(*particleB, camera.position);
+	float distA=Vec3_DistanceSq(*particleA, camera.body.position);
+	float distB=Vec3_DistanceSq(*particleB, camera.body.position);
 
 	if(distA>distB)
 		return -1;

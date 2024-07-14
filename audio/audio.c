@@ -106,12 +106,8 @@ static void HRIRInterpolate(vec3 xyz)
 	const float invRadius=1.0f/500.0f;
 
 	// Calculate relative position of the sound source to the camera
-	const vec3 relPosition=Vec3_Subv(xyz, camera.position);
-	vec3 position=Vec3(
-		Vec3_Dot(relPosition, camera.right),
-		Vec3_Dot(relPosition, camera.up),
-		Vec3_Dot(relPosition, camera.forward)
-	);
+	const vec3 relPosition=Vec3_Subv(xyz, camera.body.position);
+	vec3 position=QuatRotate(QuatInverse(camera.body.orientation), relPosition);
 
 	// Calculate distance fall-off
 	float falloffDist=fmaxf(0.0f, 1.0f-Vec3_Length(Vec3_Muls(relPosition, invRadius)));

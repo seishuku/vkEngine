@@ -218,7 +218,7 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 	), 3000.0f);
 
 	// Following the camera's position, so we don't have to composite multiple shadow maps or have super large maps.
-	matrix modelview=MatrixLookAt(Vec3_Addv(position, camera.position), camera.position, Vec3(0.0f, 1.0f, 0.0f));
+	matrix modelview=MatrixLookAt(Vec3_Addv(position, camera.body.position), camera.body.position, Vec3(0.0f, 1.0f, 0.0f));
 
 	// Multiply matrices together, so we can just send one matrix as a push constant.
 

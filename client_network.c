@@ -104,12 +104,12 @@ void NetUpdate(void *arg)
 
 				memcpy(&clientID, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
 
-				memcpy(&netCameras[clientID].position, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-				memcpy(&netCameras[clientID].velocity, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
+				memcpy(&netCameras[clientID].body.position, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
+				memcpy(&netCameras[clientID].body.velocity, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
 				memcpy(&netCameras[clientID].forward, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
 				memcpy(&netCameras[clientID].up, pBuffer, sizeof(float)*3);			pBuffer+=sizeof(float)*3;
 				netCameras[clientID].right=Vec3_Cross(netCameras[clientID].up, netCameras[clientID].forward);
-				netCameras[clientID].radius=10.0f;
+				netCameras[clientID].body.radius=10.0f;
 
 				//DBGPRINTF(DEBUG_INFO, "\033[%d;0H\033[KID %d Pos: %0.1f %0.1f %0.1f", clientID+1, clientID, NetCameras[clientID].position.x, NetCameras[clientID].position.y, NetCameras[clientID].position.z);
 			}
@@ -222,8 +222,8 @@ void ClientNetwork_SendStatus(void)
 		StatusPacket.packetMagic=STATUS_PACKETMAGIC;
 		StatusPacket.clientID=clientID;
 
-		StatusPacket.camera.position=camera.position;
-		StatusPacket.camera.velocity=camera.velocity;
+		StatusPacket.camera.position=camera.body.position;
+		StatusPacket.camera.velocity=camera.body.velocity;
 		StatusPacket.camera.forward=camera.forward;
 		StatusPacket.camera.up=camera.up;
 
