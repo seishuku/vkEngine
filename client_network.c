@@ -21,21 +21,28 @@ extern Camera_t camera;
 #define DISCONNECT_PACKETMAGIC	('D'|('i'<<8)|('s'<<16)|('C'<<24)) // "DisC"
 #define STATUS_PACKETMAGIC		('S'|('t'<<8)|('a'<<16)|('t'<<24)) // "Stat"
 #define FIELD_PACKETMAGIC		('F'|('e'<<8)|('l'<<16)|('d'<<24)) // "Feld"
+
 #define MAX_CLIENTS 16
 
 // PacketMagic determines packet type:
 //
 // Connect:
-//		Client sends connect magic, server responds back with current random seed and slot.
+//		Client only needs to send connect magic.
+//		Server responds back with connect magic and current random seed and client ID.
 // Disconnect:
-//		Client sends disconnect magic, server closes socket and removes client from list.
+//		Client sends disconnect magic and client ID.
+//		Server closes socket and removes client from list.
 // Status:
-//		Client to server: Sends current camera data
-//		Server to client: Sends all current connected client cameras.
+//		Client sends status magic and current camera data, also serves as a keep-alive to the server.
+//		Server sends status magic and *all* current connected client cameras.
 // Field:
 //		Server sends current play field (as it sees it) to all connected clients at a regular interval.
+//
+//
+// THIS IS ALL VERY INSECURE AND DANGERUS
 
-uint32_t serverAddress=NETWORK_ADDRESS(192, 168, 1, 10);
+//uint32_t serverAddress=NETWORK_ADDRESS(172, 26, 218, 132);	// my WSL instance's IP
+uint32_t serverAddress=NETWORK_ADDRESS(192, 168, 1, 10);		// my dev machine's local IP
 uint16_t serverPort=4545;
 
 uint32_t clientID=0;
@@ -45,12 +52,14 @@ Socket_t clientSocket=-1;
 uint32_t connectedClients=0;
 Camera_t netCameras[MAX_CLIENTS];
 
+uint32_t currentSeed=0;
+
 static ThreadWorker_t threadNetUpdate;
 static bool netUpdateRun=true;
 static uint8_t netBuffer[65536]={ 0 };
 static uint8_t statusBuffer[1024]={ 0 };
 
-void NetUpdate(void *arg)
+static void NetUpdate(void *arg)
 {
 	memset(netCameras, 0, sizeof(Camera_t)*MAX_CLIENTS);
 
@@ -79,9 +88,21 @@ void NetUpdate(void *arg)
 			{
 				connectedClients=Deserialize_uint32(&pBuffer);
 
+				if(connectedClients>MAX_CLIENTS)
+				{
+					DBGPRINTF(DEBUG_ERROR, "Mangled status packet: connected clients field > max clients (got %d, max %d).\n", connectedClients, MAX_CLIENTS);
+					goto error;
+				}
+
 				for(uint32_t i=0;i<connectedClients;i++)
 				{
 					uint32_t clientID=Deserialize_uint32(&pBuffer);
+
+					if(clientID>MAX_CLIENTS)
+					{
+						DBGPRINTF(DEBUG_ERROR, "Mangled status packet: client ID field > MAX_CLIENTS (got %d, max %d).\n", clientID, MAX_CLIENTS);
+						goto error;
+					}
 
 					CameraInit(&netCameras[clientID], Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f));
 
@@ -96,6 +117,12 @@ void NetUpdate(void *arg)
 			{
 				uint32_t asteroidCount=Deserialize_uint32(&pBuffer);
 
+				if(asteroidCount>NUM_ASTEROIDS)
+				{
+					DBGPRINTF(DEBUG_ERROR, "Mangled field packet: asteroid count field > NUM_ASTEROIDS (got %d, max %d).\n", asteroidCount, NUM_ASTEROIDS);
+					goto error;
+				}
+
 				for(uint32_t i=0;i<asteroidCount;i++)
 				{
 					asteroids[i].position=Deserialize_vec3(&pBuffer);
@@ -107,6 +134,9 @@ void NetUpdate(void *arg)
 			else if(magic==DISCONNECT_PACKETMAGIC)
 				ClientNetwork_Destroy();
 		}
+
+error:
+		continue;
 	}
 }
 
@@ -147,24 +177,33 @@ bool ClientNetwork_Init(void)
 			if(magic==CONNECT_PACKETMAGIC)
 			{
 				clientID=Deserialize_uint32(&pBuffer);
-				uint32_t currentSeed=Deserialize_uint32(&pBuffer);
-				uint32_t currentPort=Deserialize_uint32(&pBuffer);
 
+				if(clientID>MAX_CLIENTS)
+				{
+					DBGPRINTF(DEBUG_ERROR, "Mangled connect packet: client ID field > max clients (got %d, max %d).\n", clientID, MAX_CLIENTS);
+					Network_SocketClose(clientSocket);
+
+					return false;
+				}
+
+				currentSeed=Deserialize_uint32(&pBuffer);
 				RandomSeed(currentSeed);
 
 				response=true;
 
-				DBGPRINTF(DEBUG_INFO, "Response from server - ID: %d Seed: %d Port: %d Address: 0x%X Port: %d\n",
-						  clientID, currentSeed, currentPort, address, port);
+				DBGPRINTF(DEBUG_INFO, "Response from server - ID: %d Seed: %d Address: 0x%X Port: %d\n",
+						  clientID, currentSeed, address, port);
 			}
 		}
 
 		if(GetClock()>timeout)
 		{
 			DBGPRINTF(DEBUG_WARNING, "Connection timed out...\n");
+
 			Network_SocketClose(clientSocket);
 			clientSocket=-1;
-			break;
+
+			return false;
 		}
 	}
 
