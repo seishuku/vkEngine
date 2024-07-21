@@ -3,10 +3,13 @@
 #include <string.h>
 #include "system/system.h"
 #include "system/threads.h"
+#include "utils/lz4.h"
+#include "utils/serial.h"
 #include "math/math.h"
 #include "camera/camera.h"
 #include "physics/physics.h"
 #include "network/network.h"
+#include "client_network.h"
 
 #define NUM_ASTEROIDS 1000
 extern RigidBody_t asteroids[NUM_ASTEROIDS];
@@ -32,36 +35,9 @@ extern Camera_t camera;
 // Field:
 //		Server sends current play field (as it sees it) to all connected clients at a regular interval.
 
-// Camera data for sending over the network
-typedef struct
-{
-	vec3 position, velocity;
-	vec4 orientation;
-} NetCamera_t;
-
-// Connect data when connecting to server
-typedef struct
-{
-	uint32_t seed;
-	uint16_t port;
-} NetConnect_t;
-
-// Overall data network packet
-typedef struct
-{
-	uint32_t packetMagic;
-	uint32_t clientID;
-	union
-	{
-		NetConnect_t connect;
-		NetCamera_t camera;
-	};
-} NetworkPacket_t;
-
 uint32_t serverAddress=NETWORK_ADDRESS(192, 168, 1, 10);
 uint16_t serverPort=4545;
 
-uint16_t clientPort=0;
 uint32_t clientID=0;
 
 Socket_t clientSocket=-1;
@@ -69,9 +45,10 @@ Socket_t clientSocket=-1;
 uint32_t connectedClients=0;
 Camera_t netCameras[MAX_CLIENTS];
 
-ThreadWorker_t threadNetUpdate;
-bool NetUpdate_Run=true;
-uint8_t NetBuffer[32767]={ 0 };
+static ThreadWorker_t threadNetUpdate;
+static bool netUpdateRun=true;
+static uint8_t netBuffer[65536]={ 0 };
+static uint8_t statusBuffer[1024]={ 0 };
 
 void NetUpdate(void *arg)
 {
@@ -79,51 +56,56 @@ void NetUpdate(void *arg)
 
 	if(clientSocket==-1)
 	{
-		NetUpdate_Run=false;
+		netUpdateRun=false;
 		return;
 	}
 
-	while(NetUpdate_Run)
+	while(netUpdateRun)
 	{
-		uint8_t *pBuffer=NetBuffer;
-		uint32_t Magic=0;
-		uint32_t Address=0;
+		uint8_t *pBuffer=NULL;
+		uint32_t address=0;
 		uint16_t port=0;
 
-		Network_SocketReceive(clientSocket, NetBuffer, sizeof(NetBuffer), &Address, &port);
+		memset(netBuffer, 0, sizeof(netBuffer));
+		pBuffer=netBuffer;
 
-		memcpy(&Magic, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
+		int32_t bytesRec=Network_SocketReceive(clientSocket, netBuffer, sizeof(netBuffer), &address, &port);
 
-		if(Magic==STATUS_PACKETMAGIC)
+		if(bytesRec>0)
 		{
-			memcpy(&connectedClients, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
+			uint32_t magic=Deserialize_uint32(&pBuffer);
 
-			for(uint32_t i=0;i<connectedClients;i++)
+			if(magic==STATUS_PACKETMAGIC)
 			{
-				uint32_t clientID=0;
+				connectedClients=Deserialize_uint32(&pBuffer);
 
-				memcpy(&clientID, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
+				for(uint32_t i=0;i<connectedClients;i++)
+				{
+					uint32_t clientID=Deserialize_uint32(&pBuffer);
 
-				CameraInit(&netCameras[clientID], Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f));
+					CameraInit(&netCameras[clientID], Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f));
 
-				memcpy(&netCameras[clientID].body.position, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-				memcpy(&netCameras[clientID].body.velocity, pBuffer, sizeof(float)*3);	pBuffer+=sizeof(float)*3;
-				memcpy(&netCameras[clientID].body.orientation, pBuffer, sizeof(float)*4);	pBuffer+=sizeof(float)*4;
+					netCameras[clientID].body.position=Deserialize_vec3(&pBuffer);
+					netCameras[clientID].body.velocity=Deserialize_vec3(&pBuffer);
+					netCameras[clientID].body.orientation=Deserialize_vec4(&pBuffer);
 
-				//DBGPRINTF(DEBUG_INFO, "\033[%d;0H\033[KID %d Pos: %0.1f %0.1f %0.1f", clientID+1, clientID, NetCameras[clientID].position.x, NetCameras[clientID].position.y, NetCameras[clientID].position.z);
+					//DBGPRINTF(DEBUG_INFO, "\033[%d;0H\033[KID %d Pos: %0.1f %0.1f %0.1f", clientID+1, clientID, NetCameras[clientID].position.x, NetCameras[clientID].position.y, NetCameras[clientID].position.z);
+				}
 			}
-		}
-		else if(Magic==FIELD_PACKETMAGIC)
-		{
-			uint32_t asteroidCount=NUM_ASTEROIDS;
-
-			memcpy(&asteroidCount, pBuffer, sizeof(uint32_t));	pBuffer+=sizeof(uint32_t);
-
-			for(uint32_t i=0;i<asteroidCount;i++)
+			else if(magic==FIELD_PACKETMAGIC)
 			{
-				memcpy(&asteroids[i].position, pBuffer, sizeof(vec3));	pBuffer+=sizeof(vec3);
-				memcpy(&asteroids[i].velocity, pBuffer, sizeof(vec3));	pBuffer+=sizeof(vec3);
+				uint32_t asteroidCount=Deserialize_uint32(&pBuffer);
+
+				for(uint32_t i=0;i<asteroidCount;i++)
+				{
+					asteroids[i].position=Deserialize_vec3(&pBuffer);
+					asteroids[i].velocity=Deserialize_vec3(&pBuffer);
+					asteroids[i].orientation=Deserialize_vec4(&pBuffer);
+					asteroids[i].radius=Deserialize_float(&pBuffer);
+				}
 			}
+			else if(magic==DISCONNECT_PACKETMAGIC)
+				ClientNetwork_Destroy();
 		}
 	}
 }
@@ -140,39 +122,44 @@ bool ClientNetwork_Init(void)
 		return false;
 
 	// Send connect magic to initiate connection
-	uint32_t Magic=CONNECT_PACKETMAGIC;
-	if(!Network_SocketSend(clientSocket, (uint8_t *)&Magic, sizeof(uint32_t), serverAddress, serverPort))
+	uint32_t magic=CONNECT_PACKETMAGIC;
+	if(!Network_SocketSend(clientSocket, (uint8_t *)&magic, sizeof(uint32_t), serverAddress, serverPort))
 		return false;
 
-	double Timeout=GetClock()+5.0; // Current time +5 seconds
-	bool Response=false;
+	double timeout=GetClock()+5.0; // Current time +5 seconds
+	bool response=false;
 
-	while(!Response)
+	while(!response)
 	{
-		uint32_t Address=0;
+		uint8_t *pBuffer=NULL;
+		uint32_t address=0;
 		uint16_t port=0;
-		NetworkPacket_t ResponsePacket;
 
-		memset(&ResponsePacket, 0, sizeof(NetworkPacket_t));
+		memset(&statusBuffer, 0, sizeof(statusBuffer));
+		pBuffer=statusBuffer;
 
-		if(Network_SocketReceive(clientSocket, (uint8_t *)&ResponsePacket, sizeof(NetworkPacket_t), &Address, &port)>0)
+		int32_t bytesRec=Network_SocketReceive(clientSocket, statusBuffer, sizeof(statusBuffer), &address, &port);
+
+		if(bytesRec>0)
 		{
-			if(ResponsePacket.packetMagic==CONNECT_PACKETMAGIC)
-			{
-				DBGPRINTF(DEBUG_INFO, "Response from server - ID: %d Seed: %d Port: %d Address: 0x%X Port: %d\n",
-						  ResponsePacket.clientID,
-						  ResponsePacket.connect.seed,
-						  ResponsePacket.connect.port,
-						  Address,
-						  port);
+			uint32_t magic=Deserialize_uint32(&pBuffer);
 
-				RandomSeed(ResponsePacket.connect.seed);
-				clientID=ResponsePacket.clientID;
-				Response=true;
+			if(magic==CONNECT_PACKETMAGIC)
+			{
+				clientID=Deserialize_uint32(&pBuffer);
+				uint32_t currentSeed=Deserialize_uint32(&pBuffer);
+				uint32_t currentPort=Deserialize_uint32(&pBuffer);
+
+				RandomSeed(currentSeed);
+
+				response=true;
+
+				DBGPRINTF(DEBUG_INFO, "Response from server - ID: %d Seed: %d Port: %d Address: 0x%X Port: %d\n",
+						  clientID, currentSeed, currentPort, address, port);
 			}
 		}
 
-		if(GetClock()>Timeout)
+		if(GetClock()>timeout)
 		{
 			DBGPRINTF(DEBUG_WARNING, "Connection timed out...\n");
 			Network_SocketClose(clientSocket);
@@ -190,16 +177,20 @@ bool ClientNetwork_Init(void)
 
 void ClientNetwork_Destroy(void)
 {
-	NetUpdate_Run=false;
+	netUpdateRun=false;
 	Thread_Destroy(&threadNetUpdate);
 
 	// Send disconnect message to server and close/destroy network stuff
 	if(clientSocket!=-1)
 	{
-		Network_SocketSend(clientSocket, (uint8_t *)&(NetworkPacket_t)
-		{
-			.packetMagic=DISCONNECT_PACKETMAGIC, .clientID=clientID
-		}, sizeof(NetworkPacket_t), serverAddress, serverPort);
+		uint8_t *pBuffer=statusBuffer;
+		size_t iota=0;
+		memset(&statusBuffer, 0, sizeof(statusBuffer));
+
+		Serialize_uint32(&pBuffer, DISCONNECT_PACKETMAGIC);	iota+=sizeof(uint32_t);
+		Serialize_uint32(&pBuffer, clientID);				iota+=sizeof(uint32_t);
+
+		Network_SocketSend(clientSocket, statusBuffer, iota, serverAddress, serverPort);
 		Network_SocketClose(clientSocket);
 
 		clientSocket=-1;
@@ -214,17 +205,16 @@ void ClientNetwork_SendStatus(void)
 {
 	if(clientSocket!=-1)
 	{
-		NetworkPacket_t StatusPacket;
+		uint8_t *pBuffer=statusBuffer;
+		size_t iota=0;
+		memset(&netBuffer, 0, sizeof(statusBuffer));
 
-		memset(&StatusPacket, 0, sizeof(NetworkPacket_t));
+		Serialize_uint32(&pBuffer, STATUS_PACKETMAGIC);		iota+=sizeof(uint32_t);
+		Serialize_uint32(&pBuffer, clientID);				iota+=sizeof(uint32_t);
+		Serialize_vec3(&pBuffer, camera.body.position);		iota+=sizeof(vec3);
+		Serialize_vec3(&pBuffer, camera.body.velocity);		iota+=sizeof(vec3);
+		Serialize_vec4(&pBuffer, camera.body.orientation);	iota+=sizeof(vec4);
 
-		StatusPacket.packetMagic=STATUS_PACKETMAGIC;
-		StatusPacket.clientID=clientID;
-
-		StatusPacket.camera.position=camera.body.position;
-		StatusPacket.camera.velocity=camera.body.velocity;
-		StatusPacket.camera.orientation=camera.body.orientation;
-
-		Network_SocketSend(clientSocket, (uint8_t *)&StatusPacket, sizeof(NetworkPacket_t), serverAddress, serverPort);
+		Network_SocketSend(clientSocket, statusBuffer, iota, serverAddress, serverPort);
 	}
 }

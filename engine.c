@@ -207,7 +207,7 @@ void GenerateWorld(void)
 
 	memset(asteroids, 0, sizeof(RigidBody_t)*NUM_ASTEROIDS);
 
-	// Randomly place asteroids in a sphere without any otherlapping.
+	// Randomly place asteroids in a sphere without any overlapping.
 	while(i<NUM_ASTEROIDS)
 	{
 		vec3 randomDirection=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
@@ -289,7 +289,7 @@ void GenerateWorld(void)
 }
 //////
 
-void DrawCameraAxes(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, Camera_t camera)
+static void DrawCameraAxes(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, Camera_t camera)
 {
 	struct
 	{
@@ -319,7 +319,7 @@ void DrawCameraAxes(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye,
 	DrawLinePushConstant(commandBuffer, sizeof(linePC), &linePC);
 }
 
-void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, uint32_t index, uint32_t eye)
+static void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, uint32_t index, uint32_t eye)
 {
 	//DrawCameraAxes(commandBuffer, index, eye, camera);
 	//DrawCameraAxes(commandBuffer, index, eye, enemy);
@@ -339,14 +339,20 @@ void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, 
 
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &fighter.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 
-	for(uint32_t j=0;j<fighter.numMesh;j++)
+	for(uint32_t i=0;i<fighter.numMesh;i++)
 	{
-		vkCmdBindIndexBuffer(commandBuffer, fighter.mesh[j].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdBindIndexBuffer(commandBuffer, fighter.mesh[i].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
 		if(clientSocket!=-1)
-			vkCmdDrawIndexed(commandBuffer, fighter.mesh[j].numFace*3, connectedClients, 0, 0, 0);
+		{
+			for(uint32_t j=0;j<connectedClients;j++)
+			{
+				if(j!=clientID)
+					vkCmdDrawIndexed(commandBuffer, fighter.mesh[i].numFace*3, 1, 0, 0, j);
+			}
+		}
 		else
-			vkCmdDrawIndexed(commandBuffer, fighter.mesh[j].numFace*3, 1, 0, 0, 1);
+			vkCmdDrawIndexed(commandBuffer, fighter.mesh[i].numFace*3, 1, 0, 0, 1);
 	}
 }
 
@@ -839,13 +845,10 @@ void Thread_Physics(void *arg)
 					particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
 					particleBody.invInertia=1.0f/particleBody.inertia;
 
-					if(
-						PhysicsSphereToSphereCollisionResponse(&particleBody, &asteroids[i])>1.0f)
+					if(PhysicsSphereToSphereCollisionResponse(&particleBody, &asteroids[i])>1.0f)
 					{
 						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, particleBody.position);
 
-						// FIXME: Is this causing derelict emitters that never go away?
-						//			I don't think it is, but need to check.
 						ParticleSystem_AddEmitter
 						(
 							&particleSystem,
@@ -924,12 +927,15 @@ void Thread_Physics(void *arg)
 		// Only run physics on enemy camera when physics are running
 		PhysicsIntegrate(&enemy.body, fTimeStep);
 
-		const float scale=(1.0f/fighter.radius)*enemy.body.radius;
-		matrix local=MatrixScale(scale, scale, scale);
-		local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
-		local=MatrixMult(local, MatrixTranslatev(fighter.center));
-		local=MatrixMult(local, QuatToMatrix(enemy.body.orientation));
-		fighterInstancePtr[1]=MatrixMult(local, MatrixTranslatev(enemy.body.position));
+		if(clientSocket<0)
+		{
+			const float scale=(1.0f/fighter.radius)*enemy.body.radius;
+			matrix local=MatrixScale(scale, scale, scale);
+			local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
+			local=MatrixMult(local, MatrixTranslatev(fighter.center));
+			local=MatrixMult(local, QuatToMatrix(enemy.body.orientation));
+			fighterInstancePtr[1]=MatrixMult(local, MatrixTranslatev(enemy.body.position));
+		}
 
 		// Update instance matrix data
 		for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
@@ -960,13 +966,15 @@ void Thread_Physics(void *arg)
 			fighterInstancePtr[i]=MatrixMult(local, MatrixTranslatev(netCameras[i].body.position));
 		}
 	}
-
-	const float scale=(1.0f/fighter.radius)*camera.body.radius;
-	matrix local=MatrixScale(scale, scale, scale);
-	local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
-	local=MatrixMult(local, MatrixTranslatev(fighter.center));
-	local=MatrixMult(local, QuatToMatrix(camera.body.orientation));
-	fighterInstancePtr[0]=MatrixMult(local, MatrixTranslatev(camera.body.position));
+	else
+	{
+		const float scale=(1.0f/fighter.radius)*camera.body.radius;
+		matrix local=MatrixScale(scale, scale, scale);
+		local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
+		local=MatrixMult(local, MatrixTranslatev(fighter.center));
+		local=MatrixMult(local, QuatToMatrix(camera.body.orientation));
+		fighterInstancePtr[0]=MatrixMult(local, MatrixTranslatev(camera.body.position));
+	}
 
 	// Update camera and modelview matrix
 	modelView=CameraUpdate(&camera, fTimeStep);
@@ -1103,8 +1111,11 @@ void Render(void)
 
 	//////
 	// Do a simple dumb "seek out the player" thing
-	CameraSeekTargetCamera(&enemy, camera, asteroids, NUM_ASTEROIDS);
-	isTargeted=CameraIsTargetInFOV(enemy, camera.body.position, deg2rad(15.0f));
+	if(clientSocket<0)
+	{
+		CameraSeekTargetCamera(&enemy, camera, asteroids, NUM_ASTEROIDS);
+		isTargeted=CameraIsTargetInFOV(enemy, camera.body.position, deg2rad(15.0f));
+	}
 
 #if 0
 	// Test for if the player is in a 10 degree view cone, if so fire at them once every 2 seconds.

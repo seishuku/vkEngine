@@ -100,6 +100,7 @@ set(PROJECT_SOURCES
 	ui/ui.c
 	utils/event.c
 	utils/list.c
+	utils/lz4.c
 	utils/pipeline.c
 	utils/spvparse.c
 	utils/tokenizer.c
@@ -181,11 +182,11 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC portaudio_static ws2_32.lib)
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC portaudio_static X11 Xi Xfixes)
+target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC m portaudio_static X11 Xi Xfixes)
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Android")
-target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC android log aaudio)
+target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC m android log aaudio)
 endif()
 
 if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
