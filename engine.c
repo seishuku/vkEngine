@@ -285,7 +285,7 @@ void GenerateWorld(void)
 		fighterInstancePtr=(matrix *)fighterInstance.memory->mappedPointer;
 	}
 
-	CameraInit(&enemy, Vec3_Muls(randomDirection, 1200.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
+	CameraInit(&enemy, Vec3_Muls(randomDirection, 1200.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 }
 //////
 
@@ -951,6 +951,29 @@ void Thread_Physics(void *arg)
 		ClientNetwork_SendStatus();
 	}
 
+	//////
+	// Do a simple dumb "seek out the player" thing
+	if(clientSocket<0)
+	{
+		CameraSeekTargetCamera(&enemy, camera, asteroids, NUM_ASTEROIDS);
+		isTargeted=CameraIsTargetInFOV(enemy, camera.body.position, deg2rad(15.0f));
+	}
+
+#if 0
+	// Test for if the player is in a 10 degree view cone, if so fire at them once every 2 seconds.
+	static float fireTime=0.0f;
+	fireTime+=fTimeStep;
+
+	if(isTargeted&&fireTime>2.0f)
+	{
+		fireTime=0.0f;
+
+		Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &enemy.position);
+		FireParticleEmitter(Vec3_Addv(enemy.position, Vec3_Muls(enemy.forward, enemy.radius)), enemy.forward);
+	}
+	//////
+#endif
+
 	// Always run physics on the camera's body
 	PhysicsIntegrate(&camera.body, fTimeStep);
 
@@ -1109,29 +1132,6 @@ void Render(void)
 		headPose=MatrixIdentity();
 	}
 
-	//////
-	// Do a simple dumb "seek out the player" thing
-	if(clientSocket<0)
-	{
-		CameraSeekTargetCamera(&enemy, camera, asteroids, NUM_ASTEROIDS);
-		isTargeted=CameraIsTargetInFOV(enemy, camera.body.position, deg2rad(15.0f));
-	}
-
-#if 0
-	// Test for if the player is in a 10 degree view cone, if so fire at them once every 2 seconds.
-	static float fireTime=0.0f;
-	fireTime+=fTimeStep;
-
-	if(isTargeted&&fireTime>2.0f)
-	{
-		fireTime=0.0f;
-
-		Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &enemy.position);
-		FireParticleEmitter(Vec3_Addv(enemy.position, Vec3_Muls(enemy.forward, enemy.radius)), enemy.forward);
-	}
-	//////
-#endif
-
 	Console_Draw(&console);
 
 	Audio_SetStreamVolume(0, UI_GetBarGraphValue(&UI, volumeID));
@@ -1260,7 +1260,9 @@ bool vkuMemAllocator_Init(VkuContext_t *context);
 // Initialization call from system main
 bool Init(void)
 {
-	RandomSeed(42069);
+	//const uint32_t seed=time(NULL);
+	const uint32_t seed=69420;
+	RandomSeed(seed);
 
 	// TODO: This is a hack, fix it proper.
 	if(isVR)
@@ -1273,8 +1275,8 @@ bool Init(void)
 
 	vkuMemAllocator_Init(&vkContext);
 
-	CameraInit(&camera, Vec3(0.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
-	CameraInit(&enemy, Vec3(0.0f, 0.0f, 1200.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
+	CameraInit(&camera, Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
+	//CameraInit(&enemy, Vec3(0.0f, 0.0f, 100.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f)); // this is done when world is generated
 
 	if(!Audio_Init())
 	{
@@ -1474,7 +1476,7 @@ bool Init(void)
 		return false;
 	}
 	
-	ParticleSystem_SetGravity(&particleSystem, 0.0f, 0.0f, 0.0f);
+	//ParticleSystem_SetGravity(&particleSystem, 0.0f, 0.0f, 0.0f);
 
 	ParticleSystem_AddEmitter(&particleSystem, Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f), 0.0f, 1, PARTICLE_EMITTER_BURST, NULL);
 

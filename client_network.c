@@ -104,7 +104,7 @@ static void NetUpdate(void *arg)
 						goto error;
 					}
 
-					CameraInit(&netCameras[clientID], Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f));
+					CameraInit(&netCameras[clientID], Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f));
 
 					netCameras[clientID].body.position=Deserialize_vec3(&pBuffer);
 					netCameras[clientID].body.velocity=Deserialize_vec3(&pBuffer);

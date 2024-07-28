@@ -238,20 +238,29 @@ bool SphereBBOXIntersection(const vec3 center, const float radius, const vec3 bb
 }
 
 // Actual camera stuff
-void CameraInit(Camera_t *camera, const vec3 position, const vec3 right, const vec3 up, const vec3 forward)
+void CameraInit(Camera_t *camera, const vec3 position, const vec3 up, const vec3 forward)
 {
+	camera->right=Vec3_Cross(up, forward);
+	camera->up=up;
+	camera->forward=forward;
+
+	Vec3_Normalize(&camera->right);
+	Vec3_Normalize(&camera->up);
+	Vec3_Normalize(&camera->forward);
+
+	const matrix cameraOrientation=
+	{
+		.x=Vec4_Vec3(camera->right, 0.0f),
+		.y=Vec4_Vec3(camera->up, 0.0f),
+		.z=Vec4_Vec3(camera->forward, 0.0f),
+		.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
+	};
+
 	camera->body.position=position;
 	camera->body.velocity=Vec3b(0.0f);
 	camera->body.force=Vec3b(0.0f);
 
-	const matrix cameraOrientation=
-	{
-		.x=Vec4_Vec3(right, 0.0f),
-		.y=Vec4_Vec3(up, 0.0f),
-		.z=Vec4_Vec3(forward, 0.0f),
-		.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
-	};
-	camera->body.orientation=MatrixToQuat(MatrixTranspose(cameraOrientation));
+	camera->body.orientation=MatrixToQuat((cameraOrientation));
 	camera->body.angularVelocity=Vec3b(0.0f);
 
 	camera->body.radius=10.0f;
@@ -261,10 +270,6 @@ void CameraInit(Camera_t *camera, const vec3 position, const vec3 right, const v
 
 	camera->body.inertia=0.9f*camera->body.mass*(camera->body.radius*camera->body.radius);
 	camera->body.invInertia=1.0f/camera->body.inertia;
-
-	camera->right=right;
-	camera->up=up;
-	camera->forward=forward;
 
 	camera->key_w=false;
 	camera->key_s=false;
@@ -342,7 +347,7 @@ matrix CameraUpdate(Camera_t *camera, float dt)
 	camera->up     =Vec3(orientation.y.x, orientation.y.y, orientation.y.z);
 	camera->forward=Vec3(orientation.z.x, orientation.z.y, orientation.z.z);
 
-	return MatrixLookAt(camera->body.position, Vec3_Addv(camera->body.position, camera->forward), camera->up);
+	return MatrixLookAt(camera->body.position, camera->forward, camera->up);
 }
 
 // Camera path track stuff

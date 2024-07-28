@@ -35,7 +35,7 @@ typedef struct
 
 bool CameraIsTargetInFOV(Camera_t camera, vec3 targetPos, float FOV);
 void CameraSeekTargetCamera(Camera_t *camera, Camera_t cameraTarget, RigidBody_t *obstacles, size_t numObstacles);
-void CameraInit(Camera_t *camera, const vec3 position, const vec3 right, const vec3 up, const vec3 forward);
+void CameraInit(Camera_t *camera, const vec3 position, const vec3 up, const vec3 forward);
 matrix CameraUpdate(Camera_t *camera, float dt);
 void CameraCheckCollision(Camera_t *camera, float *vertex, uint32_t *face, int32_t numFace);
 int32_t CameraLoadPath(char *filename, CameraPath_t *path);
