@@ -227,7 +227,25 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 	context->swapchainExtension=VK_FALSE;
 	context->pushDescriptorExtension=VK_FALSE;
 	context->dynamicRenderingExtension=VK_FALSE;
+	context->getPhysicalDeviceProperties2Extension=VK_FALSE;
 	context->depthStencilResolveExtension=VK_FALSE;
+	context->createRenderPass2Extension=VK_FALSE;
+	context->externalMemoryExtension=VK_FALSE;
+	context->externalFenceExtension=VK_FALSE;
+	context->externalSemaphoreExtension=VK_FALSE;
+	context->getMemoryRequirements2Extension=VK_FALSE;
+	context->dedicatedAllocationExtension=VK_FALSE;
+
+#ifdef WIN32
+	context->externalMemoryWIN32Extension=VK_FALSE;
+	context->externalFenceWIN32Extension=VK_FALSE;
+	context->externalSemaphoreWIN32Extension=VK_FALSE;
+	context->win32KeyedMutexExtension=VK_FALSE;
+#else
+	context->externalMemoryFDExtension=VK_FALSE;
+	context->externalFenceFDExtension=VK_FALSE;
+	context->externalSemaphoreFDExtension=VK_FALSE;
+#endif
 
 	for(uint32_t i=0;i<extensionCount;i++)
 	{
@@ -266,6 +284,69 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 			DBGPRINTF(DEBUG_INFO, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME" extension is supported!\n");
 			context->createRenderPass2Extension=VK_TRUE;
 		}
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME" extension is supported!\n");
+			context->externalFenceExtension=VK_TRUE;
+		}
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME" extension is supported!\n");
+			context->externalFenceExtension=VK_TRUE;
+		}
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME" extension is supported!\n");
+			context->externalSemaphoreExtension=VK_TRUE;
+		}
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME" extension is supported!\n");
+			context->getMemoryRequirements2Extension=VK_TRUE;
+		}
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME" extension is supported!\n");
+			context->dedicatedAllocationExtension=VK_TRUE;
+		}
+#ifdef WIN32
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME" extension is supported!\n");
+			context->externalMemoryWIN32Extension=VK_TRUE;
+		}
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME" extension is supported!\n");
+			context->externalFenceWIN32Extension=VK_TRUE;
+		}
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME" extension is supported!\n");
+			context->externalSemaphoreWIN32Extension=VK_TRUE;
+		}
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_WIN32_KEYED_MUTEX_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_WIN32_KEYED_MUTEX_EXTENSION_NAME" extension is supported!\n");
+			context->win32KeyedMutexExtension=VK_TRUE;
+		}
+#else
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME" extension is supported!\n");
+			context->externalMemoryFDExtension=VK_TRUE;
+		}
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME" extension is supported!\n");
+			context->externalFenceFDExtension=VK_TRUE;
+		}
+		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME" extension is supported!\n");
+			context->externalSemaphoreFDExtension=VK_TRUE;
+		}
+#endif
 	}
 
 	Zone_Free(zone, extensionProperties);
@@ -362,24 +443,43 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 		pNext=&deviceDynamicRenderingFeatures;
 	}
 
-#if 1
-	extensions[numExtensions++]=VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME;
-	extensions[numExtensions++]=VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME;
-	extensions[numExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME;
-	extensions[numExtensions++]=VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME;
-	extensions[numExtensions++]=VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME;
+	if(context->externalMemoryExtension)
+		extensions[numExtensions++]=VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME;
+
+	if(context->externalFenceExtension)
+		extensions[numExtensions++]=VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME;
+
+	if(context->externalSemaphoreExtension)
+		extensions[numExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME;
+
+	if(context->getMemoryRequirements2Extension)
+		extensions[numExtensions++]=VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME;
+
+	if(context->dedicatedAllocationExtension)
+		extensions[numExtensions++]=VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME;
 	//extensions[numExtensions++]=VK_EXT_DEBUG_MARKER_EXTENSION_NAME;
 
 #ifdef WIN32
-	extensions[numExtensions++]=VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME;
-	extensions[numExtensions++]=VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME;
-	extensions[numExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME;
-	extensions[numExtensions++]=VK_KHR_WIN32_KEYED_MUTEX_EXTENSION_NAME;
+	if(context->externalMemoryWIN32Extension)
+		extensions[numExtensions++]=VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME;
+
+	if(context->externalFenceWIN32Extension)
+		extensions[numExtensions++]=VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME;
+
+	if(context->externalSemaphoreWIN32Extension)
+		extensions[numExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME;
+
+	if(context->win32KeyedMutexExtension)
+		extensions[numExtensions++]=VK_KHR_WIN32_KEYED_MUTEX_EXTENSION_NAME;
 #else
-	extensions[numExtensions++]=VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME;
-	extensions[numExtensions++]=VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME;
-	extensions[numExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME;
-#endif
+	if(context->externalMemoryFDExtension)
+		extensions[numExtensions++]=VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME;
+
+	if(context->externalFenceFDExtension)
+		extensions[numExtensions++]=VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME;
+
+	if(context->externalSemaphoreFDExtension)
+		extensions[numExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME;
 #endif
 
 	// Create the logical device from the physical device and queue index from above

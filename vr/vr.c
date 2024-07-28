@@ -465,8 +465,12 @@ static bool VR_GetViewConfig(XruContext_t *xrContext, const XrViewConfigurationT
 	return true;
 }
 
-static bool VR_InitSession(XruContext_t *xrContext, VkInstance Instance, VkuContext_t *Context)
+static bool VR_InitSession(XruContext_t *xrContext, VkInstance instance, VkuContext_t *context)
 {
+	// Check required Vulkan extensions
+	if(!(context->externalMemoryExtension&&context->externalFenceExtension&&context->externalSemaphoreExtension&&context->getMemoryRequirements2Extension&&context->dedicatedAllocationExtension))
+		return false;
+
 	XrGraphicsRequirementsVulkanKHR graphicsRequirements={ .type=XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN_KHR };
 
 	if(!xruCheck(xrContext->instance, xrGetVulkanGraphicsRequirementsKHR(xrContext->instance, xrContext->systemID, &graphicsRequirements)))
@@ -478,16 +482,16 @@ static bool VR_InitSession(XruContext_t *xrContext, VkInstance Instance, VkuCont
 	// Is this needed for sure?
 	// SteamVR null driver needed it, but Quest2 doesn't.
 	//VkPhysicalDevice physicalDevice=VK_NULL_HANDLE;
-	//xrGetVulkanGraphicsDeviceKHR(xrContext->instance, xrContext->systemID, Instance, &physicalDevice);
+	//xrGetVulkanGraphicsDeviceKHR(xrContext->instance, xrContext->systemID, instance, &physicalDevice);
 
 	XrGraphicsBindingVulkanKHR graphicsBindingVulkan=
 	{
 		.type=XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR,
 		.next=XR_NULL_HANDLE,
-		.instance=Instance,
-		.physicalDevice=Context->physicalDevice,
-		.device=Context->device,
-		.queueFamilyIndex=Context->graphicsQueueIndex,
+		.instance=instance,
+		.physicalDevice=context->physicalDevice,
+		.device=context->device,
+		.queueFamilyIndex=context->graphicsQueueIndex,
 		.queueIndex=0
 	};
 
@@ -529,7 +533,7 @@ static bool VR_InitReferenceSpace(XruContext_t *xrContext, XrReferenceSpaceType 
 	return true;
 }
 
-static bool VR_InitSwapchain(XruContext_t *xrContext, VkuContext_t *Context)
+static bool VR_InitSwapchain(XruContext_t *xrContext, VkuContext_t *context)
 {
 	uint32_t swapchainFormatCount;
 	if(!xruCheck(xrContext->instance, xrEnumerateSwapchainFormats(xrContext->session, 0, &swapchainFormatCount, NULL)))
@@ -582,7 +586,7 @@ static bool VR_InitSwapchain(XruContext_t *xrContext, VkuContext_t *Context)
 	Zone_Free(zone, swapchainFormats);
 
 	// Create swapchain images, imageviews, and transition to correct image layout
-	VkCommandBuffer CommandBuffer=vkuOneShotCommandBufferBegin(Context);
+	VkCommandBuffer CommandBuffer=vkuOneShotCommandBufferBegin(context);
 
 	for(uint32_t i=0;i<xrContext->viewCount;i++)
 	{
@@ -627,7 +631,7 @@ static bool VR_InitSwapchain(XruContext_t *xrContext, VkuContext_t *Context)
 		{
 			vkuTransitionLayout(CommandBuffer, xrContext->swapchain[i].images[j].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-			vkCreateImageView(Context->device, &(VkImageViewCreateInfo)
+			vkCreateImageView(context->device, &(VkImageViewCreateInfo)
 			{
 				.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 				.pNext=VK_NULL_HANDLE,
@@ -645,7 +649,7 @@ static bool VR_InitSwapchain(XruContext_t *xrContext, VkuContext_t *Context)
 		}
 	}
 
-	vkuOneShotCommandBufferEnd(Context, CommandBuffer);
+	vkuOneShotCommandBufferEnd(context, CommandBuffer);
 
 	return true;
 }
@@ -847,7 +851,7 @@ vec2 VR_GetActionVec2(XruContext_t *xrContext, XrAction action, uint32_t hand)
 	return Vec2(state.currentState.x, state.currentState.y);
 }
 
-bool VR_Init(XruContext_t *xrContext, VkInstance Instance, VkuContext_t *Context)
+bool VR_Init(XruContext_t *xrContext, VkInstance instance, VkuContext_t *context)
 {
 	xrContext->instance=XR_NULL_HANDLE;
 
@@ -897,7 +901,7 @@ bool VR_Init(XruContext_t *xrContext, VkInstance Instance, VkuContext_t *Context
 		return false;
 	}
 
-	if(!VR_InitSession(xrContext, Instance, Context))
+	if(!VR_InitSession(xrContext, instance, context))
 	{
 		DBGPRINTF(DEBUG_ERROR, "VR: VR_InitSession failed.\n");
 		return false;
@@ -909,7 +913,7 @@ bool VR_Init(XruContext_t *xrContext, VkInstance Instance, VkuContext_t *Context
 		return false;
 	}
 
-	if(!VR_InitSwapchain(xrContext, Context))
+	if(!VR_InitSwapchain(xrContext, context))
 	{
 		DBGPRINTF(DEBUG_ERROR, "VR: VR_InitSwapchain failed.\n");
 		return false;

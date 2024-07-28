@@ -62,6 +62,23 @@ typedef struct
 	VkBool32 depthStencilResolveExtension;
 	VkBool32 createRenderPass2Extension;
 
+	VkBool32 externalMemoryExtension;
+	VkBool32 externalFenceExtension;
+	VkBool32 externalSemaphoreExtension;
+	VkBool32 getMemoryRequirements2Extension;
+	VkBool32 dedicatedAllocationExtension;
+
+#ifdef WIN32
+	VkBool32 externalMemoryWIN32Extension;
+	VkBool32 externalFenceWIN32Extension;
+	VkBool32 externalSemaphoreWIN32Extension;
+	VkBool32 win32KeyedMutexExtension;
+#else
+	VkBool32 externalMemoryFDExtension;
+	VkBool32 externalFenceFDExtension;
+	VkBool32 externalSemaphoreFDExtension;
+#endif
+
 	VkPhysicalDeviceProperties2 deviceProperties;
 	VkPhysicalDeviceMaintenance3Properties deviceProperties2;
 
