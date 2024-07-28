@@ -3,5 +3,6 @@ descriptorSet {
 }
 
 pipeline {
+	pushConstant(0, 16, compute)
 	addStage("shaders/volume_gen.comp.spv", compute)
 }

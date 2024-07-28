@@ -4,6 +4,11 @@ layout(binding=0, r8) uniform writeonly image3D image;
 
 layout(local_size_x=8, local_size_y=8, local_size_z=8) in;
 
+layout(push_constant) uniform PC
+{
+	vec3 vSeed;
+};
+
 vec3 mod289(vec3 x)
 {
 	return x-floor(x*(1.0/289.0))*289.0;
@@ -93,8 +98,8 @@ float noise(vec3 P)
 
 float fbm(vec3 p)
 {
-	const int octaves=12;
-	const float gain=0.25;
+	const int octaves=4;
+	const float gain=0.15;
 	const float lacunarity=4.0;
 
 	float amplitude=1.0;
@@ -116,5 +121,5 @@ float fbm(vec3 p)
 void main(void)
 {
 	vec3 p=vec3(gl_GlobalInvocationID.xyz)/imageSize(image);
-	imageStore(image, ivec3(gl_GlobalInvocationID.xyz), vec4(fbm(p*12.0), 0.0, 0.0, 0.0));
+	imageStore(image, ivec3(gl_GlobalInvocationID.xyz), vec4(fbm((p+vSeed)*4.0), 0.0, 0.0, 0.0));
 }

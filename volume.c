@@ -309,6 +309,9 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 
 	vkCmdBindDescriptorSets(computeCommand, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline.pipelineLayout, 0, 1, &computePipeline.descriptorSet.descriptorSet, 0, 0);
 
+	vec4 vRandom=Vec4(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, 0.0f);
+	vkCmdPushConstants(computeCommand, computePipeline.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(vec4), &vRandom);
+
 	vkCmdDispatch(computeCommand, image->width/8, image->height/8, image->depth/8);
 
 	imageMemoryBarrier.oldLayout=VK_IMAGE_LAYOUT_GENERAL;
