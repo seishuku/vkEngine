@@ -477,15 +477,15 @@ static bool VR_InitSession(XruContext_t *xrContext, VkInstance Instance, VkuCont
 
 	// Is this needed for sure?
 	// SteamVR null driver needed it, but Quest2 doesn't.
-	VkPhysicalDevice physicalDevice=VK_NULL_HANDLE;
-	xrGetVulkanGraphicsDeviceKHR(xrContext->instance, xrContext->systemID, Instance, &physicalDevice);
+	//VkPhysicalDevice physicalDevice=VK_NULL_HANDLE;
+	//xrGetVulkanGraphicsDeviceKHR(xrContext->instance, xrContext->systemID, Instance, &physicalDevice);
 
 	XrGraphicsBindingVulkanKHR graphicsBindingVulkan=
 	{
 		.type=XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR,
 		.next=XR_NULL_HANDLE,
 		.instance=Instance,
-		.physicalDevice=physicalDevice,
+		.physicalDevice=Context->physicalDevice,
 		.device=Context->device,
 		.queueFamilyIndex=Context->graphicsQueueIndex,
 		.queueIndex=0

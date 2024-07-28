@@ -1060,14 +1060,14 @@ void Render(void)
 		rightGrip=VR_GetActionFloat(&xrContext, xrContext.handGrip, 1);
 		rightThumbstick=VR_GetActionVec2(&xrContext, xrContext.handThumbstick, 1);
 
-		const float speed=400.0f;
-		const float rotation=0.1f;
+		const float speed=240.0f;
+		const float rotation=5.0f;
 
-		camera.body.velocity.x-=leftThumbstick.x*speed*fTimeStep;
-		camera.body.velocity.z+=leftThumbstick.y*speed*fTimeStep;
+		camera.body.velocity=Vec3_Subv(camera.body.velocity, Vec3_Muls(camera.right, leftThumbstick.x*speed*fTimeStep));
+		camera.body.velocity=Vec3_Addv(camera.body.velocity, Vec3_Muls(camera.forward, leftThumbstick.y*speed*fTimeStep));
 
-		camera.body.angularVelocity.x-=rightThumbstick.x*rotation*fTimeStep;
-		camera.body.angularVelocity.x+=rightThumbstick.y*rotation*fTimeStep;
+		camera.body.angularVelocity.y-=rightThumbstick.x*rotation*fTimeStep;
+		camera.body.angularVelocity.x-=rightThumbstick.y*rotation*fTimeStep;
 
 		if(leftTrigger>0.1f)
 		{

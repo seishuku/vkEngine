@@ -362,7 +362,7 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 		pNext=&deviceDynamicRenderingFeatures;
 	}
 
-#if 0
+#if 1
 	extensions[numExtensions++]=VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME;
 	extensions[numExtensions++]=VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME;
 	extensions[numExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME;
