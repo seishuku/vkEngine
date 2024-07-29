@@ -17,10 +17,10 @@ extern RigidBody_t asteroids[NUM_ASTEROIDS];
 extern Camera_t camera;
 
 // Network stuff
-#define CONNECT_PACKETMAGIC		('C'|('o'<<8)|('n'<<16)|('n'<<24)) // "Conn"
-#define DISCONNECT_PACKETMAGIC	('D'|('i'<<8)|('s'<<16)|('C'<<24)) // "DisC"
-#define STATUS_PACKETMAGIC		('S'|('t'<<8)|('a'<<16)|('t'<<24)) // "Stat"
-#define FIELD_PACKETMAGIC		('F'|('e'<<8)|('l'<<16)|('d'<<24)) // "Feld"
+static const uint32_t CONNECT_PACKETMAGIC   ='C'|'o'<<8|'n'<<16|'n'<<24; // "Conn"
+static const uint32_t DISCONNECT_PACKETMAGIC='D'|'i'<<8|'s'<<16|'C'<<24; // "DisC"
+static const uint32_t STATUS_PACKETMAGIC    ='S'|'t'<<8|'a'<<16|'t'<<24; // "Stat"
+static const uint32_t FIELD_PACKETMAGIC     ='F'|'e'<<8|'l'<<16|'d'<<24; // "Feld"
 
 #define MAX_CLIENTS 16
 

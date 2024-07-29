@@ -5,15 +5,6 @@
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
 
-#define BMDL_MAGIC			(((uint32_t)'B')|((uint32_t)'M')<<8|((uint32_t)'D')<<16|((uint32_t)'L')<<24)
-#define MESH_MAGIC			(((uint32_t)'M')|((uint32_t)'E')<<8|((uint32_t)'S')<<16|((uint32_t)'H')<<24)
-#define MATL_MAGIC			(((uint32_t)'M')|((uint32_t)'A')<<8|((uint32_t)'T')<<16|((uint32_t)'L')<<24)
-#define VERT_MAGIC			(((uint32_t)'V')|((uint32_t)'E')<<8|((uint32_t)'R')<<16|((uint32_t)'T')<<24)
-#define TEXC_MAGIC			(((uint32_t)'T')|((uint32_t)'E')<<8|((uint32_t)'X')<<16|((uint32_t)'C')<<24)
-#define TANG_MAGIC			(((uint32_t)'T')|((uint32_t)'A')<<8|((uint32_t)'N')<<16|((uint32_t)'G')<<24)
-#define BNRM_MAGIC			(((uint32_t)'B')|((uint32_t)'N')<<8|((uint32_t)'R')<<16|((uint32_t)'M')<<24)
-#define NORM_MAGIC			(((uint32_t)'N')|((uint32_t)'O')<<8|((uint32_t)'R')<<16|((uint32_t)'M')<<24)
-
 typedef struct
 {
 	char name[256];

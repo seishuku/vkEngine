@@ -95,6 +95,8 @@ OBJS+=utils/event.o
 OBJS+=utils/list.o
 OBJS+=utils/pipeline.o
 OBJS+=utils/tokenizer.o
+OBJS+=utils/spvparse.o
+OBJS+=client_network.o
 OBJS+=perframe.o
 OBJS+=shadow.o
 OBJS+=skybox.o
@@ -135,6 +137,7 @@ SHADERS+=shaders/ui_sdf.frag.spv
 SHADERS+=shaders/ui_sdf.vert.spv
 SHADERS+=shaders/volume.frag.spv
 SHADERS+=shaders/volume.vert.spv
+SHADERS+=shaders/volume_gen.comp.spv
 
 CC_X86_64=$(NDK)/toolchains/llvm/prebuilt/$(HOST)/bin/x86_64-linux-android$(ANDROIDVERSION)-clang
 CC_ARM64=$(NDK)/toolchains/llvm/prebuilt/$(HOST)/bin/aarch64-linux-android$(ANDROIDVERSION)-clang
@@ -150,7 +153,7 @@ CFLAGS+=-I$(NDK)/toolchains/llvm/prebuilt/$(HOST)/sysroot/usr/include -I$(NDK)/t
 CFLAGS+=-DANDROID -D__ANDROID_MIN_SDK_VERSION__=$(ANDROIDVERSION) -DANDROIDVERSION=$(ANDROIDVERSION) -D__USE_BSD
 CFLAGS+=-include system/android_fopen.h
 
-LDFLAGS+=-shared -Wl,--no-undefined -lvulkan -lm -landroid -llog -laaudio -lopenxr_loader -logg -lvorbis
+LDFLAGS+=-shared -Wl,--no-undefined -lvulkan -lm -landroid -llog -laaudio -lopenxr_loader -logg -lvorbis -lnativewindow
 
 .PHONY: all $(KEYSTOREFILE) clean
 

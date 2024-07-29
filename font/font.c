@@ -23,7 +23,8 @@
 // external Vulkan context data/functions for this module:
 extern VkuContext_t vkContext;
 extern VkSampleCountFlags MSAA;
-extern VkuSwapchain_t swapchain;
+extern uint32_t renderWidth, renderHeight;
+//extern VkuSwapchain_t swapchain;
 
 extern VkRenderPass compositeRenderPass;
 
@@ -365,7 +366,7 @@ void Font_Draw(Font_t *font, uint32_t index, uint32_t eye)
 		fontPC.extent=(VkExtent2D){ xrContext.swapchainExtent.width, xrContext.swapchainExtent.height };
 	}
 	else
-		fontPC.extent=swapchain.extent;
+		fontPC.extent=(VkExtent2D){ renderWidth, renderHeight };
 
 	fontPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale((float)fontPC.extent.width/(float)fontPC.extent.height, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[eye]);
 

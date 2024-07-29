@@ -31,6 +31,8 @@ typedef struct
 	float left[MAX_HRIR_SAMPLES], right[MAX_HRIR_SAMPLES];
 } HRIR_Vertex_t;
 
+static const uint32_t HRIR_MAGIC='H'|'R'<<8|'I'<<16|'R'<<24;
+
 typedef struct
 {
 	uint32_t magic;
@@ -442,7 +444,7 @@ static bool HRIR_Init(void)
 
 	fread(&sphere, sizeof(uint32_t), 5, stream);
 
-	if(sphere.magic!=('H'|('R'<<8)|('I'<<16)|('R'<<24)))
+	if(sphere.magic!=HRIR_MAGIC)
 		return false;
 
 	if(sphere.sampleLength>MAX_HRIR_SAMPLES)

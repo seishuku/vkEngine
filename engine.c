@@ -634,6 +634,9 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 		threadData[1].perFrame[index].secCommandBuffer[eye]
 	});
 
+	// TODO:
+	//     Android has issues with depth readback and subsequent depth->eye/world transform, this also affects volumetrics in the compositing shader.
+#ifndef ANDROID
 	vkCmdNextSubpass(perFrame[index].commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 
 	//matrix Modelview=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
@@ -642,6 +645,7 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	//////// Volume cloud
 	DrawVolume(perFrame[index].commandBuffer, index, eye, perFrame[index].descriptorPool);
 	////////
+#endif
 
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 }

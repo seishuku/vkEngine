@@ -7,7 +7,7 @@
 #include "../vulkan/vulkan.h"
 #include "image.h"
 
-#define QOI_MAGIC			(((uint32_t)'q')<<24|((uint32_t)'o')<<16|((uint32_t)'i')<<8|((uint32_t)'f'))
+static uint32_t QOI_MAGIC='q'<<24|'o'<<16|'i'<<8|'f';
 
 #define QOI_SRGB			0
 #define QOI_LINEAR			1

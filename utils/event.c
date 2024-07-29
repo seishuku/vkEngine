@@ -275,8 +275,8 @@ bool Event_Trigger(EventID ID, void *arg)
 
 			if(activeID==UINT32_MAX&&mouseEvent->button&MOUSE_TOUCH)
 			{
-				camera.yaw-=(float)(mousePosition.x-oldMousePosition.x)/1000.0f;
-				camera.pitch+=(float)(mousePosition.y-oldMousePosition.y)/1000.0f;
+				camera.body.angularVelocity.x-=(float)(mousePosition.y-oldMousePosition.y)/200.0f;
+				camera.body.angularVelocity.y-=(float)(mousePosition.x-oldMousePosition.x)/200.0f;
 			}
 #endif
 			break;

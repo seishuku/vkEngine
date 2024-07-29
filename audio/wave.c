@@ -11,10 +11,10 @@
 #include "audio.h"
 
 // Chunk magic markers
-#define RIFF_MAGIC ('R'|('I'<<8)|('F'<<16)|('F'<<24))
-#define WAVE_MAGIC ('W'|('A'<<8)|('V'<<16)|('E'<<24))
-#define FMT_MAGIC  ('f'|('m'<<8)|('t'<<16)|(' '<<24))
-#define DATA_MAGIC ('d'|('a'<<8)|('t'<<16)|('a'<<24))
+static const uint32_t RIFF_MAGIC='R'|'I'<<8|'F'<<16|'F'<<24;
+static const uint32_t WAVE_MAGIC='W'|'A'<<8|'V'<<16|'E'<<24;
+static const uint32_t FMT_MAGIC ='f'|'m'<<8|'t'<<16|' '<<24;
+static const uint32_t DATA_MAGIC='d'|'a'<<8|'t'<<16|'a'<<24;
 
 typedef struct RIFFChunk_s
 {

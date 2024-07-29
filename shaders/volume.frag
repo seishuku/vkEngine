@@ -55,11 +55,12 @@ const mat4 _Bayer4x4=mat4(
 
 vec4 depth2Eye()
 {
-	const float viewZ=(
+	const float viewZ=max((
 		texelFetch(Depth, ivec2(gl_FragCoord.xy), 0).x+
 		texelFetch(Depth, ivec2(gl_FragCoord.xy), 1).x+
 		texelFetch(Depth, ivec2(gl_FragCoord.xy), 2).x+
-		texelFetch(Depth, ivec2(gl_FragCoord.xy), 3).x)*0.25;
+		texelFetch(Depth, ivec2(gl_FragCoord.xy), 3).x
+	)*0.25, 0.000009);
 
 	const vec4 clipPosition=inverse(projection)*vec4(vec3((gl_FragCoord.xy/vec2(uWidth, uHeight))*2-1, viewZ), 1.0);
 	return clipPosition/clipPosition.w;
@@ -181,4 +182,5 @@ void main()
 
 	// boost final color some for a more dramatic cloud
 	Output=clamp(Output*1.3, 0.0, 1.0);
+	//Output=normalize(worldPos)*0.5+0.5;
 }

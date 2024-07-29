@@ -5,10 +5,10 @@
 #include "../math/math.h"
 #include "../system/system.h"
 
-#ifdef LINUX
-#include <spirv/unified1/spirv.h>
-#else
+#ifdef WIN32
 #include <spirv-headers/spirv.h>
+#else
+#include <spirv/unified1/spirv.h>
 #endif
 
 #define SPV_SPIRV_VERSION_MAJOR_PART(WORD) (((uint32_t)(WORD)>>16)&0xFF)

@@ -27,7 +27,7 @@ extern VkuContext_t vkContext;
 
 extern VkuSwapchain_t swapchain;
 
-uint32_t windowWidth=1920, windowHeight=1080;
+static uint32_t winWidth=1920, winHeight=1080;
 extern uint32_t renderWidth, renderHeight;
 
 float fps=0.0f, fTimeStep=0.0f, fTime=0.0f;
@@ -125,8 +125,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			break;
 
 		case WM_SIZE:
-			windowWidth=LOWORD(lParam);
-			windowHeight=HIWORD(lParam);
+			winWidth=LOWORD(lParam);
+			winHeight=HIWORD(lParam);
 			break;
 
 		case WM_ACTIVATE:
@@ -157,21 +157,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					toggleFullscreen=false;
 					DBGPRINTF(DEBUG_INFO, "Going full screen...\n");
 
-					OldWidth=windowWidth;
-					OldHeight=windowHeight;
+					OldWidth=winWidth;
+					OldHeight=winHeight;
 
-					windowWidth=GetSystemMetrics(SM_CXSCREEN);
-					windowHeight=GetSystemMetrics(SM_CYSCREEN);
-					SetWindowPos(vkContext.hWnd, HWND_TOPMOST, 0, 0, windowWidth, windowHeight, 0);
+					winWidth=GetSystemMetrics(SM_CXSCREEN);
+					winHeight=GetSystemMetrics(SM_CYSCREEN);
+					SetWindowPos(vkContext.hWnd, HWND_TOPMOST, 0, 0, winWidth, winHeight, 0);
 				}
 				else
 				{
 					toggleFullscreen=true;
 					DBGPRINTF(DEBUG_INFO, "Going windowed...\n");
 
-					windowWidth=OldWidth;
-					windowHeight=OldHeight;
-					SetWindowPos(vkContext.hWnd, HWND_TOPMOST, 0, 0, windowWidth, windowHeight, 0);
+					winWidth=OldWidth;
+					winHeight=OldHeight;
+					SetWindowPos(vkContext.hWnd, HWND_TOPMOST, 0, 0, winWidth, winHeight, 0);
 				}
 			}
 			break;
@@ -440,7 +440,7 @@ int main(int argc, char **argv)
 
 	RECT Rect;
 
-	SetRect(&Rect, 0, 0, windowWidth, windowHeight);
+	SetRect(&Rect, 0, 0, winWidth, winHeight);
 	AdjustWindowRect(&Rect, WS_POPUP, FALSE);
 
 	vkContext.hWnd=CreateWindow(szAppName, szAppName, WS_POPUP|WS_CLIPSIBLINGS, 0, 0, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
@@ -484,9 +484,9 @@ int main(int argc, char **argv)
 	{
 		renderWidth=xrContext.swapchainExtent.width;
 		renderHeight=xrContext.swapchainExtent.height;
-		windowWidth=renderWidth;
-		windowHeight=renderHeight;
-		MoveWindow(vkContext.hWnd, 0, 0, windowWidth/2, windowHeight/2, TRUE);
+		winWidth=renderWidth;
+		winHeight=renderHeight;
+		MoveWindow(vkContext.hWnd, 0, 0, winWidth/2, winHeight/2, TRUE);
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Initializing Vulkan resources...\n");
