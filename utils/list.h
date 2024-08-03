@@ -6,21 +6,21 @@
 
 typedef struct
 {
-    size_t Size;
+    size_t size;
 	size_t bufSize;
-	size_t Stride;
-    uint8_t *Buffer;
+	size_t stride;
+    uint8_t *buffer;
 } List_t;
 
-bool List_Init(List_t *List, const size_t Stride, const size_t Count, const void *Data);
-bool List_Add(List_t *List, void *Data);
-bool List_Del(List_t *List, const size_t Index);
-void *List_GetPointer(List_t *List, const size_t Index);
-void List_GetCopy(List_t *List, const size_t Index, void *Data);
-size_t List_GetCount(List_t *List);
-void *List_GetBufferPointer(List_t *List);
-bool List_ShrinkFit(List_t *List);
-void List_Clear(List_t *List);
-void List_Destroy(List_t *List);
+bool List_Init(List_t *list, const size_t stride, const size_t count, const void *data);
+bool List_Add(List_t *list, void *data);
+bool List_Del(List_t *list, const size_t index);
+void *List_GetPointer(List_t *list, const size_t index);
+void List_GetCopy(List_t *list, const size_t index, void *data);
+size_t List_GetCount(List_t *list);
+void *List_GetBufferPointer(List_t *list);
+bool List_ShrinkFit(List_t *list);
+void List_Clear(List_t *list);
+void List_Destroy(List_t *list);
 
 #endif

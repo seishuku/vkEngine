@@ -1,3 +1,8 @@
+// A "vector" style list manager.
+
+// Care must be taken when using List_Add, data being passed *must* coinside
+//		with stride used when initializing the list.
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -6,183 +11,179 @@
 #include "../system/system.h"
 #include "list.h"
 
-#ifndef FREE
-#define FREE(p) { if(p) { free(p); p=NULL; } }
-#endif
-
-bool List_Init(List_t *List, const size_t Stride, const size_t Count, const void *Data)
+bool List_Init(List_t *list, const size_t stride, const size_t count, const void *data)
 {
-	if(List==NULL)
+	if(list==NULL)
 		return false;
 
 	// Require at least a stride
-	if(!Stride)
+	if(!stride)
 		return false;
 
 	// Save stride
-	List->Stride=Stride;
+	list->stride=stride;
 
 	// If initial data was specified, allocate and copy it
-	if(Data)
+	if(data)
 	{
-		// Actual list size is Stride*Count
-		List->Size=Stride*Count;
-		// Actual buffer size is 1.5x list size to help avoid reallocation stalls at the cost of more memory usage
-		List->bufSize=List->Size*2;
+		// Actual list size is stride*count
+		list->size=stride*count;
+		// Actual buffer size is 2x list size to help avoid reallocation stalls at the cost of more memory usage
+		list->bufSize=list->size*2;
 
-		List->Buffer=(uint8_t *)Zone_Malloc(zone, List->bufSize);
+		list->buffer=(uint8_t *)Zone_Malloc(zone, list->bufSize);
 
-		if(List->Buffer==NULL)
+		if(list->buffer==NULL)
 			return false;
 
-		memcpy(List->Buffer, Data, List->bufSize);
+		memcpy(list->buffer, data, list->size);
 	}
-	// Otherwise, initalize the buffer to at least stride*2 for starters
-	// Or if Count is specified and no data, use that as a pre-allocation.
+	// Otherwise, initialize the buffer to at least stride*2 for starters
+	// Or if count is specified and no data, use that as a pre-allocation.
 	else
 	{
-		List->Size=0;
-		if(!Count)
-			List->bufSize=Stride*2;
-		else
-			List->bufSize=Stride*Count*2;
+		list->size=0;
+		list->bufSize=stride*2;
 
-		List->Buffer=(uint8_t *)Zone_Malloc(zone, List->bufSize);
+		if(count)
+			list->bufSize*=count;
 
-		if(List->Buffer==NULL)
+		list->buffer=(uint8_t *)Zone_Malloc(zone, list->bufSize);
+
+		if(list->buffer==NULL)
 			return false;
 	}
 
 	return true;
 }
 
-bool List_Add(List_t *List, void *Data)
+bool List_Add(List_t *list, void *data)
 {
-	if(List==NULL)
+	if(list==NULL)
 		return false;
 
-	if(!Data)
+	if(!data)
 		return false;
 
 	// Save the current size for inserting data at the end of the list
-	size_t oldSize=List->Size;
+	size_t oldSize=list->size;
 
 	// Increment list size by the item size (stride)
-	List->Size+=List->Stride;
+	list->size+=list->stride;
 
 	// If list size is larger than the buffer, resize it
-	if(List->Size>=List->bufSize)
+	if(list->size>=list->bufSize)
 	{
 		// Over allocate memory to save from having to resize later
-		List->bufSize=List->Size*2;
+		list->bufSize=list->size*2;
 
 		// Reallocate the buffer
-		uint8_t *Ptr=(uint8_t *)Zone_Realloc(zone, List->Buffer, List->bufSize);
+		uint8_t *ptr=(uint8_t *)Zone_Realloc(zone, list->buffer, list->bufSize);
 
-		if(Ptr==NULL)
+		if(ptr==NULL)
 			return false;
 
-		List->Buffer=Ptr;
+		list->buffer=ptr;
 	}
 
 	// Copy the data into the new memory
-	memcpy(&List->Buffer[oldSize], Data, List->Stride);
+	memcpy(&list->buffer[oldSize], (uint8_t *)data, list->stride);
 
 	return true;
 }
 
-bool List_Del(List_t *List, const size_t Index)
+bool List_Del(List_t *list, const size_t index)
 {
-	if(List==NULL)
+	if(list==NULL)
 		return false;
 
 	// Check buffer bounds
-	if((Index*List->Stride)>=List->Size)
+	if((index*list->stride)>=list->size)
 		return false;
 
 	// Shift data from index to end, overwriting the item to be removed
-	memcpy(&List->Buffer[Index*List->Stride], &List->Buffer[(Index+1)*List->Stride], List->Size-(Index*List->Stride));
+	memcpy(&list->buffer[index*list->stride], &list->buffer[(index+1)*list->stride], list->size-(index*list->stride));
 	// Update list size
-	List->Size-=List->Stride;
+	list->size-=list->stride;
 
 	return true;
 }
 
-void *List_GetPointer(List_t *List, const size_t Index)
+void *List_GetPointer(List_t *list, const size_t index)
 {
-	if(List==NULL)
+	if(list==NULL)
 		return NULL;
 
 	// Check buffer bounds
-	if((Index*List->Stride)>=List->Size)
+	if((index*list->stride)>=list->size)
 		return NULL;
 
 	// Return pointer based on index and stride
-	return (void *)&List->Buffer[List->Stride*Index];
+	return (void *)&list->buffer[list->stride*index];
 }
 
-void List_GetCopy(List_t *List, const size_t Index, void *Data)
+void List_GetCopy(List_t *list, const size_t index, void *data)
 {
-	if(List==NULL)
+	if(list==NULL)
 		return;
 
 	// Check buffer bounds
-	if((Index*List->Stride)>=List->Size)
+	if((index*list->stride)>=list->size)
 		return;
 
 	// Copy data based on index and stride
-	if(Data)
-		memcpy(Data, &List->Buffer[List->Stride*Index], List->Stride);
+	if(data)
+		memcpy(data, &list->buffer[list->stride*index], list->stride);
 }
 
-size_t List_GetCount(List_t *List)
+size_t List_GetCount(List_t *list)
 {
-	// Count=size/stride
-	if(List&&List->Size)
-		return List->Size/List->Stride;
+	// count=size/stride
+	if(list&&list->size)
+		return list->size/list->stride;
 
 	return 0;
 }
 
-void *List_GetBufferPointer(List_t *List)
+void *List_GetBufferPointer(List_t *list)
 {
-	if(List)
-		return (void *)List->Buffer;
+	if(list)
+		return (void *)list->buffer;
 
 	return NULL;
 }
 
-bool List_ShrinkFit(List_t *List)
+bool List_ShrinkFit(List_t *list)
 {
-	if(List==NULL)
+	if(list==NULL)
 		return false;
 
-	void *temp=Zone_Realloc(zone, List->Buffer, List->Size);
+	uint8_t *temp=(uint8_t *)Zone_Realloc(zone, list->buffer, list->size);
 
 	if(temp==NULL)
 		return false;
 
-	List->Buffer=temp;
-	List->bufSize=List->Size;
+	list->buffer=temp;
+	list->bufSize=list->size;
 
 	return true;
 }
 
-void List_Clear(List_t *List)
+void List_Clear(List_t *list)
 {
-	if(List==NULL)
+	if(list==NULL)
 		return;
 
 	// Clearing list just zeros size, doesn't free memory
-	List->Size=0;
+	list->size=0;
 }
 
-void List_Destroy(List_t *List)
+void List_Destroy(List_t *list)
 {
-	if(List==NULL)
+	if(list==NULL)
 		return;
 
 	// Free memory and zero list structure
-	Zone_Free(zone, List->Buffer);
-    memset(List, 0, sizeof(List_t));
+	Zone_Free(zone, list->buffer);
+    memset(list, 0, sizeof(List_t));
 }
