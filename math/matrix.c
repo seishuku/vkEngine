@@ -192,12 +192,14 @@ vec3 Matrix3x3MultVec3(const vec3 in, const matrix m)
 
 matrix MatrixLookAt(const vec3 position, const vec3 forward, const vec3 up)
 {
-	vec3 f=forward;
+	vec3 f=Vec3_Subv(forward, position);
 	vec3 u=up, s;
 
 	Vec3_Normalize(&u);
 	Vec3_Normalize(&f);
 	s=Vec3_Cross(f, u);
+	Vec3_Normalize(&s);
+	u=Vec3_Cross(s, f);
 
 	return (matrix)
 	{

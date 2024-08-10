@@ -347,7 +347,7 @@ matrix CameraUpdate(Camera_t *camera, float dt)
 	camera->up     =Vec3(orientation.y.x, orientation.y.y, orientation.y.z);
 	camera->forward=Vec3(orientation.z.x, orientation.z.y, orientation.z.z);
 
-	return MatrixLookAt(camera->body.position, camera->forward, camera->up);
+	return MatrixLookAt(camera->body.position, Vec3_Addv(camera->body.position, camera->forward), camera->up);
 }
 
 // Camera path track stuff
