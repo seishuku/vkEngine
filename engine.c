@@ -1330,19 +1330,19 @@ bool Init(void)
 		return false;
 	}
 
-	if(!Audio_LoadStatic("assets/explode1.wav", &sounds[SOUND_EXPLODE1]))
+	if(!Audio_LoadStatic("assets/explode1.qoa", &sounds[SOUND_EXPLODE1]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode1.wav\n");
 		return false;
 	}
 
-	if(!Audio_LoadStatic("assets/explode2.wav", &sounds[SOUND_EXPLODE2]))
+	if(!Audio_LoadStatic("assets/explode2.qoa", &sounds[SOUND_EXPLODE2]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode2.wav\n");
 		return false;
 	}
 
-	if(!Audio_LoadStatic("assets/explode3.wav", &sounds[SOUND_EXPLODE3]))
+	if(!Audio_LoadStatic("assets/explode3.qoa", &sounds[SOUND_EXPLODE3]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode3.wav\n");
 		return false;

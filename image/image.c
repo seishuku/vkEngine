@@ -786,7 +786,7 @@ static void _GenerateMipmaps(VkCommandBuffer commandBuffer, VkuImage_t *image, u
 // Flags also set Vulkan texture sampler properties.
 VkBool32 Image_Upload(VkuContext_t *context, VkuImage_t *image, const char *filename, uint32_t flags)
 {
-	char *extension=strrchr(filename, '.');
+	const char *extension=strrchr(filename, '.');
 	VkFilter minFilter=VK_FILTER_LINEAR;
 	VkFilter magFilter=VK_FILTER_LINEAR;
 	VkSamplerMipmapMode mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
@@ -806,14 +806,13 @@ VkBool32 Image_Upload(VkuContext_t *context, VkuImage_t *image, const char *file
 			if(!TGA_Load(filename, image))
 				return VK_FALSE;
 		}
-		else
-			if(!strcmp(extension, ".qoi"))
-			{
-				if(!QOI_Load(filename, image))
-					return VK_FALSE;
-			}
-			else
+		else if(!strcmp(extension, ".qoi"))
+		{
+			if(!QOI_Load(filename, image))
 				return VK_FALSE;
+		}
+		else
+			return VK_FALSE;
 	}
 
 	if(flags&IMAGE_NEAREST)

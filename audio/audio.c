@@ -14,6 +14,7 @@
 #include "../system/system.h"
 #include "../math/math.h"
 #include "../camera/camera.h"
+#include "qoa.h"
 #include "audio.h"
 
 float audioTime=0.0;
@@ -605,4 +606,218 @@ void Audio_Destroy(void)
 	Pa_CloseStream(audioStream);
 	Pa_Terminate();
 #endif
+}
+
+// Simple resample and conversion function to the audio engine's common format (44.1KHz/16bit).
+// Based off of what id Software used in Quake, seems to work well enough.
+static int16_t *ConvertAndResample(const void *in, const uint32_t numSamples, const bool isFloat, const uint32_t sampleRate, const uint8_t bitsPerSample, const uint8_t channels)
+{
+	if(in==NULL)
+		return NULL;
+
+	const float stepScale=(float)sampleRate/AUDIO_SAMPLE_RATE;
+	const uint32_t outCount=(uint32_t)(numSamples/stepScale);
+
+	int16_t *out=(int16_t *)Zone_Malloc(zone, sizeof(int16_t)*outCount*channels);
+
+	if(out==NULL)
+		return NULL;
+
+	for(uint32_t i=0, sampleFrac=0;i<outCount;i++, sampleFrac+=(int32_t)(stepScale*256))
+	{
+		const int32_t srcSample=sampleFrac>>8;
+		int32_t sampleL=0, sampleR=0;
+
+		// Input conversion/resample
+		if(!isFloat)
+		{
+			if(bitsPerSample==32) // 32bit signed integer PCM
+			{
+				if(channels==2)
+				{
+					sampleL=((int32_t *)in)[2*srcSample+0]>>16;
+					sampleR=((int32_t *)in)[2*srcSample+1]>>16;
+				}
+				else if(channels==1)
+					sampleL=((int32_t *)in)[srcSample]>>16;
+			}
+			else if(bitsPerSample==24) // 24bit signed integer PCM
+			{
+				if(channels==2)
+				{
+					sampleL=(((uint8_t *)in)[i*6+0]|(((uint8_t *)in)[i*6+1]<<8)|(((uint8_t *)in)[i*6+2]<<16))>>8;
+					sampleR=(((uint8_t *)in)[i*6+3]|(((uint8_t *)in)[i*6+4]<<8)|(((uint8_t *)in)[i*6+5]<<16))>>8;
+				}
+				else if(channels==1)
+					sampleL=(((uint8_t *)in)[i*3+0]|(((uint8_t *)in)[i*3+1]<<8)|(((uint8_t *)in)[i*3+2]<<16))>>8;
+			}
+			else if(bitsPerSample==16) // 16bit signed integer PCM
+			{
+				if(channels==2)
+				{
+					sampleL=((int16_t *)in)[2*srcSample+0];
+					sampleR=((int16_t *)in)[2*srcSample+1];
+				}
+				else if(channels==1)
+					sampleL=((int16_t *)in)[srcSample];
+			}
+			else if(bitsPerSample==8) // 8bit unsigned integer PCM
+			{
+				if(channels==2)
+				{
+					sampleL=(((int8_t *)in)[2*srcSample+0]-128)<<8;
+					sampleR=(((int8_t *)in)[2*srcSample+1]-128)<<8;
+				}
+				else if(channels==1)
+					sampleL=(((int8_t *)in)[srcSample]-128)<<8;
+			}
+		}
+		else
+		{
+			if(bitsPerSample==64) // 64bit float
+			{
+				if(channels==2)
+				{
+					sampleL=(((double *)in)[2*srcSample+0]*INT16_MAX);
+					sampleR=(((double *)in)[2*srcSample+1]*INT16_MAX);
+				}
+				else
+					sampleL=(((double *)in)[srcSample]*INT16_MAX);
+			}
+			else if(bitsPerSample==32) // 32bit float
+			{
+				if(channels==2)
+				{
+					sampleL=(((float *)in)[2*srcSample+0]*INT16_MAX);
+					sampleR=(((float *)in)[2*srcSample+1]*INT16_MAX);
+				}
+				else
+					sampleL=(((float *)in)[srcSample]*INT16_MAX);
+			}
+		}
+
+		// Output (16bit signed int)
+		if(channels==2)
+		{
+			out[2*i+0]=(int16_t)sampleL;
+			out[2*i+1]=(int16_t)sampleR;
+		}
+		else if(channels==1)
+			out[i]=(int16_t)sampleL;
+	}
+
+	return out;
+}
+
+bool Audio_LoadStatic(const char *filename, Sample_t *sample)
+{
+	const char *extension=strrchr(filename, '.');
+	uint32_t numSamples=0, sampleRate=0, bitsPerSample=0, channels=0;
+	bool isFloat=false;
+	uint8_t *buffer=NULL;
+
+	if(extension!=NULL)
+	{
+		if(!strcmp(extension, ".wav"))
+		{
+			WaveFormat_t format={ 0 };
+			buffer=(uint8_t *)WavRead(filename, &format, &numSamples);
+
+			if(buffer==NULL)
+			{
+				DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for file %s.\n", filename);
+				return false;
+			}
+
+			if(format.formatTag==WAVE_FORMAT_IEEE_FLOAT)
+				isFloat=true;
+			else
+				isFloat=false;
+
+			sampleRate=format.samplesPerSec;
+			bitsPerSample=format.bitsPerSample;
+			channels=format.channels;
+		}
+		else if(!strcmp(extension, ".qoa"))
+		{
+			QOA_Desc_t qoa;
+			FILE *stream=NULL;
+
+			if((stream=fopen(filename, "rb"))==NULL)
+				return false;
+
+			// Seek to end of file to get file size, rescaling to align to 32 bit
+			fseek(stream, 0, SEEK_END);
+
+			int32_t size=ftell(stream);
+
+			if(size==-1)
+				return false;
+
+			fseek(stream, 0, SEEK_SET);
+
+			uint8_t *data=(uint8_t *)Zone_Malloc(zone, size);
+
+			if(data==NULL)
+			{
+				DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for file %s.\n", filename);
+				fclose(stream);
+				return false;
+			}
+
+			fread(data, 1, size, stream);
+
+			fclose(stream);
+
+			buffer=(uint8_t *)QOA_Decode(data, size, &qoa);
+
+			if(buffer==NULL)
+			{
+				DBGPRINTF(DEBUG_ERROR, "QOA decode for file %s failed.\n", filename);
+				Zone_Free(zone, data);
+				return false;
+			}
+
+			if(qoa.channels>2)
+			{
+				DBGPRINTF(DEBUG_ERROR, "QOA too many channels (%d) for file %s.\n", qoa.channels, filename);
+				Zone_Free(zone, buffer);
+				Zone_Free(zone, data);
+				return false;
+			}
+
+			isFloat=false;
+			numSamples=qoa.numSamples;
+			sampleRate=qoa.sampleRate;
+			bitsPerSample=16;
+			channels=qoa.channels;
+		}
+		else
+			return false;
+	}
+
+	// Covert to match primary buffer sampling rate
+	const uint32_t outputSamples=(uint32_t)(numSamples/((float)sampleRate/AUDIO_SAMPLE_RATE));
+
+#ifdef _DEBUG
+	DBGPRINTF(DEBUG_INFO, "Converting %s wave format from %dHz/%dbit to %d/16bit.\n", filename, sampleRate, bitsPerSample, AUDIO_SAMPLE_RATE);
+#endif
+
+	int16_t *resampledAndConverted=ConvertAndResample(buffer, numSamples, isFloat, sampleRate, bitsPerSample, channels);
+
+	if(resampledAndConverted==NULL)
+	{
+		DBGPRINTF(DEBUG_ERROR, "Unable to resample/convert buffer for file %s.\n", filename);
+		return false;
+	}
+
+	Zone_Free(zone, buffer);
+
+	sample->data=resampledAndConverted;
+
+	sample->length=outputSamples;
+	sample->channels=(uint8_t)channels;
+
+	// Done, return out
+	return true;
 }

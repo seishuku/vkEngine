@@ -18,6 +18,19 @@ typedef struct
     uint8_t channels;
 } Sample_t;
 
+#define WAVE_FORMAT_PCM			0x0001
+#define WAVE_FORMAT_IEEE_FLOAT	0x0003
+
+typedef struct WaveFormat_s
+{
+	uint16_t formatTag;			// format type (PCM, float, etc)
+	uint16_t channels;			// number of channels (mono, stereo, quad, etc)
+	uint32_t samplesPerSec;		// sample rate
+	uint32_t bytesPerSec;		// for buffer estimation
+	uint16_t blockAlign;		// block size of data
+	uint16_t bitsPerSample;		// number of bits per sample of mono data
+} WaveFormat_t;
+
 typedef struct
 {
 	// Waveform generation private variables
@@ -105,6 +118,9 @@ bool Audio_StartStream(uint32_t stream);
 bool Audio_StopStream(uint32_t stream);
 int Audio_Init(void);
 void Audio_Destroy(void);
+
+void *WavRead(const char *filename, WaveFormat_t *format, uint32_t *numSamples);
+uint32_t WavWrite(const char *filename, int16_t *samples, uint32_t numSamples, uint32_t sampleRate, uint16_t channels);
 
 void ResetWaveSample(WaveParams_t *params);
 float GenerateWaveSample(WaveParams_t *params);

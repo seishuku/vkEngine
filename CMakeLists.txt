@@ -73,6 +73,7 @@ add_custom_target(ShaderCompilation DEPENDS ${SHADER_BINARIES})
 
 set(PROJECT_SOURCES
 	audio/audio.c
+	audio/qoa.c
 	audio/wave.c
 	camera/camera.c
 	console/console.c
