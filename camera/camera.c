@@ -49,8 +49,7 @@ bool CameraIsTargetInFOV(const Camera_t camera, const vec3 targetPos, const floa
 // Move camera to targetPos while avoiding rigid body obstacles.
 void CameraSeekTargetCamera(Camera_t *camera, Camera_t cameraTarget, RigidBody_t *obstacles, size_t numObstacles)
 {
-	const float maxSpeed=1.0f;
-	const float angularSpeed=3.0f;
+	const float angularSpeed=0.05f;
 	const float positionDamping=0.0005f;
 	const float seekRadius=(camera->body.radius+cameraTarget.body.radius)*2.0f;
 
@@ -83,10 +82,8 @@ void CameraSeekTargetCamera(Camera_t *camera, Camera_t cameraTarget, RigidBody_t
 		}
 	}
 
-	// Slow down the speed as it gets closer
-	const float speed=maxSpeed*relativeDistance;
-
-	camera->body.velocity=Vec3_Addv(Vec3_Muls(camera->body.velocity, 1.0f-positionDamping), Vec3_Muls(directionWorld, speed*positionDamping));
+	// Apply the directional force to move the camera
+	camera->body.force=Vec3_Addv(camera->body.force, Vec3_Muls(directionWorld, relativeDistance*positionDamping));
 
 	// Aim:
 	// Get the axis of rotation (an axis perpendicular to the direction between current and target),
@@ -101,7 +98,7 @@ void CameraSeekTargetCamera(Camera_t *camera, Camera_t cameraTarget, RigidBody_t
 	vec4 rotation=QuatAnglev(theta, rotationAxis);
 
 	// Apply that to the angular velocity, multiplied by an angular speed const to control how fast the aiming is.
-	camera->body.angularVelocity=Vec3_Muls(Vec3(rotation.x, rotation.y, rotation.z), angularSpeed);
+	camera->body.angularVelocity=Vec3_Addv(camera->body.angularVelocity, Vec3_Muls(Vec3(rotation.x, rotation.y, rotation.z), angularSpeed));
 }
 
 // Camera collision stuff
