@@ -2,50 +2,8 @@
     "version": 3,
     "configurePresets": [
         {
-            "name": "x64-debug-cl",
-            "displayName": "Windows x64 Debug (cl)",
-            "architecture": {
-                "value": "x64",
-                "strategy": "external"
-            },
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/out/build/${presetName}",
-            "installDir": "${sourceDir}/out/install/${presetName}",
-            "cacheVariables": {
-                "CMAKE_C_COMPILER": "cl",
-                "CMAKE_CXX_COMPILER": "cl",
-                "CMAKE_BUILD_TYPE": "Debug"
-            },
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            }
-        },
-        {
-            "name": "x64-release-cl",
-            "displayName": "Windows x64 Release (cl)",
-            "architecture": {
-                "value": "x64",
-                "strategy": "external"
-            },
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/out/build/${presetName}",
-            "installDir": "${sourceDir}/out/install/${presetName}",
-            "cacheVariables": {
-                "CMAKE_C_COMPILER": "cl",
-                "CMAKE_CXX_COMPILER": "cl",
-                "CMAKE_BUILD_TYPE": "Release"
-            },
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            }
-        },
-        {
             "name": "x64-debug-clang",
-            "displayName": "Windows x64 Debug (clang)",
+            "displayName": "Windows x64 Debug",
             "architecture": {
                 "value": "x64",
                 "strategy": "external"
@@ -66,7 +24,7 @@
         },
         {
             "name": "x64-release-clang",
-            "displayName": "Windows x64 Release (clang)",
+            "displayName": "Windows x64 Release",
             "architecture": {
                 "value": "x64",
                 "strategy": "external"
@@ -86,7 +44,7 @@
             }
         },
         {
-            "name": "Linux x64 Debug (clang)",
+            "name": "Linux x64 Debug",
             "displayName": "Linux x64 Debug (clang)",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
             "cacheVariables": {
@@ -102,7 +60,7 @@
             }
         },
         {
-            "name": "Linux x64 Release (clang)",
+            "name": "Linux x64 Release",
             "displayName": "Linux x64 Release (clang)",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
             "cacheVariables": {

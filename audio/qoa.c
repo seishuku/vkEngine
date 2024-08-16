@@ -355,6 +355,9 @@ void *QOA_Decode(const uint8_t *bytes, uint32_t size, QOA_Desc_t *qoa)
 
 	int16_t *samples=(int16_t *)Zone_Malloc(zone, qoa->numSamples*qoa->channels*sizeof(int16_t));
 
+	if(samples==NULL)
+		return NULL;
+
 	for(uint32_t sampleIndex=0;sampleIndex<qoa->numSamples;)
 	{
 		uint32_t frameSamples=0;
