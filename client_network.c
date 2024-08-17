@@ -41,9 +41,8 @@ static const uint32_t FIELD_PACKETMAGIC     ='F'|'e'<<8|'l'<<16|'d'<<24; // "Fel
 //
 // THIS IS ALL VERY INSECURE AND DANGERUS
 
-//uint32_t serverAddress=NETWORK_ADDRESS(172, 26, 218, 132);	// my WSL instance's IP
-uint32_t serverAddress=NETWORK_ADDRESS(192, 168, 1, 10);		// my dev machine's local IP
-uint16_t serverPort=4545;
+uint32_t serverAddress;
+const uint16_t serverPort=4545;
 
 uint32_t clientID=0;
 
@@ -140,7 +139,7 @@ error:
 	}
 }
 
-bool ClientNetwork_Init(void)
+bool ClientNetwork_Init(uint32_t address)
 {
 	// Initialize the network API (mainly for winsock)
 	Network_Init();
@@ -150,6 +149,8 @@ bool ClientNetwork_Init(void)
 
 	if(clientSocket==-1)
 		return false;
+
+	serverAddress=address;
 
 	// Send connect magic to initiate connection
 	uint32_t magic=CONNECT_PACKETMAGIC;

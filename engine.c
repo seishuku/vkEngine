@@ -5,37 +5,38 @@
 #include <stdalign.h>
 #include <string.h>
 #include <stdatomic.h>
-#include "system/system.h"
-#include "vulkan/vulkan.h"
-#include "math/math.h"
-#include "camera/camera.h"
-#include "model/bmodel.h"
-#include "image/image.h"
-#include "utils/list.h"
-#include "lights/lights.h"
-#include "utils/event.h"
-#include "particle/particle.h"
-#include "system/threads.h"
-#include "vr/vr.h"
-#include "font/font.h"
 #include "audio/audio.h"
-#include "physics/physics.h"
-#include "ui/ui.h"
+#include "camera/camera.h"
 #include "console/console.h"
+#include "font/font.h"
+#include "image/image.h"
+#include "lights/lights.h"
+#include "math/math.h"
+#include "model/bmodel.h"
+#include "network/network.h"
+#include "particle/particle.h"
+#include "physics/physics.h"
+#include "system/system.h"
+#include "system/threads.h"
+#include "ui/ui.h"
+#include "utils/event.h"
+#include "utils/list.h"
+#include "vr/vr.h"
+#include "vulkan/vulkan.h"
 #include "client_network.h"
-#include "models.h"
-#include "textures.h"
-#include "line.h"
-#include "sphere.h"
-#include "lighting.h"
-#include "skybox.h"
-#include "shadow.h"
-#include "volume.h"
 #include "composite.h"
-#include "perframe.h"
-#include "sounds.h"
-#include "sfx.h"
+#include "lighting.h"
+#include "line.h"
+#include "models.h"
 #include "music.h"
+#include "perframe.h"
+#include "sfx.h"
+#include "shadow.h"
+#include "skybox.h"
+#include "sounds.h"
+#include "sphere.h"
+#include "textures.h"
+#include "volume.h"
 
 extern bool isDone;
 
@@ -1243,7 +1244,29 @@ void Console_CmdQuit(Console_t *console, const char *param)
 
 void Console_CmdConnect(Console_t *console, const char *param)
 {
-	ClientNetwork_Init();
+	if(param==NULL)
+		Console_Out(console, "Missing parameter.");
+	else
+	{
+		int32_t a=0, b=0, c=0, d=0;
+
+		if(sscanf(param, "%d.%d.%d.%d", &a, &b, &c, &d)!=4)
+		{
+			Console_Out(console, "Invalid IP address.");
+			return;
+		}
+		else
+		{
+			if(a<0||a>255||b<0||b>255||c<0||c>255||d<0||d>255)
+			{
+				Console_Out(console, "Invalid IP address.");
+				return;
+			}
+		}
+
+		if(!ClientNetwork_Init(NETWORK_ADDRESS(a, b, c, d)))
+			Console_Out(console, "Connect failed.");
+	}
 }
 
 void Console_CmdDisconnect(Console_t *console, const char *param)

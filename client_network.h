@@ -13,7 +13,7 @@ extern Socket_t clientSocket;
 extern uint32_t connectedClients;
 extern Camera_t netCameras[MAX_CLIENTS];
 
-bool ClientNetwork_Init(void);
+bool ClientNetwork_Init(uint32_t address);
 void ClientNetwork_Destroy(void);
 void ClientNetwork_SendStatus(void);
 

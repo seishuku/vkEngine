@@ -1,6 +1,11 @@
 #ifndef __LIGHTS_H__
 #define __LIGHTS_H__
 
+#include <stdint.h>
+#include "../math/math.h"
+#include "../utils/list.h"
+#include "../vulkan/vulkan.h"
+
 typedef struct
 {
 	uint32_t ID;
