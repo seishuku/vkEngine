@@ -778,6 +778,8 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 				return false;
 			}
 
+			Zone_Free(zone, data);
+
 			if(qoa.channels>2)
 			{
 				DBGPRINTF(DEBUG_ERROR, "QOA too many channels (%d) for file %s.\n", qoa.channels, filename);
