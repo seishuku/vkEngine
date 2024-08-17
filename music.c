@@ -7,10 +7,12 @@
 #include "math/math.h"
 #include "audio/audio.h"
 #include "music.h"
+#include "audio/qoa.h"
 
 static mtx_t musicMutex;
 
-static OggVorbis_File oggStream;
+//static OggVorbis_File oggStream;
+static QOA_File_t qoaFile;
 
 #ifdef ANDROID
 static const char *musicPath="/storage/emulated/0/Music/";
@@ -121,7 +123,8 @@ void MusicStreamData(void *buffer, size_t length)
 
 	do
 	{
-		size=ov_read(&oggStream, bufferBytePtr, (int)lengthBytes, 0, 2, 1, NULL);
+		//size=ov_read(&oggStream, bufferBytePtr, (int)lengthBytes, 0, 2, 1, NULL);
+		size=QOA_Read(&qoaFile, (int16_t *)bufferBytePtr, length*2)*2;
 		bufferBytePtr+=size;
 		lengthBytes-=size;
 	} while(lengthBytes&&size);
@@ -148,21 +151,21 @@ void PrevTrackCallback(void *arg)
 	if(musicList!=NULL)
 	{
 		mtx_lock(&musicMutex);
-		ov_clear(&oggStream);
+		//ov_clear(&oggStream);
 
-		char filePath[1024]={ 0 };
+		//char filePath[1024]={ 0 };
 
-		currentMusic=(currentMusic-1)%numMusic;
-		sprintf(filePath, "%s%s", musicPath, musicList[currentMusic].string);
+		//currentMusic=(currentMusic-1)%numMusic;
+		//sprintf(filePath, "%s%s", musicPath, musicList[currentMusic].string);
 
-		int result=ov_fopen(filePath, &oggStream);
+		//int result=ov_fopen(filePath, &oggStream);
 
-		if(result<0)
-		{
-			ov_clear(&oggStream);
-			mtx_unlock(&musicMutex);
-			return;
-		}
+		//if(result<0)
+		//{
+		//	ov_clear(&oggStream);
+		//	mtx_unlock(&musicMutex);
+		//	return;
+		//}
 
 		mtx_unlock(&musicMutex);
 	}
@@ -170,24 +173,28 @@ void PrevTrackCallback(void *arg)
 
 void NextTrackCallback(void *arg)
 {
-	if(musicList!=NULL)
+	//if(musicList!=NULL)
 	{
 		mtx_lock(&musicMutex);
-		ov_clear(&oggStream);
 
-		char filePath[1024]={ 0 };
+		QOA_CloseFile(&qoaFile);
+		QOA_OpenFile(&qoaFile, "assets/music/test.qoa");
 
-		currentMusic=(currentMusic+1)%numMusic;
-		sprintf(filePath, "%s%s", musicPath, musicList[currentMusic].string);
+		//ov_clear(&oggStream);
 
-		int result=ov_fopen(filePath, &oggStream);
+		//char filePath[1024]={ 0 };
 
-		if(result<0)
-		{
-			ov_clear(&oggStream);
-			mtx_unlock(&musicMutex);
-			return;
-		}
+		//currentMusic=(currentMusic+1)%numMusic;
+		//sprintf(filePath, "%s%s", musicPath, musicList[currentMusic].string);
+
+		//int result=ov_fopen(filePath, &oggStream);
+
+		//if(result<0)
+		//{
+		//	ov_clear(&oggStream);
+		//	mtx_unlock(&musicMutex);
+		//	return;
+		//}
 
 		mtx_unlock(&musicMutex);
 	}
@@ -197,28 +204,30 @@ void Music_Init(void)
 {
 	mtx_init(&musicMutex, mtx_plain);
 
-	musicList=BuildFileList(musicPath, ".ogg", &numMusic);
+	QOA_OpenFile(&qoaFile, "assets/music/test.qoa");
 
-	if(musicList!=NULL)
-	{
-		DBGPRINTF(DEBUG_INFO, "\nFound music files in \"%s\":\n", musicPath);
-		for(uint32_t i=0;i<numMusic;i++)
-			DBGPRINTF(DEBUG_WARNING, "%s\n", musicList[i].string);
+	//musicList=BuildFileList(musicPath, ".ogg", &numMusic);
 
-		char filePath[1024]={ 0 };
+	//if(musicList!=NULL)
+	//{
+	//	DBGPRINTF(DEBUG_INFO, "\nFound music files in \"%s\":\n", musicPath);
+	//	for(uint32_t i=0;i<numMusic;i++)
+	//		DBGPRINTF(DEBUG_WARNING, "%s\n", musicList[i].string);
 
-		currentMusic=RandRange(0, numMusic-1);
-		sprintf(filePath, "%s%s", musicPath, musicList[currentMusic].string);
+	//	char filePath[1024]={ 0 };
 
-		int result=ov_fopen(filePath, &oggStream);
+	//	currentMusic=RandRange(0, numMusic-1);
+	//	sprintf(filePath, "%s%s", musicPath, musicList[currentMusic].string);
 
-		if(result<0)
-		{
-			DBGPRINTF(DEBUG_ERROR, "Music_Init: Unable to ov_open %s\n", filePath);
-			ov_clear(&oggStream);
-			return;
-		}
-	}
+	//	int result=ov_fopen(filePath, &oggStream);
+
+	//	if(result<0)
+	//	{
+	//		DBGPRINTF(DEBUG_ERROR, "Music_Init: Unable to ov_open %s\n", filePath);
+	//		ov_clear(&oggStream);
+	//		return;
+	//	}
+	//}
 
 	Audio_SetStreamCallback(0, MusicStreamData);
 	Audio_StartStream(0);
@@ -226,7 +235,8 @@ void Music_Init(void)
 
 void Music_Destroy(void)
 {
-	ov_clear(&oggStream);
+	//ov_clear(&oggStream);
+	QOA_CloseFile(&qoaFile);
 
 	if(musicList)
 		Zone_Free(zone, musicList);

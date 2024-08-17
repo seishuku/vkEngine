@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include "../system/system.h"
 #include "qoa.h"
@@ -326,31 +327,41 @@ uint32_t QOA_DecodeFrame(const void *bytes, uint32_t size, QOA_Desc_t *qoa, int1
 	return (uint8_t *)p-(uint8_t *)bytes;
 }
 
-void *QOA_Decode(const uint8_t *bytes, uint32_t size, QOA_Desc_t *qoa)
+bool QOA_DecodeHeader(uint64_t **ptr, const uint32_t size, QOA_Desc_t *qoa)
 {
-	uint64_t *p=(uint64_t *)bytes;
+	if(ptr==NULL||size<16||qoa==NULL)
+		return false;
 
-	if(size<16)
-		return NULL;
+	const uint64_t header=QOA_SwapU64(*(*ptr)++);
 
-	uint64_t header=QOA_SwapU64(*p++);
-
-	uint32_t magic=(header&QOA_HEADER_MAGIC_MASK)>>QOA_HEADER_MAGIC_SHIFT;
+	const uint32_t magic=(header&QOA_HEADER_MAGIC_MASK)>>QOA_HEADER_MAGIC_SHIFT;
 
 	if(magic!=QOA_MAGIC)
-		return NULL;
+		return false;
 
 	qoa->numSamples=(header&QOA_HEADER_NUMSAMPLES_MASK)>>QOA_HEADER_NUMSAMPLES_SHIFT;
 
 	if(!qoa->numSamples)
-		return NULL;
+		return false;
 
-	uint64_t frameHeader=QOA_SwapU64(*p);
+	const uint64_t frameHeader=QOA_SwapU64(*(*ptr));
 
-	qoa->channels=  (frameHeader&QOA_FRAMEHEADER_CHANNELS_MASK  )>>QOA_FRAMEHEADER_CHANNELS_SHIFT;
+	qoa->channels=(frameHeader&QOA_FRAMEHEADER_CHANNELS_MASK)>>QOA_FRAMEHEADER_CHANNELS_SHIFT;
 	qoa->sampleRate=(frameHeader&QOA_FRAMEHEADER_SAMPLERATE_MASK)>>QOA_FRAMEHEADER_SAMPLERATE_SHIFT;
+	qoa->frameNumSamples=(frameHeader&QOA_FRAMEHEADER_FRAMELENGTH_MASK)>>QOA_FRAMEHEADER_FRAMELENGTH_SHIFT;
+	qoa->frameSize=(frameHeader&QOA_FRAMEHEADER_FRAMESIZE_MASK)>>QOA_FRAMEHEADER_FRAMESIZE_SHIFT;
 
 	if(qoa->channels==0||qoa->numSamples==0||qoa->sampleRate==0)
+		return false;
+
+	return true;
+}
+
+void *QOA_Decode(const uint8_t *bytes, uint32_t size, QOA_Desc_t *qoa)
+{
+	uint64_t *p=(uint64_t *)bytes;
+
+	if(!QOA_DecodeHeader(&p, size, qoa))
 		return NULL;
 
 	int16_t *samples=(int16_t *)Zone_Malloc(zone, qoa->numSamples*qoa->channels*sizeof(int16_t));
@@ -361,7 +372,7 @@ void *QOA_Decode(const uint8_t *bytes, uint32_t size, QOA_Desc_t *qoa)
 	for(uint32_t sampleIndex=0;sampleIndex<qoa->numSamples;)
 	{
 		uint32_t frameSamples=0;
-		uint32_t frameSize=QOA_DecodeFrame(p, size-((uint8_t *)p-bytes), qoa, samples+sampleIndex*qoa->channels, &frameSamples);
+		uint32_t frameSize=QOA_DecodeFrame(p, QOA_FRAME_LEN, qoa, samples+sampleIndex*qoa->channels, &frameSamples);
 
 		if(!frameSize)
 		{
@@ -369,9 +380,105 @@ void *QOA_Decode(const uint8_t *bytes, uint32_t size, QOA_Desc_t *qoa)
 			break;
 		}
 
-		p+=frameSize>>3;
+		p+=frameSize>>3; // divide by 8, because p is u64, not bytes
 		sampleIndex+=frameSamples;
 	}
 
 	return samples;
+}
+
+bool QOA_OpenFile(QOA_File_t *qoaFile, const char *filename)
+{
+	qoaFile->file=fopen(filename, "rb");
+
+	if(qoaFile->file==NULL)
+		return false;
+
+	// Read the file header and first frame header
+	uint64_t header[2];
+	if(fread(header, sizeof(uint64_t), 2, qoaFile->file)!=2)
+	{
+		fclose(qoaFile->file);
+		return false;
+	}
+
+	// Decode header and initialize qoa descriptor.
+	uint64_t *p=header;
+	if(!QOA_DecodeHeader(&p, 16, &qoaFile->qoa))
+	{
+		fclose(qoaFile->file);
+		return false;
+	}
+
+	// Seek back to frame header
+	fseek(qoaFile->file, -(long)sizeof(uint64_t), SEEK_CUR);
+
+	// Allocate memory for decoded samples.
+	qoaFile->samples=(int16_t *)Zone_Malloc(zone, qoaFile->qoa.frameNumSamples*qoaFile->qoa.channels*sizeof(int16_t));
+
+	if(qoaFile->samples==NULL)
+	{
+		fclose(qoaFile->file);
+		return false;
+	}
+
+	qoaFile->totalSamples=0;
+	qoaFile->currentSampleIndex=0;
+
+	return true;
+}
+
+void QOA_CloseFile(QOA_File_t *qoaFile)
+{
+	if(qoaFile->file!=NULL)
+		fclose(qoaFile->file);
+
+	if(qoaFile->samples!=NULL)
+		Zone_Free(zone, qoaFile->samples);
+}
+
+size_t QOA_Read(QOA_File_t *qoaFile, int16_t *output, size_t sampleCount)
+{
+	size_t samplesRead=0;
+
+	while(samplesRead<sampleCount)
+	{
+		// Check if we've run out of decoded samples.
+		if(qoaFile->currentSampleIndex>=qoaFile->totalSamples)
+		{
+			// Read the next frame.
+			uint8_t frame[QOA_FRAME_LEN*QOA_MAX_CHANNELS];
+			
+			if(fread(frame, 1, qoaFile->qoa.frameSize, qoaFile->file)!=qoaFile->qoa.frameSize)
+				break;
+
+			uint32_t frameSamples=0;
+			uint32_t frameSize=QOA_DecodeFrame(frame, qoaFile->qoa.frameSize, &qoaFile->qoa, qoaFile->samples, &frameSamples);
+
+			int32_t sizeDiff=frameSize-qoaFile->qoa.frameSize;
+
+			fseek(qoaFile->file, sizeDiff, SEEK_CUR);
+
+			// If decoding fails, either end of stream or error.
+			if(frameSize==0)
+				break;
+
+			qoaFile->totalSamples=frameSamples*qoaFile->qoa.channels;
+			qoaFile->currentSampleIndex=0;
+		}
+
+		// Copy decoded samples to output buffer.
+		size_t samplesToCopy=sampleCount-samplesRead;
+		size_t availableSamples=qoaFile->totalSamples-qoaFile->currentSampleIndex;
+
+		if(samplesToCopy>availableSamples)
+			samplesToCopy=availableSamples;
+
+		memcpy(output+samplesRead, qoaFile->samples+qoaFile->currentSampleIndex, samplesToCopy*sizeof(int16_t));
+
+		qoaFile->currentSampleIndex+=samplesToCopy;
+		samplesRead+=samplesToCopy;
+	}
+
+	return samplesRead;
 }
