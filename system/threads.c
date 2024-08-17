@@ -193,7 +193,10 @@ bool Thread_Destroy(ThreadWorker_t *worker)
 	mtx_unlock(&worker->mutex);
 
 	// Wait for thread to join back with calling thread
-	thrd_join(worker->thread, NULL);
+#ifndef WIN32
+	if(worker->thread) // POSIX apparently segfaults when calling join on an invalid thread handle, windows doesn't care.
+#endif
+		thrd_join(worker->thread, NULL);
 
 	// Destroy the mutex and condition variable
 	mtx_lock(&worker->mutex);
