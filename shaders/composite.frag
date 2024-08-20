@@ -90,7 +90,7 @@ float volumetricLightScattering(const vec3 lightPos, const vec3 rayOrigin, const
 	const vec3 rayDirection=rayVector/rayLength;
     const vec3 rayStep=rayDirection*rayLength*fNumSteps;
 	const float decay=0.98;
-	const float cosTheta=dot(rayDirection, normalize(lightPos));
+	const float cosTheta=dot(rayDirection, normalize(lightPos))*0.5+0.5;
 
 	const float miePhase=MiePhase(cosTheta, g);
 	const float scattering=mieCoefficient/(1.0-g*g);
@@ -101,8 +101,8 @@ float volumetricLightScattering(const vec3 lightPos, const vec3 rayOrigin, const
 
 	for(int i=0;i<numSteps;i++)
 	{
-		// TODO: Is there a better way to cap the rays from going off into infinity than multiplying with clamped cosTheta?
-		L+=(ShadowPCF(biasMat*lightMVP*rayPos)*max(0.0, cosTheta))*scattering*lDecay;
+		// TODO: sign/biasing cosTheta and raising it's power seems to be better, but are there better ways of handling this?
+		L+=(ShadowPCF(biasMat*lightMVP*rayPos)*pow(cosTheta, 4.0))*scattering*lDecay;
 		lDecay*=decay;
 		rayPos.xyz+=rayStep;
 	}
