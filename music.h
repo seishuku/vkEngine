@@ -1,13 +1,7 @@
 #ifndef __MUSIC_H__
 #define __MUSIC_H__
 
-typedef struct
-{
-	char string[256];
-} String_t;
-
-extern String_t *musicList;
-extern uint32_t numMusic, currentMusic;
+const char *GetCurrentMusicTrack(void);
 
 void StartStreamCallback(void *arg);
 void StopStreamCallback(void *arg);

@@ -19,20 +19,33 @@ static const char *musicPath="/storage/emulated/0/Music/";
 static const char *musicPath="assets/music/";
 #endif
 
-String_t *musicList;
-uint32_t numMusic=0, currentMusic=0;
+typedef struct
+{
+	char string[256];
+} String_t;
+
+static String_t *musicList;
+static uint32_t numMusic=0, currentMusic=0;
+
+const char *GetCurrentMusicTrack(void)
+{
+	if(musicList==NULL||currentMusic>numMusic)
+		return "Invalid track";
+
+	return musicList[currentMusic].string;
+}
 
 #if defined(LINUX)||defined(ANDROID)
 #include <dirent.h>
 #include <sys/stat.h>
 
-String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFiles)
+static String_t *BuildFileList(const char *dirName, const char *filter, uint32_t *numFiles)
 {
 	DIR *dp;
 	struct dirent *dir_entry;
-	String_t *Ret=NULL;
+	String_t *results=NULL;
 
-	if((dp=opendir(DirName))==NULL)
+	if((dp=opendir(dirName))==NULL)
 	{
 		DBGPRINTF(DEBUG_ERROR, "BuildFileList: opendir failed.\n");
 		return NULL;
@@ -46,10 +59,10 @@ String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFi
 
 			if(ptr!=NULL)
 			{
-				if(!strcmp(ptr, Filter))
+				if(!strcmp(ptr, filter))
 				{
-					Ret=(String_t *)Zone_Realloc(zone, Ret, sizeof(String_t)*(*NumFiles+1));
-					sprintf(Ret[(*NumFiles)++].string, "%s", dir_entry->d_name);
+					results=(String_t *)Zone_Realloc(zone, results, sizeof(String_t)*(*numFiles+1));
+					sprintf(results[(*numFiles)++].string, "%s", dir_entry->d_name);
 				}
 			}
 		}
@@ -57,7 +70,7 @@ String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFi
 
 	closedir(dp);
 
-	return Ret;
+	return results;
 }
 #endif
 
@@ -65,39 +78,39 @@ String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFi
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFiles)
+static String_t *BuildFileList(const char *dirName, const char *filter, uint32_t *numFiles)
 {
 	HANDLE hList;
 	char szDir[MAX_PATH+1];
-	WIN32_FIND_DATA FileData;
-	String_t *Ret=NULL;
+	WIN32_FIND_DATA fileData;
+	String_t *results=NULL;
 
-	sprintf(szDir, "%s\\*", DirName);
+	sprintf(szDir, "%s\\*", dirName);
 
-	if((hList=FindFirstFile(szDir, &FileData))==INVALID_HANDLE_VALUE)
+	if((hList=FindFirstFile(szDir, &fileData))==INVALID_HANDLE_VALUE)
 		return NULL;
 
 	for(;;)
 	{
-		if(!(FileData.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY))
+		if(!(fileData.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY))
 		{
-			const char *ptr=strrchr(FileData.cFileName, '.');
+			const char *ptr=strrchr(fileData.cFileName, '.');
 
 			if(ptr!=NULL)
 			{
-				if(!strcmp(ptr, Filter))
+				if(!strcmp(ptr, filter))
 				{
-					Ret=(String_t *)Zone_Realloc(zone, Ret, sizeof(String_t)*(*NumFiles+1));
+					results=(String_t *)Zone_Realloc(zone, results, sizeof(String_t)*(*numFiles+1));
 
-					if(Ret==NULL)
+					if(results==NULL)
 						return NULL;
 
-					sprintf(Ret[(*NumFiles)++].string, "%s", FileData.cFileName);
+					sprintf(results[(*numFiles)++].string, "%s", fileData.cFileName);
 				}
 			}
 		}
 
-		if(!FindNextFile(hList, &FileData))
+		if(!FindNextFile(hList, &fileData))
 		{
 			if(GetLastError()==ERROR_NO_MORE_FILES)
 				break;
@@ -106,7 +119,7 @@ String_t *BuildFileList(const char *DirName, const char *Filter, uint32_t *NumFi
 
 	FindClose(hList);
 
-	return Ret;
+	return results;
 }
 #endif
 
@@ -154,7 +167,7 @@ void PrevTrackCallback(void *arg)
 		char filePath[1024]={ 0 };
 
 		currentMusic=(currentMusic-1)%numMusic;
-		sprintf(filePath, "%s%s", musicPath, musicList[currentMusic].string);
+		sprintf(filePath, "%s%s", musicPath, GetCurrentMusicTrack());
 
 		int result=ov_fopen(filePath, &oggStream);
 
@@ -179,7 +192,7 @@ void NextTrackCallback(void *arg)
 		char filePath[1024]={ 0 };
 
 		currentMusic=(currentMusic+1)%numMusic;
-		sprintf(filePath, "%s%s", musicPath, musicList[currentMusic].string);
+		sprintf(filePath, "%s%s", musicPath, GetCurrentMusicTrack());
 
 		int result=ov_fopen(filePath, &oggStream);
 
@@ -209,7 +222,7 @@ void Music_Init(void)
 		char filePath[1024]={ 0 };
 
 		currentMusic=RandRange(0, numMusic-1);
-		sprintf(filePath, "%s%s", musicPath, musicList[currentMusic].string);
+		sprintf(filePath, "%s%s", musicPath, GetCurrentMusicTrack());
 
 		int result=ov_fopen(filePath, &oggStream);
 
