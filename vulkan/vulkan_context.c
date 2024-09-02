@@ -287,7 +287,7 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME)==0)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME" extension is supported!\n");
-			context->externalFenceExtension=VK_TRUE;
+			context->externalMemoryExtension=VK_TRUE;
 		}
 		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME)==0)
 		{
