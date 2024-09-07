@@ -179,7 +179,7 @@ target_link_libraries(
 )
 
 if(CMAKE_SYSTEM_NAME MATCHES "Windows")
-target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC portaudio_static ws2_32.lib)
+target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC portaudio_static ws2_32.lib xinput.lib)
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
