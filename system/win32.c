@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <hidusage.h>
+#include <Xinput.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -31,6 +32,8 @@ static uint32_t winWidth=1920, winHeight=1080;
 extern uint32_t renderWidth, renderHeight;
 
 float fps=0.0f, fTimeStep=0.0f, fTime=0.0f;
+
+extern vec2 leftThumbstick, rightThumbstick;
 
 void Render(void);
 bool Init(void);
@@ -190,47 +193,47 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			GetRawInputData((HRAWINPUT)lParam, RID_INPUT, bRawMessage, &dwSize, sizeof(RAWINPUTHEADER));
 
-			RAWINPUT *Input=(RAWINPUT *)bRawMessage;
+			RAWINPUT *input=(RAWINPUT *)bRawMessage;
 
-			switch(Input->header.dwType)
+			switch(input->header.dwType)
 			{
 				case RIM_TYPEKEYBOARD:
 				{
-					RAWKEYBOARD Keyboard=Input->data.keyboard;
+					RAWKEYBOARD keyboard=input->data.keyboard;
 
-					if(Keyboard.VKey==0xFF)
+					if(keyboard.VKey==0xFF)
 						break;
 
 					// Specific case for escape key to quit application
-					if(Keyboard.VKey==VK_ESCAPE)
+					if(keyboard.VKey==VK_ESCAPE)
 					{
 						PostQuitMessage(0);
 						return 0;
 					}
 
 					// Specific case to remap the shift/control/alt virtual keys
-					if(Keyboard.VKey==VK_SHIFT)
-						Keyboard.VKey=MapVirtualKey(Keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
+					if(keyboard.VKey==VK_SHIFT)
+						keyboard.VKey=MapVirtualKey(keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
 
-					if(Keyboard.VKey==VK_CONTROL)
-						Keyboard.VKey=MapVirtualKey(Keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
+					if(keyboard.VKey==VK_CONTROL)
+						keyboard.VKey=MapVirtualKey(keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
 
-					if(Keyboard.VKey==VK_MENU)
-						Keyboard.VKey=MapVirtualKey(Keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
+					if(keyboard.VKey==VK_MENU)
+						keyboard.VKey=MapVirtualKey(keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
 
 					// Remap from Windows virtual keys to application key enums
 					// (will probably reformat this later)
 					uint32_t code=KB_UNKNOWN;
 
-					switch(Keyboard.VKey)
+					switch(keyboard.VKey)
 					{
 						case VK_BACK:		code=KB_BACKSPACE;				break;	// Backspace
 						case VK_TAB:		code=KB_TAB;					break;	// Tab
-						case VK_RETURN:		if(Keyboard.Flags&RI_KEY_E0)
-												code=KB_NP_ENTER;					// Numpad enter
-											else
-												code=KB_ENTER;						// Enter
-											break;
+						case VK_RETURN:		if(keyboard.Flags&RI_KEY_E0)
+							code=KB_NP_ENTER;					// Numpad enter
+									  else
+							code=KB_ENTER;						// Enter
+							break;
 						case VK_PAUSE:		code=KB_PAUSE;					break;	// pause
 						case VK_CAPITAL:	code=KB_CAPS_LOCK;				break;	// Caps Lock
 						case VK_ESCAPE:		code=KB_ESCAPE;					break;	// Esc
@@ -290,20 +293,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						case VK_OEM_5:		code=KB_BACKSLASH;				break;	// Backslash
 						case VK_OEM_6:		code=KB_RIGHT_BRACKET;			break;	// ]
 						case VK_OEM_7:		code=KB_APOSTROPHE;				break;	// '
-						case VK_LCONTROL:	if(Keyboard.Flags&RI_KEY_E0)
-												code=KB_RCTRL;						// Right control
-											 else
-												code=KB_LCTRL;						// Left control
-											break;
-						case VK_LMENU:		if(Keyboard.Flags&RI_KEY_E0)
-												code=KB_RALT;						// Right alt
-											 else
-												code=KB_LALT;						// Left alt
-											break;
-						default:			code=Keyboard.VKey;	break;	// All others
+						case VK_LCONTROL:	if(keyboard.Flags&RI_KEY_E0)
+							code=KB_RCTRL;						// Right control
+										else
+							code=KB_LCTRL;						// Left control
+							break;
+						case VK_LMENU:		if(keyboard.Flags&RI_KEY_E0)
+							code=KB_RALT;						// Right alt
+									 else
+							code=KB_LALT;						// Left alt
+							break;
+						default:			code=keyboard.VKey;	break;	// All others
 					}
 
-					if(Keyboard.Flags&RI_KEY_BREAK)
+					if(keyboard.Flags&RI_KEY_BREAK)
 						Event_Trigger(EVENT_KEYUP, &code);
 					else
 						Event_Trigger(EVENT_KEYDOWN, &code);
@@ -312,62 +315,62 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				}
 
 				case RIM_TYPEMOUSE:
-                {
-					RAWMOUSE Mouse=Input->data.mouse;
-					static MouseEvent_t MouseEvent={ 0, 0, 0, 0 };
+				{
+					RAWMOUSE mouse=input->data.mouse;
+					static MouseEvent_t mouseEvent={ 0, 0, 0, 0 };
 
-					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_1_DOWN)
-						MouseEvent.button|=MOUSE_BUTTON_1;
+					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_1_DOWN)
+						mouseEvent.button|=MOUSE_BUTTON_1;
 
-					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_1_UP)
-						MouseEvent.button&=~MOUSE_BUTTON_1;
+					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_1_UP)
+						mouseEvent.button&=~MOUSE_BUTTON_1;
 
-					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_2_DOWN)
-						MouseEvent.button|=MOUSE_BUTTON_2;
+					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_2_DOWN)
+						mouseEvent.button|=MOUSE_BUTTON_2;
 
-					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_2_UP)
-						MouseEvent.button&=~MOUSE_BUTTON_2;
+					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_2_UP)
+						mouseEvent.button&=~MOUSE_BUTTON_2;
 
-					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_3_DOWN)
-						MouseEvent.button|=MOUSE_BUTTON_3;
+					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_3_DOWN)
+						mouseEvent.button|=MOUSE_BUTTON_3;
 
-					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_3_UP)
-						MouseEvent.button&=~MOUSE_BUTTON_3;
+					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_3_UP)
+						mouseEvent.button&=~MOUSE_BUTTON_3;
 
-					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_4_DOWN)
-						MouseEvent.button|=MOUSE_BUTTON_4;
+					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_4_DOWN)
+						mouseEvent.button|=MOUSE_BUTTON_4;
 
-					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_4_UP)
-						MouseEvent.button&=~MOUSE_BUTTON_4;
+					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_4_UP)
+						mouseEvent.button&=~MOUSE_BUTTON_4;
 
-					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_5_DOWN)
-						MouseEvent.button|=MOUSE_BUTTON_5;
+					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_5_DOWN)
+						mouseEvent.button|=MOUSE_BUTTON_5;
 
-					if(Mouse.usButtonFlags&RI_MOUSE_BUTTON_5_UP)
-						MouseEvent.button&=~MOUSE_BUTTON_5;
+					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_5_UP)
+						mouseEvent.button&=~MOUSE_BUTTON_5;
 
-					if(Mouse.usButtonFlags&RI_MOUSE_WHEEL)
-						MouseEvent.dz=Mouse.usButtonData;
+					if(mouse.usButtonFlags&RI_MOUSE_WHEEL)
+						mouseEvent.dz=mouse.usButtonData;
 
-					if(Mouse.usFlags==MOUSE_MOVE_RELATIVE)
+					if(mouse.usFlags==MOUSE_MOVE_RELATIVE)
 					{
-						if(Mouse.lLastX!=0||Mouse.lLastY!=0)
+						if(mouse.lLastX!=0||mouse.lLastY!=0)
 						{
-							MouseEvent.dx=Mouse.lLastX;
-							MouseEvent.dy=-Mouse.lLastY;
-							Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
+							mouseEvent.dx=mouse.lLastX;
+							mouseEvent.dy=-mouse.lLastY;
+							Event_Trigger(EVENT_MOUSEMOVE, &mouseEvent);
 						}
 					}
 
-					if(Mouse.usButtonFlags&(RI_MOUSE_BUTTON_1_DOWN|RI_MOUSE_BUTTON_2_DOWN|RI_MOUSE_BUTTON_3_DOWN|RI_MOUSE_BUTTON_4_DOWN|RI_MOUSE_BUTTON_5_DOWN))
+					if(mouse.usButtonFlags&(RI_MOUSE_BUTTON_1_DOWN|RI_MOUSE_BUTTON_2_DOWN|RI_MOUSE_BUTTON_3_DOWN|RI_MOUSE_BUTTON_4_DOWN|RI_MOUSE_BUTTON_5_DOWN))
 					{
-						Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
-						Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
+						Event_Trigger(EVENT_MOUSEDOWN, &mouseEvent);
+						Event_Trigger(EVENT_MOUSEMOVE, &mouseEvent);
 					}
-					else if(Mouse.usButtonFlags&(RI_MOUSE_BUTTON_1_UP|RI_MOUSE_BUTTON_2_UP|RI_MOUSE_BUTTON_3_UP|RI_MOUSE_BUTTON_4_UP|RI_MOUSE_BUTTON_5_UP))
+					else if(mouse.usButtonFlags&(RI_MOUSE_BUTTON_1_UP|RI_MOUSE_BUTTON_2_UP|RI_MOUSE_BUTTON_3_UP|RI_MOUSE_BUTTON_4_UP|RI_MOUSE_BUTTON_5_UP))
 					{
-						Event_Trigger(EVENT_MOUSEUP, &MouseEvent);
-						Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
+						Event_Trigger(EVENT_MOUSEUP, &mouseEvent);
+						Event_Trigger(EVENT_MOUSEMOVE, &mouseEvent);
 					}
 					break;
 				}
@@ -382,6 +385,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	}
 
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
+}
+
+static vec2 ApplyScaleDeadzone(LONG x, LONG y, LONG maxX, LONG maxY, float deadzoneThreshold)
+{
+	vec2 d={ ((float)x/maxX), ((float)y/maxY) };
+
+	if(fabsf(d.x)<deadzoneThreshold)
+		d.x=0.0f;
+	if(fabsf(d.y)<deadzoneThreshold)
+		d.y=0.0f;
+
+	return d;
 }
 
 #include "../renderdoc_app.h"
@@ -530,6 +545,85 @@ int main(int argc, char **argv)
 		}
 		else
 		{
+			// TODO: Find a better place for gamepad input handling!
+			XINPUT_STATE state={ 0 };
+
+			if(XInputGetState(0, &state)==ERROR_SUCCESS)
+			{
+				static uint32_t qKeyShot=0, eKeyShot=0, cKeyShot=0, vKeyShot=0;
+
+				leftThumbstick=ApplyScaleDeadzone(state.Gamepad.sThumbLX, state.Gamepad.sThumbLY, INT16_MAX, INT16_MAX, 0.1f);
+				rightThumbstick=ApplyScaleDeadzone(state.Gamepad.sThumbRX, state.Gamepad.sThumbRY, INT16_MAX, INT16_MAX, 0.1f);
+
+				if(state.Gamepad.wButtons&XINPUT_GAMEPAD_A)
+				{
+					if(!cKeyShot)
+					{
+						cKeyShot=KB_C;
+						Event_Trigger(EVENT_KEYDOWN, &cKeyShot);
+					}
+				}
+				else
+				{
+					if(cKeyShot)
+					{
+						Event_Trigger(EVENT_KEYUP, &cKeyShot);
+						cKeyShot=0;
+					}
+				}
+
+				if(state.Gamepad.wButtons&XINPUT_GAMEPAD_X)
+				{
+					if(!vKeyShot)
+					{
+						vKeyShot=KB_V;
+						Event_Trigger(EVENT_KEYDOWN, &vKeyShot);
+					}
+				}
+				else
+				{
+					if(vKeyShot)
+					{
+						Event_Trigger(EVENT_KEYUP, &vKeyShot);
+						vKeyShot=0;
+					}
+				}
+
+				if(state.Gamepad.wButtons&XINPUT_GAMEPAD_LEFT_SHOULDER)
+				{
+					if(!qKeyShot)
+					{
+						qKeyShot=KB_Q;
+						Event_Trigger(EVENT_KEYDOWN, &qKeyShot);
+					}
+				}
+				else
+				{
+					if(qKeyShot)
+					{
+						Event_Trigger(EVENT_KEYUP, &qKeyShot);
+						qKeyShot=0;
+					}
+				}
+
+				if(state.Gamepad.wButtons&XINPUT_GAMEPAD_RIGHT_SHOULDER)
+				{
+					if(!eKeyShot)
+					{
+						eKeyShot=KB_E;
+						Event_Trigger(EVENT_KEYDOWN, &eKeyShot);
+					}
+				}
+				else
+				{
+					if(eKeyShot)
+					{
+						Event_Trigger(EVENT_KEYUP, &eKeyShot);
+						eKeyShot=0;
+					}
+				}
+			}
+
 			static float avgFPS=0.0f;
 
 			double startTime=GetClock();

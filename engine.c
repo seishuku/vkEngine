@@ -151,6 +151,9 @@ bool isControlPressed=false;
 
 bool pausePhysics=false;
 
+extern vec2 lStick, rStick;
+extern bool buttons[4];
+
 void RecreateSwapchain(void);
 bool CreateFramebuffers(uint32_t eye);
 
@@ -1055,6 +1058,7 @@ void Render(void)
 
 		headPose=VR_GetHeadPose(&xrContext);
 
+		// TODO: Find a better place for VR input handling!
 		leftHand=VR_GetActionPose(&xrContext, xrContext.handPose, xrContext.leftHandSpace, 0);
 		leftTrigger=VR_GetActionFloat(&xrContext, xrContext.handTrigger, 0);
 		leftGrip=VR_GetActionFloat(&xrContext, xrContext.handGrip, 0);
@@ -1135,6 +1139,16 @@ void Render(void)
 
 		projection[0]=MatrixInfPerspective(90.0f, (float)renderWidth/renderHeight, 0.01f);
 		headPose=MatrixIdentity();
+
+		// TODO: Find a better place for gamepad input handling!
+		const float speed=240.0f;
+		const float rotation=5.0f;
+
+		camera.body.velocity=Vec3_Subv(camera.body.velocity, Vec3_Muls(camera.right, leftThumbstick.x*speed*fTimeStep));
+		camera.body.velocity=Vec3_Addv(camera.body.velocity, Vec3_Muls(camera.forward, leftThumbstick.y*speed*fTimeStep));
+
+		camera.body.angularVelocity.y-=rightThumbstick.x*rotation*fTimeStep;
+		camera.body.angularVelocity.x-=rightThumbstick.y*rotation*fTimeStep;
 	}
 
 	Console_Draw(&console);

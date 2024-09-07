@@ -72,6 +72,7 @@ OBJS+=vulkan/vulkan_swapchain.o
 
 # Audio
 OBJS+=audio/audio.o
+OBJS+=audio/qoa.o
 OBJS+=audio/wave.o
 OBJS+=music.o
 OBJS+=sfx.o

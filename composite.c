@@ -6,7 +6,6 @@
 #include "math/math.h"
 #include "utils/pipeline.h"
 #include "font/font.h"
-#include "camera/camera.h"
 #include "ui/ui.h"
 #include "vr/vr.h"
 #include "perframe.h"
@@ -561,7 +560,7 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	{
 		uint32_t uFrame;
 		uint32_t uSize[2];
-		uint32_t Pad;
+		uint32_t pad;
 	} PC;
 
 	PC.uFrame=uFrame++;
@@ -576,7 +575,7 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	UI_Draw(&UI, index, eye, fTimeStep);
 
 	// Draw text in the compositing renderpass
-	Font_Print(&font, 16.0f, 0.0f, 0.0f, "FPS: %0.1f\n\x1B[33mFrame time: %0.3fms\nAudio time: %0.3fms\nPhysics time: %0.3fms", fps, fTimeStep*1000.0f, audioTime*1000.0f, physicsTime*1000.0f);
+	Font_Print(&font, 16.0f, 0.0f, (float)height-16.0f, "FPS: %0.1f\n\x1B[33mFrame time: %0.3fms\nAudio time: %0.3fms\nPhysics time: %0.3fms", fps, fTimeStep*1000.0f, audioTime*1000.0f, physicsTime*1000.0f);
 
 	Font_Draw(&font, index, eye);
 

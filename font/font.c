@@ -286,11 +286,11 @@ void Font_Print(Font_t *font, float size, float x, float y, const char *string, 
 	font->numChar+=(uint32_t)strlen(text);
 
 	// Loop through and pre-offset 'y' by any CRs in the string, so nothing goes off screen
-	for(ptr=text;*ptr!='\0';ptr++)
-	{
-		if(*ptr=='\n')
-			y+=size;
-	}
+	//for(ptr=text;*ptr!='\0';ptr++)
+	//{
+	//	if(*ptr=='\n')
+	//		y+=size;
+	//}
 
 	// Loop through the text string until EOL
 	for(ptr=text;*ptr!='\0';ptr++)
