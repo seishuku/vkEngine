@@ -118,6 +118,7 @@ set(PROJECT_SOURCES
 	vulkan/vulkan_swapchain.c
 	client_network.c
 	composite.c
+	enemy.c
 	engine.c
 	lighting.c
 	line.c

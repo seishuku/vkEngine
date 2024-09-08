@@ -25,6 +25,7 @@
 #include "vulkan/vulkan.h"
 #include "client_network.h"
 #include "composite.h"
+#include "enemy.h"
 #include "lighting.h"
 #include "line.h"
 #include "models.h"
@@ -153,6 +154,8 @@ bool pausePhysics=false;
 
 extern vec2 lStick, rStick;
 extern bool buttons[4];
+
+Enemy_t enemyAI;
 
 void RecreateSwapchain(void);
 bool CreateFramebuffers(uint32_t eye);
@@ -290,6 +293,7 @@ void GenerateWorld(void)
 	}
 
 	CameraInit(&enemy, Vec3_Muls(randomDirection, 1200.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
+	InitEnemy(&enemyAI, &enemy, camera);
 }
 //////
 
@@ -932,6 +936,8 @@ void Thread_Physics(void *arg)
 			}
 		}
 
+		UpdateEnemy(&enemyAI, camera);
+
 		// Only run physics on enemy camera when physics are running
 		PhysicsIntegrate(&enemy.body, fTimeStep);
 
@@ -959,6 +965,7 @@ void Thread_Physics(void *arg)
 		ClientNetwork_SendStatus();
 	}
 
+#if 0
 	//////
 	// Do a simple dumb "seek out the player" thing
 	if(clientSocket<0)
@@ -967,7 +974,6 @@ void Thread_Physics(void *arg)
 		isTargeted=CameraIsTargetInFOV(enemy, camera.body.position, deg2rad(15.0f));
 	}
 
-#if 0
 	// Test for if the player is in a 10 degree view cone, if so fire at them once every 2 seconds.
 	static float fireTime=0.0f;
 	fireTime+=fTimeStep;
@@ -1156,6 +1162,28 @@ void Render(void)
 	Audio_SetStreamVolume(0, UI_GetBarGraphValue(&UI, volumeID));
 
 	Font_Print(&font, 16.0f, renderWidth-400.0f, renderHeight-50.0f-16.0f, "Current track: %s", GetCurrentMusicTrack());
+
+	{
+		const char *enemyState;
+
+		switch(enemyAI.state)
+		{
+			case PURSUING:
+				enemyState="Pursuing";
+				break;
+			case SEARCHING:
+				enemyState="Searching";
+				break;
+			case ATTACKING:
+				enemyState="Attacking";
+				break;
+			default:
+				enemyState="Unknown";
+				break;
+		}
+
+		Font_Print(&font, 16.0f, 0.0f, 32.0f, "Enemy state: %s\nEnemy position: %f %f %f\nPlayer position: %f %f %f", enemyState, enemyAI.camera->body.position.x, enemyAI.camera->body.position.y, enemyAI.camera->body.position.z, camera.body.position.x, camera.body.position.y, camera.body.position.z);
+	}
 
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
