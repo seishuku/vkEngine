@@ -1,0 +1,31 @@
+//descriptorSet {
+//	addBinding(0, combinedSampler, fragment)
+//}
+
+pipeline {
+	addStage("shaders/particle.geom.spv", geometry)
+	addStage("shaders/particle.vert.spv", vertex)
+	addStage("shaders/particle.frag.spv", fragment)
+
+	pushConstant(0, 96, geometry)
+
+	subpass(0)
+	topology(pointList)
+	cullMode(back)
+	depthTest(true)
+	depthWrite(true)
+	depthCompareOp(greaterOrEqual)
+	rasterizationSamples(4)
+
+	blend(true)
+	srcColorBlendFactor(srcAlpha)
+	dstColorBlendFactor(one)
+	colorBlendOp(add)
+	srcAlphaBlendFactor(srcAlpha)
+	dstAlphaBlendFactor(one)
+	alphaBlendOp(add)
+
+	addVertexBinding(0, 32, perVertex)
+	addVertexAttribute(0, 0, rgba32_sfloat, 0)
+	addVertexAttribute(1, 0, rgba32_sfloat, 16)
+}

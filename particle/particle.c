@@ -8,6 +8,7 @@
 #include "../image/image.h"
 #include "../math/math.h"
 #include "../utils/list.h"
+#include "../utils/pipeline.h"
 #include "../camera/camera.h"
 #include "particle.h"
 
@@ -22,8 +23,8 @@ extern Camera_t camera;
 ////////////////////////////
 
 //static VkuDescriptorSet_t particleDescriptorSet;
-static VkPipelineLayout particlePipelineLayout;
-static VkuPipeline_t particlePipeline;
+//static VkPipelineLayout particlePipelineLayout;
+static Pipeline_t particlePipeline;
 
 //static VkuImage_t particleTexture;
 
@@ -110,13 +111,6 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3
 	}
 
 	List_Add(&system->emitters, &emitter);
-
-	// Resize vertex buffers (both system memory and OpenGL buffer)
-	// if(!ParticleSystem_ResizeBuffer(system))
-	// {
-	// 	atomic_store(&system->mutex, false);
-	// 	return UINT32_MAX;
-	// }
 
 	mtx_unlock(&system->mutex);
 
@@ -239,6 +233,7 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 	// Default generic gravity
 	system->gravity=Vec3(0.0f, -9.81f, 0.0f);
 
+#if 0
 	//if(!Image_Upload(&Context, &ParticleTexture, "assets/particle.tga", IMAGE_BILINEAR|IMAGE_MIPMAP))
 	//	return false;
 
@@ -304,6 +299,10 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 	//};
 
 	if(!vkuAssemblePipeline(&particlePipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
+		return false;
+#endif
+
+	if(!CreatePipeline(&vkContext, &particlePipeline, renderPass, "pipelines/particle.pipeline"))
 		return false;
 
 	return true;
@@ -448,8 +447,8 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 
 	//vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, particlePipelineLayout, 0, 1, &particleDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, particlePipeline.pipeline);
-	vkCmdPushConstants(commandBuffer, particlePipelineLayout, VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(particlePC), &particlePC);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, particlePipeline.pipeline.pipeline);
+	vkCmdPushConstants(commandBuffer, particlePipeline.pipelineLayout, VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(particlePC), &particlePC);
 
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &system->particleBuffer.buffer, &(VkDeviceSize) { 0 });
 	vkCmdDraw(commandBuffer, count, 1, 0, 0);
@@ -465,8 +464,8 @@ void ParticleSystem_Destroy(ParticleSystem_t *system)
 
 	//vkuDestroyImageBuffer(&Context, &particleTexture);
 
-	vkDestroyPipeline(vkContext.device, particlePipeline.pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.device, particlePipelineLayout, VK_NULL_HANDLE);
+	vkDestroyPipeline(vkContext.device, particlePipeline.pipeline.pipeline, VK_NULL_HANDLE);
+	vkDestroyPipelineLayout(vkContext.device, particlePipeline.pipelineLayout, VK_NULL_HANDLE);
 	//vkDestroyDescriptorSetLayout(Context.device, particleDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
 
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
