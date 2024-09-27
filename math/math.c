@@ -171,3 +171,29 @@ float raySphereIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 sphereCenter, f
 	else
 		return (-b-sqrtf(discriminant))/(2.0f*a);
 }
+
+uint32_t planeSphereIntersect(vec4 plane, vec3 center, float radius, vec3 *intersectionA, vec3 *intersectionB)
+{
+	const vec3 planeVec3=Vec3(plane.x, plane.y, plane.z);
+	const float planeSphereSqDist=Vec3_Dot(planeVec3, center)+plane.w;
+	const float planeSqLength=Vec3_Dot(planeVec3, planeVec3);
+
+	const float distance=fabsf(planeSphereSqDist)/sqrtf(planeSqLength);
+
+	if(distance>radius)
+		return 0;
+
+	const float projectionFactor=-planeSphereSqDist/planeSqLength;
+
+	const vec3 projection=Vec3_Addv(center, Vec3_Muls(planeVec3, projectionFactor));
+
+	const float distanceToIntersection=sqrtf(radius*radius-distance*distance);
+
+	if(intersectionA)
+		*intersectionA=Vec3_Addv(projection, Vec3_Muls(planeVec3, distanceToIntersection));
+
+	if(intersectionB)
+		*intersectionB=Vec3_Subv(projection, Vec3_Muls(planeVec3, distanceToIntersection));
+
+	return (distance==radius)?1:2;
+}

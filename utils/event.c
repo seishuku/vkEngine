@@ -87,6 +87,9 @@ void FireParticleEmitter(vec3 position, vec3 direction)
 			break;
 		}
 	}
+
+	// Finally, play the audio SFX
+	Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, position);
 }
 
 static uint32_t activeID=UINT32_MAX;
@@ -157,7 +160,6 @@ bool Event_Trigger(EventID ID, void *arg)
 					break;
 
 				case KB_SPACE:
-					Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, camera.body.position);
 					FireParticleEmitter(Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, camera.body.radius)), camera.forward);
 					break;
 				case KB_P:		GenerateWorld();		break;

@@ -147,7 +147,6 @@ float leftTrigger, rightTrigger;
 float leftGrip, rightGrip;
 vec2 leftThumbstick, rightThumbstick;
 
-bool isTargeted=false;
 bool isControlPressed=false;
 
 bool pausePhysics=false;
@@ -293,6 +292,7 @@ void GenerateWorld(void)
 	}
 
 	CameraInit(&enemy, Vec3_Muls(randomDirection, 1200.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
+	//CameraInit(&enemy, Vec3(0.0f, 0.0f, 100.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 	InitEnemy(&enemyAI, &enemy, camera);
 }
 //////
@@ -330,7 +330,7 @@ static void DrawCameraAxes(VkCommandBuffer commandBuffer, uint32_t index, uint32
 static void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, uint32_t index, uint32_t eye)
 {
 	//DrawCameraAxes(commandBuffer, index, eye, camera);
-	//DrawCameraAxes(commandBuffer, index, eye, enemy);
+	DrawCameraAxes(commandBuffer, index, eye, enemy);
 
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipeline.pipeline);
 
@@ -482,23 +482,6 @@ void Thread_Main(void *arg)
 						Vec3_Subv(camera.body.position, Vec3_Addv(camera.up, camera.right)),
 						Vec3_Addv(camera.body.position, Vec3_Muls(Vec3_Subv(camera.forward, randVec), distance)),
 						Vec4(1.0f+RandFloatRange(10.0f, 500.0f), 1.0f, 1.0f, 1.0f));
-		}
-	}
-#endif
-
-#if 0
-	if(isTargeted)
-	{
-		for(uint32_t i=0;i<10;i++)
-		{
-			const float distance=10000000000.0f;
-			const float val=0.001f;
-			const vec3 randVec=Vec3(RandFloatRange(-val, val), RandFloatRange(-val, val), RandFloatRange(-val, val));
-
-			DrawLine(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye,
-					 enemy.position,
-					 Vec3_Addv(enemy.position, Vec3_Muls(Vec3_Addv(enemy.forward, randVec), distance)),
-					 Vec4(1.0f+RandFloatRange(10.0f, 500.0f), 1.0f, 1.0f, 1.0f));
 		}
 	}
 #endif
@@ -658,32 +641,6 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 }
 
-int planeSphereIntersection(vec4 plane, RigidBody_t sphere, vec3 *intersectionA, vec3 *intersectionB)
-{
-	const vec3 planeVec3=Vec3(plane.x, plane.y, plane.z);
-	const float planeSphereSqDist=Vec3_Dot(planeVec3, sphere.position)+plane.w;
-	const float planeSqLength=Vec3_Dot(planeVec3, planeVec3);
-
-	const float distance=fabsf(planeSphereSqDist)/sqrtf(planeSqLength);
-
-	if(distance>sphere.radius)
-		return 0;
-
-	const float projectionFactor=-planeSphereSqDist/planeSqLength;
-
-	const vec3 projection=Vec3_Addv(sphere.position, Vec3_Muls(planeVec3, projectionFactor));
-
-	const float distanceToIntersection=sqrtf(sphere.radius*sphere.radius-distance*distance);
-
-	if(intersectionA)
-		*intersectionA=Vec3_Addv(projection, Vec3_Muls(planeVec3, distanceToIntersection));
-	
-	if(intersectionB)
-		*intersectionB=Vec3_Subv(projection, Vec3_Muls(planeVec3, distanceToIntersection));
-
-	return (distance==sphere.radius)?1:2;
-}
-
 void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *particle)
 {
 	particle->position=Vec3b(0.0f);
@@ -784,55 +741,6 @@ void Thread_Physics(void *arg)
 					}
 				}
 			}
-
-#if 0
-			if(isTargeted)
-			{
-				float distance=raySphereIntersect(enemy.position, enemy.forward, asteroids[i].position, asteroids[i].radius);
-
-				if(distance>0.0f)
-				{
-					RigidBody_t particleBody;
-
-					particleBody.position=Vec3_Addv(enemy.position, Vec3_Muls(enemy.forward, distance));
-					particleBody.velocity=Vec3_Muls(enemy.forward, 300.0f);
-					particleBody.force=Vec3b(0.0f);
-
-					particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-					particleBody.angularVelocity=Vec3b(0.0f);
-
-					particleBody.radius=2.0f;
-
-					particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*10000.0f;
-					particleBody.invMass=1.0f/particleBody.mass;
-
-					particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
-					particleBody.invInertia=1.0f/particleBody.inertia;
-
-					if(PhysicsSphereToSphereCollisionResponse(&particleBody, &asteroids[i])>1.0f)
-					{
-						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, &particleBody.position);
-
-						// FIXME: Is this causing derelict emitters that never go away?
-						//			I don't think it is, but need to check.
-						ParticleSystem_AddEmitter
-						(
-							&particleSystem,
-							particleBody.position,		// Position
-							Vec3(100.0f, 12.0f, 5.0f),	// Start color
-							Vec3(0.0f, 0.0f, 0.0f),		// End color
-							5.0f,						// Radius of particles
-							1000,						// Number of particles in system
-							PARTICLE_EMITTER_ONCE,		// Type?
-							ExplodeEmitterCallback		// Callback for particle generation
-						);
-
-						// Silly radius reduction on hit
-						//body->radius=fmaxf(body->radius-10.0f, 0.0f);
-					}
-				}
-			}
-#endif
 
 #if 1
 			if(isControlPressed)
@@ -965,29 +873,6 @@ void Thread_Physics(void *arg)
 		ClientNetwork_SendStatus();
 	}
 
-#if 0
-	//////
-	// Do a simple dumb "seek out the player" thing
-	if(clientSocket<0)
-	{
-		CameraSeekTargetCamera(&enemy, camera, asteroids, NUM_ASTEROIDS);
-		isTargeted=CameraIsTargetInFOV(enemy, camera.body.position, deg2rad(15.0f));
-	}
-
-	// Test for if the player is in a 10 degree view cone, if so fire at them once every 2 seconds.
-	static float fireTime=0.0f;
-	fireTime+=fTimeStep;
-
-	if(isTargeted&&fireTime>2.0f)
-	{
-		fireTime=0.0f;
-
-		Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, &enemy.position);
-		FireParticleEmitter(Vec3_Addv(enemy.position, Vec3_Muls(enemy.forward, enemy.radius)), enemy.forward);
-	}
-	//////
-#endif
-
 	// Always run physics on the camera's body
 	PhysicsIntegrate(&camera.body, fTimeStep);
 
@@ -1115,7 +1000,6 @@ void Render(void)
 			vec3 direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatToMatrix(rightOrientation), MatrixInverse(modelView)));
 
 			FireParticleEmitter(Vec3_Addv(camera.body.position, Vec3_Muls(direction, camera.body.radius)), direction);
-			Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, camera.body.position);
 		}
 
 		if(rightTrigger<0.25f&&!rightTriggerOnce)
@@ -1802,6 +1686,9 @@ void RecreateSwapchain(void)
 
 	for(uint32_t i=0;i<swapchain.numImages;i++)
 	{
+		vkDestroyFence(vkContext.device, perFrame[i].frameFence, VK_NULL_HANDLE);
+		vkCreateFence(vkContext.device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=VK_FENCE_CREATE_SIGNALED_BIT }, VK_NULL_HANDLE, &perFrame[i].frameFence);
+
 		vkDestroySemaphore(vkContext.device, perFrame[i].presentCompleteSemaphore, VK_NULL_HANDLE);
 		vkDestroySemaphore(vkContext.device, perFrame[i].renderCompleteSemaphore, VK_NULL_HANDLE);
 
