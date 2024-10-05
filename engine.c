@@ -844,13 +844,13 @@ void Thread_Physics(void *arg)
 			}
 		}
 
-		UpdateEnemy(&enemyAI, camera);
-
 		// Only run physics on enemy camera when physics are running
 		PhysicsIntegrate(&enemy.body, fTimeStep);
 
 		if(clientSocket<0)
 		{
+			UpdateEnemy(&enemyAI, camera);
+
 			const float scale=(1.0f/fighter.radius)*enemy.body.radius;
 			matrix local=MatrixScale(scale, scale, scale);
 			local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
