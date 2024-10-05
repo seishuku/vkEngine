@@ -21,12 +21,12 @@ static void applyConstraints(RigidBody_t *body)
 	if(distanceSq>radiiSum)
 	{
 		const float distance=Vec3_Normalize(&normal);
-		body->velocity=Vec3_Addv(body->velocity, Vec3_Muls(normal, -distance));
+		body->force=Vec3_Addv(body->force, Vec3_Muls(normal, -distance));
 	}
 
 	// Apply linear velocity damping
-	//const float linearDamping=0.998f;
-	//body->velocity=Vec3_Muls(body->velocity, linearDamping);
+	const float linearDamping=0.999f;
+	body->velocity=Vec3_Muls(body->velocity, linearDamping);
 
 	// Apply angular velocity damping
 	const float angularDamping=0.998f;
