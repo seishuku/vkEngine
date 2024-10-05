@@ -47,8 +47,6 @@ typedef struct
 
 static HRIR_Sphere_t sphere;
 
-#define MAX_VOLUME INT8_MAX
-
 #define MAX_CHANNELS 128
 
 typedef struct
@@ -142,13 +140,16 @@ static void HRIRInterpolate(vec3 xyz)
 
 	if(coords.x>=0.0f&&coords.y>=0.0f&&coords.z>=0.0f)
 	{
-		for(uint32_t j=0;j<sphere.sampleLength;j++)
+		for(uint32_t i=0;i<sphere.sampleLength;i++)
 		{
-			const vec3 left=Vec3(v0->left[j], v1->left[j], v2->left[j]);
-			const vec3 right=Vec3(v0->right[j], v1->right[j], v2->right[j]);
+			const vec3 left=Vec3(v0->left[i], v1->left[i], v2->left[i]);
+			const vec3 right=Vec3(v0->right[i], v1->right[i], v2->right[i]);
+			const float gain=4.0f;
+			const float window=0.5f*(0.5f-cosf(2.0f*PI*(float)i/(sphere.sampleLength-1)));
+			const float final=falloffDist*gain*window*INT16_MAX;
 
-			HRIRSamples[2*j+0]=(int16_t)(falloffDist*Vec3_Dot(left, coords)*INT16_MAX);
-			HRIRSamples[2*j+1]=(int16_t)(falloffDist*Vec3_Dot(right, coords)*INT16_MAX);
+			HRIRSamples[2*i+0]=(int16_t)(final*Vec3_Dot(left, coords));
+			HRIRSamples[2*i+1]=(int16_t)(final*Vec3_Dot(right, coords));
 		}
 	}
 }
@@ -191,7 +192,7 @@ static void Convolve(const int16_t *input, int16_t *output, const size_t length,
 }
 
 // Additively mix source into destination
-static void MixAudio(int16_t *dst, const int16_t *src, const size_t length, const int8_t volume)
+static void MixAudio(int16_t *dst, const int16_t *src, const size_t length, const float volume)
 {
 	if(volume==0)
 		return;
@@ -201,30 +202,30 @@ static void MixAudio(int16_t *dst, const int16_t *src, const size_t length, cons
 		const int16_t src0=*src++, src1=*src++, src2=*src++, src3=*src++;
 		const int16_t dst0=dst[0], dst1=dst[1], dst2=dst[2], dst3=dst[3];
 
-		int32_t mix0=((src0*volume)/MAX_VOLUME)+dst0;
-		int32_t mix1=((src1*volume)/MAX_VOLUME)+dst1;
-		int32_t mix2=((src2*volume)/MAX_VOLUME)+dst2;
-		int32_t mix3=((src3*volume)/MAX_VOLUME)+dst3;
+		int32_t mix0=src0*volume+dst0;
+		int32_t mix1=src1*volume+dst1;
+		int32_t mix2=src2*volume+dst2;
+		int32_t mix3=src3*volume+dst3;
 
 		if(mix0<INT16_MIN)
 			mix0=INT16_MIN;
-		else if(mix0>=INT16_MAX)
-			mix0=INT16_MAX-1;
+		else if(mix0>INT16_MAX)
+			mix0=INT16_MAX;
 
 		if(mix1<INT16_MIN)
 			mix1=INT16_MIN;
-		else if(mix1>=INT16_MAX)
-			mix1=INT16_MAX-1;
+		else if(mix1>INT16_MAX)
+			mix1=INT16_MAX;
 
 		if(mix2<INT16_MIN)
 			mix2=INT16_MIN;
-		else if(mix2>=INT16_MAX)
-			mix2=INT16_MAX-1;
+		else if(mix2>INT16_MAX)
+			mix2=INT16_MAX;
 
 		if(mix3<INT16_MIN)
 			mix3=INT16_MIN;
-		else if(mix3>=INT16_MAX)
-			mix3=INT16_MAX-1;
+		else if(mix3>INT16_MAX)
+			mix3=INT16_MAX;
 
 		*dst++=mix0;
 		*dst++=mix1;
@@ -235,7 +236,7 @@ static void MixAudio(int16_t *dst, const int16_t *src, const size_t length, cons
 
 static void Audio_FillBuffer(void *buffer, uint32_t length)
 {
-	double startTime=GetClock();
+	const double startTime=GetClock();
 
 	// Get pointer to output buffer.
 	int16_t *out=(int16_t *)buffer;
@@ -288,7 +289,7 @@ static void Audio_FillBuffer(void *buffer, uint32_t length)
 		Convolve(channel->working, audioBuffer, remainingData, HRIRSamples, sphere.sampleLength);
 
 		// Mix out the samples into the output buffer
-		MixAudio(out, audioBuffer, (uint32_t)remainingData, (int8_t)(channel->volume*MAX_VOLUME));
+		MixAudio(out, audioBuffer, (uint32_t)remainingData, channel->volume);
 
 		// Advance the sample position by what we've used, next time around will take another chunk.
 		channel->position+=(uint32_t)remainingData;
@@ -317,7 +318,7 @@ static void Audio_FillBuffer(void *buffer, uint32_t length)
 			if(streamBuffer.stream[i].streamCallback)
 			{
 				streamBuffer.stream[i].streamCallback(&streamBuffer.buffer[streamBuffer.position], remainingData);
-				MixAudio(out, &streamBuffer.buffer[streamBuffer.position], remainingData, (int8_t)(streamBuffer.stream[i].volume*MAX_VOLUME));
+				MixAudio(out, &streamBuffer.buffer[streamBuffer.position], remainingData, streamBuffer.stream[i].volume);
 			}
 		}
 	}
