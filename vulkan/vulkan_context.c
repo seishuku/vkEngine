@@ -78,6 +78,18 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 		return VK_FALSE;
 	}
 #elif LINUX
+#ifdef WAYLAND
+	if(vkCreateWaylandSurfaceKHR(instance, &(VkWaylandSurfaceCreateInfoKHR)
+	{
+		.sType=VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
+		.display=context->wlDisplay,
+		.surface=context->wlSurface,
+	}, NULL, &context->surface)!=VK_SUCCESS)
+	{
+		DBGPRINTF(DEBUG_ERROR, "vkCreateWaylandSurfaceKHR failed.\n");
+		return VK_FALSE;
+	}
+#else
 	if(vkCreateXlibSurfaceKHR(instance, &(VkXlibSurfaceCreateInfoKHR)
 	{
 		.sType=VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,
@@ -88,6 +100,7 @@ VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context)
 		DBGPRINTF(DEBUG_ERROR, "vkCreateXlibSurfaceKHR failed.\n");
 		return VK_FALSE;
 	}
+#endif
 #elif ANDROID
 	if(vkCreateAndroidSurfaceKHR(instance, &(VkAndroidSurfaceCreateInfoKHR)
 	{

@@ -59,46 +59,46 @@ double GetClock(void)
 
 void EventLoop(void)
 {
-	static MouseEvent_t MouseEvent={ 0, 0, 0, 0 };
+	static MouseEvent_t mouseEvent={ 0, 0, 0, 0 };
 	uint32_t code;
-	XEvent Event;
+	XEvent event;
 
 	while(!isDone)
 	{
 		while(XPending(vkContext.display)>0)
 		{
-			XNextEvent(vkContext.display, &Event);
+			XNextEvent(vkContext.display, &event);
 
-			switch(Event.type)
+			switch(event.type)
 			{
 				case Expose:
 					break;
 
 				case ConfigureNotify:
-					winWidth=Event.xconfigure.width;
-					winHeight=Event.xconfigure.height;
+					winWidth=event.xconfigure.width;
+					winHeight=event.xconfigure.height;
 					break;
 			}
 
-			if(XGetEventData(vkContext.display, &Event.xcookie)&&(Event.xcookie.type==GenericEvent)&&(Event.xcookie.extension==_xi_opcode))
+			if(XGetEventData(vkContext.display, &event.xcookie)&&(event.xcookie.type==GenericEvent)&&(event.xcookie.extension==_xi_opcode))
 			{
-				switch(Event.xcookie.evtype)
+				switch(event.xcookie.evtype)
 				{
 					case XI_RawMotion:
 					{
-						XIRawEvent *re=(XIRawEvent *)Event.xcookie.data;
+						XIRawEvent *re=(XIRawEvent *)event.xcookie.data;
 
 						if(re->valuators.mask_len)
 						{
 							const double *values=re->raw_values;
 
 							if(XIMaskIsSet(re->valuators.mask, 0))
-								MouseEvent.dx=*values++;
+								mouseEvent.dx=*values++;
 
 							if(XIMaskIsSet(re->valuators.mask, 1))
-								MouseEvent.dy=-*values++;
+								mouseEvent.dy=-*values++;
 
-							Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
+							Event_Trigger(EVENT_MOUSEMOVE, &mouseEvent);
 
 							XWarpPointer(vkContext.display, None, vkContext.window, 0, 0, 0, 0, winWidth/2, winHeight/2);
 							XFlush(vkContext.display);
@@ -119,78 +119,55 @@ void EventLoop(void)
 					// 9: forward
 					case XI_ButtonPress:
 					{
-						XIDeviceEvent *event=(XIDeviceEvent *)Event.xcookie.data;
+						XIDeviceEvent *de=(XIDeviceEvent *)event.xcookie.data;
 
-						if(event->detail==1)
-							MouseEvent.button|=MOUSE_BUTTON_1;
+						if(de->detail==1)
+							mouseEvent.button|=MOUSE_BUTTON_1;
 
-						if(event->detail==2)
-							MouseEvent.button|=MOUSE_BUTTON_3;
+						if(de->detail==2)
+							mouseEvent.button|=MOUSE_BUTTON_3;
 
-						if(event->detail==3)
-							MouseEvent.button|=MOUSE_BUTTON_2;
+						if(de->detail==3)
+							mouseEvent.button|=MOUSE_BUTTON_2;
 
-						Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
+						Event_Trigger(EVENT_MOUSEDOWN, &mouseEvent);
 						break;
 					}
 
 					case XI_ButtonRelease:
 					{
-						XIDeviceEvent *event=(XIDeviceEvent *)Event.xcookie.data;
+						XIDeviceEvent *de=(XIDeviceEvent *)event.xcookie.data;
 
-						if(event->detail==1)
-							MouseEvent.button&=~MOUSE_BUTTON_1;
+						if(de->detail==1)
+							mouseEvent.button&=~MOUSE_BUTTON_1;
 
-						if(event->detail==2)
-							MouseEvent.button&=~MOUSE_BUTTON_3;
+						if(de->detail==2)
+							mouseEvent.button&=~MOUSE_BUTTON_3;
 
-						if(event->detail==3)
-							MouseEvent.button&=~MOUSE_BUTTON_2;
+						if(de->detail==3)
+							mouseEvent.button&=~MOUSE_BUTTON_2;
 
-						Event_Trigger(EVENT_MOUSEUP, &MouseEvent);
+						Event_Trigger(EVENT_MOUSEUP, &mouseEvent);
 						break;
 					}
 
 					case XI_KeyPress:
+					case XI_KeyRelease:
 					{
-						XIDeviceEvent *event=(XIDeviceEvent *)Event.xcookie.data;
-						KeySym Keysym=XkbKeycodeToKeysym(vkContext.display, (KeyCode)event->detail, 0, 0), temp;
-						XConvertCase(Keysym, &temp, &Keysym);
+						XIDeviceEvent *de=(XIDeviceEvent *)event.xcookie.data;
+						KeySym keysym=XkbKeycodeToKeysym(vkContext.display, (KeyCode)de->detail, 0, 0), temp;
 
-						if(Keysym==XK_Return&&Event.xkey.state&Mod1Mask)
-						{
-							static uint32_t OldWidth, OldHeight;
+						// Convert lowercase to uppercase
+						if(keysym>=XK_a&&keysym<=XK_z)
+        					keysym-=0x0020;
 
-							if(toggleFullscreen)
-							{
-								toggleFullscreen=false;
-								DBGPRINTF(DEBUG_INFO, "Going full screen...\n");
-
-								OldWidth=winWidth;
-								OldHeight=winHeight;
-
-								winWidth=XDisplayWidth(vkContext.display, DefaultScreen(vkContext.display));
-								winHeight=XDisplayHeight(vkContext.display, DefaultScreen(vkContext.display));
-								XMoveResizeWindow(vkContext.display, vkContext.window, 0, 0, winWidth, winHeight);
-							}
-							else
-							{
-								toggleFullscreen=true;
-								DBGPRINTF(DEBUG_INFO, "Going windowed...\n");
-
-								winWidth=OldWidth;
-								winHeight=OldHeight;
-								XMoveResizeWindow(vkContext.display, vkContext.window, 0, 0, winWidth, winHeight);
-							}
-						}
-
-						if(Keysym==XK_Escape)
+						if(keysym==XK_Escape)
 						{
 							isDone=true;
 							break;
 						}
 
-						switch(Keysym)
+						switch(keysym)
 						{
 							case XK_BackSpace:	code=KB_BACKSPACE;				break;	// Backspace
 							case XK_Tab:		code=KB_TAB;					break;	// Tab
@@ -247,85 +224,18 @@ void EventLoop(void)
 							case XK_Control_R:	code=KB_RCTRL;					break;	// Right control
 							case XK_Alt_L:		code=KB_LALT;					break;	// Left alt
 							case XK_Alt_R:		code=KB_RALT;					break;	// Left alt
-							default:			code=Keysym;					break;	// All others
+							default:			code=keysym;					break;	// All others
 						}
 
-						Event_Trigger(EVENT_KEYDOWN, &code);
-						break;
-					}
-
-					case XI_KeyRelease:
-					{
-						XIDeviceEvent *event=(XIDeviceEvent *)Event.xcookie.data;
-						KeySym Keysym=XkbKeycodeToKeysym(vkContext.display, (KeyCode)event->detail, 0, 0), temp;
-						XConvertCase(Keysym, &temp, &Keysym);
-
-						switch(Keysym)
-						{
-							case XK_BackSpace:	code=KB_BACKSPACE;				break;	// Backspace
-							case XK_Tab:		code=KB_TAB;					break;	// Tab
-							case XK_Return:		code=KB_ENTER;					break;	// Enter
-							case XK_Pause:		code=KB_PAUSE;					break;	// Pause
-							case XK_Caps_Lock:	code=KB_CAPS_LOCK;				break;	// Caps Lock
-							case XK_Escape:		code=KB_ESCAPE;					break;	// Esc
-							case XK_Prior:		code=KB_PAGE_UP;				break;	// Page Up
-							case XK_Next:		code=KB_PAGE_DOWN;				break;	// Page Down
-							case XK_End:		code=KB_END;					break;	// End
-							case XK_Home:		code=KB_HOME;					break;	// Home
-							case XK_Left:		code=KB_LEFT;					break;	// Left
-							case XK_Up:			code=KB_UP;						break;	// Up
-							case XK_Right:		code=KB_RIGHT;					break;	// Right
-							case XK_Down:		code=KB_DOWN;					break;	// Down
-							case XK_Print:		code=KB_PRINT_SCREEN;			break;	// Prnt Scrn
-							case XK_Insert:		code=KB_INSERT;					break;	// Insert
-							case XK_Delete:		code=KB_DEL;					break;	// Delete
-							case XK_Super_L:	code=KB_LSUPER;					break;	// Left Windows
-							case XK_Super_R:	code=KB_RSUPER;					break;	// Right Windows
-							case XK_Menu:		code=KB_MENU;					break;	// Application
-							case XK_KP_0:		code=KB_NP_0;					break;	// Num 0
-							case XK_KP_1:		code=KB_NP_1;					break;	// Num 1
-							case XK_KP_2:		code=KB_NP_2;					break;	// Num 2
-							case XK_KP_3:		code=KB_NP_3;					break;	// Num 3
-							case XK_KP_4:		code=KB_NP_4;					break;	// Num 4
-							case XK_KP_5:		code=KB_NP_5;					break;	// Num 5
-							case XK_KP_6:		code=KB_NP_6;					break;	// Num 6
-							case XK_KP_7:		code=KB_NP_7;					break;	// Num 7
-							case XK_KP_8:		code=KB_NP_8;					break;	// Num 8
-							case XK_KP_9:		code=KB_NP_9;					break;	// Num 9
-							case XK_KP_Multiply:code=KB_NP_MULTIPLY;			break;	// Num *
-							case XK_KP_Add:		code=KB_NP_ADD;					break;	// Num +
-							case XK_KP_Subtract:code=KB_NP_SUBTRACT;			break;	// Num -
-							case XK_KP_Decimal:	code=KB_NP_DECIMAL;				break;	// Num Del
-							case XK_KP_Divide:	code=KB_NP_DIVIDE;				break;	// Num /
-							case XK_F1:			code=KB_F1;						break;	// F1
-							case XK_F2:			code=KB_F2;						break;	// F2
-							case XK_F3:			code=KB_F3;						break;	// F3
-							case XK_F4:			code=KB_F4;						break;	// F4
-							case XK_F5:			code=KB_F5;						break;	// F5
-							case XK_F6:			code=KB_F6;						break;	// F6
-							case XK_F7:			code=KB_F7;						break;	// F7
-							case XK_F8:			code=KB_F8;						break;	// F8
-							case XK_F9:			code=KB_F9;						break;	// F9
-							case XK_F10:		code=KB_F10;					break;	// F10
-							case XK_F11:		code=KB_F11;					break;	// F11
-							case XK_F12:		code=KB_F12;					break;	// F12
-							case XK_Num_Lock:	code=KB_NUM_LOCK;				break;	// Num Lock
-							case XK_Scroll_Lock:code=KB_SCROLL_LOCK;			break;	// Scroll Lock
-							case XK_Shift_L:	code=KB_LSHIFT;					break;	// Shift
-							case XK_Shift_R:	code=KB_RSHIFT;					break;	// Right Shift
-							case XK_Control_L:	code=KB_LCTRL;					break;	// Left control
-							case XK_Control_R:	code=KB_RCTRL;					break;	// Right control
-							case XK_Alt_L:		code=KB_LALT;					break;	// Left alt
-							case XK_Alt_R:		code=KB_RALT;					break;	// Left alt
-							default:			code=Keysym;					break;	// All others
-						}
-
-						Event_Trigger(EVENT_KEYUP, &code);
+						if(event.xcookie.evtype==XI_KeyPress)
+							Event_Trigger(EVENT_KEYDOWN, &code);
+						else if(event.xcookie.evtype==XI_KeyRelease)
+							Event_Trigger(EVENT_KEYUP, &code);
 						break;
 					}
 				}
 
-				XFreeEventData(vkContext.display, &Event.xcookie);
+				XFreeEventData(vkContext.display, &event.xcookie);
 			}
 		}
 

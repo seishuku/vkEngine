@@ -64,8 +64,11 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 		surfaceCaps.currentExtent.width=height;
 	}
 
-	// Set swapchain extents to the surface width/height
-	swapchain->extent=surfaceCaps.currentExtent;
+	// Set swapchain extents to the surface width/height,
+	// otherwise if extent is already non-zero, use that for surface width/height.
+	// This allows setting width/height externally.
+	if(!(swapchain->extent.width&&swapchain->extent.height))
+		swapchain->extent=surfaceCaps.currentExtent;
 
 	// Get available present modes
 	uint32_t presentModeCount=0;

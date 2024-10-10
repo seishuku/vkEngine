@@ -72,11 +72,19 @@ VkBool32 CreateVulkanInstance(VkInstance *instance)
 			surfaceOSExtension=VK_TRUE;
 		}
 #elif LINUX
+#ifdef WAYLAND
+		if(strcmp(extensionProperties[i].extensionName, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME)==0)
+		{
+			DBGPRINTF(DEBUG_INFO, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME" extension is supported!\n");
+			surfaceOSExtension=VK_TRUE;
+		}
+#else
 		if(strcmp(extensionProperties[i].extensionName, VK_KHR_XLIB_SURFACE_EXTENSION_NAME)==0)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_KHR_XLIB_SURFACE_EXTENSION_NAME" extension is supported!\n");
 			surfaceOSExtension=VK_TRUE;
 		}
+#endif
 #elif ANDROID
 		if(strcmp(extensionProperties[i].extensionName, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME)==0)
 		{
@@ -122,7 +130,11 @@ VkBool32 CreateVulkanInstance(VkInstance *instance)
 #ifdef WIN32
 		extensions[numExtensions++]=VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
 #elif LINUX
+#ifdef WAYLAND
+		extensions[numExtensions++]=VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME;
+#else
 		extensions[numExtensions++]=VK_KHR_XLIB_SURFACE_EXTENSION_NAME;
+#endif
 #elif ANDROID
 		extensions[numExtensions++]=VK_KHR_ANDROID_SURFACE_EXTENSION_NAME;
 #endif

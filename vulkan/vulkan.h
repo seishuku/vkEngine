@@ -5,9 +5,13 @@
 #define VK_USE_PLATFORM_WIN32_KHR
 #include <Windows.h>
 #elif LINUX
+#ifdef WAYLAND
+#define VK_USE_PLATFORM_WAYLAND_KHR
+#include <wayland-client.h>
+#else
 #define VK_USE_PLATFORM_XLIB_KHR
 #include <X11/Xlib.h>
-#include <GL/glx.h>
+#endif
 #elif ANDROID
 #define VK_USE_PLATFORM_ANDROID_KHR
 #include <android/native_activity.h>
@@ -33,7 +37,7 @@ extern PFN_vkCmdPushDescriptorSetKHR _vkCmdPushDescriptorSetKHR;
 
 #define VKU_MAX_DESCRIPTORSET_BINDINGS 16
 
-#define VKU_MAX_FRAME_COUNT 4
+#define VKU_MAX_FRAME_COUNT 8
 
 #define VKU_MAX_FRAMEBUFFER_ATTACHMENTS 8
 
@@ -47,8 +51,13 @@ typedef struct
 #ifdef WIN32
 	HWND hWnd;
 #elif LINUX
+#ifdef WAYLAND
+	struct wl_display *wlDisplay;
+	struct wl_surface *wlSurface;
+#else
 	Display *display;
 	Window window;
+#endif
 #elif ANDROID
 	ANativeWindow *window;
 #endif
