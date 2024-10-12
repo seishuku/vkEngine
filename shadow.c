@@ -13,9 +13,6 @@
 #include "perframe.h"
 
 #define NUM_ASTEROIDS 1000
-extern VkuBuffer_t asteroidInstance;
-
-extern VkuBuffer_t fighterInstance;
 
 extern VkuContext_t vkContext;
 extern Camera_t camera;
@@ -225,7 +222,7 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 	shadowMVP=MatrixMult(modelview, projection);
 	vkCmdPushConstants(commandBuffer, shadowPipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(matrix), &shadowMVP);
 
-	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &asteroidInstance.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[frameIndex].asteroidInstance.buffer, &(VkDeviceSize) { 0 });
 
 	// Draw the models
 	for(uint32_t j=0;j<NUM_MODELS;j++)
@@ -240,7 +237,7 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 		}
 	}
 
-	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &fighterInstance.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[frameIndex].fighterInstance.buffer, &(VkDeviceSize) { 0 });
 
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &fighter.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 

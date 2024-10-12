@@ -75,8 +75,6 @@ BModel_t models[NUM_MODELS];
 
 // Player model
 BModel_t fighter;
-VkuBuffer_t fighterInstance;
-matrix *fighterInstancePtr;
 uint32_t fighterTexture=0;
 
 // Texture images
@@ -105,9 +103,6 @@ VkFramebuffer framebuffer[2];
 // Asteroid data
 #define NUM_ASTEROIDS 1000
 RigidBody_t asteroids[NUM_ASTEROIDS];
-
-VkuBuffer_t asteroidInstance;
-matrix *asteroidInstancePtr;
 //////
 
 // Thread stuff
@@ -247,10 +242,13 @@ void GenerateWorld(void)
 	//////
 
 	// Set up instance data for asteroid rendering
-	if(!asteroidInstance.buffer)
+	if(!perFrame[0].asteroidInstance.buffer)
 	{
-		vkuCreateHostBuffer(&vkContext, &asteroidInstance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-		asteroidInstancePtr=(matrix *)asteroidInstance.memory->mappedPointer;
+		for(uint32_t i=0;i<swapchain.numImages;i++)
+		{
+			vkuCreateHostBuffer(&vkContext, &perFrame[i].asteroidInstance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+			perFrame[i].asteroidInstancePtr=(matrix *)perFrame[i].asteroidInstance.memory->mappedPointer;
+		}
 	}
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
@@ -285,10 +283,13 @@ void GenerateWorld(void)
 
 	fighterTexture=RandRange(0, 7);
 
-	if(!fighterInstance.buffer)
+	if(!perFrame[0].fighterInstance.buffer)
 	{
-		vkuCreateHostBuffer(&vkContext, &fighterInstance, sizeof(matrix)*(2+MAX_CLIENTS), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-		fighterInstancePtr=(matrix *)fighterInstance.memory->mappedPointer;
+		for(uint32_t i=0;i<swapchain.numImages;i++)
+		{
+			vkuCreateHostBuffer(&vkContext, &perFrame[i].fighterInstance, sizeof(matrix)*(2+MAX_CLIENTS), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+			perFrame[i].fighterInstancePtr=(matrix *)perFrame[i].fighterInstance.memory->mappedPointer;
+		}
 	}
 
 	CameraInit(&enemy, Vec3_Muls(randomDirection, 1200.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
@@ -334,7 +335,7 @@ static void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipeline.pipeline);
 
-	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &fighterInstance.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[index].fighterInstance.buffer, &(VkDeviceSize) { 0 });
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 0, textures[TEXTURE_FIGHTER1+fighterTexture].sampler, textures[TEXTURE_FIGHTER1+fighterTexture].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 1, textures[TEXTURE_FIGHTER1_NORMAL+fighterTexture].sampler, textures[TEXTURE_FIGHTER1_NORMAL+fighterTexture].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -655,6 +656,7 @@ void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *p
 // Runs anything physics related
 void Thread_Physics(void *arg)
 {
+	const uint32_t index=*((uint32_t *)arg);
 	double startTime=GetClock();
 
 	if(!pausePhysics)
@@ -856,7 +858,7 @@ void Thread_Physics(void *arg)
 			local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
 			local=MatrixMult(local, MatrixTranslatev(fighter.center));
 			local=MatrixMult(local, QuatToMatrix(enemy.body.orientation));
-			fighterInstancePtr[1]=MatrixMult(local, MatrixTranslatev(enemy.body.position));
+			perFrame[index].fighterInstancePtr[1]=MatrixMult(local, MatrixTranslatev(enemy.body.position));
 		}
 
 		// Update instance matrix data
@@ -866,7 +868,7 @@ void Thread_Physics(void *arg)
 
 			matrix local=MatrixScale(asteroids[i].radius*radiusScale, asteroids[i].radius*radiusScale, asteroids[i].radius*radiusScale);
 			local=MatrixMult(local, QuatToMatrix(asteroids[i].orientation));
-			asteroidInstancePtr[i]=MatrixMult(local, MatrixTranslatev(asteroids[i].position));
+			perFrame[index].asteroidInstancePtr[i]=MatrixMult(local, MatrixTranslatev(asteroids[i].position));
 		}
 		//////
 
@@ -885,7 +887,7 @@ void Thread_Physics(void *arg)
 			local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
 			local=MatrixMult(local, MatrixTranslatev(fighter.center));
 			local=MatrixMult(local, QuatToMatrix(netCameras[i].body.orientation));
-			fighterInstancePtr[i]=MatrixMult(local, MatrixTranslatev(netCameras[i].body.position));
+			perFrame[index].fighterInstancePtr[i]=MatrixMult(local, MatrixTranslatev(netCameras[i].body.position));
 		}
 	}
 	else
@@ -895,7 +897,7 @@ void Thread_Physics(void *arg)
 		local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
 		local=MatrixMult(local, MatrixTranslatev(fighter.center));
 		local=MatrixMult(local, QuatToMatrix(camera.body.orientation));
-		fighterInstancePtr[0]=MatrixMult(local, MatrixTranslatev(camera.body.position));
+		perFrame[index].fighterInstancePtr[0]=MatrixMult(local, MatrixTranslatev(camera.body.position));
 	}
 
 	// Update camera and modelview matrix
@@ -1806,11 +1808,13 @@ void Destroy(void)
 	Font_Destroy(&font);
 	//////////
 
-	// Asteroid instance buffer destruction
-	vkuDestroyBuffer(&vkContext, &asteroidInstance);
+	// Asteroid and fighter instance buffer destruction
+	for(uint32_t i=0;i<swapchain.numImages;i++)
+	{
+		vkuDestroyBuffer(&vkContext, &perFrame[i].asteroidInstance);
+		vkuDestroyBuffer(&vkContext, &perFrame[i].fighterInstance);
+	}
 	//////////
-
-	vkuDestroyBuffer(&vkContext, &fighterInstance);
 
 	// Textures destruction
 	for(uint32_t i=0;i<NUM_TEXTURES;i++)

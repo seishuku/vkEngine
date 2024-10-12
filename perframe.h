@@ -27,6 +27,14 @@ typedef struct
 	VkuBuffer_t mainUBOBuffer[2];
 	//////
 
+	// Model instance per-frame data
+	VkuBuffer_t asteroidInstance;
+	matrix *asteroidInstancePtr;
+
+	VkuBuffer_t fighterInstance;
+	matrix *fighterInstancePtr;
+	//////
+
 	VkFramebuffer compositeFramebuffer[2];
 
 	// Descriptor pool

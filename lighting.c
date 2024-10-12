@@ -10,7 +10,6 @@
 #include "shadow.h"
 
 #define NUM_ASTEROIDS 1000
-extern VkuBuffer_t asteroidInstance;
 
 extern VkuContext_t vkContext;
 extern VkuSwapchain_t swapchain;
@@ -262,7 +261,7 @@ void DrawLighting(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, V
 {
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipeline.pipeline);
 
-	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &asteroidInstance.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[index].asteroidInstance.buffer, &(VkDeviceSize) { 0 });
 
 	for(uint32_t i=0;i<NUM_MODELS;i++)
 	{
