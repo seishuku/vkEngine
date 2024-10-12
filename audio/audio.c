@@ -85,6 +85,12 @@ static AudioStream_t streamBuffer;
 
 extern Camera_t camera;
 
+static inline int32_t bitwiseClamp32(int32_t x, int32_t min, int32_t max)
+{
+	const int32_t y=max^((x^max)&-(x<max));
+	return y^((y^min)&-(y<min));
+}
+
 static vec2 CalculateBarycentric(const vec3 p, const vec3 a, const vec3 b, const vec3 c)
 {
 	const vec3 v0=Vec3_Subv(b, a), v1=Vec3_Subv(c, a), v2=Vec3_Subv(p, a);
@@ -176,18 +182,8 @@ static void Convolve(const int16_t *input, int16_t *output, const size_t length,
 			inputPtr--;
 		}
 
-		if(sum[0]<-0x40000000)
-			sum[0]=-0x40000000;
-		else if(sum[0]>0x3fffffff)
-			sum[0]=0x3fffffff;
-
-		if(sum[1]<-0x40000000)
-			sum[1]=-0x40000000;
-		else if(sum[1]>0x3fffffff)
-			sum[1]=0x3fffffff;
-
-		*outputPtr++=(int16_t)(sum[0]>>15);
-		*outputPtr++=(int16_t)(sum[1]>>15);
+		*outputPtr++=(int16_t)(bitwiseClamp32(sum[0], -0x40000000, 0x3FFFFFFF)>>15);
+		*outputPtr++=(int16_t)(bitwiseClamp32(sum[1], -0x40000000, 0x3FFFFFFF)>>15);
 	}
 }
 
@@ -202,35 +198,10 @@ static void MixAudio(int16_t *dst, const int16_t *src, const size_t length, cons
 		const int16_t src0=*src++, src1=*src++, src2=*src++, src3=*src++;
 		const int16_t dst0=dst[0], dst1=dst[1], dst2=dst[2], dst3=dst[3];
 
-		int32_t mix0=src0*volume+dst0;
-		int32_t mix1=src1*volume+dst1;
-		int32_t mix2=src2*volume+dst2;
-		int32_t mix3=src3*volume+dst3;
-
-		if(mix0<INT16_MIN)
-			mix0=INT16_MIN;
-		else if(mix0>INT16_MAX)
-			mix0=INT16_MAX;
-
-		if(mix1<INT16_MIN)
-			mix1=INT16_MIN;
-		else if(mix1>INT16_MAX)
-			mix1=INT16_MAX;
-
-		if(mix2<INT16_MIN)
-			mix2=INT16_MIN;
-		else if(mix2>INT16_MAX)
-			mix2=INT16_MAX;
-
-		if(mix3<INT16_MIN)
-			mix3=INT16_MIN;
-		else if(mix3>INT16_MAX)
-			mix3=INT16_MAX;
-
-		*dst++=mix0;
-		*dst++=mix1;
-		*dst++=mix2;
-		*dst++=mix3;
+		*dst++=bitwiseClamp32(src0*volume+dst0, INT16_MIN, INT16_MAX);
+		*dst++=bitwiseClamp32(src1*volume+dst1, INT16_MIN, INT16_MAX);
+		*dst++=bitwiseClamp32(src2*volume+dst2, INT16_MIN, INT16_MAX);
+		*dst++=bitwiseClamp32(src3*volume+dst3, INT16_MIN, INT16_MAX);
 	}
 }
 
