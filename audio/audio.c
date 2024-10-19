@@ -34,7 +34,7 @@ typedef struct
 
 static const uint32_t HRIR_MAGIC='H'|'R'<<8|'I'<<16|'R'<<24;
 
-typedef struct
+static struct
 {
 	uint32_t magic;
 	uint32_t sampleRate;
@@ -43,9 +43,7 @@ typedef struct
 	uint32_t numIndex;
 	uint32_t *indices;
 	HRIR_Vertex_t *vertices;
-} HRIR_Sphere_t;
-
-static HRIR_Sphere_t sphere;
+} sphere;
 
 #define MAX_CHANNELS 128
 
@@ -56,19 +54,19 @@ typedef struct
 	bool looping;
 	float volume;
 	vec3 xyz;
-	int16_t working[MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES];
 } Channel_t;
 
 static Channel_t channels[MAX_CHANNELS];
 
-// HRIR interpolation buffers
-static int16_t HRIRSamples[2*MAX_HRIR_SAMPLES];
+// HRIR interpolation result kernel buffer 
+static int16_t HRIRKernel[2*MAX_HRIR_SAMPLES];
 
-// Audio buffer after HRTF convolve
-static int16_t audioBuffer[2*(MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES)];
+// Audio buffers for HRTF convolve
+static int16_t preConvolve[MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES];
+static int16_t postConvole[2*(MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES)];
 
 // Streaming audio
-typedef struct
+static struct
 {
 	uint32_t position;
 	int16_t buffer[MAX_STREAM_SAMPLES*2];
@@ -79,9 +77,7 @@ typedef struct
 		float volume;
 		void (*streamCallback)(void *buffer, size_t length);
 	} stream[MAX_AUDIO_STREAMS];
-} AudioStream_t;
-
-static AudioStream_t streamBuffer;
+} streamBuffer;
 
 extern Camera_t camera;
 
@@ -154,8 +150,8 @@ static void HRIRInterpolate(vec3 xyz)
 			const float window=0.5f*(0.5f-cosf(2.0f*PI*(float)i/(sphere.sampleLength-1)));
 			const float final=falloffDist*gain*window*INT16_MAX;
 
-			HRIRSamples[2*i+0]=(int16_t)(final*Vec3_Dot(left, coords));
-			HRIRSamples[2*i+1]=(int16_t)(final*Vec3_Dot(right, coords));
+			HRIRKernel[2*i+0]=(int16_t)(final*Vec3_Dot(left, coords));
+			HRIRKernel[2*i+1]=(int16_t)(final*Vec3_Dot(right, coords));
 		}
 	}
 }
@@ -251,16 +247,16 @@ static void Audio_FillBuffer(void *buffer, uint32_t length)
 		for(size_t dataIdx=0;dataIdx<(MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES);dataIdx++)
 		{
 			if(dataIdx<=toFill)
-				channel->working[dataIdx]=channel->sample->data[channel->position+dataIdx];
+				preConvolve[dataIdx]=channel->sample->data[channel->position+dataIdx];
 			else
-				channel->working[dataIdx]=0;
+				preConvolve[dataIdx]=0;
 		}
 
 		// Convolve the samples with the interpolated HRIR sample to produce a stereo sample to mix into the output buffer
-		Convolve(channel->working, audioBuffer, remainingData, HRIRSamples, sphere.sampleLength);
+		Convolve(preConvolve, postConvole, remainingData, HRIRKernel, sphere.sampleLength);
 
 		// Mix out the samples into the output buffer
-		MixAudio(out, audioBuffer, (uint32_t)remainingData, channel->volume);
+		MixAudio(out, postConvole, (uint32_t)remainingData, channel->volume);
 
 		// Advance the sample position by what we've used, next time around will take another chunk.
 		channel->position+=(uint32_t)remainingData;
@@ -470,7 +466,7 @@ int Audio_Init(void)
 	memset(channels, 0, sizeof(Channel_t)*MAX_CHANNELS);
 
 	// Clear out stream buffer
-	memset(&streamBuffer, 0, sizeof(AudioStream_t));
+	memset(&streamBuffer, 0, sizeof(streamBuffer));
 
 	if(!HRIR_Init())
 	{
