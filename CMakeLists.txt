@@ -12,7 +12,7 @@ FetchContent_Declare(openxr-loader
 	GIT_REPOSITORY https://github.com/KhronosGroup/OpenXR-SDK.git
 	GIT_SHALLOW TRUE
 	GIT_TAG 288d3a7ebc1ad959f62d51da75baa3d27438c499 #1.0.34
- )
+)
 FetchContent_MakeAvailable(openxr-loader)
 
 message(STATUS "${PROJECT_NAME}: Fetching PortAudio...")
@@ -124,7 +124,6 @@ set(PROJECT_SOURCES
 	line.c
 	music.c
 	volume.c
-	perframe.c
 	sfx.c
 	shadow.c
 	skybox.c

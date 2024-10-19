@@ -52,6 +52,9 @@ XruContext_t xrContext;
 VkInstance vkInstance;
 VkuContext_t vkContext;
 
+// Per-frame data
+PerFrame_t perFrame[VKU_MAX_FRAME_COUNT];
+
 // Camera data
 Camera_t camera, enemy;
 matrix modelView, projection[2], headPose;
