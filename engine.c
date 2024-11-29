@@ -942,8 +942,8 @@ void Render(void)
 {
 	static uint32_t index=0, lastImageIndex=0, imageIndex=2;
 
-	Thread_AddJob(&threadPhysics, Thread_Physics, &index);
-	//Thread_Physics(NULL);
+	Thread_AddJob(&threadPhysics, Thread_Physics, (void *)&index);
+	//Thread_Physics((void *)&index);
 
 	vkWaitForFences(vkContext.device, 1, &perFrame[index].frameFence, VK_TRUE, UINT64_MAX);
 
@@ -1793,6 +1793,11 @@ void Destroy(void)
 		else
 			DBGPRINTF(DEBUG_ERROR, "Failed to allocate memory for pipeline cache data.\n");
 	}
+
+	DestroyLineGraphPipeline();
+	DestroyLineGraph(&frameTimes);
+	DestroyLineGraph(&audioTimes);
+	DestroyLineGraph(&physicsTimes);
 
 	// Compositing pipeline
 	DestroyComposite();
