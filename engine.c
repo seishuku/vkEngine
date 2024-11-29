@@ -28,6 +28,7 @@
 #include "enemy.h"
 #include "lighting.h"
 #include "line.h"
+#include "linegraph.h"
 #include "models.h"
 #include "music.h"
 #include "perframe.h"
@@ -60,7 +61,7 @@ Camera_t camera, enemy;
 matrix modelView, projection[2], headPose;
 
 // extern timing data from system main
-extern float fps, fTimeStep, fTime;
+extern float fps, fTimeStep, fTime, audioTime;
 
 float physicsTime=0.0f;
 
@@ -153,6 +154,8 @@ extern vec2 lStick, rStick;
 extern bool buttons[4];
 
 Enemy_t enemyAI;
+
+LineGraph_t frameTimes, audioTimes, physicsTimes;
 
 void RecreateSwapchain(void);
 bool CreateFramebuffers(uint32_t eye);
@@ -1166,6 +1169,10 @@ void Render(void)
 
 		index=(index+1)%swapchain.numImages;
 	}
+
+	UpdateLineGraph(&frameTimes, fTimeStep, fTimeStep);
+	UpdateLineGraph(&audioTimes, audioTime, fTimeStep);
+	UpdateLineGraph(&physicsTimes, physicsTime, fTimeStep);
 }
 
 void Console_CmdQuit(Console_t *console, const char *param)
@@ -1426,6 +1433,11 @@ bool Init(void)
 		CreateFramebuffers(1);
 		CreateCompositeFramebuffers(1);
 	}
+
+	CreateLineGraphPipeline();
+	CreateLineGraph(&frameTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, renderHeight-32.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
+	CreateLineGraph(&audioTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, renderHeight-48.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
+	CreateLineGraph(&physicsTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, renderHeight-64.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
 
 	// Set up particle system
 	if(!ParticleSystem_Init(&particleSystem))

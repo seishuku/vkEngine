@@ -1,0 +1,12 @@
+pipeline {
+	addStage("shaders/linegraph.vert.spv", vertex)
+	addStage("shaders/linegraph.frag.spv", fragment)
+
+	pushConstant(0, 96, vertex|fragment)
+
+	topology(lineStrip)
+	cullMode(back)
+
+	addVertexBinding(0, 8, perVertex)
+	addVertexAttribute(0, 0, rg32_sfloat, 0)
+}

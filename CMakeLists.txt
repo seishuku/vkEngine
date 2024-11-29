@@ -50,6 +50,7 @@ set(SHADER_SOURCES
 	shaders/volume_gen.comp
 	shaders/volume.frag shaders/volume.vert
 	shaders/line.frag shaders/line.vert
+	shaders/linegraph.frag shaders/linegraph.vert
 	shaders/sphere.frag shaders/sphere.vert
 	shaders/font.frag shaders/font.vert
 	shaders/ui_sdf.frag shaders/ui_sdf.vert
@@ -122,6 +123,7 @@ set(PROJECT_SOURCES
 	engine.c
 	lighting.c
 	line.c
+	linegraph.c
 	music.c
 	volume.c
 	sfx.c

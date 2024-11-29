@@ -8,6 +8,7 @@
 #include "font/font.h"
 #include "ui/ui.h"
 #include "vr/vr.h"
+#include "linegraph.h"
 #include "perframe.h"
 
 extern VkuContext_t vkContext;
@@ -28,6 +29,8 @@ extern VkuImage_t shadowDepth;
 
 extern UI_t UI;
 extern Font_t font;
+
+extern LineGraph_t frameTimes, audioTimes, physicsTimes;
 
 Pipeline_t compositePipeline;
 VkRenderPass compositeRenderPass;
@@ -569,6 +572,10 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	Font_Print(&font, 16.0f, 0.0f, (float)height-16.0f, "FPS: %0.1f\n\x1B[33mFrame time: %0.3fms\nAudio time: %0.3fms\nPhysics time: %0.3fms", fps, fTimeStep*1000.0f, audioTime*1000.0f, physicsTime*1000.0f);
 
 	Font_Draw(&font, index, eye);
+
+	DrawLineGraph(perFrame[index].commandBuffer, 0, 0, &frameTimes);
+	DrawLineGraph(perFrame[index].commandBuffer, 0, 0, &audioTimes);
+	DrawLineGraph(perFrame[index].commandBuffer, 0, 0, &physicsTimes);
 
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 }
