@@ -235,7 +235,6 @@ typedef struct
 
 typedef struct
 {
-	size_t size;
 	VkBuffer buffer;
 	VkuMemBlock_t *memory;
 } VkuBuffer_t;
