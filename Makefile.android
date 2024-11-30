@@ -92,21 +92,24 @@ OBJS+=system/threads.o
 OBJS+=system/memzone.o
 
 OBJS+=font/font.o
+
 OBJS+=utils/event.o
 OBJS+=utils/list.o
 OBJS+=utils/pipeline.o
 OBJS+=utils/tokenizer.o
 OBJS+=utils/spvparse.o
+
 OBJS+=client_network.o
-OBJS+=perframe.o
-OBJS+=shadow.o
-OBJS+=skybox.o
+OBJS+=composite.o
+OBJS+=enemy.o
+OBJS+=engine.o
 OBJS+=lighting.o
 OBJS+=line.o
+OBJS+=linegraph.o
+OBJS+=shadow.o
+OBJS+=skybox.o
 OBJS+=sphere.o
 OBJS+=volume.o
-OBJS+=composite.o
-OBJS+=engine.o
 
 # Android
 OBJS+=system/android_fopen.o
@@ -125,6 +128,8 @@ SHADERS+=shaders/lighting.frag.spv
 SHADERS+=shaders/lighting.vert.spv
 SHADERS+=shaders/line.frag.spv
 SHADERS+=shaders/line.vert.spv
+SHADERS+=shaders/linegraph.frag.spv
+SHADERS+=shaders/linegraph.vert.spv
 SHADERS+=shaders/particle.frag.spv
 SHADERS+=shaders/particle.geom.spv
 SHADERS+=shaders/particle.vert.spv
