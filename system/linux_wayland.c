@@ -372,14 +372,14 @@ int main(int argc, char** argv)
     wl_display_roundtrip(vkContext.wlDisplay);
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Instance...\n");
-	if(!CreateVulkanInstance(&vkInstance))
+	if(!vkuCreateInstance(&vkInstance))
 	{
 		DBGPRINTF(DEBUG_ERROR, "...failed.\n");
 		return -1;
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Context...\n");
-	if(!CreateVulkanContext(vkInstance, &vkContext))
+	if(!vkuCreateContext(vkInstance, &vkContext))
 	{
 		DBGPRINTF(DEBUG_ERROR, "...failed.\n");
 		return -1;
@@ -450,8 +450,8 @@ int main(int argc, char** argv)
 
 	DBGPRINTF(DEBUG_INFO, "Shutting down...\n");
 	Destroy();
-	DestroyVulkan(vkInstance, &vkContext);
-	vkDestroyInstance(vkInstance, VK_NULL_HANDLE);
+	vkuDestroyContext(vkInstance, &vkContext);
+	vkuDestroyInstance(vkInstance);
 
     xdg_toplevel_destroy(toplevel);
     xdg_surface_destroy(shellSurface);

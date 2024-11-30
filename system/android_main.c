@@ -199,7 +199,7 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			}
 
 			DBGPRINTF(DEBUG_INFO, "Creating Vulkan instance...\n");
-			if(!CreateVulkanInstance(&vkInstance))
+			if(!vkuCreateInstance(&vkInstance))
 			{
 				DBGPRINTF(DEBUG_ERROR, "\t...create Vulkan instance failed.\n");
 				appState.app->destroyRequested=true;
@@ -208,7 +208,7 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			}
 
 			DBGPRINTF(DEBUG_INFO, "Creating Vulkan context...\n");
-			if(!CreateVulkanContext(vkInstance, &vkContext))
+			if(!vkuCreateContext(vkInstance, &vkContext))
 			{
 				DBGPRINTF(DEBUG_ERROR, "\t...create Vulkan context failed.\n");
 				appState.app->destroyRequested=true;
@@ -269,8 +269,8 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 
 			DBGPRINTF(DEBUG_INFO, "Shutting down...\n");
 			Destroy();
-			DestroyVulkan(vkInstance, &vkContext);
-			vkDestroyInstance(vkInstance, VK_NULL_HANDLE);
+			vkuDestroyContext(vkInstance, &vkContext);
+			vkuDestroyInstance(vkInstance);
 
 			DBGPRINTF(DEBUG_WARNING, "Zone remaining block list:\n");
 			Zone_Print(zone);

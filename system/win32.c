@@ -464,14 +464,14 @@ int main(int argc, char **argv)
 	SetForegroundWindow(vkContext.hWnd);
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan instance...\n");
-	if(!CreateVulkanInstance(&vkInstance))
+	if(!vkuCreateInstance(&vkInstance))
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
 		return -1;
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan context...\n");
-	if(!CreateVulkanContext(vkInstance, &vkContext))
+	if(!vkuCreateContext(vkInstance, &vkContext))
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
 		return -1;
@@ -665,8 +665,8 @@ int main(int argc, char **argv)
 
 	DBGPRINTF(DEBUG_INFO, "Shutting down...\n");
 	Destroy();
-	DestroyVulkan(vkInstance, &vkContext);
-	vkDestroyInstance(vkInstance, VK_NULL_HANDLE);
+	vkuDestroyContext(vkInstance, &vkContext);
+	vkuDestroyInstance(vkInstance);
 
 	DestroyWindow(vkContext.hWnd);
 

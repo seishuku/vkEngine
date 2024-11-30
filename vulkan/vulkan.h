@@ -345,9 +345,11 @@ void vkuMem_Free(VkuMemZone_t *vkZone, VkuMemBlock_t *ptr);
 VkuMemBlock_t *vkuMem_Malloc(VkuMemZone_t *vkZone, VkMemoryRequirements requirements);
 void vkuMem_Print(VkuMemZone_t *vkZone);
 
-VkBool32 CreateVulkanInstance(VkInstance *instance);
-VkBool32 CreateVulkanContext(VkInstance instance, VkuContext_t *context);
-void DestroyVulkan(VkInstance instance, VkuContext_t *context);
+VkBool32 vkuCreateInstance(VkInstance *instance);
+void vkuDestroyInstance(VkInstance instance);
+
+VkBool32 vkuCreateContext(VkInstance instance, VkuContext_t *context);
+void vkuDestroyContext(VkInstance instance, VkuContext_t *context);
 
 VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, VkBool32 vSync);
 void vkuDestroySwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain);

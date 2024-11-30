@@ -30,7 +30,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 #endif
 
 // Create Vulkan Instance
-VkBool32 CreateVulkanInstance(VkInstance *instance)
+VkBool32 vkuCreateInstance(VkInstance *instance)
 {
 	uint32_t extensionCount=0;
 
@@ -188,7 +188,7 @@ VkBool32 CreateVulkanInstance(VkInstance *instance)
 			debugExtension=VK_FALSE;
 		}
 
-		if(debugExtension&&vkCreateDebugUtilsMessengerEXT(*instance, &(VkDebugUtilsMessengerCreateInfoEXT)
+		if(vkCreateDebugUtilsMessengerEXT(*instance, &(VkDebugUtilsMessengerCreateInfoEXT)
 		{
 			.sType=VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
 			.messageSeverity=VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT|VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT|VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
@@ -200,4 +200,13 @@ VkBool32 CreateVulkanInstance(VkInstance *instance)
 #endif
 
 	return VK_TRUE;
+}
+
+void vkuDestroyInstance(VkInstance instance)
+{
+#ifdef _DEBUG
+	vkDestroyDebugUtilsMessengerEXT(instance, debugMessenger, VK_NULL_HANDLE);
+#endif
+
+	vkDestroyInstance(instance, VK_NULL_HANDLE);
 }
