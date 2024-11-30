@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include "../system/system.h"
 #include "../math/math.h"
 #include "../vulkan/vulkan.h"
