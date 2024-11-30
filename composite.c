@@ -55,7 +55,7 @@ bool CreateThresholdPipeline(void)
 			{
 				.format=colorFormat,
 				.samples=VK_SAMPLE_COUNT_1_BIT,
-				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -74,35 +74,17 @@ bool CreateThresholdPipeline(void)
 				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			}
 		},
-		.dependencyCount=3,
+		.dependencyCount=1,
 		.pDependencies=(VkSubpassDependency[])
 		{
 			{
 				.srcSubpass=VK_SUBPASS_EXTERNAL,
 				.dstSubpass=0,
-				.srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
-			},
-			{
-				.srcSubpass=0,
-				.dstSubpass=VK_SUBPASS_EXTERNAL,
-				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
-			},
-			{
-				.srcSubpass=VK_SUBPASS_EXTERNAL,
-				.dstSubpass=0,
-				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
+				.dependencyFlags=0
 			},
 		},
 	}, 0, &thresholdRenderPass);
@@ -124,7 +106,7 @@ bool CreateGaussianPipeline(void)
 			{
 				.format=colorFormat,
 				.samples=VK_SAMPLE_COUNT_1_BIT,
-				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -143,27 +125,18 @@ bool CreateGaussianPipeline(void)
 				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			}
 		},
-		.dependencyCount=2,
+		.dependencyCount=1,
 		.pDependencies=(VkSubpassDependency[])
 		{
 			{
 				.srcSubpass=VK_SUBPASS_EXTERNAL,
 				.dstSubpass=0,
-				.srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
-				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
-			},
-			{
-				.srcSubpass=0,
-				.dstSubpass=VK_SUBPASS_EXTERNAL,
 				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
-			}
+				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dependencyFlags=0
+			},
 		},
 	}, 0, &gaussianRenderPass);
 
@@ -306,7 +279,7 @@ bool CreateCompositePipeline(void)
 			{
 				.format=surfaceFormat,
 				.samples=VK_SAMPLE_COUNT_1_BIT,
-				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -325,27 +298,18 @@ bool CreateCompositePipeline(void)
 				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			}
 		},
-		.dependencyCount=2,
+		.dependencyCount=1,
 		.pDependencies=(VkSubpassDependency[])
 		{
 			{
 				.srcSubpass=VK_SUBPASS_EXTERNAL,
 				.dstSubpass=0,
-				.srcStageMask=VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.srcAccessMask=VK_ACCESS_MEMORY_READ_BIT,
-				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
-			},
-			{
-				.srcSubpass=0,
-				.dstSubpass=VK_SUBPASS_EXTERNAL,
 				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.dstStageMask=VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-				.dstAccessMask=VK_ACCESS_MEMORY_READ_BIT,
-				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT
-			}
+				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dependencyFlags=0
+			},
 		},
 	}, 0, &compositeRenderPass);
 
