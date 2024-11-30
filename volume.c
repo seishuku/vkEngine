@@ -269,8 +269,6 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 		.pPoolSizes=(VkDescriptorPoolSize[]){ {.type=VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount=1, }, },
 	}, VK_NULL_HANDLE, &computeDescriptorPool);
 
-	VkResult result=VK_ERROR_UNKNOWN;
-
 	if(vkCreateCommandPool(vkContext.device, &(VkCommandPoolCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -279,28 +277,33 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 	}, VK_NULL_HANDLE, &computeCommandPool)!=VK_SUCCESS)
 		return VK_FALSE;
 
-	if((result=vkAllocateCommandBuffers(vkContext.device, &(VkCommandBufferAllocateInfo)
+	if(vkAllocateCommandBuffers(vkContext.device, &(VkCommandBufferAllocateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 		.commandPool=computeCommandPool,
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount=1,
-	}, &computeCommand))!=VK_SUCCESS)
+	}, &computeCommand)!=VK_SUCCESS)
 		return VK_FALSE;
 
-	vkBeginCommandBuffer(computeCommand, &(VkCommandBufferBeginInfo) {.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, });
+	vkBeginCommandBuffer(computeCommand, &(VkCommandBufferBeginInfo) { .sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO });
 
-	VkImageMemoryBarrier imageMemoryBarrier={ 0 };
-	imageMemoryBarrier.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	imageMemoryBarrier.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED;
-	imageMemoryBarrier.newLayout=VK_IMAGE_LAYOUT_GENERAL;
-	imageMemoryBarrier.image=image->image;
-	imageMemoryBarrier.subresourceRange=(VkImageSubresourceRange){ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-	imageMemoryBarrier.srcAccessMask=0;
-	imageMemoryBarrier.dstAccessMask=VK_ACCESS_SHADER_WRITE_BIT;
-	imageMemoryBarrier.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
-	imageMemoryBarrier.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
-	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcAccessMask=VK_ACCESS_NONE,
+		.dstAccessMask=VK_ACCESS_SHADER_WRITE_BIT,
+		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+		.newLayout=VK_IMAGE_LAYOUT_GENERAL,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=image->image,
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+		.subresourceRange.baseMipLevel=0,
+		.subresourceRange.levelCount=1,
+		.subresourceRange.baseArrayLayer=0,
+		.subresourceRange.layerCount=1,
+	});
 
 	vkCmdBindPipeline(computeCommand, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline.pipeline.pipeline);
 
@@ -314,11 +317,22 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 
 	vkCmdDispatch(computeCommand, image->width/8, image->height/8, image->depth/8);
 
-	imageMemoryBarrier.oldLayout=VK_IMAGE_LAYOUT_GENERAL;
-	imageMemoryBarrier.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	imageMemoryBarrier.srcAccessMask=VK_ACCESS_SHADER_WRITE_BIT;
-	imageMemoryBarrier.dstAccessMask=0;
-	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcAccessMask=VK_ACCESS_SHADER_WRITE_BIT,
+		.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+		.oldLayout=VK_IMAGE_LAYOUT_GENERAL,
+		.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=image->image,
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+		.subresourceRange.baseMipLevel=0,
+		.subresourceRange.levelCount=1,
+		.subresourceRange.baseArrayLayer=0,
+		.subresourceRange.layerCount=1,
+	});
 
 	// End command buffer and submit
 	if(vkEndCommandBuffer(computeCommand)!=VK_SUCCESS)
@@ -355,66 +369,6 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 // Create functions for volume rendering
 bool CreateVolumePipeline(void)
 {
-#if 0
-	vkuInitDescriptorSet(&volumeDescriptorSet, vkContext.device);
-	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&volumeDescriptorSet, 4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuAssembleDescriptorSetLayout(&volumeDescriptorSet);
-
-	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=1,
-		.pSetLayouts=&volumeDescriptorSet.descriptorSetLayout,
-		.pushConstantRangeCount=1,
-		.pPushConstantRanges=&(VkPushConstantRange)
-		{
-			.offset=0,
-			.size=sizeof(uint32_t)*4,
-			.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT,
-		},
-	}, 0, &volumePipelineLayout);
-
-	vkuInitPipeline(&volumePipeline, vkContext.device, vkContext.pipelineCache);
-
-	vkuPipeline_SetPipelineLayout(&volumePipeline, volumePipelineLayout);
-	vkuPipeline_SetRenderPass(&volumePipeline, renderPass);
-
-	volumePipeline.subpass=1;
-
-	volumePipeline.depthWrite=VK_FALSE;
-	volumePipeline.cullMode=VK_CULL_MODE_BACK_BIT;
-	volumePipeline.rasterizationSamples=MSAA;
-
-	volumePipeline.blend=VK_TRUE;
-	volumePipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	volumePipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	volumePipeline.colorBlendOp=VK_BLEND_OP_ADD;
-	volumePipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	volumePipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	volumePipeline.alphaBlendOp=VK_BLEND_OP_ADD;
-
-	if(!vkuPipeline_AddStage(&volumePipeline, "shaders/volume.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
-		return false;
-
-	if(!vkuPipeline_AddStage(&volumePipeline, "shaders/volume.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-		return false;
-
-	//VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo=
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-	//	.colorAttachmentCount=1,
-	//	.pColorAttachmentFormats=&ColorFormat,
-	//	.depthAttachmentFormat=DepthFormat,
-	//};
-
-	if(!vkuAssemblePipeline(&volumePipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
-		return false;
-#endif
-
 	if(!CreatePipeline(&vkContext, &volumePipeline, renderPass, "pipelines/volume.pipeline"))
 		return false;
 
