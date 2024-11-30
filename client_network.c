@@ -217,12 +217,13 @@ bool ClientNetwork_Init(uint32_t address)
 
 void ClientNetwork_Destroy(void)
 {
-	netUpdateRun=false;
-	Thread_Destroy(&threadNetUpdate);
-
-	// Send disconnect message to server and close/destroy network stuff
+	// Only disconnect if there was already a connected socket
 	if(clientSocket!=-1)
 	{
+		netUpdateRun=false;
+		Thread_Destroy(&threadNetUpdate);
+
+		// Send disconnect message to server and close/destroy network stuff
 		uint8_t *pBuffer=statusBuffer;
 		size_t iota=0;
 		memset(&statusBuffer, 0, sizeof(statusBuffer));
