@@ -316,8 +316,6 @@ inline static const VkAccessFlags selectLayoutAccessFlags(const VkImageLayout la
 			return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
 		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-			return VK_ACCESS_MEMORY_READ_BIT;
-
 		case VK_IMAGE_LAYOUT_UNDEFINED:
 		default:
 			return VK_ACCESS_NONE;

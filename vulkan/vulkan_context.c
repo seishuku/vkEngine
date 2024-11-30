@@ -423,6 +423,8 @@ VkBool32 vkuCreateContext(VkInstance instance, VkuContext_t *context)
 		return VK_FALSE;
 	}
 
+	features.robustBufferAccess=false;
+
 	// Enable extensions that are supported
 	const char *extensions[100];
 	uint32_t numExtensions=0;
