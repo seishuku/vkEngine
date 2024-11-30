@@ -4,58 +4,70 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define CONSOLE_MAX_COLUMN 80
-#define CONSOLE_MAX_ROW 25
-#define CONSOLE_MAX_SCROLLBACK (CONSOLE_MAX_ROW)
-
-#define CONSOLE_MAX_COMMAND_HISTORY 30
-
-#define CONSOLE_MAX_COMMAND_NAME CONSOLE_MAX_COLUMN
-#define CONSOLE_MAX_COMMANDS 100
+#define CONSOLE_MAX_NAME 32
+#define CONSOLE_MAX_COMMANDS 64
+#define CONSOLE_MAX_VARIABLES 64
+#define CONSOLE_MAX_HISTORY 16
+#define CONSOLE_MAX_LINES 256
+#define CONSOLE_LINE_LENGTH 128
 
 typedef struct Console_s Console_t;
 
+typedef void (*ConsoleCommandFunc)(Console_t *console, const char *args);
+
 typedef struct
 {
-	char commandName[CONSOLE_MAX_COMMAND_NAME];
-	void (*commandFunction)(Console_t *, const char *);
+    char name[CONSOLE_MAX_NAME];
+    ConsoleCommandFunc func;
 } ConsoleCommand_t;
+
+typedef struct
+{
+    char name[CONSOLE_MAX_NAME];
+    float value;
+} ConsoleVariable_t;
+
+typedef struct
+{
+    char buffer[CONSOLE_LINE_LENGTH];
+} ConsoleLine_t;
 
 typedef struct Console_s
 {
-	struct {
-		char text[CONSOLE_MAX_COLUMN];
-	} buffer[CONSOLE_MAX_SCROLLBACK];
+    bool active;
 
-	int32_t newLine, column, viewBottom;
+    uint32_t numCommand;
+    ConsoleCommand_t commands[CONSOLE_MAX_COMMANDS];
 
-	char commandHistory[CONSOLE_MAX_COMMAND_HISTORY][CONSOLE_MAX_COMMAND_NAME];
-	int32_t numCommandHistory;
+    uint32_t numVariable;
+    ConsoleVariable_t variables[CONSOLE_MAX_VARIABLES];
 
-	int32_t newCommand, currentCommand;
+    uint32_t numHistory, historyIndex;
+    char history[CONSOLE_MAX_HISTORY][CONSOLE_LINE_LENGTH];
 
-	ConsoleCommand_t commands[CONSOLE_MAX_COMMANDS];
-	uint32_t numCommand;
+    uint32_t numLine;
+    ConsoleLine_t lines[CONSOLE_MAX_LINES];
 
-	uint32_t width, height;
+    uint32_t inputLength;
+    char input[CONSOLE_LINE_LENGTH];
 
-	bool active;
+    uint32_t scrollbackOffset;
 } Console_t;
 
-bool Console_ExecFile(Console_t *console, const char *filename);
-void Console_ClearCommandHistory(Console_t *console);
-void Console_Clear(Console_t *console);
-void Console_Init(Console_t *console, const uint32_t width, const uint32_t height);
-void Console_Destroy(Console_t *console);
-void Console_Advance(Console_t *console);
-void Console_Scroll(Console_t *console, const bool up);
-void Console_Out(Console_t *console, const char *string);
-bool Console_AddCommand(Console_t *console, const char *commandName, void (*commandFunction)(Console_t *, const char *));
-bool Console_ExecCommand(Console_t *console, const char *command, const char *param);
-void Console_History(Console_t *console, const bool up);
-void Console_Backspace(Console_t *console);
-void Console_Process(Console_t *console);
-void Console_KeyInput(Console_t *console, const uint32_t keyCode);
-void Console_Draw(Console_t *console);
+void ConsoleInit(Console_t *console);
+void ConsoleClear(Console_t *console, const char *param);
+void ConsoleRegisterCommand(Console_t *console, const char *name, ConsoleCommandFunc func);
+void ConsoleRegisterVariable(Console_t *console, const char *name, float value);
+void ConsoleSetVariable(Console_t *console, const char *name, float value);
+float ConsoleGetVariable(Console_t *console, const char *name);
+void ConsolePrint(Console_t *console, const char *text);
+void ConsolePrintCommands(Console_t *console, const char *param);
+void ConsolePrintVariables(Console_t *console, const char *param);
+void ConsoleScroll(Console_t *console, const bool up);
+void ConsoleExecuteCommand(Console_t *console, const char *input);
+void ConsoleHistory(Console_t *console, const bool up);
+void ConsoleAddToHistory(Console_t *console, const char *input);
+void ConsoleKeyInput(Console_t *console, char key);
+void ConsoleDraw(Console_t *console);
 
 #endif

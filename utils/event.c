@@ -121,31 +121,35 @@ bool Event_Trigger(EventID ID, void *arg)
 						break;
 
 					case KB_UP:
-						Console_History(&console, true);
+						ConsoleHistory(&console, true);
 						break;
 
 					case KB_DOWN:
-						Console_History(&console, false);
+						ConsoleHistory(&console, false);
 						break;
 
 					case KB_PAGE_UP:
-						Console_Scroll(&console, true);
+						ConsoleScroll(&console, true);
 						break;
 
 					case KB_PAGE_DOWN:
-						Console_Scroll(&console, false);
+						ConsoleScroll(&console, false);
 						break;
 
 					case KB_BACKSPACE:
-						Console_Backspace(&console);
+						ConsoleKeyInput(&console, '\b');
+						break;
+
+					case KB_TAB:
+						ConsoleKeyInput(&console, '\t');
 						break;
 
 					case KB_ENTER:
-						Console_Process(&console);
+						ConsoleKeyInput(&console, '\n');
 						break;
 
 					default:
-						Console_KeyInput(&console, key);
+						ConsoleKeyInput(&console, tolower(key));
 				}
 
 				// Ignore the rest of event while console is up

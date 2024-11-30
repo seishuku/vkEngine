@@ -4,302 +4,320 @@
 #include "../font/font.h"
 #include "console.h"
 
-#ifdef WIN32
-#include <string.h>
-#define strcasecmp _stricmp
-#else
-#include <strings.h>
-#endif
-
-extern Font_t font;
-
-// Standard/basic console commands
-void Console_CmdClear(Console_t *console, const char *param)
+void ConsoleInit(Console_t *console)
 {
-	Console_Clear(console);
+    memset(console, 0, sizeof(Console_t));
+
+    ConsoleRegisterCommand(console, "clear", ConsoleClear);
+    ConsoleRegisterCommand(console, "echo", ConsolePrint);
+    ConsoleRegisterCommand(console, "listcommands", ConsolePrintCommands);
+    ConsoleRegisterCommand(console, "listvariables", ConsolePrintVariables);
+
+    ConsoleRegisterVariable(console, "testvar", 123.0f);
 }
 
-void Console_CmdEcho(Console_t *console, const char *param)
+void ConsolePrint(Console_t *console, const char *text)
 {
-	Console_Out(console, param);
+    if(console->numLine>=CONSOLE_MAX_LINES)
+    {
+        // Scroll up to make room for the new line
+        memmove(&console->lines[0], &console->lines[1], (CONSOLE_MAX_LINES-1)*sizeof(ConsoleLine_t));
+        strncpy(console->lines[CONSOLE_MAX_LINES-1].buffer, text, CONSOLE_LINE_LENGTH-1);
+    }
+    else
+    {
+        // Add text to the next available line (which should be at the bottom)
+        strncpy(console->lines[console->numLine].buffer, text, CONSOLE_LINE_LENGTH-1);
+        console->numLine++;
+    }
 }
 
-bool Console_ExecFile(Console_t *console, const char *filename)
+void ConsolePrintCommands(Console_t *console, const char *param)
 {
-	FILE *stream=NULL;
-	char buf[CONSOLE_MAX_COLUMN];
+    (void)param; // Unused
 
-	if(!filename)
-	{
-		Console_Out(console, "No file specified");
-		return false;
-	}
-
-	stream=fopen(filename, "r");
-
-	if(stream==NULL)
-	{
-		sprintf(buf, "Unable to open file: %s", filename);
-		Console_Out(console, buf);
-
-		return false;
-	}
-
-	while(fgets(buf, CONSOLE_MAX_COLUMN, stream))
-	{
-		strtok(buf, " \n\f");
-		char *param=buf+strlen(buf)+1;
-
-		if(param[0]==0)
-			param=NULL;
-
-		if(!Console_ExecCommand(console, buf, param))
-			Console_Out(console, "Invalid command in file");
-	}
-
-	fclose(stream);
-
-	return true;
+    ConsolePrint(console, "List of console commands:");
+    for(uint32_t i=0;i<console->numCommand;i++)
+        ConsolePrint(console, console->commands[i].name);
 }
 
-void Console_ClearCommandHistory(Console_t *console)
+void ConsolePrintVariables(Console_t *console, const char *param)
 {
-	memset(console->commandHistory, '\0', sizeof(char)*CONSOLE_MAX_COMMAND_HISTORY*CONSOLE_MAX_COMMAND_NAME);
-	console->numCommandHistory=0;
+    (void)param; // Unused
 
-	console->newCommand=0;
-	console->currentCommand=0;
+    ConsolePrint(console, "List of console variables:");
+    for(uint32_t i=0;i<console->numVariable;i++)
+        ConsolePrint(console, console->variables[i].name);
 }
 
-void Console_Clear(Console_t *console)
+void ConsoleClear(Console_t *console, const char *param)
 {
-	memset(console->buffer, '\0', sizeof(char)*CONSOLE_MAX_ROW*CONSOLE_MAX_COLUMN);
+    (void)param; // Unused
 
-	console->newLine=0;
-	console->viewBottom=0;
+    memset(console->lines, 0, sizeof(console->lines));
+    console->numLine=0;
 }
 
-void Console_Init(Console_t *console, const uint32_t width, const uint32_t height)
+void ConsoleRegisterCommand(Console_t *console, const char *name, ConsoleCommandFunc func)
 {
-	console->column=1;
+    if(console->numCommand>=CONSOLE_MAX_COMMANDS)
+    {
+        printf("Command list full!\n");
+        return;
+    }
 
-	console->width=width;
-	console->height=height;
-
-	console->numCommand=0;
-
-	Console_AddCommand(console, "echo", Console_CmdEcho);
-	Console_AddCommand(console, "clear", Console_CmdClear);
-//	Console_AddCommand(console, "exec", Console_ExecFile);
-
-	Console_Clear(console);
-	Console_ClearCommandHistory(console);
-	Console_Advance(console);
-
-	console->buffer[console->newLine].text[0]=']';
-	console->buffer[console->newLine].text[1]='_';
-	console->buffer[console->newLine].text[2]='\0';
+    strncpy(console->commands[console->numCommand].name, name, CONSOLE_MAX_NAME-1);
+    console->commands[console->numCommand].func=func;
+    console->numCommand++;
 }
 
-void Console_Destroy(Console_t *console)
+void ConsoleRegisterVariable(Console_t *console, const char *name, float value)
 {
+    if(console->numVariable>=CONSOLE_MAX_VARIABLES)
+    {
+        printf("Variable list full!\n");
+        return;
+    }
+
+    strncpy(console->variables[console->numVariable].name, name, CONSOLE_MAX_NAME-1);
+    console->variables[console->numVariable].value=value;
+    console->numVariable++;
 }
 
-void Console_Advance(Console_t *console)
+void ConsoleSetVariable(Console_t *console, const char *name, float value)
 {
-	console->newLine--;
+    for(uint32_t i=0; i<console->numVariable; i++)
+    {
+        if(strncmp(console->variables[i].name, name, CONSOLE_MAX_NAME)==0)
+        {
+            console->variables[i].value=value;
+            return;
+        }
+    }
 
-	if(console->newLine<0)
-		console->newLine+=CONSOLE_MAX_SCROLLBACK;
-
-	console->buffer[console->newLine].text[0]='\0';
-	console->viewBottom=console->newLine;
+    ConsolePrint(console, "Variable not found!");
 }
 
-void Console_Scroll(Console_t *console, const bool up)
+float ConsoleGetVariable(Console_t *console, const char *name)
 {
-	if(up)
-	{
-		console->viewBottom++;
+    for(uint32_t i=0; i<console->numVariable; i++)
+    {
+        if(strncmp(console->variables[i].name, name, CONSOLE_MAX_NAME)==0)
+            return console->variables[i].value;
+    }
 
-		if(console->viewBottom>=CONSOLE_MAX_SCROLLBACK+CONSOLE_MAX_SCROLLBACK)
-			console->viewBottom-=CONSOLE_MAX_SCROLLBACK+CONSOLE_MAX_SCROLLBACK;
-
-		if(console->viewBottom==console->newLine)
-			console->viewBottom--;
-	}
-	else
-	{
-		console->viewBottom--;
-
-		if(console->viewBottom<0)
-			console->viewBottom+=CONSOLE_MAX_SCROLLBACK;
-
-		if(console->viewBottom==console->newLine-1)
-			console->viewBottom=console->newLine;
-	}
+    ConsolePrint(console, "Variable not found!");
+    return 0.0f;
 }
 
-void Console_Out(Console_t *console, const char *string)
+void ConsoleScroll(Console_t *console, const bool up)
 {
-	Console_Advance(console);
-
-	if(string)
-		strcpy(console->buffer[console->newLine].text, string);
+    if(up)
+    {
+        if(console->numLine>0)
+        {
+            if(console->scrollbackOffset<console->numLine-1)
+                console->scrollbackOffset++;
+        }
+    }
+    else
+    {
+        if(console->scrollbackOffset>0)
+            console->scrollbackOffset--;
+        else
+            console->scrollbackOffset=0;
+    }
 }
 
-bool Console_AddCommand(Console_t *console, const char *commandName, void (*commandFunction)(Console_t *, const char *))
+void ConsoleExecuteCommand(Console_t *console, const char *input)
 {
-	if(console==NULL)
-		return false;
+    char name[CONSOLE_MAX_NAME]={ 0 };
+    const char *args=NULL;
 
-	if(console->numCommand>=CONSOLE_MAX_COMMANDS)
-		return false;
+    // Split the input between the name and arguments
+    const char *separatorToken=strchr(input, ' ');
 
-	strcpy(console->commands[console->numCommand].commandName, commandName);
-	console->commands[console->numCommand].commandFunction=commandFunction;
+    if(separatorToken)
+    {
+        strncpy(name, input, separatorToken-input);
+        args=separatorToken+1;
+    }
+    else
+        strncpy(name, input, CONSOLE_MAX_NAME-1);
 
-	console->numCommand++;
+    // Search variable list first
+    for(uint32_t i=0; i<console->numVariable; i++)
+    {
+        if(strncmp(name, console->variables[i].name, CONSOLE_MAX_NAME)==0)
+        {
+            // If there's a value, set the variable, if no value, just print the variable's value
+            if(args)
+            {
+                float value=atof(args);
+                ConsoleSetVariable(console, name, value);
+            }
+            else
+            {
+                char value[CONSOLE_MAX_NAME]={ 0 };
+                snprintf(value, CONSOLE_MAX_NAME, "%f", console->variables[i].value);
+                ConsolePrint(console, value);
+            }
 
-	return true;
+            return;
+        }
+    }
+
+    // Then search command list
+    for(uint32_t i=0;i<console->numCommand;i++)
+    {
+        if(strncmp(name, console->commands[i].name, CONSOLE_MAX_NAME)==0)
+        {
+            if(console->commands[i].func)
+            {
+                console->commands[i].func(console, args?args:"");
+                return;
+            }
+        }
+    }
+
+    ConsolePrint(console, "Unknown command/variable.");
 }
 
-bool Console_ExecCommand(Console_t *console, const char *command, const char *param)
+void ConsoleHistory(Console_t *console, const bool up)
 {
-	if(console==NULL)
-		return false;
-
-	if(command==NULL)
-		return false;
-
-	// Search through command list and run it
-	for(uint32_t i=0;i<console->numCommand;i++)
-	{
-		if(strcasecmp(command, console->commands[i].commandName)==0)
-		{
-			console->commands[i].commandFunction(console, param);
-			return true;
-		}
-	}
-
-	return false;
+    if(up)
+    {
+        if(console->historyIndex>0)
+        {
+            console->historyIndex--;
+            strncpy(console->input, console->history[console->historyIndex], CONSOLE_LINE_LENGTH-1);
+            console->inputLength=strlen(console->input);
+        }
+    }
+    else
+    {
+        if(console->historyIndex<console->numHistory-1)
+        {
+            console->historyIndex++;
+            strncpy(console->input, console->history[console->historyIndex], CONSOLE_LINE_LENGTH-1);
+            console->inputLength=strlen(console->input);
+        }
+        else if(console->historyIndex==console->numHistory-1)
+        {
+            console->historyIndex=console->numHistory;
+            memset(console->input, 0, sizeof(console->input));
+            console->inputLength=0;
+        }
+    }
 }
 
-void Console_History(Console_t *console, const bool up)
+void ConsoleAddToHistory(Console_t *console, const char *input)
 {
-	if(up)
-	{
-		console->currentCommand++;
+    if(console->numHistory>=CONSOLE_MAX_HISTORY)
+    {
+        // Scroll up the history
+        memmove(&console->history[0], &console->history[1], (CONSOLE_MAX_HISTORY-1)*CONSOLE_LINE_LENGTH);
+        strncpy(console->history[CONSOLE_MAX_HISTORY-1], input, CONSOLE_LINE_LENGTH-1);
+    }
+    else
+    {
+        strncpy(console->history[console->numHistory], input, CONSOLE_LINE_LENGTH-1);
+        console->numHistory++;
+    }
 
-		if(console->currentCommand>console->numCommandHistory)
-			console->currentCommand=console->numCommandHistory;
-	}
-	else
-	{
-		console->currentCommand--;
-
-		if(console->currentCommand<0)
-			console->currentCommand=0;
-	}
-
-	if(console->currentCommand!=-1)
-	{
-		char buf[CONSOLE_MAX_COLUMN];
-
-		buf[0]=']';
-		buf[1]='\0';
-
-		int32_t commandNumber=console->newCommand-console->currentCommand;
-
-		if(commandNumber<0)
-			commandNumber+=console->numCommandHistory;
-
-		strcat(buf, console->commandHistory[commandNumber]);
-		strcat(buf, "_");
-		strcpy(console->buffer[console->newLine].text, buf);
-
-		console->column=(int)strlen(buf)-1;
-	}
+    console->historyIndex=console->numHistory;
 }
 
-void Console_Backspace(Console_t *console)
+void ConsoleAutocomplete(Console_t *console)
 {
-	// Backspace only up to the prompt character
-	if(console->column>1)
-	{
-		console->buffer[console->newLine].text[console->column]='\0';
-		console->buffer[console->newLine].text[console->column-1]='_';
-		console->column--;
-	}
+    char matches[CONSOLE_MAX_COMMANDS+CONSOLE_MAX_VARIABLES][CONSOLE_MAX_NAME];
+    uint32_t numMatches=0;
+
+    // Find command matches
+    for(uint32_t i=0;i<console->numCommand;i++)
+    {
+        if(strncmp(console->input, console->commands[i].name, console->inputLength)==0)
+            strncpy(matches[numMatches++], console->commands[i].name, CONSOLE_MAX_NAME-1);
+    }
+
+    // Find variable matches
+    for(uint32_t i=0; i<console->numVariable; i++)
+    {
+        if(strncmp(console->input, console->variables[i].name, console->inputLength)==0)
+            strncpy(matches[numMatches++], console->variables[i].name, CONSOLE_MAX_NAME-1);
+    }
+
+    if(numMatches==1)
+    {
+        // Single match: auto-complete
+        strncpy(console->input, matches[0], CONSOLE_LINE_LENGTH-1);
+        console->inputLength=strlen(console->input);
+    }
+    else
+    {
+        // Multiple matches: display options
+        for(uint32_t i=0;i<numMatches;i++)
+            ConsolePrint(console, matches[i]);
+    }
 }
 
-void Console_Process(Console_t *console)
+void ConsoleKeyInput(Console_t *console, char key)
 {
-	// Terminate the line and process it
-	console->buffer[console->newLine].text[console->column]='\0';
-
-	char command[CONSOLE_MAX_COLUMN];
-
-	// Copy the line out of the console buffer into a command buffer (not including the prompt character)
-	strcpy(command, console->buffer[console->newLine].text+1);
-
-	// Also place the command into the command history
-	strcpy(console->commandHistory[console->newCommand], command);
-
-	console->newCommand++;
-	console->newCommand%=CONSOLE_MAX_COMMAND_HISTORY;
-	console->currentCommand=0;
-
-	console->numCommandHistory++;
-
-	if(console->numCommandHistory>CONSOLE_MAX_COMMAND_HISTORY)
-		console->numCommandHistory=CONSOLE_MAX_COMMAND_HISTORY;
-
-	// Find the parameter after the command
-	char *commandParam=strrchr(command, ' ');
-
-	// If there was a parameter to the command
-	if(commandParam!=NULL)
-	{
-		// Replace the space with a null-terminator and advance to split the string
-		//     around the space and separate command and parameter.
-		*commandParam='\0';
-		commandParam++;
-	}
-
-	if(!Console_ExecCommand(console, command, commandParam))
-		Console_Out(console, "Invalid command");
-
-	// New line, prompt and cursor
-	Console_Advance(console);
-
-	console->column=1;
-	console->buffer[console->newLine].text[0]=']';
-	console->buffer[console->newLine].text[1]='_';
-	console->buffer[console->newLine].text[2]='\0';
+    if(key=='\n')
+    {
+        // Enter key
+        if(console->inputLength>0)
+        {
+            ConsoleAddToHistory(console, console->input);
+            ConsolePrint(console, console->input);
+            ConsoleExecuteCommand(console, console->input);
+            memset(console->input, 0, sizeof(console->input));
+            console->inputLength=0;
+        }
+    }
+    else if(key=='\b')
+    {
+        // Backspace
+        if(console->inputLength>0)
+            console->input[--console->inputLength]='\0';
+    }
+    else if(key=='\t')
+    {
+        // Tab (autocomplete placeholder)
+        ConsoleAutocomplete(console);
+    }
+    else if(key>=32&&key<127)
+    { 
+        // Printable characters
+        if(console->inputLength<CONSOLE_LINE_LENGTH-1)
+        {
+            console->input[console->inputLength++]=key;
+            console->input[console->inputLength]='\0';
+        }
+    }
 }
 
-void Console_KeyInput(Console_t *console, const uint32_t keyCode)
+void ConsoleDraw(Console_t *console)
 {
-	// Don't type past edge of console
-	if(console->column>(signed)console->width-2)
-		return;
+    extern Font_t font;
 
-	console->buffer[console->newLine].text[console->column++]=keyCode;
-	console->buffer[console->newLine].text[console->column]='_';
-	console->buffer[console->newLine].text[console->column+1]='\0';
-}
+    if(!console->active)
+        return;
 
-void Console_Draw(Console_t *console)
-{
-	if(!console->active)
-		return;
+    const int maxLines=5;
+    uint32_t startLine=(console->numLine>maxLines+console->scrollbackOffset)?console->numLine-maxLines-console->scrollbackOffset:0;
+    uint32_t endLine=console->numLine-console->scrollbackOffset;
 
-	uint32_t temp=console->viewBottom;
+    if(startLine<0)
+        startLine=0;
 
-	for(uint32_t i=0;i<console->height;i++)
-	{
-		Font_Print(&font, 16.0f, 0.0f, (float)i*16.0f, "%s", console->buffer[temp].text);
-		temp=(temp+1)%CONSOLE_MAX_ROW;
-	}
+    if(endLine>console->numLine)
+        endLine=console->numLine;
+
+    // Print window of maxLines, y position is such that the most recent entry is near the prompt
+    for(uint32_t i=startLine;i<endLine;i++)
+        Font_Print(&font, 16.0f, 0.0f, (float)(endLine-i-1)*16.0f+100.0f, "%s", console->lines[i].buffer);
+
+    // Print prompt
+    Font_Print(&font, 16.0f, 0.0f, (float)100.0f-16.0f, "> %s", console->input);
 }

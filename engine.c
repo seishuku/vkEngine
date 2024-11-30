@@ -1057,7 +1057,7 @@ void Render(void)
 		camera.body.angularVelocity.x-=rightThumbstick.y*rotation*fTimeStep;
 	}
 
-	Console_Draw(&console);
+	ConsoleDraw(&console);
 
 	Audio_SetStreamVolume(0, UI_GetBarGraphValue(&UI, volumeID));
 
@@ -1183,27 +1183,27 @@ void Console_CmdQuit(Console_t *console, const char *param)
 void Console_CmdConnect(Console_t *console, const char *param)
 {
 	if(param==NULL)
-		Console_Out(console, "Missing parameter.");
+		ConsolePrint(console, "Missing parameter.");
 	else
 	{
 		int32_t a=0, b=0, c=0, d=0;
 
 		if(sscanf(param, "%d.%d.%d.%d", &a, &b, &c, &d)!=4)
 		{
-			Console_Out(console, "Invalid IP address.");
+			ConsolePrint(console, "Invalid IP address.");
 			return;
 		}
 		else
 		{
 			if(a<0||a>255||b<0||b>255||c<0||c>255||d<0||d>255)
 			{
-				Console_Out(console, "Invalid IP address.");
+				ConsolePrint(console, "Invalid IP address.");
 				return;
 			}
 		}
 
 		if(!ClientNetwork_Init(NETWORK_ADDRESS(a, b, c, d)))
-			Console_Out(console, "Connect failed.");
+			ConsolePrint(console, "Connect failed.");
 	}
 }
 
@@ -1233,10 +1233,10 @@ bool Init(void)
 	if(isVR)
 		swapchain.numImages=xrContext.swapchain[0].numImages;
 
-	Console_Init(&console, 80, 25);
-	Console_AddCommand(&console, "quit", Console_CmdQuit);
-	Console_AddCommand(&console, "connect", Console_CmdConnect);
-	Console_AddCommand(&console, "disconnect", Console_CmdDisconnect);
+	ConsoleInit(&console);
+	ConsoleRegisterCommand(&console, "quit", Console_CmdQuit);
+	ConsoleRegisterCommand(&console, "connect", Console_CmdConnect);
+	ConsoleRegisterCommand(&console, "disconnect", Console_CmdDisconnect);
 
 	vkuMemAllocator_Init(&vkContext);
 
