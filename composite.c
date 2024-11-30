@@ -406,8 +406,6 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=thresholdRenderPass,
 		.framebuffer=thresholdFramebuffer[eye],
-		.clearValueCount=1,
-		.pClearValues=(VkClearValue[]){ {{{ 1.0f, 0.0f, 0.0f, 1.0f }}} },
 		.renderArea={ { 0, 0 }, { width>>2, height>>2 } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -434,8 +432,6 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=gaussianRenderPass,
 		.framebuffer=gaussianFramebufferTemp[eye],
-		.clearValueCount=1,
-		.pClearValues=(VkClearValue[]){ {{{ 1.0f, 0.0f, 0.0f, 1.0f }}} },
 		.renderArea={ { 0, 0 }, { width>>2, height>>2 } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -444,7 +440,7 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 
 	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipeline.pipeline);
 
-	vkCmdPushConstants(perFrame[index].commandBuffer, gaussianPipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*2, &(float[]){ 1.0f, 0.0 });
+	vkCmdPushConstants(perFrame[index].commandBuffer, gaussianPipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &(vec2){ 1.0f, 0.0 });
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianPipeline.descriptorSet, 0, colorBlur[eye].sampler, colorBlur[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuAllocateUpdateDescriptorSet(&gaussianPipeline.descriptorSet, perFrame[index].descriptorPool);
@@ -464,17 +460,10 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=gaussianRenderPass,
 		.framebuffer=gaussianFramebufferBlur[eye],
-		.clearValueCount=1,
-		.pClearValues=(VkClearValue[]){ {{{ 1.0f, 0.0f, 0.0f, 1.0f }}} },
 		.renderArea={ { 0, 0 }, { width>>2, height>>2 } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
-	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)(width>>2), (float)(height>>2), 0.0f, 1.0f });
-	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { width>>2, height>>2 } });
-
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipeline.pipeline);
-
-	vkCmdPushConstants(perFrame[index].commandBuffer, gaussianPipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)*2, &(float[]){ 0.0f, 1.0 });
+	vkCmdPushConstants(perFrame[index].commandBuffer, gaussianPipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &(vec2){ 0.0f, 1.0f });
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianPipeline.descriptorSet, 0, colorTemp[eye].sampler, colorTemp[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuAllocateUpdateDescriptorSet(&gaussianPipeline.descriptorSet, perFrame[index].descriptorPool);
