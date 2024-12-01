@@ -5,6 +5,7 @@
 #include "physics/physics.h"
 #include "camera/camera.h"
 #include "audio/audio.h"
+#include "physicslist.h"
 #include "sounds.h"
 #include "enemy.h"
 
@@ -18,7 +19,7 @@ void FireParticleEmitter(vec3 position, vec3 direction);
 // angles here are in cosine space (-1.0 to 1.0)
 static const float MAX_SIGHT_DISTANCE=1000.0f;
 static const float MAX_SIGHT_ANGLE=0.5f;
-static const float TRACK_FORCE=1.0f;
+static const float TRACK_FORCE=2.0f;
 static const float TRACK_RANGE=80.0f;
 static const float ROTATION_FORCE=0.2f;
 static const float ATTACK_ANGLE_THRESHOLD=0.5f;
@@ -52,17 +53,17 @@ static bool HasLineOfSight(Enemy_t *enemy, const Camera_t player)
 	return theta>MAX_SIGHT_ANGLE;
 }
 
-static float TrackPlayer(Enemy_t *enemy, const Camera_t player, const RigidBody_t *obstacles, size_t numObstacles)
+static float TrackPlayer(Enemy_t *enemy, const Camera_t player)
 {
 	vec3 direction=Vec3_Subv(player.body.position, enemy->camera->body.position);
 	float distance=Vec3_Normalize(&direction);
 	vec3 avoidanceDirection=Vec3b(0.0f);
 
 	// Check for obstacles in the avoidance radius
-	for(size_t i=0;i<numObstacles;i++)
+	for(size_t i=0;i<numPhysicsObjects;i++)
 	{
-		const float avoidanceRadius=(enemy->camera->body.radius+obstacles[i].radius)*1.5f;
-		const vec3 cameraToObstacle=Vec3_Subv(enemy->camera->body.position, obstacles[i].position);
+		const float avoidanceRadius=(enemy->camera->body.radius+physicsObjects[i].rigidBody->radius)*1.5f;
+		const vec3 cameraToObstacle=Vec3_Subv(enemy->camera->body.position, physicsObjects[i].rigidBody->position);
 		const float cameraToObstacleDistanceSq=Vec3_Dot(cameraToObstacle, cameraToObstacle);
 
 		if(cameraToObstacleDistanceSq<avoidanceRadius*avoidanceRadius)
@@ -141,7 +142,7 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 	{
 		case PURSUING:
 		{
-			const float distance=TrackPlayer(enemy, player, asteroids, NUM_ASTEROIDS);
+			const float distance=TrackPlayer(enemy, player);
 
 			DBGPRINTF(DEBUG_WARNING, "%f\r", distance);
 
@@ -158,7 +159,7 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 
 		case SEARCHING:
 		{
-			const float distance=TrackPlayer(enemy, enemy->lastKnownPlayer, asteroids, NUM_ASTEROIDS);
+			const float distance=TrackPlayer(enemy, enemy->lastKnownPlayer);
 
 			DBGPRINTF(DEBUG_WARNING, "%f\r", distance);
 
@@ -169,7 +170,7 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 
 		case ATTACKING:
 		{
-			TrackPlayer(enemy, player, asteroids, NUM_ASTEROIDS);
+			TrackPlayer(enemy, player);
 			AttackPlayer(enemy, player);
 
 			// Stay in attack mode while aligned and within range
