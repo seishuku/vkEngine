@@ -57,7 +57,7 @@ VkuContext_t vkContext;
 PerFrame_t perFrame[VKU_MAX_FRAME_COUNT];
 
 // Camera data
-Camera_t camera, enemy;
+Camera_t camera;
 matrix modelView, projection[2], headPose;
 
 // extern timing data from system main
@@ -134,7 +134,6 @@ Font_t font;
 UI_t UI;
 
 uint32_t volumeID=UINT32_MAX;
-uint32_t faceID=UINT32_MAX;
 uint32_t cursorID=UINT32_MAX;
 uint32_t colorShiftID=UINT32_MAX;
 //////
@@ -153,9 +152,47 @@ bool pausePhysics=false;
 extern vec2 lStick, rStick;
 extern bool buttons[4];
 
-Enemy_t enemyAI;
+#define NUM_ENEMY 3
+Camera_t enemy[NUM_ENEMY];
+Enemy_t enemyAI[NUM_ENEMY];
 
 LineGraph_t frameTimes, audioTimes, physicsTimes;
+
+#define MAX_PHYSICSOBJECTS 2000
+uint32_t numPhysicsObjects=0;
+
+typedef enum
+{
+	PHYSICSOBJECTTYPE_PLAYER,
+	PHYSICSOBJECTTYPE_ASTEROID,
+	PHYSICSOBJECTTYPE_PROJECTILE,
+} PhysicsObjectType_e;
+
+typedef struct
+{
+	RigidBody_t *rigidBody;
+	PhysicsObjectType_e objectType;
+} PhysicsObject_t;
+
+PhysicsObject_t physicsObjects[MAX_PHYSICSOBJECTS];
+
+void ResetPhysicsObjectList(void)
+{
+	numPhysicsObjects=0;
+	memset(physicsObjects, 0, sizeof(PhysicsObject_t)*MAX_PHYSICSOBJECTS);
+}
+
+void AddPhysicsObject(RigidBody_t *physicsObject, PhysicsObjectType_e objectType)
+{
+	if(numPhysicsObjects>=MAX_PHYSICSOBJECTS)
+	{
+		DBGPRINTF(DEBUG_ERROR, "Ran out of physics object space.\n");
+		return;
+	}
+
+	physicsObjects[numPhysicsObjects].objectType=objectType;
+	physicsObjects[numPhysicsObjects++].rigidBody=physicsObject;
+}
 
 void RecreateSwapchain(void);
 bool CreateFramebuffers(uint32_t eye);
@@ -280,27 +317,29 @@ void GenerateWorld(void)
 	}
 	//////
 
-	vec3 randomDirection=Vec3(
-		RandFloatRange(-1.0f, 1.0f),
-		RandFloatRange(-1.0f, 1.0f),
-		RandFloatRange(-1.0f, 1.0f)
-	);
-	Vec3_Normalize(&randomDirection);
-
-	fighterTexture=RandRange(0, 7);
-
-	if(!perFrame[0].fighterInstance.buffer)
+	for(uint32_t i=0;i<NUM_ENEMY;i++)
 	{
-		for(uint32_t i=0;i<swapchain.numImages;i++)
-		{
-			vkuCreateHostBuffer(&vkContext, &perFrame[i].fighterInstance, sizeof(matrix)*(2+MAX_CLIENTS), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-			perFrame[i].fighterInstancePtr=(matrix *)perFrame[i].fighterInstance.memory->mappedPointer;
-		}
-	}
+		vec3 randomDirection=Vec3(
+			RandFloatRange(-1.0f, 1.0f),
+			RandFloatRange(-1.0f, 1.0f),
+			RandFloatRange(-1.0f, 1.0f)
+		);
+		Vec3_Normalize(&randomDirection);
 
-	CameraInit(&enemy, Vec3_Muls(randomDirection, 1200.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
-	//CameraInit(&enemy, Vec3(0.0f, 0.0f, 100.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
-	InitEnemy(&enemyAI, &enemy, camera);
+		fighterTexture=RandRange(0, 7);
+
+		if(!perFrame[0].fighterInstance.buffer)
+		{
+			for(uint32_t i=0;i<swapchain.numImages;i++)
+			{
+				vkuCreateHostBuffer(&vkContext, &perFrame[i].fighterInstance, sizeof(matrix)*(2+MAX_CLIENTS), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+				perFrame[i].fighterInstancePtr=(matrix *)perFrame[i].fighterInstance.memory->mappedPointer;
+			}
+		}
+
+		CameraInit(&enemy[i], Vec3_Muls(randomDirection, 1200.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
+		InitEnemy(&enemyAI[i], &enemy[i], camera);
+	}
 }
 //////
 
@@ -337,7 +376,8 @@ static void DrawCameraAxes(VkCommandBuffer commandBuffer, uint32_t index, uint32
 static void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, uint32_t index, uint32_t eye)
 {
 	//DrawCameraAxes(commandBuffer, index, eye, camera);
-	DrawCameraAxes(commandBuffer, index, eye, enemy);
+	for(uint32_t i=0;i<NUM_ENEMY;i++)
+		DrawCameraAxes(commandBuffer, index, eye, enemy[i]);
 
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipeline.pipeline);
 
@@ -367,7 +407,7 @@ static void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 			}
 		}
 		else
-			vkCmdDrawIndexed(commandBuffer, fighter.mesh[i].numFace*3, 1, 0, 0, 1);
+			vkCmdDrawIndexed(commandBuffer, fighter.mesh[i].numFace*3, NUM_ENEMY, 0, 0, 1);
 	}
 }
 
@@ -673,19 +713,44 @@ void Thread_Physics(void *arg)
 	const uint32_t index=*((uint32_t *)arg);
 	double startTime=GetClock();
 
+	// Set up physics objects to be processed
+	ResetPhysicsObjectList();
+
+	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
+		AddPhysicsObject(&asteroids[i], PHYSICSOBJECTTYPE_ASTEROID);
+
+	AddPhysicsObject(&camera.body, PHYSICSOBJECTTYPE_PLAYER);
+
+	for(uint32_t i=0;i<NUM_ENEMY;i++)
+		AddPhysicsObject(&enemy[i].body, PHYSICSOBJECTTYPE_PLAYER);
+
+	if(clientSocket!=-1)
+	{
+		for(uint32_t i=0;i<connectedClients;i++)
+		{
+			// Don't check for collision with our own net camera
+			if(i!=clientID)
+				AddPhysicsObject(&netCameras[i].body, PHYSICSOBJECTTYPE_PLAYER);
+		}
+	}
+	//////
+
 	if(!pausePhysics)
 	{
+		// Run particle system simlation
 		ParticleSystem_Step(&particleSystem, fTimeStep);
 
-		// Run integration for particle emitter objects
+		// Run lifetime check for particle emitter objects
 		for(uint32_t i=0;i<MAX_EMITTERS;i++)
 		{
 			// If it's alive reduce the life and integrate,
 			// otherwise if it's dead and still has an ID assigned, delete/unassign it.
 			if(particleEmittersLife[i]>0.0f)
 			{
+				// Add particle emitter to physics list
+				AddPhysicsObject(&particleEmitters[i], PHYSICSOBJECTTYPE_PROJECTILE);
+
 				particleEmittersLife[i]-=fTimeStep;
-				PhysicsIntegrate(&particleEmitters[i], fTimeStep);
 
 				for(uint32_t j=0;j<List_GetCount(&particleSystem.emitters);j++)
 				{
@@ -709,41 +774,53 @@ void Thread_Physics(void *arg)
 			}
 		}
 
-		// Loop through objects, integrate and check/resolve collisions
-		for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
+		// Run through the physics object list, run integration step and check for collisions against all other objects
+		for(uint32_t i=0;i<numPhysicsObjects;i++)
 		{
-			// Run physics integration on the asteroids
-			PhysicsIntegrate(&asteroids[i], fTimeStep);
+			PhysicsIntegrate(physicsObjects[i].rigidBody, fTimeStep);
 
-			// Check asteroids against other asteroids
-			for(uint32_t j=i+1;j<NUM_ASTEROIDS;j++)
+			for(uint32_t j=i+1;j<numPhysicsObjects;j++)
 			{
-				if(PhysicsSphereToSphereCollisionResponse(&asteroids[i], &asteroids[j])>1.0f)
-					Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, asteroids[i].position);
-			}
-
-			// Check asteroids against the camera rigid body rep
-			if(PhysicsSphereToSphereCollisionResponse(&camera.body, &asteroids[i])||
-			   PhysicsSphereToSphereCollisionResponse(&enemy.body, &asteroids[i])>1.0f)
-				Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, camera.body.position);
-			//////////
-
-			// Check asteroids against projectile emitters
-			for(uint32_t j=0;j<MAX_EMITTERS;j++)
-			{
-				if(particleEmittersLife[j]>0.0f)
+				if(PhysicsSphereToSphereCollisionResponse(physicsObjects[i].rigidBody, physicsObjects[j].rigidBody)>1.0f)
 				{
-					if(PhysicsSphereToSphereCollisionResponse(&particleEmitters[j], &asteroids[i])>1.0f)
+					// If both objects are asteroids
+					if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_ASTEROID&&physicsObjects[j].objectType==PHYSICSOBJECTTYPE_ASTEROID)
+					{
+						Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, physicsObjects[j].rigidBody->position);
+					}
+					// If one is an asteroid and one is a player
+					else if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_ASTEROID&&physicsObjects[j].objectType==PHYSICSOBJECTTYPE_PLAYER)
+					{
+						Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, physicsObjects[j].rigidBody->position);
+					}
+					// If both objects are players
+					else if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_PLAYER&&physicsObjects[j].objectType==PHYSICSOBJECTTYPE_PLAYER)
+					{
+						Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, physicsObjects[j].rigidBody->position);
+					}
+					// If it was a projectile colliding with anything
+					else if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_PROJECTILE||physicsObjects[j].objectType==PHYSICSOBJECTTYPE_PROJECTILE)
 					{
 						// It collided, kill it.
 						// Setting this directly to <0.0 seems to cause emitters that won't get removed,
 						//     so setting it to nearly 0.0 allows the natural progression kill it off.
-						particleEmittersLife[j]=0.001f;
+						// Need to find the source emitter first:
+						for(uint32_t k=0;k<MAX_EMITTERS;k++)
+						{
+							if(particleEmittersLife[k]>0.0f)
+							{
+								if(physicsObjects[j].rigidBody==&particleEmitters[k])
+								{
+									particleEmittersLife[k]=0.001f;
+									break;
+								}
+							}
+						}
 
-						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, asteroids[i].position);
+						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, physicsObjects[j].rigidBody->position);
 
 						ParticleSystem_AddEmitter(&particleSystem,
-												  particleEmitters[j].position,	// Position
+												  physicsObjects[j].rigidBody->position,	// Position
 												  Vec3(100.0f, 12.0f, 5.0f),		// Start color
 												  Vec3(0.0f, 0.0f, 0.0f),			// End color
 												  5.0f,							// Radius of particles
@@ -751,20 +828,18 @@ void Thread_Physics(void *arg)
 												  PARTICLE_EMITTER_ONCE,			// Type?
 												  ExplodeEmitterCallback			// Callback for particle generation
 						);
-
-						// Silly radius reduction on hit
-						//body->radius=fmaxf(body->radius-10.0f, 0.0f);
 					}
 				}
 			}
-
 #if 1
+			// Fire "laser beam"
 			if(isControlPressed)
 			{
-				float distance=raySphereIntersect(camera.body.position, camera.forward, asteroids[i].position, asteroids[i].radius);
+				float distance=raySphereIntersect(camera.body.position, camera.forward, physicsObjects[i].rigidBody->position, physicsObjects[i].rigidBody->radius);
 
 				if(distance>0.0f)
 				{
+					// This is a bit hacky, can't add particleBody as a physics object due to scope lifetime, so test in place.
 					RigidBody_t particleBody;
 
 					particleBody.position=Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, distance));
@@ -781,7 +856,7 @@ void Thread_Physics(void *arg)
 					particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
 					particleBody.invInertia=1.0f/particleBody.inertia;
 
-					if(PhysicsSphereToSphereCollisionResponse(&particleBody, &asteroids[i])>1.0f)
+					if(PhysicsSphereToSphereCollisionResponse(&particleBody, physicsObjects[i].rigidBody)>1.0f)
 					{
 						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, particleBody.position);
 
@@ -796,102 +871,47 @@ void Thread_Physics(void *arg)
 							PARTICLE_EMITTER_ONCE,		// Type?
 							ExplodeEmitterCallback		// Callback for particle generation
 						);
-
-						// Silly radius reduction on hit
-						//body->radius=fmaxf(body->radius-10.0f, 0.0f);
 					}
 				}
 			}
 #endif
 		}
+	}
 
-#if 0
-		for(uint32_t j=0;j<connectedClients;j++)
+	// Update enemy player model instance data
+	if(clientSocket==-1)
+	{
+		for(uint32_t i=0;i<NUM_ENEMY;i++)
 		{
-			// Don't check for collision with our own net camera
-			if(j!=clientID)
-				PhysicsSphereToSphereCollisionResponse(&netCameras[j], &asteroids[i]);
-		}
-#endif
+			UpdateEnemy(&enemyAI[i], camera);
 
-		// Check camera against the enemy camera rigid body rep
-		if(PhysicsSphereToSphereCollisionResponse(&camera.body, &enemy.body)>1.0f)
-			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, camera.body.position);
-
-#if 0
-		for(uint32_t i=0;i<connectedClients;i++)
-		{
-			// Don't check for collision with our own net camera
-			if(i!=clientID)
-				PhysicsCameraToCameraCollisionResponse(&camera, &netCameras[i]);
-		}
-#endif
-		////////
-
-		// Emitters<->Camera collision
-		for(uint32_t j=0;j<MAX_EMITTERS;j++)
-		{
-			if(particleEmittersLife[j]>0.0f)
-			{
-				if(
-					PhysicsSphereToSphereCollisionResponse(&particleEmitters[j], &enemy.body)||
-					PhysicsSphereToSphereCollisionResponse(&particleEmitters[j], &camera.body)>1.0f)
-				{
-					// It collided, kill it.
-					// Setting this directly to <0.0 seems to cause emitters that won't get removed,
-					//     so setting it to nearly 0.0 allows the natural progression kill it off.
-					particleEmittersLife[j]=0.001f;
-
-					Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, particleEmitters[j].position);
-
-					ParticleSystem_AddEmitter(&particleSystem,
-											  particleEmitters[j].position,	// Position
-											  Vec3(100.0f, 12.0f, 5.0f),		// Start color
-											  Vec3(0.0f, 0.0f, 0.0f),			// End color
-											  5.0f,							// Radius of particles
-											  1000,							// Number of particles in system
-											  PARTICLE_EMITTER_ONCE,			// Type?
-											  ExplodeEmitterCallback			// Callback for particle generation
-					);
-
-					// Silly radius reduction on hit
-					//body->radius=fmaxf(body->radius-10.0f, 0.0f);
-				}
-			}
-		}
-
-		// Only run physics on enemy camera when physics are running
-		PhysicsIntegrate(&enemy.body, fTimeStep);
-
-		if(clientSocket<0)
-		{
-			UpdateEnemy(&enemyAI, camera);
-
-			const float scale=(1.0f/fighter.radius)*enemy.body.radius;
+			const float scale=(1.0f/fighter.radius)*enemy[i].body.radius;
 			matrix local=MatrixScale(scale, scale, scale);
 			local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
 			local=MatrixMult(local, MatrixTranslatev(fighter.center));
-			local=MatrixMult(local, QuatToMatrix(enemy.body.orientation));
-			perFrame[index].fighterInstancePtr[1]=MatrixMult(local, MatrixTranslatev(enemy.body.position));
+			local=MatrixMult(local, QuatToMatrix(enemy[i].body.orientation));
+			perFrame[index].fighterInstancePtr[1+i]=MatrixMult(local, MatrixTranslatev(enemy[i].body.position));
 		}
-
-		// Update instance matrix data
-		for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
-		{
-			float radiusScale=0.666667f;
-
-			matrix local=MatrixScale(asteroids[i].radius*radiusScale, asteroids[i].radius*radiusScale, asteroids[i].radius*radiusScale);
-			local=MatrixMult(local, QuatToMatrix(asteroids[i].orientation));
-			perFrame[index].asteroidInstancePtr[i]=MatrixMult(local, MatrixTranslatev(asteroids[i].position));
-		}
-		//////
-
-		ClientNetwork_SendStatus();
 	}
 
-	// Always run physics on the camera's body
-	PhysicsIntegrate(&camera.body, fTimeStep);
+	// Update instance matrix data
+	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
+	{
+		float radiusScale=0.666667f;
 
+		matrix local=MatrixScale(asteroids[i].radius*radiusScale, asteroids[i].radius*radiusScale, asteroids[i].radius*radiusScale);
+		local=MatrixMult(local, QuatToMatrix(asteroids[i].orientation));
+		perFrame[index].asteroidInstancePtr[i]=MatrixMult(local, MatrixTranslatev(asteroids[i].position));
+	}
+	//////
+
+	ClientNetwork_SendStatus();
+
+	// Always run physics on the camera's body
+	if(pausePhysics)
+		PhysicsIntegrate(&camera.body, fTimeStep);
+
+	// Update player model instance data
 	if(clientSocket!=-1)
 	{
 		for(uint32_t i=0;i<connectedClients;i++)
@@ -916,10 +936,12 @@ void Thread_Physics(void *arg)
 
 	// Update camera and modelview matrix
 	modelView=CameraUpdate(&camera, fTimeStep);
-	CameraUpdate(&enemy, fTimeStep);
+
+	for(uint32_t i=0;i<NUM_ENEMY;i++)
+		CameraUpdate(&enemy[i], fTimeStep);
 
 	// View from enemy camera
-	//modelView=MatrixMult(CameraUpdate(&enemy, fTimeStep), MatrixTranslate(0.0f, -5.0f, -10.0f));
+	//modelView=MatrixMult(CameraUpdate(&enemy[i], fTimeStep), MatrixTranslate(0.0f, -5.0f, -10.0f));
 	//////
 
 	physicsTime=(float)(GetClock()-startTime);
@@ -1063,27 +1085,27 @@ void Render(void)
 
 	Font_Print(&font, 16.0f, renderWidth-400.0f, renderHeight-50.0f-16.0f, "Current track: %s", GetCurrentMusicTrack());
 
-	{
-		const char *enemyState;
+	//{
+	//	const char *enemyState;
 
-		switch(enemyAI.state)
-		{
-			case PURSUING:
-				enemyState="Pursuing";
-				break;
-			case SEARCHING:
-				enemyState="Searching";
-				break;
-			case ATTACKING:
-				enemyState="Attacking";
-				break;
-			default:
-				enemyState="Unknown";
-				break;
-		}
+	//	switch(enemyAI.state)
+	//	{
+	//		case PURSUING:
+	//			enemyState="Pursuing";
+	//			break;
+	//		case SEARCHING:
+	//			enemyState="Searching";
+	//			break;
+	//		case ATTACKING:
+	//			enemyState="Attacking";
+	//			break;
+	//		default:
+	//			enemyState="Unknown";
+	//			break;
+	//	}
 
-		Font_Print(&font, 16.0f, 0.0f, 32.0f, "Enemy state: %s\nEnemy position: %f %f %f\nPlayer position: %f %f %f", enemyState, enemyAI.camera->body.position.x, enemyAI.camera->body.position.y, enemyAI.camera->body.position.z, camera.body.position.x, camera.body.position.y, camera.body.position.z);
-	}
+	//	Font_Print(&font, 16.0f, 0.0f, 32.0f, "Enemy state: %s\nEnemy position: %f %f %f\nPlayer position: %f %f %f", enemyState, enemyAI.camera->body.position.x, enemyAI.camera->body.position.y, enemyAI.camera->body.position.z, camera.body.position.x, camera.body.position.y, camera.body.position.z);
+	//}
 
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
