@@ -33,6 +33,7 @@
 #include "music.h"
 #include "perframe.h"
 #include "sfx.h"
+#include "physicslist.h"
 #include "shadow.h"
 #include "skybox.h"
 #include "sounds.h"
@@ -157,42 +158,6 @@ Camera_t enemy[NUM_ENEMY];
 Enemy_t enemyAI[NUM_ENEMY];
 
 LineGraph_t frameTimes, audioTimes, physicsTimes;
-
-#define MAX_PHYSICSOBJECTS 2000
-uint32_t numPhysicsObjects=0;
-
-typedef enum
-{
-	PHYSICSOBJECTTYPE_PLAYER,
-	PHYSICSOBJECTTYPE_ASTEROID,
-	PHYSICSOBJECTTYPE_PROJECTILE,
-} PhysicsObjectType_e;
-
-typedef struct
-{
-	RigidBody_t *rigidBody;
-	PhysicsObjectType_e objectType;
-} PhysicsObject_t;
-
-PhysicsObject_t physicsObjects[MAX_PHYSICSOBJECTS];
-
-void ResetPhysicsObjectList(void)
-{
-	numPhysicsObjects=0;
-	memset(physicsObjects, 0, sizeof(PhysicsObject_t)*MAX_PHYSICSOBJECTS);
-}
-
-void AddPhysicsObject(RigidBody_t *physicsObject, PhysicsObjectType_e objectType)
-{
-	if(numPhysicsObjects>=MAX_PHYSICSOBJECTS)
-	{
-		DBGPRINTF(DEBUG_ERROR, "Ran out of physics object space.\n");
-		return;
-	}
-
-	physicsObjects[numPhysicsObjects].objectType=objectType;
-	physicsObjects[numPhysicsObjects++].rigidBody=physicsObject;
-}
 
 void RecreateSwapchain(void);
 bool CreateFramebuffers(uint32_t eye);
@@ -1487,7 +1452,7 @@ bool Init(void)
 		particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
 		particleBody.angularVelocity=Vec3b(0.0f);
 
-		particleBody.radius=2.0f;
+		particleBody.radius=5.0f;
 
 		particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*10.0f;
 		particleBody.invMass=1.0f/particleBody.mass;

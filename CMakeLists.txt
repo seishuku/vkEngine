@@ -126,6 +126,7 @@ set(PROJECT_SOURCES
 	linegraph.c
 	music.c
 	volume.c
+	physicslist.c
 	sfx.c
 	shadow.c
 	skybox.c
