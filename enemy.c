@@ -3,10 +3,10 @@
 #include "system/system.h"
 #include "math/math.h"
 #include "physics/physics.h"
+#include "physics/physicslist.h"
 #include "camera/camera.h"
 #include "audio/audio.h"
-#include "physicslist.h"
-#include "sounds.h"
+#include "audio/sounds.h"
 #include "enemy.h"
 
 #define NUM_ASTEROIDS 1000

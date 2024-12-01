@@ -1,14 +1,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include "system/system.h"
-#include "system/threads.h"
-#include "utils/lz4.h"
-#include "utils/serial.h"
-#include "math/math.h"
-#include "camera/camera.h"
-#include "physics/physics.h"
-#include "network/network.h"
+#include "../system/system.h"
+#include "../system/threads.h"
+#include "../utils/serial.h"
+#include "../math/math.h"
+#include "../physics/physics.h"
+#include "../camera/camera.h"
+#include "network.h"
 #include "client_network.h"
 
 #define NUM_ASTEROIDS 1000

@@ -3,7 +3,7 @@
 
 #include "vulkan/vulkan.h"
 #include "math/math.h"
-#include "skybox.h"
+#include "pipelines/skybox.h"
 
 typedef struct
 {

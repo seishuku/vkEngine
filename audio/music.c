@@ -3,11 +3,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <vorbis/vorbisfile.h>
-#include "system/system.h"
-#include "math/math.h"
-#include "audio/audio.h"
-#include "music.h"
-#include "audio/qoa.h"
+#include "../system/system.h"
+#include "../math/math.h"
+#include "../audio/audio.h"
+#include "../audio/music.h"
+#include "../audio/qoa.h"
 
 static mtx_t musicMutex;
 

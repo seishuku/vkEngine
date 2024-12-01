@@ -1,11 +1,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "vulkan/vulkan.h"
-#include "math/math.h"
-#include "utils/pipeline.h"
-#include "vr/vr.h"
+#include "../math/math.h"
+#include "../utils/pipeline.h"
+#include "../vr/vr.h"
+#include "../perframe.h"
 #include "linegraph.h"
-#include "perframe.h"
 
 extern VkuContext_t vkContext;
 extern VkuSwapchain_t swapchain;

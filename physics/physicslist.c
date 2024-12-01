@@ -1,8 +1,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include "system/system.h"
-#include "physics/physics.h"
+#include "../system/system.h"
+#include "../physics/physics.h"
 #include "physicslist.h"
 
 uint32_t numPhysicsObjects=0;

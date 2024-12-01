@@ -1,15 +1,15 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "system/system.h"
-#include "vulkan/vulkan.h"
-#include "math/math.h"
-#include "utils/pipeline.h"
-#include "font/font.h"
-#include "ui/ui.h"
-#include "vr/vr.h"
+#include "../system/system.h"
+#include "../vulkan/vulkan.h"
+#include "../math/math.h"
+#include "../utils/pipeline.h"
+#include "../font/font.h"
+#include "../ui/ui.h"
+#include "../vr/vr.h"
+#include "../perframe.h"
 #include "linegraph.h"
-#include "perframe.h"
 
 extern VkuContext_t vkContext;
 extern VkuSwapchain_t swapchain;

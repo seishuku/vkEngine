@@ -1,12 +1,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include "system/system.h"
-#include "math/math.h"
-#include "audio/audio.h"
+#include "../system/system.h"
+#include "../math/math.h"
+#include "../audio/audio.h"
 #include "sfx.h"
 
-#include "camera/camera.h"
+#include "../camera/camera.h"
 extern Camera_t camera;
 
 extern bool isControlPressed;

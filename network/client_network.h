@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "network/network.h"
-#include "camera/camera.h"
+#include "network.h"
+#include "../camera/camera.h"
 
 #define MAX_CLIENTS 16
 

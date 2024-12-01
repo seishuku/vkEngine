@@ -1,9 +1,9 @@
-#include "vulkan/vulkan.h"
-#include "math/math.h"
-#include "utils/pipeline.h"
-#include "ui/ui.h"
-#include "perframe.h"
-#include "textures.h"
+#include "../vulkan/vulkan.h"
+#include "../math/math.h"
+#include "../utils/pipeline.h"
+#include "../ui/ui.h"
+#include "../perframe.h"
+#include "../textures.h"
 #include "shadow.h"
 
 #define USE_COMPUTE_SHADER

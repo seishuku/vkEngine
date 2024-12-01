@@ -1,16 +1,16 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "system/system.h"
-#include "vulkan/vulkan.h"
-#include "math/math.h"
-#include "camera/camera.h"
-#include "model/bmodel.h"
-#include "utils/pipeline.h"
-#include "models.h"
+#include "../system/system.h"
+#include "../vulkan/vulkan.h"
+#include "../math/math.h"
+#include "../camera/camera.h"
+#include "../model/bmodel.h"
+#include "../utils/pipeline.h"
+#include "../models.h"
+#include "../perframe.h"
 #include "skybox.h"
 #include "shadow.h"
-#include "perframe.h"
 
 #define NUM_ASTEROIDS 1000
 

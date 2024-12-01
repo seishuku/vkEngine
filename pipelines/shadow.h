@@ -1,8 +1,8 @@
 #ifndef __SHADOW_H__
 #define __SHADOW_H__
 
-#include "vulkan/vulkan.h"
-#include "math/math.h"
+#include "../vulkan/vulkan.h"
+#include "../math/math.h"
 
 extern matrix shadowMVP;
 extern VkuImage_t shadowDepth;

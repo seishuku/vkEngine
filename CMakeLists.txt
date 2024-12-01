@@ -74,7 +74,9 @@ add_custom_target(ShaderCompilation DEPENDS ${SHADER_BINARIES})
 
 set(PROJECT_SOURCES
 	audio/audio.c
+	audio/music.c
 	audio/qoa.c
+	audio/sfx.c
 	audio/wave.c
 	camera/camera.c
 	console/console.c
@@ -89,9 +91,19 @@ set(PROJECT_SOURCES
 	math/vec3.c
 	math/vec4.c
 	model/bmodel.c
+	network/client_network.c
 	network/network.c
-	particle/particle.c
+	physics/particle.c
 	physics/physics.c
+	physics/physicslist.c
+	pipelines/composite.c
+	pipelines/lighting.c
+	pipelines/line.c
+	pipelines/linegraph.c
+	pipelines/shadow.c
+	pipelines/skybox.c
+	pipelines/sphere.c
+	pipelines/volume.c
 	system/memzone.c
 	system/threads.c
 	ui/bargraph.c
@@ -102,7 +114,6 @@ set(PROJECT_SOURCES
 	ui/ui.c
 	utils/event.c
 	utils/list.c
-	utils/lz4.c
 	utils/pipeline.c
 	utils/spvparse.c
 	utils/tokenizer.c
@@ -117,20 +128,8 @@ set(PROJECT_SOURCES
 	vulkan/vulkan_pipeline.c
 	vulkan/vulkan_renderpass.c
 	vulkan/vulkan_swapchain.c
-	client_network.c
-	composite.c
 	enemy.c
 	engine.c
-	lighting.c
-	line.c
-	linegraph.c
-	music.c
-	volume.c
-	physicslist.c
-	sfx.c
-	shadow.c
-	skybox.c
-	sphere.c
 )
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")

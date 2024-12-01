@@ -1,12 +1,11 @@
 #include <stdint.h>
 #include <stdbool.h>
-#include "vulkan/vulkan.h"
-#include "math/math.h"
-#include "utils/pipeline.h"
-
-#include "perframe.h"
-#include "models.h"
-#include "textures.h"
+#include "../vulkan/vulkan.h"
+#include "../math/math.h"
+#include "../utils/pipeline.h"
+#include "../perframe.h"
+#include "../models.h"
+#include "../textures.h"
 #include "shadow.h"
 
 #define NUM_ASTEROIDS 1000
@@ -22,11 +21,6 @@ Pipeline_t mainPipeline;
 
 bool CreateLightingPipeline(void)
 {
-/*
-renderPass {
-	addAttachment(
-}
-*/
 	vkCreateRenderPass(vkContext.device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
@@ -167,65 +161,6 @@ renderPass {
 		perFrame[i].mainUBO[1]=perFrame[i].mainUBOBuffer[1].memory->mappedPointer;
 	}
 
-#if 0
-	vkuInitDescriptorSet(&mainDescriptorSet, vkContext.device);
-
-	vkuDescriptorSet_AddBinding(&mainDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&mainDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&mainDescriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&mainDescriptorSet, 3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuDescriptorSet_AddBinding(&mainDescriptorSet, 4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT);
-
-	vkuAssembleDescriptorSetLayout(&mainDescriptorSet);
-
-	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=1,
-		.pSetLayouts=&mainDescriptorSet.descriptorSetLayout,
-	}, 0, &mainPipelineLayout);
-
-	vkuInitPipeline(&mainPipeline, vkContext.device, vkContext.pipelineCache);
-
-	vkuPipeline_SetPipelineLayout(&mainPipeline, mainPipelineLayout);
-	vkuPipeline_SetRenderPass(&mainPipeline, renderPass);
-
-	mainPipeline.depthTest=VK_TRUE;
-	mainPipeline.cullMode=VK_CULL_MODE_BACK_BIT;
-	mainPipeline.depthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
-	mainPipeline.rasterizationSamples=MSAA;
-
-	if(!vkuPipeline_AddStage(&mainPipeline, "shaders/lighting.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
-		return false;
-
-	if(!vkuPipeline_AddStage(&mainPipeline, "shaders/lighting.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-		return false;
-
-	vkuPipeline_AddVertexBinding(&mainPipeline, 0, sizeof(vec4)*5, VK_VERTEX_INPUT_RATE_VERTEX);
-	vkuPipeline_AddVertexAttribute(&mainPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
-	vkuPipeline_AddVertexAttribute(&mainPipeline, 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*1);
-	vkuPipeline_AddVertexAttribute(&mainPipeline, 2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*2);
-	vkuPipeline_AddVertexAttribute(&mainPipeline, 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*3);
-	vkuPipeline_AddVertexAttribute(&mainPipeline, 4, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*4);
-
-	vkuPipeline_AddVertexBinding(&mainPipeline, 1, sizeof(matrix), VK_VERTEX_INPUT_RATE_INSTANCE);
-	vkuPipeline_AddVertexAttribute(&mainPipeline, 5, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
-	vkuPipeline_AddVertexAttribute(&mainPipeline, 6, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*1);
-	vkuPipeline_AddVertexAttribute(&mainPipeline, 7, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*2);
-	vkuPipeline_AddVertexAttribute(&mainPipeline, 8, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*3);
-
-	//VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo=
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-	//	.colorAttachmentCount=1,
-	//	.pColorAttachmentFormats=&colorFormat,
-	//	.depthAttachmentFormat=depthFormat,
-	//};
-
-	if(!vkuAssemblePipeline(&mainPipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
-		return false;
-#endif
-
 	if(!CreatePipeline(&vkContext, &mainPipeline, renderPass, "pipelines/lighting.pipeline"))
 		return false;
 
@@ -240,11 +175,6 @@ void DestroyLighting(void)
 		vkuDestroyBuffer(&vkContext, &perFrame[i].mainUBOBuffer[1]);
 	}
 
-#if 0
-	vkDestroyDescriptorSetLayout(vkContext.device, mainPipeline.descriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
-	vkDestroyPipeline(vkContext.device, mainPipeline.pipeline.pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.device, mainPipeline.pipelineLayout, VK_NULL_HANDLE);
-#endif
 	DestroyPipeline(&vkContext, &mainPipeline);
 }
 

@@ -1,7 +1,7 @@
 #ifndef __SOUNDS_H__
 #define __SOUNDS_H__
 
-#include "audio/audio.h"
+#include "audio.h"
 
 enum
 {
