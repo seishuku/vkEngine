@@ -45,14 +45,6 @@ static bool HasLineOfSight(Enemy_t *enemy, const Camera_t player)
 	if(distance>MAX_SIGHT_DISTANCE)
 		return false;
 
-	//for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
-	//{
-	//	RigidBody_t *obstacle=&asteroids[i];
-	//
-	//	if(raySphereIntersect(enemy->camera->body.position, direction, obstacle->position, obstacle->radius)>0.0f)
-	//		return false;  // Obstacle blocks line of sight
-	//}
-
 	const float theta=Vec3_Dot(enemy->camera->forward, direction);
 
 	// Calculate the angle between the camera's forward vector and the direction to the target
@@ -60,14 +52,37 @@ static bool HasLineOfSight(Enemy_t *enemy, const Camera_t player)
 	return theta>MAX_SIGHT_ANGLE;
 }
 
-static float TrackPlayer(Enemy_t *enemy, const Camera_t player)
+static float TrackPlayer(Enemy_t *enemy, const Camera_t player, const RigidBody_t *obstacles, size_t numObstacles)
 {
-
 	vec3 direction=Vec3_Subv(player.body.position, enemy->camera->body.position);
-	const float distance=Vec3_Normalize(&direction);
+	float distance=Vec3_Normalize(&direction);
+	vec3 avoidanceDirection=Vec3b(0.0f);
+
+	// Check for obstacles in the avoidance radius
+	for(size_t i=0;i<numObstacles;i++)
+	{
+		const float avoidanceRadius=(enemy->camera->body.radius+obstacles[i].radius)*1.5f;
+		const vec3 cameraToObstacle=Vec3_Subv(enemy->camera->body.position, obstacles[i].position);
+		const float cameraToObstacleDistanceSq=Vec3_Dot(cameraToObstacle, cameraToObstacle);
+
+		if(cameraToObstacleDistanceSq<avoidanceRadius*avoidanceRadius)
+		{
+			if(cameraToObstacleDistanceSq>0.0f)
+			{
+				// Adjust the camera trajectory to avoid the obstacle
+				const float rMag=1.0f/sqrtf(cameraToObstacleDistanceSq);
+				avoidanceDirection=Vec3_Muls(cameraToObstacle, rMag);
+			}
+		}
+	}
 
 	if(distance>TRACK_RANGE)
-		enemy->camera->body.force=Vec3_Addv(enemy->camera->body.force, Vec3_Muls(direction, TRACK_FORCE));
+	{
+		vec3 trackDistance=Vec3_Addv(direction, avoidanceDirection);
+		Vec3_Normalize(&trackDistance);
+
+		enemy->camera->body.force=Vec3_Addv(enemy->camera->body.force, Vec3_Muls(trackDistance, TRACK_FORCE));
+	}
 
 	vec3 rotationAxis=QuatRotate(QuatInverse(enemy->camera->body.orientation), Vec3_Cross(enemy->camera->forward, direction));
 	float cosTheta=clampf(Vec3_Dot(enemy->camera->forward, direction), -1.0f, 1.0f);
@@ -97,8 +112,8 @@ static void AttackPlayer(Enemy_t *enemy, const Camera_t player)
 
 		if(fireCooldownTimer>fireCooldown)
 		{
+			fireCooldownTimer-=fireCooldown;
 			fireCooldown=RandFloatRange(0.25f, 2.0f);
-			fireCooldownTimer=0.0f;
 
 			FireParticleEmitter(Vec3_Addv(enemy->camera->body.position, Vec3_Muls(enemy->camera->forward, enemy->camera->body.radius)), enemy->camera->forward);
 		}
@@ -126,7 +141,7 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 	{
 		case PURSUING:
 		{
-			const float distance=TrackPlayer(enemy, player);
+			const float distance=TrackPlayer(enemy, player, asteroids, NUM_ASTEROIDS);
 
 			DBGPRINTF(DEBUG_WARNING, "%f\r", distance);
 
@@ -143,7 +158,7 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 
 		case SEARCHING:
 		{
-			const float distance=TrackPlayer(enemy, enemy->lastKnownPlayer);
+			const float distance=TrackPlayer(enemy, enemy->lastKnownPlayer, asteroids, NUM_ASTEROIDS);
 
 			DBGPRINTF(DEBUG_WARNING, "%f\r", distance);
 
@@ -154,7 +169,7 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 
 		case ATTACKING:
 		{
-			TrackPlayer(enemy, player);
+			TrackPlayer(enemy, player, asteroids, NUM_ASTEROIDS);
 			AttackPlayer(enemy, player);
 
 			// Stay in attack mode while aligned and within range
