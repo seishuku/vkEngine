@@ -1353,12 +1353,6 @@ bool Init(void)
 	DBGPRINTF(DEBUG_ERROR, "\nNot an error, just a total triangle count: %d\n\n", TriangleCount);
 
 	// Load textures
-	
-	// TODO: For some reason on Linux/Android, the first loaded QOI here has corruption and I'm not sure why.
-	//			If I upload a temp image and delete it afterwards, it's all good.
-	VkuImage_t temp;
-	Image_Upload(&vkContext, &temp, "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-
 	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID1], "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID1_NORMAL], "assets/asteroid1_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID2], "assets/asteroid2.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
@@ -1385,8 +1379,6 @@ bool Init(void)
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER7_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER8], "assets/wilko.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER8_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-
-	vkuDestroyImageBuffer(&vkContext, &temp);
 
 	GenNebulaVolume(&textures[TEXTURE_VOLUME]);
 
