@@ -138,50 +138,61 @@ void vkuMem_Free(VkuMemZone_t *vkZone, VkuMemBlock_t *block)
 	}
 }
 
+static inline size_t AlignUp(size_t value, size_t alignment)
+{
+	return (value+alignment-1)&~(alignment-1);
+}
+
 VkuMemBlock_t *vkuMem_Malloc(VkuMemZone_t *vkZone, VkMemoryRequirements memoryRequirements)
 {
-	const size_t minimumBlockSize=64;
+	const size_t minimumBlockSize=memoryRequirements.alignment;
 
-	// Does size also need this alignment?
-	size_t size=(memoryRequirements.size+(memoryRequirements.alignment-1))&~(memoryRequirements.alignment-1);
+	// Align size to the memory requirements
+	const size_t alignedSize=AlignUp(memoryRequirements.size, memoryRequirements.alignment);
 
 	VkuMemBlock_t *baseBlock=vkZone->blocks;
 
 	while(baseBlock!=NULL)
 	{
-		if(baseBlock->free&&baseBlock->size>=size)
+		if(baseBlock->free&&baseBlock->size>=alignedSize)
 		{
-			size_t extra=baseBlock->size-size;
+			const size_t remainingSize=baseBlock->size-alignedSize;
 
-			if(extra>minimumBlockSize)
+			// Check if we can split the block and ensure alignment for the new block
+			if(remainingSize>=minimumBlockSize)
 			{
+				// Create a new free space block from the extra space
 				VkuMemBlock_t *newBlock=(VkuMemBlock_t *)Zone_Malloc(zone, sizeof(VkuMemBlock_t));
-				newBlock->size=extra;
-				newBlock->offset=size;
+
+				// Align the new block's offset
+				newBlock->offset=baseBlock->offset+alignedSize;
+				newBlock->size=remainingSize;
 				newBlock->free=true;
-				newBlock->prev=baseBlock;
-				newBlock->next=baseBlock->next;
 				newBlock->deviceMemory=vkZone->deviceMemory;
 
 				if(vkZone->mappedPointer)
-					newBlock->mappedPointer=(void*)((uint8_t *)vkZone->mappedPointer+newBlock->offset);
+					newBlock->mappedPointer=(void *)((uint8_t *)vkZone->mappedPointer+newBlock->offset);
+
+				newBlock->prev=baseBlock;
+				newBlock->next=baseBlock->next;
+
+				if(baseBlock->next)
+					baseBlock->next->prev=newBlock;
 
 				baseBlock->next=newBlock;
-				baseBlock->size=size;
-
-				if(baseBlock->prev)
-				{
-					baseBlock->offset=(baseBlock->prev->size+baseBlock->prev->offset+(memoryRequirements.alignment-1))&~(memoryRequirements.alignment-1);
-
-					if(vkZone->mappedPointer)
-						baseBlock->mappedPointer=(void *)((uint8_t *)vkZone->mappedPointer+baseBlock->offset);
-				}
+				baseBlock->size=alignedSize;
 			}
 
+			// Mark the base block as used and readjust offset and mapped pointer as needed
 			baseBlock->free=false;
+			baseBlock->offset=AlignUp(baseBlock->offset, memoryRequirements.alignment);
+
+			if(vkZone->mappedPointer)
+				baseBlock->mappedPointer=(void *)((uint8_t *)vkZone->mappedPointer+baseBlock->offset);
 
 #ifdef _DEBUG
-			DBGPRINTF(DEBUG_WARNING, "Vulkan mem allocate block - Location offset: %zu Size: %0.3fKB\n", baseBlock->offset, (float)baseBlock->size/1000.0f);
+			DBGPRINTF(DEBUG_WARNING, "Vulkan mem allocate block - Location offset: %zu Size: %0.3fKB\n",
+					  baseBlock->offset, (float)baseBlock->size/1000.0f);
 #endif
 			return baseBlock;
 		}
