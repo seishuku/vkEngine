@@ -298,12 +298,23 @@ void ConsoleKeyInput(Console_t *console, char key)
     }
 }
 
+#include "../ui/ui.h"
+
+extern uint32_t renderWidth;
+extern uint32_t consoleBackground;
+extern UI_t UI;
+
 void ConsoleDraw(Console_t *console)
 {
     extern Font_t font;
 
     if(!console->active)
+    {
+        UI_UpdateSpriteSize(&UI, consoleBackground, Vec2(0.0f, 0.0f));
         return;
+    }
+    else
+        UI_UpdateSpriteSize(&UI, consoleBackground, Vec2((float)renderWidth, 16.0f*6.0f));
 
     const int maxLines=5;
     uint32_t startLine=(console->numLine>maxLines+console->scrollbackOffset)?console->numLine-maxLines-console->scrollbackOffset:0;
