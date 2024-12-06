@@ -10,6 +10,7 @@
 #include "../utils/list.h"
 #include "../utils/pipeline.h"
 #include "../camera/camera.h"
+#include "../perframe.h"
 #include "particle.h"
 
 // External data from engine.c
@@ -18,12 +19,11 @@ extern VkSampleCountFlags MSAA;
 extern VkFormat ColorFormat, DepthFormat;
 
 extern VkRenderPass renderPass;
+extern VkuSwapchain_t swapchain;
 
 extern Camera_t camera;
 ////////////////////////////
 
-//static VkuDescriptorSet_t particleDescriptorSet;
-//static VkPipelineLayout particlePipelineLayout;
 static Pipeline_t particlePipeline;
 
 //static VkuImage_t particleTexture;
@@ -233,77 +233,12 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 	// Default generic gravity
 	system->gravity=Vec3(0.0f, -9.81f, 0.0f);
 
-#if 0
-	//if(!Image_Upload(&Context, &ParticleTexture, "assets/particle.tga", IMAGE_BILINEAR|IMAGE_MIPMAP))
-	//	return false;
-
-	//vkuInitDescriptorSet(&ParticleDescriptorSet, &Context);
-	//vkuDescriptorSet_AddBinding(&ParticleDescriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	//vkuAssembleDescriptorSetLayout(&ParticleDescriptorSet);
-
-	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		//.setLayoutCount=1,
-		//.pSetLayouts=&ParticleDescriptorSet.descriptorSetLayout,
-		.pushConstantRangeCount=1,
-		.pPushConstantRanges=&(VkPushConstantRange)
-		{
-			.stageFlags=VK_SHADER_STAGE_GEOMETRY_BIT,
-			.offset=0,
-			.size=sizeof(particlePC)
-		},
-	}, 0, &particlePipelineLayout);
-
-	vkuInitPipeline(&particlePipeline, vkContext.device, vkContext.pipelineCache);
-
-	vkuPipeline_SetPipelineLayout(&particlePipeline, particlePipelineLayout);
-	vkuPipeline_SetRenderPass(&particlePipeline, renderPass);
-
-	particlePipeline.subpass=0;
-
-	particlePipeline.topology=VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-	particlePipeline.cullMode=VK_CULL_MODE_BACK_BIT;
-	particlePipeline.depthTest=VK_TRUE;
-	particlePipeline.depthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
-	particlePipeline.depthWrite=VK_TRUE;
-	particlePipeline.rasterizationSamples=MSAA;
-
-	particlePipeline.blend=VK_TRUE;
-	particlePipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	particlePipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE;
-	particlePipeline.colorBlendOp=VK_BLEND_OP_ADD;
-	particlePipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	particlePipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE;
-	particlePipeline.alphaBlendOp=VK_BLEND_OP_ADD;
-
-	if(!vkuPipeline_AddStage(&particlePipeline, "shaders/particle.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
-		return false;
-
-	if(!vkuPipeline_AddStage(&particlePipeline, "shaders/particle.geom.spv", VK_SHADER_STAGE_GEOMETRY_BIT))
-		return false;
-
-	if(!vkuPipeline_AddStage(&particlePipeline, "shaders/particle.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-		return false;
-
-	vkuPipeline_AddVertexBinding(&particlePipeline, 0, sizeof(vec4)*2, VK_VERTEX_INPUT_RATE_VERTEX);
-	vkuPipeline_AddVertexAttribute(&particlePipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-	vkuPipeline_AddVertexAttribute(&particlePipeline, 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4));
-
-	//VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo=
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-	//	.colorAttachmentCount=1,
-	//	.pColorAttachmentFormats=&ColorFormat,
-	//	.depthAttachmentFormat=DepthFormat,
-	//};
-
-	if(!vkuAssemblePipeline(&particlePipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
-		return false;
-#endif
-
 	if(!CreatePipeline(&vkContext, &particlePipeline, renderPass, "pipelines/particle.pipeline"))
 		return false;
+
+	// Pre-allocate minimal sized buffers
+	for(uint32_t i=0;i<swapchain.numImages;i++)
+		vkuCreateHostBuffer(&vkContext, &system->particleBuffer[i], sizeof(vec4)*2, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
 	return true;
 }
@@ -366,7 +301,7 @@ int compareParticles(const void *a, const void *b)
 	return 0;
 }
 
-void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, matrix modelview, matrix projection)
+void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye)
 {
 	if(system==NULL)
 		return;
@@ -384,23 +319,23 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 	// If the count isn't what the last count was, resize the buffer.
 	if(count!=system->count)
 	{
+		// Set new total particle count
 		system->count=count;
-
-		// Resize vertex buffer, this is not ideal.
-		vkDeviceWaitIdle(vkContext.device);
-
-		if(system->particleBuffer.buffer)
-		{
-			vkuDestroyBuffer(&vkContext, &system->particleBuffer);
-			Zone_Free(zone, system->systemBuffer);
-		}
-
-		vkuCreateHostBuffer(&vkContext, &system->particleBuffer, sizeof(vec4)*2*count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-		system->systemBuffer=(float *)Zone_Malloc(zone, sizeof(vec4)*2*count);
+		system->systemBuffer=(float *)Zone_Realloc(zone, system->systemBuffer, sizeof(vec4)*2*count);
 	}
 
+	// Check current frame's vertex buffer size against the current particle count needs
+	const size_t curSize=sizeof(vec4)*2*system->count;
+	if(curSize>system->particleBuffer[index].memory->size)
+	{
+		// Reallocate if so
+		vkuDestroyBuffer(&vkContext, &system->particleBuffer[index]);
+		vkuCreateHostBuffer(&vkContext, &system->particleBuffer[index], sizeof(vec4)*2*count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	}
+
+	// zero count and reuse it for final vertex data 
 	count=0;
-	float *array=system->systemBuffer;//(float *)system->particleBuffer.memory->mappedPointer;
+	float *array=system->systemBuffer;
 
 	if(array==NULL)
 	{
@@ -434,11 +369,12 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 
 	qsort(system->systemBuffer, count, sizeof(vec4)*2, compareParticles);
 
-	memcpy(system->particleBuffer.memory->mappedPointer, system->systemBuffer, sizeof(vec4)*2*count);
+	memcpy(system->particleBuffer[index].memory->mappedPointer, system->systemBuffer, sizeof(vec4)*2*count);
 
 	mtx_unlock(&system->mutex);
 
-	particlePC.mvp=MatrixMult(modelview, projection);
+	matrix modelview=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
+	particlePC.mvp=MatrixMult(modelview, perFrame[index].mainUBO[eye]->projection);
 	particlePC.Right=Vec4(modelview.x.x, modelview.y.x, modelview.z.x, modelview.w.x);
 	particlePC.Up=Vec4(modelview.x.y, modelview.y.y, modelview.z.y, modelview.w.y);
 
@@ -450,7 +386,7 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, particlePipeline.pipeline.pipeline);
 	vkCmdPushConstants(commandBuffer, particlePipeline.pipelineLayout, VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(particlePC), &particlePC);
 
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &system->particleBuffer.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &system->particleBuffer[index].buffer, &(VkDeviceSize) { 0 });
 	vkCmdDraw(commandBuffer, count, 1, 0, 0);
 }
 
@@ -459,14 +395,14 @@ void ParticleSystem_Destroy(ParticleSystem_t *system)
 	if(system==NULL)
 		return;
 
-	vkuDestroyBuffer(&vkContext, &system->particleBuffer);
+	for(uint32_t i=0;i<swapchain.numImages;i++)
+		vkuDestroyBuffer(&vkContext, &system->particleBuffer[i]);
+
 	Zone_Free(zone, system->systemBuffer);
 
 	//vkuDestroyImageBuffer(&Context, &particleTexture);
 
-	vkDestroyPipeline(vkContext.device, particlePipeline.pipeline.pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.device, particlePipeline.pipelineLayout, VK_NULL_HANDLE);
-	//vkDestroyDescriptorSetLayout(Context.device, particleDescriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
+	DestroyPipeline(&vkContext, &particlePipeline);
 
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
 	{

@@ -49,7 +49,7 @@ typedef struct ParticleSystem_s
 	mtx_t mutex;
 
 	uint32_t count;
-	VkuBuffer_t particleBuffer;
+	VkuBuffer_t particleBuffer[VKU_MAX_FRAME_COUNT];
 	float *systemBuffer;
 } ParticleSystem_t;
 
@@ -63,7 +63,7 @@ bool ParticleSystem_SetGravityv(ParticleSystem_t *system, vec3 v);
 
 bool ParticleSystem_Init(ParticleSystem_t *system);
 void ParticleSystem_Step(ParticleSystem_t *system, float dt);
-void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, matrix modelview, matrix projection);
+void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye);
 void ParticleSystem_Destroy(ParticleSystem_t *system);
 
 #endif

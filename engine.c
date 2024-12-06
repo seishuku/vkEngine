@@ -137,6 +137,7 @@ UI_t UI;
 uint32_t volumeID=UINT32_MAX;
 uint32_t cursorID=UINT32_MAX;
 uint32_t colorShiftID=UINT32_MAX;
+uint32_t consoleBackground=UINT32_MAX;
 //////
 
 Console_t console;
@@ -583,8 +584,7 @@ void Thread_Particles(void *arg)
 	vkCmdSetViewport(data->perFrame[data->index].secCommandBuffer[data->eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
 	vkCmdSetScissor(data->perFrame[data->index].secCommandBuffer[data->eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
 
-	matrix Modelview=MatrixMult(perFrame[data->index].mainUBO[data->eye]->modelView, perFrame[data->index].mainUBO[data->eye]->HMD);
-	ParticleSystem_Draw(&particleSystem, data->perFrame[data->index].secCommandBuffer[data->eye], data->perFrame[data->index].descriptorPool[data->eye], Modelview, perFrame[data->index].mainUBO[data->eye]->projection);
+	ParticleSystem_Draw(&particleSystem, data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye);
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
@@ -682,7 +682,7 @@ void Thread_Physics(void *arg)
 	ResetPhysicsObjectList();
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
-		AddPhysicsObject(&asteroids[i], PHYSICSOBJECTTYPE_ASTEROID);
+		AddPhysicsObject(&asteroids[i], PHYSICSOBJECTTYPE_FIELD);
 
 	AddPhysicsObject(&camera.body, PHYSICSOBJECTTYPE_PLAYER);
 
@@ -749,12 +749,12 @@ void Thread_Physics(void *arg)
 				if(PhysicsSphereToSphereCollisionResponse(physicsObjects[i].rigidBody, physicsObjects[j].rigidBody)>1.0f)
 				{
 					// If both objects are asteroids
-					if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_ASTEROID&&physicsObjects[j].objectType==PHYSICSOBJECTTYPE_ASTEROID)
+					if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_FIELD&&physicsObjects[j].objectType==PHYSICSOBJECTTYPE_FIELD)
 					{
 						Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, physicsObjects[j].rigidBody->position);
 					}
 					// If one is an asteroid and one is a player
-					else if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_ASTEROID&&physicsObjects[j].objectType==PHYSICSOBJECTTYPE_PLAYER)
+					else if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_FIELD&&physicsObjects[j].objectType==PHYSICSOBJECTTYPE_PLAYER)
 					{
 						Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, physicsObjects[j].rigidBody->position);
 					}
@@ -786,12 +786,12 @@ void Thread_Physics(void *arg)
 
 						ParticleSystem_AddEmitter(&particleSystem,
 												  physicsObjects[j].rigidBody->position,	// Position
-												  Vec3(100.0f, 12.0f, 5.0f),		// Start color
-												  Vec3(0.0f, 0.0f, 0.0f),			// End color
-												  5.0f,							// Radius of particles
-												  1000,							// Number of particles in system
-												  PARTICLE_EMITTER_ONCE,			// Type?
-												  ExplodeEmitterCallback			// Callback for particle generation
+												  Vec3(100.0f, 12.0f, 5.0f),				// Start color
+												  Vec3(0.0f, 0.0f, 0.0f),					// End color
+												  5.0f,										// Radius of particles
+												  1000,										// Number of particles in system
+												  PARTICLE_EMITTER_ONCE,					// Type?
+												  ExplodeEmitterCallback					// Callback for particle generation
 						);
 					}
 				}
@@ -1049,28 +1049,6 @@ void Render(void)
 	Audio_SetStreamVolume(0, UI_GetBarGraphValue(&UI, volumeID));
 
 	Font_Print(&font, 16.0f, renderWidth-400.0f, renderHeight-50.0f-16.0f, "Current track: %s", GetCurrentMusicTrack());
-
-	//{
-	//	const char *enemyState;
-
-	//	switch(enemyAI.state)
-	//	{
-	//		case PURSUING:
-	//			enemyState="Pursuing";
-	//			break;
-	//		case SEARCHING:
-	//			enemyState="Searching";
-	//			break;
-	//		case ATTACKING:
-	//			enemyState="Attacking";
-	//			break;
-	//		default:
-	//			enemyState="Unknown";
-	//			break;
-	//	}
-
-	//	Font_Print(&font, 16.0f, 0.0f, 32.0f, "Enemy state: %s\nEnemy position: %f %f %f\nPlayer position: %f %f %f", enemyState, enemyAI.camera->body.position.x, enemyAI.camera->body.position.y, enemyAI.camera->body.position.z, camera.body.position.x, camera.body.position.y, camera.body.position.z);
-	//}
 
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
@@ -1429,30 +1407,32 @@ bool Init(void)
 
 	ParticleSystem_AddEmitter(&particleSystem, Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f), 0.0f, 1, PARTICLE_EMITTER_BURST, NULL);
 
-	// Set up emitter initial state and projectial rigid body parameters
+	// Set up emitter initial state and projectile rigid body parameters
 	for(uint32_t i=0;i<MAX_EMITTERS;i++)
 	{
 		particleEmittersID[i]=UINT32_MAX;	// No assigned particle ID
 		particleEmittersLife[i]=-1.0f;		// No life
 
-		RigidBody_t particleBody;
+		const float radius=5.0f;
+		const float mass=(1.0f/3000.0f)*(1.33333333f*PI*radius)*10.0f;
+		const float inertia=0.4f*mass*(radius*radius);
 
-		particleBody.position=Vec3b(0.0f);
-		particleBody.velocity=Vec3b(0.0f);
-		particleBody.force=Vec3b(0.0f);
+		particleEmitters[i]=(RigidBody_t)
+		{
+			.position=Vec3b(0.0f),
 
-		particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-		particleBody.angularVelocity=Vec3b(0.0f);
+			.velocity=Vec3b(0.0f),
+			.force=Vec3b(0.0f),
+			.mass=mass,
+			.invMass=1.0f/mass,
 
-		particleBody.radius=5.0f;
+			.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
+			.angularVelocity=Vec3b(0.0f),
+			.inertia=inertia,
+			.invInertia=1.0f/inertia,
 
-		particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*10.0f;
-		particleBody.invMass=1.0f/particleBody.mass;
-
-		particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
-		particleBody.invInertia=1.0f/particleBody.inertia;
-
-		particleEmitters[i]=particleBody;
+			.radius=5.0f,
+		};
 	}
 
 	Font_Init(&font);
@@ -1505,6 +1485,8 @@ bool Init(void)
 							0.0f, 1.0f, 0.45f);			// min/max/initial value
 
 	UI_AddSprite(&UI, Vec2((float)renderWidth/2.0f, (float)renderHeight/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &textures[TEXTURE_CROSSHAIR], 0.0f);
+
+	consoleBackground=UI_AddSprite(&UI, Vec2((float)renderWidth/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2((float)renderWidth, 16.0f*6.0f), Vec3(1.0f, 1.0f, 1.0f), &textures[TEXTURE_FIGHTER1], 0.0f);
 
 	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3(1.0f, 1.0f, 1.0f));
 
