@@ -26,9 +26,14 @@ extern Camera_t camera;
 extern ParticleSystem_t particleSystem;
 
 #define MAX_EMITTERS 1000
-extern RigidBody_t particleEmitters[MAX_EMITTERS];
-extern uint32_t particleEmittersID[MAX_EMITTERS];
-extern float particleEmittersLife[MAX_EMITTERS];
+typedef struct
+{
+	RigidBody_t body;
+	uint32_t ID;
+	float life;
+} PhyParticleEmitter_t;
+
+extern PhyParticleEmitter_t emitters[MAX_EMITTERS];
 
 #define NUM_ASTEROIDS 1000
 extern RigidBody_t asteroids[NUM_ASTEROIDS];
@@ -76,14 +81,16 @@ void FireParticleEmitter(vec3 position, vec3 direction)
 	for(uint32_t i=0;i<MAX_EMITTERS;i++)
 	{
 		// When found, assign the new emitter ID to that particle, set position/direction/life and break out
-		if(particleEmittersLife[i]<0.0f)
+		if(emitters[i].life<0.0f)
 		{
-			particleEmittersID[i]=ID;
-			particleEmitters[i].position=position;
-			Vec3_Normalize(&direction);
-			particleEmitters[i].velocity=Vec3_Muls(direction, 100.0f);
+			emitters[i].ID=ID;
+			emitters[i].body.position=position;
 
-			particleEmittersLife[i]=15.0f;
+			Vec3_Normalize(&direction);
+
+			emitters[i].body.velocity=Vec3_Muls(direction, 100.0f);
+
+			emitters[i].life=15.0f;
 
 			break;
 		}

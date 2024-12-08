@@ -7,7 +7,7 @@ pipeline {
 	addStage("shaders/particle.vert.spv", vertex)
 	addStage("shaders/particle.frag.spv", fragment)
 
-	pushConstant(0, 96, geometry)
+	pushConstant(0, 128, geometry)
 
 	subpass(0)
 	topology(pointList)

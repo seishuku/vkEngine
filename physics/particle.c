@@ -28,13 +28,6 @@ static Pipeline_t particlePipeline;
 
 //static VkuImage_t particleTexture;
 
-struct
-{
-	matrix mvp;
-	vec4 Right;
-	vec4 Up;
-} particlePC;
-
 inline static void emitterDefaultInit(Particle_t *particle)
 {
 	float seedRadius=30.0f;
@@ -273,7 +266,7 @@ void ParticleSystem_Step(ParticleSystem_t *system, float dt)
 				emitter->particles[j].position=Vec3_Addv(emitter->particles[j].position, emitter->position);
 			}
 
-			emitter->particles[j].life-=dt*0.75f;
+			emitter->particles[j].life-=dt;
 		}
 
 		if(!isActive&&emitter->type==PARTICLE_EMITTER_ONCE)
@@ -373,10 +366,14 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 
 	mtx_unlock(&system->mutex);
 
-	matrix modelview=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
-	particlePC.mvp=MatrixMult(modelview, perFrame[index].mainUBO[eye]->projection);
-	particlePC.Right=Vec4(modelview.x.x, modelview.y.x, modelview.z.x, modelview.w.x);
-	particlePC.Up=Vec4(modelview.x.y, modelview.y.y, modelview.z.y, modelview.w.y);
+	struct
+	{
+		matrix modelview;
+		matrix projection;
+	} particlePC;
+
+	particlePC.modelview=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
+	particlePC.projection=perFrame[index].mainUBO[eye]->projection;
 
 	//vkuDescriptorSet_UpdateBindingImageInfo(&particleDescriptorSet, 0, &particleTexture);
 	//vkuAllocateUpdateDescriptorSet(&particleDescriptorSet, descriptorPool);

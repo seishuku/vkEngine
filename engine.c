@@ -71,9 +71,14 @@ ParticleSystem_t particleSystem;
 
 // Particle system emitters as rigid bodies with life and ID hashmaps
 #define MAX_EMITTERS 1000
-RigidBody_t particleEmitters[MAX_EMITTERS]={ 0 };
-uint32_t particleEmittersID[MAX_EMITTERS]={ 0 };
-float particleEmittersLife[MAX_EMITTERS]={ 0 };
+typedef struct
+{
+	RigidBody_t body;
+	uint32_t ID;
+	float life;
+} PhyParticleEmitter_t;
+
+PhyParticleEmitter_t emitters[MAX_EMITTERS]={ 0 };
 
 // 3D Model data
 BModel_t models[NUM_MODELS];
@@ -710,32 +715,32 @@ void Thread_Physics(void *arg)
 		{
 			// If it's alive reduce the life and integrate,
 			// otherwise if it's dead and still has an ID assigned, delete/unassign it.
-			if(particleEmittersLife[i]>0.0f)
+			if(emitters[i].life>0.0f)
 			{
 				// Add particle emitter to physics list
-				AddPhysicsObject(&particleEmitters[i], PHYSICSOBJECTTYPE_PROJECTILE);
+				AddPhysicsObject(&emitters[i].body, PHYSICSOBJECTTYPE_PROJECTILE);
 
-				particleEmittersLife[i]-=fTimeStep;
+				emitters[i].life-=fTimeStep;
 
 				for(uint32_t j=0;j<List_GetCount(&particleSystem.emitters);j++)
 				{
 					ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&particleSystem.emitters, j);
 
-					if(emitter->ID==particleEmittersID[i])
+					if(emitter->ID==emitters[i].ID)
 					{
-						emitter->position=particleEmitters[i].position;
+						emitter->position=emitters[i].body.position;
 
-						if(particleEmittersLife[i]<5.0f)
-							emitter->particleSize*=fmaxf(0.0f, fminf(1.0f, particleEmittersLife[i]/5.0f));
+						if(emitters[i].life<5.0f)
+							emitter->particleSize*=fmaxf(0.0f, fminf(1.0f, emitters[i].life/5.0f));
 
 						break;
 					}
 				}
 			}
-			else if(particleEmittersID[i]!=UINT32_MAX)
+			else if(emitters[i].ID!=UINT32_MAX)
 			{
-				ParticleSystem_DeleteEmitter(&particleSystem, particleEmittersID[i]);
-				particleEmittersID[i]=UINT32_MAX;
+				ParticleSystem_DeleteEmitter(&particleSystem, emitters[i].ID);
+				emitters[i].ID=UINT32_MAX;
 			}
 		}
 
@@ -772,11 +777,11 @@ void Thread_Physics(void *arg)
 						// Need to find the source emitter first:
 						for(uint32_t k=0;k<MAX_EMITTERS;k++)
 						{
-							if(particleEmittersLife[k]>0.0f)
+							if(emitters[k].life>0.0f)
 							{
-								if(physicsObjects[j].rigidBody==&particleEmitters[k])
+								if(physicsObjects[j].rigidBody==&emitters[k].body)
 								{
-									particleEmittersLife[k]=0.001f;
+									emitters[k].life=0.001f;
 									break;
 								}
 							}
@@ -1410,14 +1415,14 @@ bool Init(void)
 	// Set up emitter initial state and projectile rigid body parameters
 	for(uint32_t i=0;i<MAX_EMITTERS;i++)
 	{
-		particleEmittersID[i]=UINT32_MAX;	// No assigned particle ID
-		particleEmittersLife[i]=-1.0f;		// No life
+		emitters[i].ID=UINT32_MAX;	// No assigned particle ID
+		emitters[i].life=-1.0f;		// No life
 
 		const float radius=5.0f;
 		const float mass=(1.0f/3000.0f)*(1.33333333f*PI*radius)*10.0f;
 		const float inertia=0.4f*mass*(radius*radius);
 
-		particleEmitters[i]=(RigidBody_t)
+		emitters[i].body=(RigidBody_t)
 		{
 			.position=Vec3b(0.0f),
 

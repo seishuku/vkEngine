@@ -11,8 +11,8 @@ void main()
 {
 	float Alpha=1.0-length(vUV*2.0-1.0);
 
-	Output=vColor*vec4(0.5, 0.5, 0.5, Alpha);
-
 	if(Alpha<0.001)
 		discard;
+
+	Output=vec4(vColor.xyz, Alpha*Alpha);
 }
