@@ -1190,6 +1190,13 @@ void Fire(void *arg)
 	Event_Trigger(EVENT_KEYUP, (void *)&key);
 }
 
+uint32_t em=UINT32_MAX;
+
+void Console_CmdExplode(Console_t *console, const char *param)
+{
+	ParticleSystem_ResetEmitter(&particleSystem, em);
+}
+
 bool vkuMemAllocator_Init(VkuContext_t *context);
 
 // Initialization call from system main
@@ -1207,11 +1214,11 @@ bool Init(void)
 	ConsoleRegisterCommand(&console, "quit", Console_CmdQuit);
 	ConsoleRegisterCommand(&console, "connect", Console_CmdConnect);
 	ConsoleRegisterCommand(&console, "disconnect", Console_CmdDisconnect);
+	ConsoleRegisterCommand(&console, "explode", Console_CmdExplode);
 
 	vkuMemAllocator_Init(&vkContext);
 
 	CameraInit(&camera, Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
-	//CameraInit(&enemy, Vec3(0.0f, 0.0f, 100.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f)); // this is done when world is generated
 
 	if(!Audio_Init())
 	{
@@ -1409,7 +1416,7 @@ bool Init(void)
 	}
 	
 	ParticleSystem_SetGravity(&particleSystem, 0.0f, 0.0f, 0.0f);
-	//ParticleSystem_AddEmitter(&particleSystem, Vec3(0.0f, 0.0f, 50.0f), Vec3b(10.0f), Vec3b(0.0f), 5.0f, 10000, PARTICLE_EMITTER_CONTINOUS, NULL);
+	em=ParticleSystem_AddEmitter(&particleSystem, Vec3(0.0f, 0.0f, 50.0f), Vec3b(10.0f), Vec3b(0.0f), 2.0f, 50, PARTICLE_EMITTER_BURST, NULL);
 
 	// Set up emitter initial state and projectile rigid body parameters
 	for(uint32_t i=0;i<MAX_EMITTERS;i++)
