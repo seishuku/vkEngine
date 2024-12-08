@@ -41,6 +41,30 @@ inline static void emitterDefaultInit(Particle_t *particle)
 	particle->life=RandFloat()*0.999f+0.001f;
 }
 
+static bool addParticle(ParticleSystem_t *system, Particle_t particle)
+{
+	// Check if there's enough space
+	if(system->numParticles>=system->maxParticles)
+	{
+		DBGPRINTF(DEBUG_ERROR, "Too many particles %d>%d\n", system->numParticles, system->maxParticles);
+		return false;
+	}
+
+	// Find first available particle and set it
+	for(uint32_t i=0;i<system->maxParticles;i++)
+	{
+		if(system->particles[i].life<=0.0f)
+		{
+			system->particles[i]=particle;
+			system->numParticles++;
+
+			return true;
+		}
+	}
+
+	return true;
+}
+
 // Adds a particle emitter to the system
 uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3 startColor, vec3 endColor, float particleSize, uint32_t numParticles, ParticleEmitterType_e type, ParticleInitCallback initCallback)
 {
@@ -52,58 +76,56 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3
 	// Pull the next ID from the global ID count
 	uint32_t ID=system->baseID++;
 
-	// Increment emitter count and resize emitter memory
-
-	ParticleEmitter_t emitter;
-
-	if(initCallback==NULL)
-		emitter.initCallback=NULL;
-	else
-		emitter.initCallback=initCallback;
-
-	// Set various flags/parameters
-	emitter.type=type;
-	emitter.ID=ID;
-	emitter.startColor=startColor;
-	emitter.endColor=endColor;
-	emitter.particleSize=particleSize;
-
-	// Set number of particles and allocate memory
-	emitter.numParticles=numParticles;
-	emitter.particles=(Particle_t *)Zone_Malloc(zone, numParticles*sizeof(Particle_t));
-
-	if(emitter.particles==NULL)
+	// Set up the emitter structure
+	ParticleEmitter_t emitter=
 	{
-		mtx_unlock(&system->mutex);
-		return UINT32_MAX;
-	}
+		.ID=ID,
+		.type=type,
+		.position=position,
+		.startColor=startColor,
+		.endColor=endColor,
+		.particleSize=particleSize,
+		.emissionRate=(float)numParticles,
+		.emissionInterval=1.0f/emitter.emissionRate,
+		.emissionTime=0.0f,
+		.initCallback=initCallback
+	};
 
-	memset(emitter.particles, 0, numParticles*sizeof(Particle_t));
-
-	// Set emitter position (used when resetting/recycling particles when they die)
-	emitter.position=position;
-
-	// Set initial particle position and life to -1.0 (dead), unless it's a one-shot, then set it up with default or callback
-	for(uint32_t i=0;i<emitter.numParticles;i++)
+	// If it's a one time emitter, just dump a bunch of new particles,
+	//   otherwise add the emitter to the list for later processing
+	if(emitter.type==PARTICLE_EMITTER_ONCE)
 	{
-		emitter.particles[i].ID=ID;
-		emitter.particles[i].position=position;
+		uint32_t offset=system->numParticles;
 
-		if(emitter.type==PARTICLE_EMITTER_ONCE)
+		// Check if there's enough space
+		if(offset+numParticles>=system->maxParticles)
 		{
-			if(emitter.initCallback)
-				emitter.initCallback(i, emitter.numParticles, &emitter.particles[i]);
-			else
-				emitterDefaultInit(&emitter.particles[i]);
-
-			// Add particle emitter position to the calculated position
-			emitter.particles[i].position=Vec3_Addv(emitter.particles[i].position, emitter.position);
+			mtx_unlock(&system->mutex);
+			return UINT32_MAX;
 		}
-		else
-			emitter.particles[i].life=-1.0f;
-	}
 
-	List_Add(&system->emitters, &emitter);
+		// Spawn the particles
+		for(uint32_t i=offset;i<offset+numParticles;i++)
+		{
+			Particle_t particle;
+
+			if(emitter.initCallback)
+				emitter.initCallback(0, 1, &particle);
+			else
+				emitterDefaultInit(&particle);
+
+			particle.startColor=emitter.startColor;
+			particle.endColor=emitter.endColor;
+			particle.particleSize=emitter.particleSize;
+			particle.position=Vec3_Addv(particle.position, emitter.position);
+
+			addParticle(system, particle);
+		}
+
+		system->numParticles+=numParticles;
+	}
+	else
+		List_Add(&system->emitters, &emitter);
 
 	mtx_unlock(&system->mutex);
 
@@ -124,11 +146,7 @@ void ParticleSystem_DeleteEmitter(ParticleSystem_t *system, uint32_t ID)
 
 		if(emitter->ID==ID)
 		{
-			Zone_Free(zone, emitter->particles);
 			List_Del(&system->emitters, i);
-
-			// Resize vertex buffers (both system memory and OpenGL buffer)
-			// ParticleSystem_ResizeBuffer(system);
 			break;
 		}
 	}
@@ -142,31 +160,47 @@ void ParticleSystem_ResetEmitter(ParticleSystem_t *system, uint32_t ID)
 	if(system==NULL||ID==UINT32_MAX)
 		return;
 
+	mtx_lock(&system->mutex);
+
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
 	{
 		ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&system->emitters, i);
 
 		if(emitter->ID==ID)
 		{
-			for(uint32_t j=0;j<emitter->numParticles;j++)
+			if(emitter->type==PARTICLE_EMITTER_BURST)
 			{
-				// Only reset dead particles, limit "total reset" weirdness
-				if(emitter->particles[j].life<0.0f)
-				{
-					// If a velocity/life callback was set, use it... Otherwise use default "fountain" style
-					if(emitter->initCallback)
-						emitter->initCallback(j, emitter->numParticles, &emitter->particles[j]);
-					else
-						emitterDefaultInit(&emitter->particles[j]);
+				uint32_t offset=system->numParticles;
 
-					// Add particle emitter position to the calculated position
-					emitter->particles[j].position=Vec3_Addv(emitter->particles[j].position, emitter->position);
+				// Check if there's enough space
+				if(offset+emitter->emissionRate>=system->maxParticles)
+				{
+					mtx_unlock(&system->mutex);
+					return;
+				}
+
+				// Spawn the particles
+				for(uint32_t i=offset;i<offset+emitter->emissionRate;i++)
+				{
+					Particle_t particle;
+
+					if(emitter->initCallback)
+						emitter->initCallback(0, 1, &particle);
+					else
+						emitterDefaultInit(&particle);
+
+					particle.startColor=emitter->startColor;
+					particle.endColor=emitter->endColor;
+					particle.particleSize=emitter->particleSize;
+					particle.position=Vec3_Addv(particle.position, emitter->position);
+
+					addParticle(system, particle);
 				}
 			}
-
-			return;
 		}
 	}
+
+	mtx_unlock(&system->mutex);
 }
 
 void ParticleSystem_SetEmitterPosition(ParticleSystem_t *system, uint32_t ID, vec3 position)
@@ -221,7 +255,33 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 
 	List_Init(&system->emitters, sizeof(ParticleEmitter_t), 10, NULL);
 
-	system->count=0;
+	system->numParticles=0;
+	system->maxParticles=100000;
+	system->particles=(Particle_t *)Zone_Malloc(zone, sizeof(Particle_t)*system->maxParticles);
+
+	if(system->particles==NULL)
+	{
+		DBGPRINTF(DEBUG_ERROR, "ParticleSystem_Init: Unable to allocate memory for particle pool.\r\n");
+		return false;
+	}
+	else
+	{
+		for(uint32_t i=0;i<system->maxParticles;i++)
+		{
+			system->particles[i].ID=UINT32_MAX;
+			system->particles[i].position=Vec3b(0.0f);
+			system->particles[i].velocity=Vec3b(0.0f);
+			system->particles[i].startColor=Vec3b(0.0f);
+			system->particles[i].endColor=Vec3b(0.0f);
+			system->particles[i].particleSize=0.0f;
+			system->particles[i].life=-1.0f;
+		}
+	}
+
+	system->systemBuffer=(float *)Zone_Realloc(zone, system->systemBuffer, sizeof(vec4)*2*system->maxParticles);
+
+	if(system->systemBuffer==NULL)
+		return false;
 
 	// Default generic gravity
 	system->gravity=Vec3(0.0f, -9.81f, 0.0f);
@@ -231,7 +291,7 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 
 	// Pre-allocate minimal sized buffers
 	for(uint32_t i=0;i<swapchain.numImages;i++)
-		vkuCreateHostBuffer(&vkContext, &system->particleBuffer[i], sizeof(vec4)*2, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+		vkuCreateHostBuffer(&vkContext, &system->particleBuffer[i], sizeof(vec4)*2*system->maxParticles, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
 	return true;
 }
@@ -241,40 +301,54 @@ void ParticleSystem_Step(ParticleSystem_t *system, float dt)
 	if(system==NULL)
 		return;
 
+	mtx_lock(&system->mutex);
+
+	// Run all alive parts
+	system->numParticles=0;
+
+	for(uint32_t i=0;i<system->maxParticles;i++)
+	{
+		if(system->particles[i].life>0.0f)
+		{
+			system->particles[i].velocity=Vec3_Addv(system->particles[i].velocity, Vec3_Muls(system->gravity, dt));
+			system->particles[i].position=Vec3_Addv(system->particles[i].position, Vec3_Muls(system->particles[i].velocity, dt));
+			system->numParticles++;
+		}
+
+		system->particles[i].life-=dt;
+	}
+
+	// Run emitters and spawn particles based on emission rate
 	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
 	{
 		ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&system->emitters, i);
-		bool isActive=false;
 
-		for(uint32_t j=0;j<emitter->numParticles;j++)
+		if(emitter->type==PARTICLE_EMITTER_CONTINOUS)
 		{
-			if(emitter->particles[j].life>0.0f)
+			emitter->emissionTime+=dt;
+
+			while(emitter->emissionTime>emitter->emissionInterval)
 			{
-				isActive=true;
-				emitter->particles[j].velocity=Vec3_Addv(emitter->particles[j].velocity, Vec3_Muls(system->gravity, dt));
-				emitter->particles[j].position=Vec3_Addv(emitter->particles[j].position, Vec3_Muls(emitter->particles[j].velocity, dt));
-			}
-			else if(emitter->type==PARTICLE_EMITTER_CONTINOUS)
-			{
-				// If a velocity/life callback was set, use it... Otherwise use default "fountain" style
+				emitter->emissionTime-=emitter->emissionInterval;
+
+				Particle_t particle;
+
 				if(emitter->initCallback)
-					emitter->initCallback(j, emitter->numParticles, &emitter->particles[j]);
+					emitter->initCallback(0, 1, &particle);
 				else
-					emitterDefaultInit(&emitter->particles[j]);
+					emitterDefaultInit(&particle);
 
-				// Add particle emitter position to the calculated position
-				emitter->particles[j].position=Vec3_Addv(emitter->particles[j].position, emitter->position);
+				particle.startColor=emitter->startColor;
+				particle.endColor=emitter->endColor;
+				particle.particleSize=emitter->particleSize;
+				particle.position=Vec3_Addv(particle.position, emitter->position);
+
+				addParticle(system, particle);
 			}
-
-			emitter->particles[j].life-=dt;
-		}
-
-		if(!isActive&&emitter->type==PARTICLE_EMITTER_ONCE)
-		{
-			DBGPRINTF(DEBUG_WARNING, "REMOVING UNUSED EMITTER #%d\n", emitter->ID);
-			ParticleSystem_DeleteEmitter(system, emitter->ID);
 		}
 	}
+
+	mtx_unlock(&system->mutex);
 }
 
 int compareParticles(const void *a, const void *b)
@@ -302,32 +376,6 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 	mtx_lock(&system->mutex);
 
 	uint32_t count=0;
-
-	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
-	{
-		ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&system->emitters, i);
-		count+=emitter->numParticles;
-	}
-
-	// If the count isn't what the last count was, resize the buffer.
-	if(count!=system->count)
-	{
-		// Set new total particle count
-		system->count=count;
-		system->systemBuffer=(float *)Zone_Realloc(zone, system->systemBuffer, sizeof(vec4)*2*count);
-	}
-
-	// Check current frame's vertex buffer size against the current particle count needs
-	const size_t curSize=sizeof(vec4)*2*system->count;
-	if(curSize>system->particleBuffer[index].memory->size)
-	{
-		// Reallocate if so
-		vkuDestroyBuffer(&vkContext, &system->particleBuffer[index]);
-		vkuCreateHostBuffer(&vkContext, &system->particleBuffer[index], sizeof(vec4)*2*count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	}
-
-	// zero count and reuse it for final vertex data 
-	count=0;
 	float *array=system->systemBuffer;
 
 	if(array==NULL)
@@ -336,32 +384,27 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 		return;
 	}
 
-	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
+	for(uint32_t i=0;i<system->maxParticles;i++)
 	{
-		ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&system->emitters, i);
-
-		for(uint32_t j=0;j<emitter->numParticles;j++)
+		// Only draw ones that are alive still
+		if(system->particles[i].life>0.0f)
 		{
-			// Only draw ones that are alive still
-			if(emitter->particles[j].life>0.0f)
-			{
-				*array++=emitter->particles[j].position.x;
-				*array++=emitter->particles[j].position.y;
-				*array++=emitter->particles[j].position.z;
-				*array++=emitter->particleSize;
-				vec3 color=Vec3_Lerp(emitter->startColor, emitter->endColor, emitter->particles[j].life);
-				*array++=color.x;
-				*array++=color.y;
-				*array++=color.z;
-				*array++=clampf(emitter->particles[j].life, 0.0f, 1.0f);
+			*array++=system->particles[i].position.x;
+			*array++=system->particles[i].position.y;
+			*array++=system->particles[i].position.z;
+			*array++=system->particles[i].particleSize;
+			vec3 color=Vec3_Lerp(system->particles[i].startColor, system->particles[i].endColor, system->particles[i].life);
+			*array++=color.x;
+			*array++=color.y;
+			*array++=color.z;
+			*array++=clampf(system->particles[i].life, 0.0f, 1.0f);
 
-				count++;
-			}
+			count++;
 		}
 	}
 
+	// Sort and copy, because qsort on a GPU mapped buffer is bad :)
 	qsort(system->systemBuffer, count, sizeof(vec4)*2, compareParticles);
-
 	memcpy(system->particleBuffer[index].memory->mappedPointer, system->systemBuffer, sizeof(vec4)*2*count);
 
 	mtx_unlock(&system->mutex);
@@ -396,17 +439,11 @@ void ParticleSystem_Destroy(ParticleSystem_t *system)
 		vkuDestroyBuffer(&vkContext, &system->particleBuffer[i]);
 
 	Zone_Free(zone, system->systemBuffer);
+	Zone_Free(zone, system->particles);
 
 	//vkuDestroyImageBuffer(&Context, &particleTexture);
 
 	DestroyPipeline(&vkContext, &particlePipeline);
-
-	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
-	{
-		ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&system->emitters, i);
-
-		Zone_Free(zone, emitter->particles);
-	}
 
 	List_Destroy(&system->emitters);
 }

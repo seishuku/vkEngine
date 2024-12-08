@@ -12,8 +12,10 @@
 typedef struct Particle_s
 {
 	uint32_t ID;
-	float life;
 	vec3 position, velocity;
+	vec3 startColor, endColor;
+	float particleSize;
+	float life;
 } Particle_t;
 
 typedef void (*ParticleInitCallback)(uint32_t index, uint32_t numParticles, Particle_t *particle);
@@ -32,8 +34,7 @@ typedef struct ParticleEmitter_s
 	vec3 position;
 	vec3 startColor, endColor;
 	float particleSize;
-	uint32_t numParticles;
-	Particle_t *particles;
+	float emissionRate, emissionInterval, emissionTime;
 
 	ParticleInitCallback initCallback;
 } ParticleEmitter_t;
@@ -45,6 +46,9 @@ typedef struct ParticleSystem_s
 	vec3 gravity;
 
 	List_t emitters;
+
+	uint32_t numParticles, maxParticles;
+	Particle_t *particles;
 
 	mtx_t mutex;
 

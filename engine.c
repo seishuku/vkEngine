@@ -1408,9 +1408,8 @@ bool Init(void)
 		return false;
 	}
 	
-	//ParticleSystem_SetGravity(&particleSystem, 0.0f, 0.0f, 0.0f);
-
-	ParticleSystem_AddEmitter(&particleSystem, Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f), 0.0f, 1, PARTICLE_EMITTER_BURST, NULL);
+	ParticleSystem_SetGravity(&particleSystem, 0.0f, 0.0f, 0.0f);
+	//ParticleSystem_AddEmitter(&particleSystem, Vec3(0.0f, 0.0f, 50.0f), Vec3b(10.0f), Vec3b(0.0f), 5.0f, 10000, PARTICLE_EMITTER_CONTINOUS, NULL);
 
 	// Set up emitter initial state and projectile rigid body parameters
 	for(uint32_t i=0;i<MAX_EMITTERS;i++)
