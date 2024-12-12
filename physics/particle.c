@@ -257,7 +257,7 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 		}
 	}
 
-	system->systemBuffer=(float *)Zone_Malloc(zone, sizeof(vec4)*2*system->maxParticles);
+	system->systemBuffer=(vec4 *)Zone_Malloc(zone, sizeof(vec4)*2*system->maxParticles);
 
 	if(system->systemBuffer==NULL)
 	{

@@ -52,7 +52,7 @@ typedef struct ParticleSystem_s
 	mtx_t mutex;
 
 	VkuBuffer_t particleBuffer[VKU_MAX_FRAME_COUNT];
-	float *systemBuffer;
+	vec4 *systemBuffer;
 } ParticleSystem_t;
 
 uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3 startColor, vec3 endColor, float particleSize, uint32_t numParticles, ParticleEmitterType_e type, ParticleInitCallback initCallback);
