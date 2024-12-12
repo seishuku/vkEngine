@@ -2,7 +2,7 @@
     "version": 3,
     "configurePresets": [
         {
-            "name": "x64-debug-clang",
+            "name": "Windows x64 Debug",
             "displayName": "Windows x64 Debug",
             "architecture": {
                 "value": "x64",
@@ -10,7 +10,7 @@
             },
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
-            "installDir": "${sourceDir}/out/install/${presetName}",
+            "installDir": "${sourceDir}/${presetName}",
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "clang-cl",
                 "CMAKE_CXX_COMPILER": "clang-cl",
@@ -23,7 +23,7 @@
             }
         },
         {
-            "name": "x64-release-clang",
+            "name": "Windows x64 Release",
             "displayName": "Windows x64 Release",
             "architecture": {
                 "value": "x64",
@@ -31,7 +31,7 @@
             },
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
-            "installDir": "${sourceDir}/out/install/${presetName}",
+            "installDir": "${sourceDir}/${presetName}",
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "clang-cl",
                 "CMAKE_CXX_COMPILER": "clang-cl",
@@ -45,10 +45,10 @@
         },
         {
             "name": "Linux x64 Debug",
-            "displayName": "Linux x64 Debug (clang)",
+            "displayName": "Linux x64 Debug",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
             "cacheVariables": {
-                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/${presetName}",
                 "CMAKE_C_COMPILER": "/usr/bin/clang",
                 "CMAKE_CXX_COMPILER": "/usr/bin/clang++",
                 "CMAKE_BUILD_TYPE": "Debug",
@@ -62,10 +62,10 @@
         },
         {
             "name": "Linux x64 Release",
-            "displayName": "Linux x64 Release (clang)",
+            "displayName": "Linux x64 Release",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
             "cacheVariables": {
-                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/${presetName}",
                 "CMAKE_C_COMPILER": "/usr/bin/clang",
                 "CMAKE_CXX_COMPILER": "/usr/bin/clang++",
                 "CMAKE_BUILD_TYPE": "Release",
@@ -75,6 +75,28 @@
                 "type": "equals",
                 "lhs": "${hostSystemName}",
                 "rhs": "Linux"
+            }
+        },
+        {
+            "name": "Android Debug",
+            "displayName": "Android Debug",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{ANDROID_NDK}/build/cmake/android.toolchain.cmake",
+                "ANDROID_PLATFORM": "android-28",
+                "ANDROID_ABI": "arm64-v8a",
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "Android Release",
+            "displayName": "Android Release",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{ANDROID_NDK}/build/cmake/android.toolchain.cmake",
+                "ANDROID_PLATFORM": "android-28",
+                "ANDROID_ABI": "arm64-v8a",
+                "CMAKE_BUILD_TYPE": "Release"
             }
         }
     ]
