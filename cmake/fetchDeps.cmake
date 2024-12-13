@@ -10,7 +10,7 @@ function(fetchDeps)
 #	)
 #	FetchContent_MakeAvailable(openxr-loader)
 
-	#if(NOT CMAKE_SYSTEM_NAME MATCHES "Android") # Android has it's own decent audio library
+	if(NOT CMAKE_SYSTEM_NAME MATCHES "Android") # Android has it's own decent audio library
 	message(STATUS "${PROJECT_NAME}: Fetching PortAudio...")
 	add_subdirectory(deps/portaudio)
 #	FetchContent_Declare(portaudio
@@ -19,7 +19,7 @@ function(fetchDeps)
 #		GIT_TAG 147dd722548358763a8b649b3e4b41dfffbcfbb6 #v19.7.0
 #	)
 #	FetchContent_MakeAvailable(portaudio)
-	#endif()
+	endif()
 
 	message(STATUS "${PROJECT_NAME}: Fetching OGG...")
 	add_subdirectory(deps/ogg)
