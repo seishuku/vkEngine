@@ -3,7 +3,10 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
-# GCC objects
+# android signing signature?
+*.idsig
+
+# code objects
 *.o
 
 #vscode user-specific files
