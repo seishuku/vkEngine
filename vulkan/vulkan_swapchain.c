@@ -55,15 +55,6 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 	VkSurfaceCapabilitiesKHR surfaceCaps;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context->physicalDevice, context->surface, &surfaceCaps);
 
-	if(surfaceCaps.currentTransform&VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR||surfaceCaps.currentTransform&VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR)
-	{
-		// Swap to get identity width and height
-		uint32_t width=surfaceCaps.currentExtent.width;
-		uint32_t height=surfaceCaps.currentExtent.height;
-		surfaceCaps.currentExtent.height=width;
-		surfaceCaps.currentExtent.width=height;
-	}
-
 	// Set swapchain extents to the surface width/height,
 	// otherwise if extent is already non-zero, use that for surface width/height.
 	// This allows setting width/height externally.
@@ -167,7 +158,7 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 		.imageSharingMode=VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount=0,
 		.pQueueFamilyIndices=VK_NULL_HANDLE,
-		.preTransform=surfaceCaps.currentTransform,
+		.preTransform=VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
 		.compositeAlpha=compositeAlpha,
 		.presentMode=swapchainPresentMode,
 		.clipped=VK_TRUE,

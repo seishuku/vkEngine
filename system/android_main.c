@@ -31,6 +31,8 @@ extern uint32_t renderWidth, renderHeight;
 
 float fps=0.0f, fTimeStep=0.0f, fTime=0.0;
 
+static const uint32_t scale=2;
+
 struct
 {
 	bool running;
@@ -68,21 +70,21 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 					{
 						case AMOTION_EVENT_ACTION_DOWN:
 							MouseEvent.button|=MOUSE_TOUCH;
-							MouseEvent.dx=(int)AMotionEvent_getX(event, 0);
-							MouseEvent.dy=winHeight-(int)AMotionEvent_getY(event, 0);
+							MouseEvent.dx=(int)(AMotionEvent_getX(event, 0)/scale);
+							MouseEvent.dy=winHeight-(int)(AMotionEvent_getY(event, 0)/scale);
 							Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
 							break;
 
 						case AMOTION_EVENT_ACTION_UP:
 							MouseEvent.button&=~MOUSE_TOUCH;
-							MouseEvent.dx=(int)AMotionEvent_getX(event, 0);
-							MouseEvent.dy=winHeight-(int)AMotionEvent_getY(event, 0);
+							MouseEvent.dx=(int)(AMotionEvent_getX(event, 0)/scale);
+							MouseEvent.dy=winHeight-(int)(AMotionEvent_getY(event, 0)/scale);
 							Event_Trigger(EVENT_MOUSEUP, &MouseEvent);
 							break;
 
 						case AMOTION_EVENT_ACTION_MOVE:
-							MouseEvent.dx=(int)AMotionEvent_getX(event, 0);
-							MouseEvent.dy=winHeight-(int)AMotionEvent_getY(event, 0);
+							MouseEvent.dx=(int)(AMotionEvent_getX(event, 0)/scale);
+							MouseEvent.dy=winHeight-(int)(AMotionEvent_getY(event, 0)/scale);
 							Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
 							break;
 					}
@@ -181,8 +183,8 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 	switch(cmd)
 	{
 		case APP_CMD_INIT_WINDOW:
-			winWidth=ANativeWindow_getWidth(app->window);
-			winHeight=ANativeWindow_getHeight(app->window);
+			winWidth=ANativeWindow_getWidth(app->window)/scale;
+			winHeight=ANativeWindow_getHeight(app->window)/scale;
 			ANativeWindow_setBuffersGeometry(app->window, winWidth, winHeight, 0);
 
 			vkContext.window=app->window;
