@@ -23,14 +23,14 @@ function("buildAndroid")
 		nativewindow
 	)
 
-	set(OUTPUT_APK "${CMAKE_SOURCE_DIR}/${CMAKE_PROJECT_NAME}.apk")
-	set(ANDROID_MANIFEST "${CMAKE_SOURCE_DIR}/AndroidManifest.xml")
-	set(APK_BUILD_DIR "${CMAKE_SOURCE_DIR}/apk")
+	set(OUTPUT_APK "${PROJECT_SOURCE_DIR}/${CMAKE_PROJECT_NAME}.apk")
+	set(ANDROID_MANIFEST "${PROJECT_SOURCE_DIR}/AndroidManifest.xml")
+	set(APK_BUILD_DIR "${PROJECT_SOURCE_DIR}/apk")
 	set(ANDROID_VERSION "28")
 	set(AAPT "$ENV{ANDROID_HOME}/build-tools/34.0.0/aapt")  # Update to your build-tools version
 	set(ZIPALIGN "$ENV{ANDROID_HOME}/build-tools/34.0.0/zipalign")
 	set(APK_SIGNER "$ENV{ANDROID_HOME}/build-tools/34.0.0/apksigner")  # Optional: for signing
-	set(KEYSTORE "${CMAKE_SOURCE_DIR}/my-release-key.keystore")  # Path to your keystore file
+	set(KEYSTORE "${PROJECT_SOURCE_DIR}/my-release-key.keystore")  # Path to your keystore file
 	set(KEY_ALIAS "standkey")  # Replace with your key alias
 	set(KEYSTORE_PASSWORD "password")  # Replace with your keystore password
 
@@ -38,12 +38,19 @@ function("buildAndroid")
 	file(MAKE_DIRECTORY ${APK_BUILD_DIR})
 
 	# Collect pipeline file names
-	file(GLOB PIPELINE_FILES "${CMAKE_SOURCE_DIR}/pipelines/*.pipeline")
+	file(GLOB PIPELINE_FILES "${PROJECT_SOURCE_DIR}/pipelines/*.pipeline")
 
 	# Collect shader file names
-	file(GLOB SHADER_FILES "${CMAKE_SOURCE_DIR}/shaders/*.spv")
+	file(GLOB SHADER_FILES "${PROJECT_SOURCE_DIR}/shaders/*.spv")
 
-	# Copy the shared library to the APK lib folder
+	# Strip debug info/symbols from release binaries
+	add_custom_command(
+		TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
+		COMMAND $<$<CONFIG:release>:${CMAKE_STRIP}> ARGS --strip-all $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
+		COMMAND $<$<CONFIG:release>:${CMAKE_STRIP}> ARGS --strip-all $<TARGET_FILE:OpenXR::openxr_loader>
+	)
+
+	# Build APK folder
 	add_custom_command(
 		TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
 
@@ -62,7 +69,7 @@ function("buildAndroid")
 
 		# Copy assets and remove music
 		COMMAND ${CMAKE_COMMAND} -E make_directory ${APK_BUILD_DIR}/assets/assets
-		COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/assets ${APK_BUILD_DIR}/assets/assets
+		COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/assets ${APK_BUILD_DIR}/assets/assets
 		COMMAND ${CMAKE_COMMAND} -E remove_directory ${APK_BUILD_DIR}/assets/assets/music
 
 		COMMENT "Preparing APK build directory"
@@ -70,7 +77,7 @@ function("buildAndroid")
 
 	add_custom_command(
 		TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
-		COMMAND ${AAPT} package -f -F ${OUTPUT_APK} -I $ENV{ANDROID_HOME}/platforms/android-${ANDROID_VERSION}/android.jar -M ${ANDROID_MANIFEST} -v --app-as-shared-lib --target-sdk-version $(ANDROID_VERSION) ${APK_BUILD_DIR}
+		COMMAND ${AAPT} package -f -F ${OUTPUT_APK} -I $ENV{ANDROID_HOME}/platforms/android-${ANDROID_VERSION}/android.jar -M ${ANDROID_MANIFEST} -v --app-as-shared-lib --target-sdk-version ${ANDROID_VERSION} ${APK_BUILD_DIR}
 		COMMENT "Creating APK with aapt"
 	)
 
@@ -86,4 +93,7 @@ function("buildAndroid")
 		COMMAND ${APK_SIGNER} sign --ks ${KEYSTORE} --ks-key-alias ${KEY_ALIAS} --ks-pass pass:${KEYSTORE_PASSWORD} ${OUTPUT_APK}
 		COMMENT "Signing APK with apksigner"
 	)
+
+	# Additional cleaning
+	set_property(DIRECTORY PROPERTY ADDITIONAL_CLEAN_FILES ${PROJECT_SOURCE_DIR}/apk)
 endFunction()

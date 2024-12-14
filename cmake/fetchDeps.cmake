@@ -21,6 +21,9 @@ function(fetchDeps)
 #	FetchContent_MakeAvailable(portaudio)
 	endif()
 
+	set(BUILD_SHARED_LIBS OFF)
+	set(BUILD_TESTING OFF)
+
 	message(STATUS "${PROJECT_NAME}: Fetching OGG...")
 	add_subdirectory(deps/ogg)
 #	FetchContent_Declare(ogg
