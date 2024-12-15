@@ -5,11 +5,8 @@
 #include "../math/math.h"
 #include "../system/system.h"
 
-#ifdef WIN32
-#include <spirv-headers/spirv.h>
-#else
-#include <spirv/unified1/spirv.h>
-#endif
+// Local copy from the Vulkan SDK, because some SDK deployments are dumb and don't include this or are in differing locations.
+#include "spirv.h"
 
 #define SPV_SPIRV_VERSION_MAJOR_PART(WORD) (((uint32_t)(WORD)>>16)&0xFF)
 #define SPV_SPIRV_VERSION_MINOR_PART(WORD) (((uint32_t)(WORD)>>8)&0xFF)

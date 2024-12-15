@@ -1,9 +1,9 @@
 ﻿cmake_minimum_required (VERSION 3.8)
 
-set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED True)
 
-project ("vkEngine" LANGUAGES C)
+project("vkEngine" LANGUAGES C)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 

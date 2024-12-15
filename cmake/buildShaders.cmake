@@ -15,9 +15,6 @@ function("buildShaders")
 		shaders/ui_sdf.frag shaders/ui_sdf.vert
 	)
 
-	find_package(Vulkan COMPONENTS glslc)
-	find_program(GLSLC NAMES glslc HINTS Vulkan::glslc)
-
 	foreach(SOURCE ${SHADER_SOURCES})
 		set(SHADER_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE}.spv)
 		set(SHADER_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE})

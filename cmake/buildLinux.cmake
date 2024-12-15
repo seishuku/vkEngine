@@ -7,20 +7,9 @@ function("buildLinux")
 		list(APPEND PROJECT_SOURCES system/linux_x11.c)
 	endif()
 
-	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+	if(CMAKE_C_COMPILER_ID OR CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 		if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
-			add_compile_options(
-				"-march=x86-64-v3"
-				"-ggdb3"
-				"-fprofile-instr-generate"
-				"/PROFILE"
-			)
-		else()
-			message(WARNING "Unknown CPU architecture ${CMAKE_SYSTEM_PROCESSOR} not targeted.")
-		endif()
-	elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-		if(CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64")
-			add_compile_options("/arch:AVX2")
+			add_compile_options("-march=x86-64-v3")
 		else()
 			message(WARNING "Unknown CPU architecture ${CMAKE_SYSTEM_PROCESSOR} not targeted.")
 		endif()

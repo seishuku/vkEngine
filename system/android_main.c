@@ -327,7 +327,7 @@ void android_main(struct android_app *app)
 		int ident, events;
 		struct android_poll_source *source;
 
-		while((ident=ALooper_pollAll(appState.running?0:-1, NULL, &events, (void **)&source))>=0)
+		while((ident=ALooper_pollOnce(appState.running?0:-1, NULL, &events, (void **)&source))>=0)
 		{
 			// Process this event.
 			if(source!=NULL)
