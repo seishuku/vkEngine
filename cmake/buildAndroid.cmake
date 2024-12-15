@@ -7,7 +7,7 @@ function("buildAndroid")
 	if(BUILD_TOOLS_COUNT GREATER 0)
 		list(GET BUILD_TOOLS_DIRS -1 BUILD_TOOLS)
 	else()
-		message(FATAL_ERROR "No build-tools directory found in ${ANDROID_HOME}/build-tools/")
+		message(FATAL_ERROR "No build-tools directory found in $ENV{ANDROID_HOME}/build-tools/")
 	endif()
 
 	# Find NDK directory
@@ -18,13 +18,13 @@ function("buildAndroid")
 	if(NDK_COUNT GREATER 0)
 		list(GET NDK_DIRS -1 NDK)
 	else()
-		message(FATAL_ERROR "No NDK directory found in ${ANDROID_HOME}/ndk/")
+		message(FATAL_ERROR "No NDK directory found in $ENV{ANDROID_HOME}/ndk/")
 	endif()
 
 	# Print out the selected directories (optional)
 	message(STATUS "Selected BUILD_TOOLS: ${BUILD_TOOLS}")
 	message(STATUS "Selected NDK: ${NDK}")
-	
+
 	add_definitions(-DANDROID -D__USE_BSD)
 	add_compile_options(-O3 -ffast-math -std=gnu17 -include ${PROJECT_SOURCE_DIR}/system/android_fopen.h)
 
