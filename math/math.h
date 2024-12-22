@@ -32,8 +32,8 @@ typedef struct { vec4 x, y, z, w; } matrix;
 // VecX_Xs - Broadcast wise type op (b math op on vector)
 
 #ifdef VEC_INLINE
-inline static const vec2 Vec2(const float x, const float y) { return (vec2) { .x=x, .y=y }; }
-inline static const vec2 Vec2b(const float b) { return (vec2) { .x=b, .y=b }; }
+inline static const vec2 Vec2(const float x, const float y) { return (const vec2) { .x=x, .y=y }; }
+inline static const vec2 Vec2b(const float b) { return (const vec2) { .x=b, .y=b }; }
 inline static vec2 Vec2_Add(const vec2 a, const float x, const float y) { return (vec2) { .x=a.x+x, .y=a.y+y }; }
 inline static vec2 Vec2_Addv(const vec2 a, const vec2 b) { return (vec2) { .x=a.x+b.x, .y=a.y+b.y }; }
 inline static vec2 Vec2_Adds(const vec2 a, const float b) { return (vec2) { .x=a.x+b, .y=a.y+b }; }
@@ -76,9 +76,9 @@ vec2 Vec2_Clampv(const vec2 v, const vec2 min, const vec2 max);
 float Vec2_Normalize(vec2 *v);
 
 #ifdef VEC_INLINE
-inline static const vec3 Vec3(const float x, const float y, const float z) { return (vec3) { .x=x, .y=y, .z=z }; }
-inline static const vec3 Vec3_Vec2(const vec2 a, const float z) { return (vec3) { .x=a.x, .y=a.y, .z=z }; }
-inline static const vec3 Vec3b(const float b) { return (vec3) { .x=b, .y=b, .z=b }; }
+inline static const vec3 Vec3(const float x, const float y, const float z) { return (const vec3) { .x=x, .y=y, .z=z }; }
+inline static const vec3 Vec3_Vec2(const vec2 a, const float z) { return (const vec3) { .x=a.x, .y=a.y, .z=z }; }
+inline static const vec3 Vec3b(const float b) { return (const vec3) { .x=b, .y=b, .z=b }; }
 inline static vec3 Vec3_Add(const vec3 a, const float x, const float y, const float z) { return (vec3) { .x=a.x+x, .y=a.y+y, .z=a.z+z }; }
 inline static vec3 Vec3_Addv(const vec3 a, const vec3 b) { return (vec3) { .x=a.x+b.x, .y=a.y+b.y, .z=a.z+b.z }; }
 inline static vec3 Vec3_Adds(const vec3 a, const float b) { return (vec3) { .x=a.x+b, .y=a.y+b, .z=a.z+b }; }
@@ -125,9 +125,9 @@ vec3 Vec3_Clampv(const vec3 v, const vec3 min, const vec3 max);
 float Vec3_Normalize(vec3 *v);
 
 #ifdef VEC_INLINE
-inline static const vec4 Vec4(const float x, const float y, const float z, const float w) { return (vec4) { .x=x, .y=y, .z=z, .w=w }; }
-inline static const vec4 Vec4_Vec3(const vec3 a, const float w) { return (vec4) { .x=a.x, .y=a.y, .z=a.z, .w=w }; }
-inline static const vec4 Vec4_Vec2(const vec2 a, const float z, const float w) { return (vec4) { .x=a.x, .y=a.y, .z=z, .w=w }; }
+inline static const vec4 Vec4(const float x, const float y, const float z, const float w) { return (const vec4) { .x=x, .y=y, .z=z, .w=w }; }
+inline static const vec4 Vec4_Vec3(const vec3 a, const float w) { return (const vec4) { .x=a.x, .y=a.y, .z=a.z, .w=w }; }
+inline static const vec4 Vec4_Vec2(const vec2 a, const float z, const float w) { return (const vec4) { .x=a.x, .y=a.y, .z=z, .w=w }; }
 inline static const vec4 Vec4b(const float b) { return (vec4) { .x=b, .y=b, .z=b, .w=b }; }
 inline static vec4 Vec4_Add(const vec4 a, const float x, const float y, const float z, const float w) { return (vec4) { .x=a.x+x, .y=a.y+y, .z=a.z+z, .w=a.w+w }; }
 inline static vec4 Vec4_Addv(const vec4 a, const vec4 b) { return (vec4) { .x=a.x+b.x, .y=a.y+b.y, .z=a.z+b.z, .w=a.w+b.w }; }

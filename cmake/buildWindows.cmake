@@ -1,6 +1,6 @@
 function("buildWindows")
 	add_definitions(-DWIN32 -D_CRT_SECURE_NO_WARNINGS -D_CONSOLE)
-	list(APPEND PROJECT_SOURCES system/win32.c)
+	list(APPEND PROJECT_SOURCES system/win32/win32.c)
 
     if(CMAKE_C_COMPILER_ID OR CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")

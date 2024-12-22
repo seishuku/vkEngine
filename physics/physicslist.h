@@ -14,7 +14,7 @@ typedef struct
 	PhysicsObjectType_e objectType;
 } PhysicsObject_t;
 
-#define MAX_PHYSICSOBJECTS 2000
+#define MAX_PHYSICSOBJECTS 10000
 
 extern uint32_t numPhysicsObjects;
 extern PhysicsObject_t physicsObjects[MAX_PHYSICSOBJECTS];

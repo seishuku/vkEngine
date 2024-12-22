@@ -10,13 +10,13 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "../system/system.h"
-#include "../vulkan/vulkan.h"
-#include "../math/math.h"
-#include "../camera/camera.h"
-#include "../utils/list.h"
-#include "../utils/event.h"
-#include "../vr/vr.h"
+#include "../../system/system.h"
+#include "../../vulkan/vulkan.h"
+#include "../../math/math.h"
+#include "../../camera/camera.h"
+#include "../../utils/list.h"
+#include "../../utils/event.h"
+#include "../../vr/vr.h"
 
 MemZone_t *zone;
 

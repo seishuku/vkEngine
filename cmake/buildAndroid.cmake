@@ -26,12 +26,13 @@ function("buildAndroid")
 	message(STATUS "Selected NDK: ${NDK}")
 
 	add_definitions(-DANDROID -D__USE_BSD)
-	add_compile_options(-O3 -ffast-math -std=gnu17 -include ${PROJECT_SOURCE_DIR}/system/android_fopen.h)
+	add_compile_options(-O3 -ffast-math -std=gnu17 -Wall -include ${PROJECT_SOURCE_DIR}/system/android/android_fopen.h)
+	add_link_options(-Wl,--no-undefined)
 
 	list(APPEND PROJECT_SOURCES
-		system/android_fopen.c
-		system/android_main.c
-		system/android_native_app_glue.c
+		system/android/android_fopen.c
+		system/android/android_main.c
+		system/android/android_native_app_glue.c
 	)
 
 	add_library(${CMAKE_PROJECT_NAME} SHARED ${PROJECT_SOURCES})

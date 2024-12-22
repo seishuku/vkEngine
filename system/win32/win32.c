@@ -4,14 +4,13 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "../system/system.h"
-#include "../vulkan/vulkan.h"
-#include "../math/math.h"
-#include "../camera/camera.h"
-#include "../utils/list.h"
-#include "../lights/lights.h"
-#include "../utils/event.h"
-#include "../vr/vr.h"
+#include "../../system/system.h"
+#include "../../vulkan/vulkan.h"
+#include "../../math/math.h"
+#include "../../camera/camera.h"
+#include "../../utils/list.h"
+#include "../../utils/event.h"
+#include "../../vr/vr.h"
 
 MemZone_t *zone;
 
@@ -399,8 +398,10 @@ static vec2 ApplyScaleDeadzone(LONG x, LONG y, LONG maxX, LONG maxY, float deadz
 	return d;
 }
 
-#include "../renderdoc_app.h"
+#if 0
+#include "../../renderdoc_app.h"
 RENDERDOC_API_1_6_0 *rdoc_api=NULL;
+#endif
 
 #ifndef _CONSOLE
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int iCmdShow)

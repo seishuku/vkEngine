@@ -12,15 +12,15 @@
 #include <wayland-client.h>
 #include <linux/input-event-codes.h>
 #include <xkbcommon/xkbcommon.h>
-#include "xdg-shell.h"
-#include "relative-pointer.h"
-#include "../system/system.h"
-#include "../vulkan/vulkan.h"
-#include "../math/math.h"
-#include "../camera/camera.h"
-#include "../utils/list.h"
-#include "../utils/event.h"
-#include "../vr/vr.h"
+#include "wayland/xdg-shell.h"
+#include "wayland/relative-pointer.h"
+#include "../../System/system.h"
+#include "../../vulkan/vulkan.h"
+#include "../../math/math.h"
+#include "../../camera/camera.h"
+#include "../../utils/list.h"
+#include "../../utils/event.h"
+#include "../../vr/vr.h"
 
 MemZone_t *zone;
 

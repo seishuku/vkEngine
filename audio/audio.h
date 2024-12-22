@@ -18,8 +18,13 @@ typedef struct
     uint8_t channels;
 } Sample_t;
 
+#ifndef WAVE_FORMAT_PCM
 #define WAVE_FORMAT_PCM			0x0001
+#endif
+
+#ifndef WAVE_FORMAT_IEEE_FLOAT
 #define WAVE_FORMAT_IEEE_FLOAT	0x0003
+#endif
 
 typedef struct WaveFormat_s
 {

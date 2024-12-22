@@ -7,12 +7,12 @@
 #include <sys/time.h>
 #include <time.h>
 #include "android_native_app_glue.h"
-#include "../system/system.h"
-#include "../system/memzone.h"
-#include "../vulkan/vulkan.h"
-#include "../math/math.h"
-#include "../vr/vr.h"
-#include "../utils/event.h"
+#include "../../system/system.h"
+#include "../../system/memzone.h"
+#include "../../vulkan/vulkan.h"
+#include "../../math/math.h"
+#include "../../vr/vr.h"
+#include "../../utils/event.h"
 
 MemZone_t *zone;
 
