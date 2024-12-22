@@ -14,7 +14,7 @@
 #include <xkbcommon/xkbcommon.h>
 #include "wayland/xdg-shell.h"
 #include "wayland/relative-pointer.h"
-#include "../../System/system.h"
+#include "../../system/system.h"
 #include "../../vulkan/vulkan.h"
 #include "../../math/math.h"
 #include "../../camera/camera.h"
