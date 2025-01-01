@@ -111,7 +111,7 @@ VkuImage_t depthImage[2];		// left and right eye depth buffers
 VkFramebuffer framebuffer[2];
 
 // Asteroid data
-#define NUM_ASTEROIDS 1000
+//#define NUM_ASTEROIDS 5000
 RigidBody_t asteroids[NUM_ASTEROIDS];
 //////
 
@@ -214,7 +214,7 @@ void GenerateWorld(void)
 
 	// Set up rigid body reps for asteroids
 	const float asteroidFieldMinRadius=50.0f;
-	const float asteroidFieldMaxRadius=1000.0f;
+	const float asteroidFieldMaxRadius=2000.0f;
 	const float asteroidMinRadius=0.05f;
 	const float asteroidMaxRadius=40.0f;
 
@@ -666,125 +666,6 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	vkuTransitionLayout(perFrame[index].commandBuffer, colorResolve[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
-#define HASH_TABLE_SIZE 200
-#define GRID_SIZE 50.0f
-
-typedef struct
-{
-	uint32_t count;
-	PhysicsObject_t *objects[100];
-} Cell_t;
-
-Cell_t hashTable[HASH_TABLE_SIZE];
-
-static uint32_t hashFunction(int32_t hx, int32_t hy, int32_t hz)
-{
-	return abs((hx*73856093)^(hy*19349663)^(hz*83492791))%HASH_TABLE_SIZE;
-}
-
-void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *particle);
-
-void RunSpatialHash(void)
-{
-	// Clear hash table
-	memset(hashTable, 0, sizeof(Cell_t)*HASH_TABLE_SIZE);
-
-	// Add physics objects to table
-	for(uint32_t i=0;i<numPhysicsObjects;i++)
-	{
-		int32_t hx=(int32_t)((physicsObjects[i].rigidBody->position.x)/GRID_SIZE);
-		int32_t hy=(int32_t)((physicsObjects[i].rigidBody->position.y)/GRID_SIZE);
-		int32_t hz=(int32_t)((physicsObjects[i].rigidBody->position.z)/GRID_SIZE);
-		uint32_t index=hashFunction(hx, hy, hz);
-
-		if(hashTable[index].count<100)
-			hashTable[index].objects[hashTable[index].count++]=&physicsObjects[i];
-		else
-			DBGPRINTF(DEBUG_ERROR, "Ran out of bucket space.\n");
-	}
-
-	// Check it
-	for(uint32_t i=0;i<numPhysicsObjects;i++)
-	{
-		int32_t hx=(int32_t)((physicsObjects[i].rigidBody->position.x)/GRID_SIZE);
-		int32_t hy=(int32_t)((physicsObjects[i].rigidBody->position.y)/GRID_SIZE);
-		int32_t hz=(int32_t)((physicsObjects[i].rigidBody->position.z)/GRID_SIZE);
-
-		for(int dx=-1;dx<=1;dx++)
-		{
-			for(int dy=-1;dy<=1;dy++)
-			{
-				for(int dz=-1;dz<=1;dz++)
-				{
-					uint32_t index=hashFunction(hx+dx, hy+dy, hz+dz);
-					Cell_t *neighborHash=&hashTable[index];
-
-					// Iterate over objects in the neighbor cell
-					for(uint32_t j=0;j<neighborHash->count;j++)
-					{
-						PhysicsObject_t *obj=neighborHash->objects[j];
-
-						if(physicsObjects[i].rigidBody==obj->rigidBody)
-							continue;
-
-						if(PhysicsSphereToSphereCollisionResponse(physicsObjects[i].rigidBody, obj->rigidBody)>1.0f)
-						{
-							// If both objects are asteroids
-							if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_FIELD&&obj->objectType==PHYSICSOBJECTTYPE_FIELD)
-							{
-								Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, obj->rigidBody->position);
-							}
-							// If one is an asteroid and one is a player
-							else if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_FIELD&&obj->objectType==PHYSICSOBJECTTYPE_PLAYER)
-							{
-								Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, obj->rigidBody->position);
-							}
-							// If both objects are players
-							else if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_PLAYER&&obj->objectType==PHYSICSOBJECTTYPE_PLAYER)
-							{
-								Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, obj->rigidBody->position);
-							}
-							// If it was a projectile colliding with anything
-							else if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_PROJECTILE||obj->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
-							{
-								// It collided, kill it.
-								// Setting this directly to <0.0 seems to cause emitters that won't get removed,
-								//     so setting it to nearly 0.0 allows the natural progression kill it off.
-								// Need to find the source emitter first:
-								for(uint32_t k=0;k<MAX_EMITTERS;k++)
-								{
-									if(emitters[k].life>0.0f)
-									{
-										if(obj->rigidBody==&emitters[k].body)
-										{
-											emitters[k].life=0.001f;
-											break;
-										}
-									}
-								}
-
-								Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, obj->rigidBody->position);
-
-								ParticleSystem_AddEmitter(&particleSystem,
-														  obj->rigidBody->position,	// Position
-														  Vec3(100.0f, 12.0f, 5.0f),				// Start color
-														  Vec3(0.0f, 0.0f, 0.0f),					// End color
-														  5.0f,										// Radius of particles
-														  1000,										// Number of particles in system
-														  PARTICLE_EMITTER_ONCE,					// Type?
-														  ExplodeEmitterCallback					// Callback for particle generation
-								);
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-#define SPATIAL_HASHING
-
 void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *particle)
 {
 	particle->position=Vec3b(0.0f);
@@ -795,6 +676,133 @@ void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *p
 
 	particle->life=RandFloat()*0.5f+0.01f;
 }
+
+#define HASH_TABLE_SIZE (NUM_ASTEROIDS/2)
+#define GRID_SIZE 50.0f
+
+typedef struct
+{
+	uint32_t count;
+	uint32_t objects[100];
+} Cell_t;
+
+Cell_t hashTable[HASH_TABLE_SIZE];
+
+static uint32_t hashFunction(int32_t hx, int32_t hy, int32_t hz)
+{
+	return abs((hx*73856093)^(hy*19349663)^(hz*83492791))%HASH_TABLE_SIZE;
+}
+
+void RunSpatialHash(void)
+{
+	// Clear hash table
+	memset(hashTable, 0, sizeof(Cell_t)*HASH_TABLE_SIZE);
+
+	// Add physics objects to table
+	for(uint32_t i=0;i<numPhysicsObjects;i++)
+	{
+		int32_t hx=(int32_t)(physicsObjects[i].rigidBody->position.x/GRID_SIZE);
+		int32_t hy=(int32_t)(physicsObjects[i].rigidBody->position.y/GRID_SIZE);
+		int32_t hz=(int32_t)(physicsObjects[i].rigidBody->position.z/GRID_SIZE);
+		uint32_t index=hashFunction(hx, hy, hz);
+
+		if(hashTable[index].count<100)
+			hashTable[index].objects[hashTable[index].count++]=i;
+		else
+			DBGPRINTF(DEBUG_ERROR, "Ran out of bucket space.\n");
+	}
+
+	// Neighbor cell offsets
+	const int32_t offsets[27][3]=
+	{
+		{-1,-1,-1 }, {-1,-1, 0 }, {-1,-1, 1 },
+		{-1, 0,-1 }, {-1, 0, 0 }, {-1, 0, 1 },
+		{-1, 1,-1 }, {-1, 1, 0 }, {-1, 1, 1 },
+		{ 0,-1,-1 }, { 0,-1, 0 }, { 0,-1, 1 },
+		{ 0, 0,-1 }, { 0, 0, 0 }, { 0, 0, 1 },
+		{ 0, 1,-1 }, { 0, 1, 0 }, { 0, 1, 1 },
+		{ 1,-1,-1 }, { 1,-1, 0 }, { 1,-1, 1 },
+		{ 1, 0,-1 }, { 1, 0, 0 }, { 1, 0, 1 },
+		{ 1, 1,-1 }, { 1, 1, 0 }, { 1, 1, 1 }
+	};
+
+	// Check physics object collisions against neighboring cells
+	for(uint32_t i=0;i<numPhysicsObjects;i++)
+	{
+		// Object 'A' hash position
+		int32_t hx=(int32_t)(physicsObjects[i].rigidBody->position.x/GRID_SIZE);
+		int32_t hy=(int32_t)(physicsObjects[i].rigidBody->position.y/GRID_SIZE);
+		int32_t hz=(int32_t)(physicsObjects[i].rigidBody->position.z/GRID_SIZE);
+
+		// Itorate over cell offsets
+		for(uint32_t j=0;j<27;j++)
+		{
+			uint32_t hashIndex=hashFunction(hx+offsets[j][0], hy+offsets[j][1], hz+offsets[j][2]);
+			Cell_t *neighborCell=&hashTable[hashIndex];
+
+			// Iterate over objects in the neighbor cell
+			for(uint32_t k=0;k<neighborCell->count;k++)
+			{
+				PhysicsObject_t *obj=&physicsObjects[neighborCell->objects[k]];
+
+				if(physicsObjects[i].rigidBody==obj->rigidBody)
+					continue;
+
+				if(PhysicsSphereToSphereCollisionResponse(physicsObjects[i].rigidBody, obj->rigidBody)>1.0f)
+				{
+					// If both objects are asteroids
+					if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_FIELD&&obj->objectType==PHYSICSOBJECTTYPE_FIELD)
+					{
+						Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, obj->rigidBody->position);
+					}
+					// If one is an asteroid and one is a player
+					else if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_FIELD&&obj->objectType==PHYSICSOBJECTTYPE_PLAYER)
+					{
+						Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, obj->rigidBody->position);
+					}
+					// If both objects are players
+					else if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_PLAYER&&obj->objectType==PHYSICSOBJECTTYPE_PLAYER)
+					{
+						Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, obj->rigidBody->position);
+					}
+					// If it was a projectile colliding with anything
+					else if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_PROJECTILE||obj->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+					{
+						// It collided, kill it.
+						// Setting this directly to <0.0 seems to cause emitters that won't get removed,
+						//     so setting it to nearly 0.0 allows the natural progression kill it off.
+						// Need to find the source emitter first:
+						for(uint32_t k=0;k<MAX_EMITTERS;k++)
+						{
+							if(emitters[k].life>0.0f)
+							{
+								if(obj->rigidBody==&emitters[k].body)
+								{
+									emitters[k].life=0.001f;
+									break;
+								}
+							}
+						}
+
+						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, obj->rigidBody->position);
+
+						ParticleSystem_AddEmitter(&particleSystem,
+													obj->rigidBody->position,	// Position
+													Vec3(100.0f, 12.0f, 5.0f),	// Start color
+													Vec3(0.0f, 0.0f, 0.0f),		// End color
+													5.0f,						// Radius of particles
+													1000,						// Number of particles in system
+													PARTICLE_EMITTER_ONCE,		// Type?
+													ExplodeEmitterCallback		// Callback for particle generation
+						);
+					}
+				}
+			}
+		}
+	}
+}
+
+#define SPATIAL_HASHING
 
 // Runs anything physics related
 void Thread_Physics(void *arg)

@@ -12,8 +12,6 @@
 #include "skybox.h"
 #include "shadow.h"
 
-#define NUM_ASTEROIDS 1000
-
 extern VkuContext_t vkContext;
 extern Camera_t camera;
 extern VkuSwapchain_t swapchain;

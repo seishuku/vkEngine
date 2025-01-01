@@ -35,7 +35,6 @@ typedef struct
 
 extern PhyParticleEmitter_t emitters[MAX_EMITTERS];
 
-#define NUM_ASTEROIDS 1000
 extern RigidBody_t asteroids[NUM_ASTEROIDS];
 
 extern UI_t UI;

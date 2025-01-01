@@ -73,6 +73,9 @@ set(PROJECT_SOURCES
 	engine.c
 )
 
+# change this for how many asteroids you want
+add_definitions(-DNUM_ASTEROIDS=5000)
+
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
 	add_definitions(-D_DEBUG)
 endif()

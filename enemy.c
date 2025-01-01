@@ -9,7 +9,6 @@
 #include "audio/sounds.h"
 #include "enemy.h"
 
-#define NUM_ASTEROIDS 1000
 extern RigidBody_t asteroids[NUM_ASTEROIDS];
 
 extern float fTimeStep;

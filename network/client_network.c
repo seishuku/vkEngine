@@ -10,7 +10,6 @@
 #include "network.h"
 #include "client_network.h"
 
-#define NUM_ASTEROIDS 1000
 extern RigidBody_t asteroids[NUM_ASTEROIDS];
 
 extern Camera_t camera;

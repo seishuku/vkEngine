@@ -8,8 +8,6 @@
 #include "../textures.h"
 #include "shadow.h"
 
-#define NUM_ASTEROIDS 1000
-
 extern VkuContext_t vkContext;
 extern VkuSwapchain_t swapchain;
 extern VkSampleCountFlags MSAA;
