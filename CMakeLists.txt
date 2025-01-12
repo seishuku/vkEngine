@@ -37,6 +37,7 @@ set(PROJECT_SOURCES
 	physics/particle.c
 	physics/physics.c
 	physics/physicslist.c
+	physics/spatialhash.c
 	pipelines/composite.c
 	pipelines/lighting.c
 	pipelines/line.c

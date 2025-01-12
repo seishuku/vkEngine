@@ -21,6 +21,7 @@
 #include "physics/particle.h"
 #include "physics/physics.h"
 #include "physics/physicslist.h"
+#include "physics/spatialhash.h"
 #include "pipelines/composite.h"
 #include "pipelines/lighting.h"
 #include "pipelines/line.h"
@@ -159,7 +160,7 @@ bool pausePhysics=false;
 extern vec2 lStick, rStick;
 extern bool buttons[4];
 
-#define NUM_ENEMY 3
+#define NUM_ENEMY 1
 Camera_t enemy[NUM_ENEMY];
 Enemy_t enemyAI[NUM_ENEMY];
 
@@ -648,7 +649,7 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 
 	// TODO:
 	//     Android has issues with depth readback and subsequent depth->eye/world transform, this also affects volumetrics in the compositing shader.
-#ifndef ANDROID
+//#ifndef ANDROID
 	vkCmdNextSubpass(perFrame[index].commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 
 	//matrix Modelview=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
@@ -657,7 +658,7 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	//////// Volume cloud
 	DrawVolume(perFrame[index].commandBuffer, index, eye, perFrame[index].descriptorPool);
 	////////
-#endif
+//#endif
 
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 
@@ -677,135 +678,70 @@ void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *p
 	particle->life=RandFloat()*0.5f+0.01f;
 }
 
-#define HASH_TABLE_SIZE (NUM_ASTEROIDS/2)
-#define GRID_SIZE 50.0f
-
-typedef struct
+void TestCollision(PhysicsObject_t *objA, PhysicsObject_t *objB)
 {
-	uint32_t numObjects;
-	uint32_t objects[100];
-} Cell_t;
-
-Cell_t hashTable[HASH_TABLE_SIZE];
-
-static uint32_t hashFunction(int32_t hx, int32_t hy, int32_t hz)
-{
-	return abs((hx*73856093)^(hy*19349663)^(hz*83492791))%HASH_TABLE_SIZE;
-}
-
-void RunSpatialHash(void)
-{
-	// Clear hash table
-	memset(hashTable, 0, sizeof(Cell_t)*HASH_TABLE_SIZE);
-
-	// Add physics objects to table
-	for(uint32_t i=0;i<numPhysicsObjects;i++)
+	if(PhysicsSphereToSphereCollisionResponse(objA->rigidBody, objB->rigidBody)>1.0f)
 	{
-		int32_t hx=(int32_t)(physicsObjects[i].rigidBody->position.x/GRID_SIZE);
-		int32_t hy=(int32_t)(physicsObjects[i].rigidBody->position.y/GRID_SIZE);
-		int32_t hz=(int32_t)(physicsObjects[i].rigidBody->position.z/GRID_SIZE);
-		uint32_t index=hashFunction(hx, hy, hz);
-
-		if(hashTable[index].numObjects<100)
-			hashTable[index].objects[hashTable[index].numObjects++]=i;
-		else
-			DBGPRINTF(DEBUG_ERROR, "Ran out of bucket space.\n");
-	}
-
-	// Neighbor cell offsets
-	const int32_t offsets[27][3]=
-	{
-		{-1,-1,-1 }, {-1,-1, 0 }, {-1,-1, 1 },
-		{-1, 0,-1 }, {-1, 0, 0 }, {-1, 0, 1 },
-		{-1, 1,-1 }, {-1, 1, 0 }, {-1, 1, 1 },
-		{ 0,-1,-1 }, { 0,-1, 0 }, { 0,-1, 1 },
-		{ 0, 0,-1 }, { 0, 0, 0 }, { 0, 0, 1 },
-		{ 0, 1,-1 }, { 0, 1, 0 }, { 0, 1, 1 },
-		{ 1,-1,-1 }, { 1,-1, 0 }, { 1,-1, 1 },
-		{ 1, 0,-1 }, { 1, 0, 0 }, { 1, 0, 1 },
-		{ 1, 1,-1 }, { 1, 1, 0 }, { 1, 1, 1 }
-	};
-
-	// Check physics object collisions against neighboring cells
-	for(uint32_t i=0;i<numPhysicsObjects;i++)
-	{
-		PhysicsObject_t *objA=&physicsObjects[i];
-
-		// Object 'A' hash position
-		int32_t hx=(int32_t)(objA->rigidBody->position.x/GRID_SIZE);
-		int32_t hy=(int32_t)(objA->rigidBody->position.y/GRID_SIZE);
-		int32_t hz=(int32_t)(objA->rigidBody->position.z/GRID_SIZE);
-
-		// Iterate over cell offsets
-		for(uint32_t j=0;j<27;j++)
+		// If both objects are asteroids
+		if(objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_FIELD)
 		{
-			uint32_t hashIndex=hashFunction(hx+offsets[j][0], hy+offsets[j][1], hz+offsets[j][2]);
-			Cell_t *neighborCell=&hashTable[hashIndex];
+			Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, objB->rigidBody->position);
+		}
+		// If one is an asteroid and one is a player
+		else if((objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)||
+				(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_FIELD))
+		{
+			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, objB->rigidBody->position);
+		}
+		// If both objects are players
+		else if(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)
+		{
+			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, objB->rigidBody->position);
+		}
+		// If it was a projectile colliding with anything
+		else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE||objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+		{
+			PhysicsObject_t *whichProjectile=NULL;
 
-			// Iterate over objects in the neighbor cell
-			for(uint32_t k=0;k<neighborCell->numObjects;k++)
+			if(objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+				whichProjectile=objB;
+			else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+				whichProjectile=objA;
+			else
+				return; // SHOULD NEVER BE HERE.
+
+			// It collided, kill it.
+			// Setting this directly to <0.0 seems to cause emitters that won't get removed,
+			//     so setting it to nearly 0.0 allows the natural progression kill it off.
+			// Need to find the source emitter first:
+			for(uint32_t k=0;k<MAX_EMITTERS;k++)
 			{
-				// Object 'B'
-				PhysicsObject_t *objB=&physicsObjects[neighborCell->objects[k]];
-
-				if(objA->rigidBody==objB->rigidBody)
-					continue;
-
-				if(PhysicsSphereToSphereCollisionResponse(objA->rigidBody, objB->rigidBody)>1.0f)
+				if(emitters[k].life>0.0f)
 				{
-					// If both objects are asteroids
-					if(objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_FIELD)
+					if(whichProjectile->rigidBody==&emitters[k].body)
 					{
-						Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, objB->rigidBody->position);
-					}
-					// If one is an asteroid and one is a player
-					else if(objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)
-					{
-						Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, objB->rigidBody->position);
-					}
-					// If both objects are players
-					else if(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)
-					{
-						Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, objB->rigidBody->position);
-					}
-					// If it was a projectile colliding with anything
-					else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE||objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
-					{
-						// It collided, kill it.
-						// Setting this directly to <0.0 seems to cause emitters that won't get removed,
-						//     so setting it to nearly 0.0 allows the natural progression kill it off.
-						// Need to find the source emitter first:
-						for(uint32_t k=0;k<MAX_EMITTERS;k++)
-						{
-							if(emitters[k].life>0.0f)
-							{
-								if(objB->rigidBody==&emitters[k].body)
-								{
-									emitters[k].life=0.001f;
-									break;
-								}
-							}
-						}
-
-						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, objB->rigidBody->position);
-
-						ParticleSystem_AddEmitter(&particleSystem,
-													objB->rigidBody->position,	// Position
-													Vec3(100.0f, 12.0f, 5.0f),	// Start color
-													Vec3(0.0f, 0.0f, 0.0f),		// End color
-													5.0f,						// Radius of particles
-													1000,						// Number of particles in system
-													PARTICLE_EMITTER_ONCE,		// Type?
-													ExplodeEmitterCallback		// Callback for particle generation
-						);
+						emitters[k].life=0.001f;
+						break;
 					}
 				}
 			}
+
+			Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, whichProjectile->rigidBody->position);
+
+			ParticleSystem_AddEmitter(&particleSystem,
+									  whichProjectile->rigidBody->position,	// Position
+									  Vec3(100.0f, 12.0f, 5.0f),	// Start color
+									  Vec3(0.0f, 0.0f, 0.0f),		// End color
+									  5.0f,						// Radius of particles
+									  1000,						// Number of particles in system
+									  PARTICLE_EMITTER_ONCE,		// Type?
+									  ExplodeEmitterCallback		// Callback for particle generation
+			);
 		}
 	}
 }
 
-#define SPATIAL_HASHING
+SpatialHash_t spatialHash;
 
 // Runs anything physics related
 void Thread_Physics(void *arg)
@@ -834,6 +770,11 @@ void Thread_Physics(void *arg)
 		}
 	}
 	//////
+
+	SpatialHash_Clear(&spatialHash);
+
+	for(uint32_t i=0;i<numPhysicsObjects;i++)
+		SpatialHash_AddPhysicsObject(&spatialHash, &physicsObjects[i]);
 
 	if(!pausePhysics)
 	{
@@ -879,60 +820,7 @@ void Thread_Physics(void *arg)
 		{
 			PhysicsIntegrate(physicsObjects[i].rigidBody, fTimeStep);
 
-#ifndef SPATIAL_HASHING
-			for(uint32_t j=i+1;j<numPhysicsObjects;j++)
-			{
-				if(PhysicsSphereToSphereCollisionResponse(physicsObjects[i].rigidBody, physicsObjects[j].rigidBody)>1.0f)
-				{
-					// If both objects are asteroids
-					if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_FIELD&&physicsObjects[j].objectType==PHYSICSOBJECTTYPE_FIELD)
-					{
-						Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, physicsObjects[j].rigidBody->position);
-					}
-					// If one is an asteroid and one is a player
-					else if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_FIELD&&physicsObjects[j].objectType==PHYSICSOBJECTTYPE_PLAYER)
-					{
-						Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, physicsObjects[j].rigidBody->position);
-					}
-					// If both objects are players
-					else if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_PLAYER&&physicsObjects[j].objectType==PHYSICSOBJECTTYPE_PLAYER)
-					{
-						Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, physicsObjects[j].rigidBody->position);
-					}
-					// If it was a projectile colliding with anything
-					else if(physicsObjects[i].objectType==PHYSICSOBJECTTYPE_PROJECTILE||physicsObjects[j].objectType==PHYSICSOBJECTTYPE_PROJECTILE)
-					{
-						// It collided, kill it.
-						// Setting this directly to <0.0 seems to cause emitters that won't get removed,
-						//     so setting it to nearly 0.0 allows the natural progression kill it off.
-						// Need to find the source emitter first:
-						for(uint32_t k=0;k<MAX_EMITTERS;k++)
-						{
-							if(emitters[k].life>0.0f)
-							{
-								if(physicsObjects[j].rigidBody==&emitters[k].body)
-								{
-									emitters[k].life=0.001f;
-									break;
-								}
-							}
-						}
-
-						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, physicsObjects[j].rigidBody->position);
-
-						ParticleSystem_AddEmitter(&particleSystem,
-												  physicsObjects[j].rigidBody->position,	// Position
-												  Vec3(100.0f, 12.0f, 5.0f),				// Start color
-												  Vec3(0.0f, 0.0f, 0.0f),					// End color
-												  5.0f,										// Radius of particles
-												  1000,										// Number of particles in system
-												  PARTICLE_EMITTER_ONCE,					// Type?
-												  ExplodeEmitterCallback					// Callback for particle generation
-						);
-					}
-				}
-			}
-#endif
+			SpatialHash_TestObjects(&spatialHash, &physicsObjects[i], TestCollision);
 
 #if 1
 			// Fire "laser beam"
@@ -979,10 +867,6 @@ void Thread_Physics(void *arg)
 			}
 #endif
 		}
-
-#ifdef SPATIAL_HASHING
-		RunSpatialHash();
-#endif
 	}
 
 	// Update enemy player model instance data
@@ -990,7 +874,7 @@ void Thread_Physics(void *arg)
 	{
 		for(uint32_t i=0;i<NUM_ENEMY;i++)
 		{
-			//UpdateEnemy(&enemyAI[i], camera);
+			UpdateEnemy(&enemyAI[i], camera);
 
 			const float scale=(1.0f/fighter.radius)*enemy[i].body.radius;
 			matrix local=MatrixScale(scale, scale, scale);
@@ -1048,7 +932,7 @@ void Thread_Physics(void *arg)
 		CameraUpdate(&enemy[i], fTimeStep);
 
 	// View from enemy camera
-	//modelView=MatrixMult(CameraUpdate(&enemy[i], fTimeStep), MatrixTranslate(0.0f, -5.0f, -10.0f));
+	//modelView=MatrixMult(CameraUpdate(&enemy[0], fTimeStep), MatrixTranslate(0.0f, -5.0f, -10.0f));
 	//////
 
 	physicsTime=(float)(GetClock()-startTime);
@@ -1355,7 +1239,7 @@ bool Init(void)
 
 	vkuMemAllocator_Init(&vkContext);
 
-	CameraInit(&camera, Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
+	CameraInit(&camera, Vec3(0.0f, 0.0f, -1000.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 
 	if(!Audio_Init())
 	{

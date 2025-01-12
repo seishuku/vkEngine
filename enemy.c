@@ -143,8 +143,6 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 		{
 			const float distance=TrackPlayer(enemy, player);
 
-			DBGPRINTF(DEBUG_WARNING, "%f\r", distance);
-
 			// Switch to attacking if within range and aligned
 			if(IsInAttackRange(enemy, player)&&IsAlignedForAttack(enemy, player))
 				enemy->state=ATTACKING;
@@ -159,8 +157,6 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 		case SEARCHING:
 		{
 			const float distance=TrackPlayer(enemy, enemy->lastKnownPlayer);
-
-			DBGPRINTF(DEBUG_WARNING, "%f\r", distance);
 
 			if(HasLineOfSight(enemy, player))
 				enemy->state=PURSUING;
