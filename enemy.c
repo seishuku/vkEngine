@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include "system/system.h"
 #include "math/math.h"
+#include "physics/particle.h"
 #include "physics/physics.h"
 #include "physics/physicslist.h"
 #include "camera/camera.h"
@@ -10,8 +11,8 @@
 #include "enemy.h"
 
 extern RigidBody_t asteroids[NUM_ASTEROIDS];
-
 extern float fTimeStep;
+extern ParticleSystem_t particleSystem;
 
 void FireParticleEmitter(vec3 position, vec3 direction);
 
@@ -26,6 +27,9 @@ static const float ATTACK_RANGE=100.0f;
 
 void InitEnemy(Enemy_t *enemy, Camera_t *enemyCamera, const Camera_t playerCamera)
 {
+	// Set starting health
+	enemy->health=100.0f;
+
 	// Set initial state
 	enemy->state=SEARCHING;
 
@@ -135,8 +139,26 @@ bool IsAlignedForAttack(Enemy_t *enemy, const Camera_t player)
 	return Vec3_Dot(enemy->camera->forward, direction)>ATTACK_ANGLE_THRESHOLD;
 }
 
+void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *particle);
+
 void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 {
+	if(enemy->health<0.0f&&enemy->state!=DEAD)
+	{
+		Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, enemy->camera->body.position);
+
+		ParticleSystem_AddEmitter(&particleSystem,
+								  enemy->camera->body.position,	// Position
+								  Vec3(1000.0f, 0.0f, 0.0f),	// Start color
+								  Vec3(0.0f, 0.0f, 0.0f),		// End color
+								  20.0f,						// Radius of particles
+								  1000,							// Number of particles in system
+								  PARTICLE_EMITTER_ONCE,		// Type?
+								  ExplodeEmitterCallback		// Callback for particle generation
+		);
+		enemy->state=DEAD;
+	}
+
 	switch(enemy->state)
 	{
 		case PURSUING:
@@ -180,5 +202,8 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 			}
 			break;
 		}
+
+		case DEAD:
+			break;
 	}
 }

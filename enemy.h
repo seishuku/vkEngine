@@ -5,11 +5,13 @@ typedef enum
 {
 	PURSUING=0,
 	SEARCHING,
-	ATTACKING
+	ATTACKING,
+	DEAD
 } EnemyState_t;
 
 typedef struct
 {
+	float health;
 	EnemyState_t state;
 	Camera_t lastKnownPlayer;
 

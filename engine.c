@@ -215,7 +215,7 @@ void GenerateWorld(void)
 
 	// Set up rigid body reps for asteroids
 	const float asteroidFieldMinRadius=50.0f;
-	const float asteroidFieldMaxRadius=2000.0f;
+	const float asteroidFieldMaxRadius=fminf((float)NUM_ASTEROIDS/2, 2000.0f);
 	const float asteroidMinRadius=0.05f;
 	const float asteroidMaxRadius=40.0f;
 
@@ -702,13 +702,32 @@ void TestCollision(PhysicsObject_t *objA, PhysicsObject_t *objB)
 		else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE||objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
 		{
 			PhysicsObject_t *whichProjectile=NULL;
+			PhysicsObject_t *otherObject=NULL;
 
 			if(objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+			{
 				whichProjectile=objB;
+				otherObject=objA;
+			}
 			else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+			{
 				whichProjectile=objA;
+				otherObject=objB;
+			}
 			else
 				return; // SHOULD NEVER BE HERE.
+
+			if(otherObject->objectType==PHYSICSOBJECTTYPE_PLAYER)
+			{
+				for(uint32_t i=0;i<NUM_ENEMY;i++)
+				{
+					if(&enemyAI[i].camera->body==otherObject->rigidBody)
+					{
+						enemyAI[i].health-=10.0f;
+						break;
+					}
+				}
+			}
 
 			// It collided, kill it.
 			// Setting this directly to <0.0 seems to cause emitters that won't get removed,
