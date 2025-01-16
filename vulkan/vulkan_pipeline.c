@@ -9,6 +9,22 @@
 #include "vulkan.h"
 #include "../utils/spvparse.h"
 
+// Loads a binary shader from memory and creates a shader module
+VkShaderModule vkuCreateShaderModuleMemory(VkDevice device, const uint32_t *data, const uint32_t size)
+{
+	VkShaderModule shaderModule=VK_NULL_HANDLE;
+
+	VkShaderModuleCreateInfo CreateInfo={ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, NULL, 0, size, data };
+	VkResult Result=vkCreateShaderModule(device, &CreateInfo, VK_NULL_HANDLE, &shaderModule);
+
+	parseSpv(data, size);
+
+	if(Result==VK_SUCCESS)
+		return shaderModule;
+
+	return VK_NULL_HANDLE;
+}
+
 // Loads a binary shader file and creates a shader module
 VkShaderModule vkuCreateShaderModule(VkDevice device, const char *shaderFile)
 {
@@ -32,18 +48,11 @@ VkShaderModule vkuCreateShaderModule(VkDevice device, const char *shaderFile)
 
 	fclose(stream);
 
-	VkShaderModuleCreateInfo CreateInfo={ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, NULL, 0, size, data };
-	VkResult Result=vkCreateShaderModule(device, &CreateInfo, VK_NULL_HANDLE, &shaderModule);
-
-	DBGPRINTF(DEBUG_INFO, "Shader file: %s\n", shaderFile);
-	parseSpv(data, size);
+	shaderModule=vkuCreateShaderModuleMemory(device, data, size);
 
 	Zone_Free(zone, data);
 
-	if(Result==VK_SUCCESS)
-		return shaderModule;
-
-	return VK_NULL_HANDLE;
+	return shaderModule;
 }
 
 // Adds a vertex binding
@@ -93,6 +102,39 @@ VkBool32 vkuPipeline_AddVertexAttribute(VkuPipeline_t *pipeline, uint32_t locati
 	// Assign it to a slot
 	pipeline->vertexAttribs[pipeline->numVertexAttribs]=Descriptor;
 	pipeline->numVertexAttribs++;
+
+	return VK_TRUE;
+}
+
+// Loads a shader from memory and assign to a stage
+VkBool32 vkuPipeline_AddStageMemory(VkuPipeline_t *pipeline, const uint32_t *data, const uint32_t size, VkShaderStageFlagBits stage)
+{
+	if(!pipeline)
+		return VK_FALSE;
+
+	// Already at max stages
+	if(pipeline->numStages>=VKU_MAX_PIPELINE_SHADER_STAGES)
+		return VK_FALSE;
+
+	// Load and create the shader module from file
+	VkShaderModule shaderModule=vkuCreateShaderModuleMemory(pipeline->device, data, size);
+
+	// Check that it's valid
+	if(shaderModule==VK_NULL_HANDLE)
+		return VK_FALSE;
+
+	// Set the create information
+	VkPipelineShaderStageCreateInfo shaderStageCreateInfo=
+	{
+		.sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+		.stage=stage,
+		.module=shaderModule,
+		.pName="main",
+	};
+
+	// Assign the slot
+	pipeline->stages[pipeline->numStages]=shaderStageCreateInfo;
+	pipeline->numStages++;
 
 	return VK_TRUE;
 }

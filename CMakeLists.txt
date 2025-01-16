@@ -54,6 +54,7 @@ set(PROJECT_SOURCES
 	ui/cursor.c
 	ui/sprite.c
 	ui/ui.c
+	utils/base64.c
 	utils/event.c
 	utils/list.c
 	utils/pipeline.c

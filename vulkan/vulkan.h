@@ -321,10 +321,12 @@ VkCommandBuffer vkuOneShotCommandBufferBegin(VkuContext_t *context);
 VkBool32 vkuOneShotCommandBufferFlush(VkuContext_t *context, VkCommandBuffer commandBuffer);
 VkBool32 vkuOneShotCommandBufferEnd(VkuContext_t *context, VkCommandBuffer commandBuffer);
 
+VkShaderModule vkuCreateShaderModuleMemory(VkDevice device, const uint32_t *data, const uint32_t size);
 VkShaderModule vkuCreateShaderModule(VkDevice device, const char *shaderFile);
 
 VkBool32 vkuPipeline_AddVertexBinding(VkuPipeline_t *pipeline, uint32_t binding, uint32_t stride, VkVertexInputRate inputRate);
 VkBool32 vkuPipeline_AddVertexAttribute(VkuPipeline_t *pipeline, uint32_t location, uint32_t binding, VkFormat format, uint32_t offset);
+VkBool32 vkuPipeline_AddStageMemory(VkuPipeline_t *pipeline, const uint32_t *data, const uint32_t size, VkShaderStageFlagBits stage);
 VkBool32 vkuPipeline_AddStage(VkuPipeline_t *pipeline, const char *shaderFilename, VkShaderStageFlagBits stage);
 VkBool32 vkuPipeline_SetRenderPass(VkuPipeline_t *pipeline, VkRenderPass renderPass);
 VkBool32 vkuPipeline_SetPipelineLayout(VkuPipeline_t *pipeline, VkPipelineLayout pipelineLayout);

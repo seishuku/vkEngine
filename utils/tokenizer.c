@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "../system/system.h"
 #include "tokenizer.h"
 
 bool Tokenizer_Init(Tokenizer_t *context, size_t stringLength, char *string, size_t numKeywords, const char **keywords)
@@ -78,9 +79,10 @@ static void SkipWhitespace(Tokenizer_t *context)
 }
 
 // Pull a token from string stream, classify it and advance the string pointer.
-Token_t Tokenizer_GetNext(Tokenizer_t *context)
+// Token must be freed.
+Token_t *Tokenizer_GetNext(Tokenizer_t *context)
 {
-	Token_t token={ TOKEN_UNKNOWN };
+	Token_t *token=NULL;
 
 	SkipWhitespace(context);
 
@@ -153,43 +155,61 @@ Token_t Tokenizer_GetNext(Tokenizer_t *context)
 		while(!IsDelimiter(GetChar(context, count))&&GetChar(context, count)!='\0')
 			count++;
 
-		if(count>MAX_TOKEN_STRING_LENGTH)
-			count=MAX_TOKEN_STRING_LENGTH;
+		token=(Token_t *)Zone_Malloc(zone, sizeof(Token_t)+count+1);
 
-		token.type=TOKEN_STRING;
-		memcpy(token.string, &context->string[context->stringPosition], count);
-		token.string[count]='\0';
+		if(token==NULL)
+			return NULL;
+
+		token->type=TOKEN_STRING;
+		token->string=(char *)(token+1);
+
+		memcpy(token->string, &context->string[context->stringPosition], count);
+		token->string[count]='\0';
 
 		context->stringPosition+=count;
 
 		// Re-classify the string if it matches any of these:
-		if(IsWord(token.string, booleans, sizeof(booleans)/sizeof(booleans[0])))
+		if(IsWord(token->string, booleans, sizeof(booleans)/sizeof(booleans[0])))
 		{
-			token.type=TOKEN_BOOLEAN;
+			token->type=TOKEN_BOOLEAN;
 
-			if(strcmp(token.string, "true")==0)
-				token.boolean=true;
+			if(strcmp(token->string, "true")==0)
+				token->boolean=true;
 			else
-				token.boolean=false;
+				token->boolean=false;
 		}
 
-		if(IsWord(token.string, context->keywords, context->numKeywords))
-			token.type=TOKEN_KEYWORD;
+		if(IsWord(token->string, context->keywords, context->numKeywords))
+			token->type=TOKEN_KEYWORD;
 	}
 	else if(GetChar(context, 0)=='0'&&(GetChar(context, 1)=='x'||GetChar(context, 1)=='X')) // Hexidecimal numbers
 	{
 		const char *start=context->string+context->stringPosition+2;
 		char *end=NULL;
-		token.type=TOKEN_INT;
-		token.ival=strtoll(start, &end, 16);
+
+		token=(Token_t *)Zone_Malloc(zone, sizeof(Token_t));
+
+		if(token==NULL)
+			return NULL;
+
+		token->type=TOKEN_INT;
+		token->ival=strtoll(start, &end, 16);
+
 		context->stringPosition+=end-start;
 	}
 	else if(GetChar(context, 0)=='0'&&(GetChar(context, 1)=='b'||GetChar(context, 1)=='B')) // Binary numbers
 	{
 		const char *start=context->string+context->stringPosition+2;
 		char *end=NULL;
-		token.type=TOKEN_INT;
-		token.ival=strtoll(start, &end, 2);
+
+		token=(Token_t *)Zone_Malloc(zone, sizeof(Token_t));
+
+		if(token==NULL)
+			return NULL;
+
+		token->type=TOKEN_INT;
+		token->ival=strtoll(start, &end, 2);
+
 		context->stringPosition+=end-start;
 	}
 	else if((GetChar(context, 0)=='-'&&IsDigit(GetChar(context, 1)))||IsDigit(GetChar(context, 0))) // Whole numbers and floating point
@@ -197,6 +217,11 @@ Token_t Tokenizer_GetNext(Tokenizer_t *context)
 		const char *start=context->string+context->stringPosition;
 		char *end=NULL;
 		size_t count=0;
+
+		token=(Token_t *)Zone_Malloc(zone, sizeof(Token_t));
+
+		if(token==NULL)
+			return NULL;
 
 		while(!IsDelimiter(GetChar(context, count)))
 		{
@@ -208,13 +233,13 @@ Token_t Tokenizer_GetNext(Tokenizer_t *context)
 
 		if(GetChar(context, count)=='.')
 		{
-			token.type=TOKEN_FLOAT;
-			token.fval=strtod(start, &end);
+			token->type=TOKEN_FLOAT;
+			token->fval=strtod(start, &end);
 		}
 		else
 		{
-			token.type=TOKEN_INT;
-			token.ival=strtoll(start, &end, 10);
+			token->type=TOKEN_INT;
+			token->ival=strtoll(start, &end, 10);
 		}
 
 		context->stringPosition+=end-start;
@@ -231,27 +256,33 @@ Token_t Tokenizer_GetNext(Tokenizer_t *context)
 			while(GetChar(context, count)!='\"'&&GetChar(context, count)!='\0')
 				count++;
 
-			if(count>MAX_TOKEN_STRING_LENGTH)
-				count=MAX_TOKEN_STRING_LENGTH;
+			token=(Token_t *)Zone_Malloc(zone, sizeof(Token_t)+count+1);
 
-			token.type=TOKEN_QUOTED;
-			memcpy(token.string, &context->string[context->stringPosition], count);
-			token.string[count]='\0';
+			if(token==NULL)
+				return NULL;
+
+			token->type=TOKEN_QUOTED;
+			token->string=(char *)(token+1);
+
+			memcpy(token->string, &context->string[context->stringPosition], count);
+			token->string[count]='\0';
 
 			context->stringPosition+=count+1;
 		}
 		else
 		{
-			token.type=TOKEN_DELIMITER;
-			token.string[0]=GetChar(context, 0);
+			token=(Token_t *)Zone_Malloc(zone, sizeof(Token_t));
+
+			if(token==NULL)
+				return NULL;
+
+			token->type=TOKEN_DELIMITER;
+			token->string=((char *)token)+sizeof(TokenType_e);
+			token->string[0]=GetChar(context, 0);
+			token->string[1]='\0';
 
 			context->stringPosition++;
 		}
-	}
-	else if(GetChar(context, 0)=='\0')
-	{
-		token.type=TOKEN_END;
-		context->stringPosition++;
 	}
 	else
 		context->stringPosition++;
@@ -260,11 +291,12 @@ Token_t Tokenizer_GetNext(Tokenizer_t *context)
 }
 
 // Same as Token_GetNext, but does not advance string pointer
-Token_t Tokenizer_PeekNext(Tokenizer_t *context)
+// Token must be freed.
+Token_t *Tokenizer_PeekNext(Tokenizer_t *context)
 {
-	char *start=context->string;
-	Token_t result=Tokenizer_GetNext(context);
-	context->string=start;
+	size_t startPosition=context->stringPosition;
+	Token_t *result=Tokenizer_GetNext(context);
+	context->stringPosition=startPosition;
 
 	return result;
 }
