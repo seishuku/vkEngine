@@ -2,13 +2,12 @@
 #define __FONT_H__
 
 #include "../vulkan/vulkan.h"
+#include "../utils/pipeline.h"
 #include "../math/math.h"
 
 typedef struct
 {
-	VkuDescriptorSet_t descriptorSet;
-	VkPipelineLayout pipelineLayout;
-	VkuPipeline_t pipeline;
+	Pipeline_t pipeline;
 
 	// Vertex data handles
 	VkuBuffer_t vertexBuffer;

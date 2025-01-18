@@ -67,7 +67,7 @@ function("buildAndroid")
 	file(GLOB PIPELINE_FILES "${PROJECT_SOURCE_DIR}/pipelines/*.pipeline")
 
 	# Collect shader file names
-	file(GLOB SHADER_FILES "${PROJECT_SOURCE_DIR}/shaders/*.spv")
+	#file(GLOB SHADER_FILES "${PROJECT_SOURCE_DIR}/shaders/*.spv")
 
 	# Strip debug info/symbols from release binaries
 	add_custom_command(
@@ -86,8 +86,8 @@ function("buildAndroid")
 		COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:OpenXR::openxr_loader> ${APK_BUILD_DIR}/lib/arm64-v8a/
 
 		# Copy shaders
-		COMMAND ${CMAKE_COMMAND} -E make_directory ${APK_BUILD_DIR}/assets/shaders
-		COMMAND ${CMAKE_COMMAND} -E copy ${SHADER_FILES} ${APK_BUILD_DIR}/assets/shaders/
+		#COMMAND ${CMAKE_COMMAND} -E make_directory ${APK_BUILD_DIR}/assets/shaders
+		#COMMAND ${CMAKE_COMMAND} -E copy ${SHADER_FILES} ${APK_BUILD_DIR}/assets/shaders/
 
 		# Copy pipelines
 		COMMAND ${CMAKE_COMMAND} -E make_directory ${APK_BUILD_DIR}/assets/pipelines

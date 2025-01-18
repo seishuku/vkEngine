@@ -6,6 +6,7 @@
 #include "../perframe.h"
 #include "../math/math.h"
 #include "../utils/list.h"
+#include "../utils/pipeline.h"
 #include "../font/font.h"
 #include "../vr/vr.h"
 #include "ui.h"
@@ -114,63 +115,7 @@ static bool UI_VulkanVertex(UI_t *UI)
 
 static bool UI_VulkanPipeline(UI_t *UI)
 {
-	vkuInitDescriptorSet(&UI->descriptorSet, vkContext.device);
-	vkuDescriptorSet_AddBinding(&UI->descriptorSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	vkuAssembleDescriptorSetLayout(&UI->descriptorSet);
-
-	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=1,
-		.pSetLayouts=&UI->descriptorSet.descriptorSetLayout,
-		.pushConstantRangeCount=1,
-		.pPushConstantRanges=&(VkPushConstantRange)
-		{
-			.offset=0,
-			.size=(sizeof(vec2)*2)+sizeof(matrix),
-			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
-		},		
-	}, 0, &UI->pipelineLayout);
-
-	vkuInitPipeline(&UI->pipeline, vkContext.device, vkContext.pipelineCache);
-
-	vkuPipeline_SetPipelineLayout(&UI->pipeline, UI->pipelineLayout);
-	vkuPipeline_SetRenderPass(&UI->pipeline, compositeRenderPass);
-
-	UI->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-	UI->pipeline.cullMode=VK_CULL_MODE_BACK_BIT;
-	UI->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;
-
-	UI->pipeline.blend=VK_TRUE;
-	UI->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	UI->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	UI->pipeline.colorBlendOp=VK_BLEND_OP_ADD;
-	UI->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	UI->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	UI->pipeline.alphaBlendOp=VK_BLEND_OP_ADD;
-
-	if(!vkuPipeline_AddStage(&UI->pipeline, "shaders/ui_sdf.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
-		return false;
-
-	if(!vkuPipeline_AddStage(&UI->pipeline, "shaders/ui_sdf.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-		return false;
-
-	vkuPipeline_AddVertexBinding(&UI->pipeline, 0, sizeof(vec4), VK_VERTEX_INPUT_RATE_VERTEX);
-	vkuPipeline_AddVertexAttribute(&UI->pipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
-
-	vkuPipeline_AddVertexBinding(&UI->pipeline, 1, sizeof(UI_Instance_t), VK_VERTEX_INPUT_RATE_INSTANCE);
-	vkuPipeline_AddVertexAttribute(&UI->pipeline, 1, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
-	vkuPipeline_AddVertexAttribute(&UI->pipeline, 2, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*1);
-	vkuPipeline_AddVertexAttribute(&UI->pipeline, 3, 1, VK_FORMAT_R32G32B32A32_UINT, sizeof(vec4)*2);
-
-	//VkPipelineRenderingCreateInfo PipelineRenderingCreateInfo=
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-	//	.colorAttachmentCount=1,
-	//	.pColorAttachmentFormats=&swapchain.surfaceFormat.format,
-	//};
-
-	if(!vkuAssemblePipeline(&UI->pipeline, VK_NULL_HANDLE/*&PipelineRenderingCreateInfo*/))
+	if(!CreatePipeline(&vkContext, &UI->pipeline, compositeRenderPass, "pipelines/ui_sdf.pipeline"))
 		return false;
 
 	UI_VulkanVertex(UI);
@@ -212,10 +157,7 @@ void UI_Destroy(UI_t *UI)
 
 	vkuDestroyImageBuffer(&vkContext, &UI->blankImage);
 
-	vkDestroyPipeline(vkContext.device, UI->pipeline.pipeline, VK_NULL_HANDLE);
-	vkDestroyPipelineLayout(vkContext.device, UI->pipelineLayout, VK_NULL_HANDLE);
-
-	vkDestroyDescriptorSetLayout(vkContext.device, UI->descriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
+	DestroyPipeline(&vkContext, &UI->pipeline);
 }
 
 UI_Control_t *UI_FindControlByID(UI_t *UI, uint32_t ID)
@@ -560,7 +502,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 		0, VK_WHOLE_SIZE
 	});
 
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipeline);
+	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipeline.pipeline);
 
 	// Bind vertex data buffer
 	vkCmdBindVertexBuffers(perFrame[index].commandBuffer, 0, 1, &UI->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
@@ -582,7 +524,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 	UIPC.viewport=UI->size;
 	UIPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale(UIPC.viewport.x/UIPC.viewport.y, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[eye]);
 
-	vkCmdPushConstants(perFrame[index].commandBuffer, UI->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(UIPC), &UIPC);
+	vkCmdPushConstants(perFrame[index].commandBuffer, UI->pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(UIPC), &UIPC);
 
 	// Draw sprites, they need descriptor set changes and aren't easy to draw instanced...
 	uint32_t spriteCount=instanceCount;
@@ -592,18 +534,18 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 
 		if(Control->type==UI_CONTROL_SPRITE)
 		{
-			vkuDescriptorSet_UpdateBindingImageInfo(&UI->descriptorSet, 0, Control->sprite.image->sampler, Control->sprite.image->imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			vkuAllocateUpdateDescriptorSet(&UI->descriptorSet, perFrame[index].descriptorPool);
-			vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipelineLayout, 0, 1, &UI->descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+			vkuDescriptorSet_UpdateBindingImageInfo(&UI->pipeline.descriptorSet, 0, Control->sprite.image->sampler, Control->sprite.image->imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			vkuAllocateUpdateDescriptorSet(&UI->pipeline.descriptorSet, perFrame[index].descriptorPool);
+			vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipelineLayout, 0, 1, &UI->pipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 			// Use the last unused instanced data slot for drawing
 			vkCmdDraw(perFrame[index].commandBuffer, 4, 1, 0, spriteCount++);
 		}
 	}
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&UI->descriptorSet, 0, UI->blankImage.sampler, UI->blankImage.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuAllocateUpdateDescriptorSet(&UI->descriptorSet, perFrame[index].descriptorPool);
-	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipelineLayout, 0, 1, &UI->descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+	vkuDescriptorSet_UpdateBindingImageInfo(&UI->pipeline.descriptorSet, 0, UI->blankImage.sampler, UI->blankImage.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuAllocateUpdateDescriptorSet(&UI->pipeline.descriptorSet, perFrame[index].descriptorPool);
+	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipelineLayout, 0, 1, &UI->pipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 	// Draw instanced UI elements
 	vkCmdDraw(perFrame[index].commandBuffer, 4, instanceCount, 0, 0);

@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "../math/math.h"
+#include "../utils/pipeline.h"
 #include "../utils/list.h"
 
 // Does the callback really need args? (userdata?)
@@ -80,8 +82,7 @@ typedef struct
 	vec2 position, size;
 
 	// Unique Vulkan data
-	VkPipelineLayout pipelineLayout;
-	VkuPipeline_t pipeline;
+	Pipeline_t pipeline;
 
 	VkuImage_t blankImage;
 
@@ -89,8 +90,6 @@ typedef struct
 
 	VkuBuffer_t instanceBuffer;
 	void *instanceBufferPtr;
-
-	VkuDescriptorSet_t descriptorSet;
 
 	// Base ID for generating IDs
 	uint32_t baseID;

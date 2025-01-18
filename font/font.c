@@ -38,64 +38,9 @@ bool Font_Init(Font_t *font)
 	VkuBuffer_t stagingBuffer;
 	VkCommandBuffer copyCommand;
 
-	// Create descriptors and pipeline
-	vkuInitDescriptorSet(&font->descriptorSet, vkContext.device);
-	vkuAssembleDescriptorSetLayout(&font->descriptorSet);
-
-	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=1,
-		.pSetLayouts=&font->descriptorSet.descriptorSetLayout,
-		.pushConstantRangeCount=1,
-		.pPushConstantRanges=&(VkPushConstantRange)
-		{
-			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
-			.size=(sizeof(uint32_t)*4)+sizeof(matrix),
-			.offset=0,
-		},
-	}, 0, &font->pipelineLayout);
-
-	vkuInitPipeline(&font->pipeline, vkContext.device, vkContext.pipelineCache);
-
-	vkuPipeline_SetPipelineLayout(&font->pipeline, font->pipelineLayout);
-	vkuPipeline_SetRenderPass(&font->pipeline, compositeRenderPass);
-
-	font->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-	font->pipeline.cullMode=VK_CULL_MODE_BACK_BIT;
-	font->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;
-
-	font->pipeline.blend=VK_TRUE;
-	font->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	font->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	font->pipeline.colorBlendOp=VK_BLEND_OP_ADD;
-	font->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-	font->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	font->pipeline.alphaBlendOp=VK_BLEND_OP_ADD;
-
-	if(!vkuPipeline_AddStage(&font->pipeline, "shaders/font.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	// Load and create pipeline
+	if(!CreatePipeline(&vkContext, &font->pipeline, compositeRenderPass, "pipelines/font.pipeline"))
 		return false;
-
-	if(!vkuPipeline_AddStage(&font->pipeline, "shaders/font.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-		return false;
-
-	vkuPipeline_AddVertexBinding(&font->pipeline, 0, sizeof(vec4), VK_VERTEX_INPUT_RATE_VERTEX);
-	vkuPipeline_AddVertexAttribute(&font->pipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
-
-	vkuPipeline_AddVertexBinding(&font->pipeline, 1, sizeof(vec4)*2, VK_VERTEX_INPUT_RATE_INSTANCE);
-	vkuPipeline_AddVertexAttribute(&font->pipeline, 1, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
-	vkuPipeline_AddVertexAttribute(&font->pipeline, 2, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*1);
-
-	//VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo=
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-	//	.colorAttachmentCount=1,
-	//	.pColorAttachmentFormats=&swapchain.surfaceFormat.format,
-	//};
-
-	if(!vkuAssemblePipeline(&font->pipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
-		return false;
-	// ---
 
 	// Create static vertex data buffer
 	vkuCreateGPUBuffer(&vkContext, &font->vertexBuffer, sizeof(float)*4*4, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
@@ -371,9 +316,9 @@ void Font_Draw(Font_t *font, uint32_t index, uint32_t eye)
 	fontPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale((float)fontPC.extent.width/(float)fontPC.extent.height, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[eye]);
 
 	// Bind the font rendering pipeline (sets states and shaders)
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, font->pipeline.pipeline);
+	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, font->pipeline.pipeline.pipeline);
 
-	vkCmdPushConstants(perFrame[index].commandBuffer, font->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(fontPC), &fontPC);
+	vkCmdPushConstants(perFrame[index].commandBuffer, font->pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(fontPC), &fontPC);
 
 	// Bind vertex data buffer
 	vkCmdBindVertexBuffers(perFrame[index].commandBuffer, 0, 1, &font->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
@@ -400,9 +345,5 @@ void Font_Destroy(Font_t *font)
 	vkuDestroyBuffer(&vkContext, &font->vertexBuffer);
 
 	// Pipeline
-	vkDestroyPipelineLayout(vkContext.device, font->pipelineLayout, VK_NULL_HANDLE);
-	vkDestroyPipeline(vkContext.device, font->pipeline.pipeline, VK_NULL_HANDLE);
-
-	// Descriptors
-	vkDestroyDescriptorSetLayout(vkContext.device, font->descriptorSet.descriptorSetLayout, VK_NULL_HANDLE);
+	DestroyPipeline(&vkContext, &font->pipeline);
 }
