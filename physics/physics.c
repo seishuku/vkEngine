@@ -143,11 +143,18 @@ float PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 		const vec3 impulse=Vec3_Muls(normal, j);
 
 		// Head-on collision velocities
+
+		// Linear velocity
 		a->velocity=Vec3_Subv(a->velocity, Vec3_Muls(impulse, a->invMass));
 		b->velocity=Vec3_Addv(b->velocity, Vec3_Muls(impulse, b->invMass));
 
-		a->angularVelocity=Vec3_Subv(a->angularVelocity, Vec3_Muls(Vec3_Cross(r1, impulse), a->invInertia));
-		b->angularVelocity=Vec3_Addv(b->angularVelocity, Vec3_Muls(Vec3_Cross(r2, impulse), b->invInertia));
+		// Transform torque to local space
+		vec3 localTorqueA=QuatRotate(QuatInverse(a->orientation), Vec3_Cross(r1, impulse));
+		vec3 localTorqueB=QuatRotate(QuatInverse(b->orientation), Vec3_Cross(r2, impulse));
+
+		// Angular velocity
+		a->angularVelocity=Vec3_Subv(a->angularVelocity, Vec3_Muls(localTorqueA, a->invInertia));
+		b->angularVelocity=Vec3_Addv(b->angularVelocity, Vec3_Muls(localTorqueB, b->invInertia));
 
 		// Calculate tangential velocities
 		vec3 tangentialVel=Vec3_Subv(relativeVel, Vec3_Muls(normal, Vec3_Dot(relativeVel, normal)));
@@ -168,11 +175,16 @@ float PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 
 		const vec3 impulseT=Vec3_Muls(tangentialVel, jT);
 
+		// Linear frictional velocity
 		a->velocity=Vec3_Subv(a->velocity, Vec3_Muls(impulseT, a->invMass));
 		b->velocity=Vec3_Addv(b->velocity, Vec3_Muls(impulseT, b->invMass));
 
-		a->angularVelocity=Vec3_Subv(a->angularVelocity, Vec3_Muls(Vec3_Cross(r1, impulseT), a->invInertia));
-		b->angularVelocity=Vec3_Addv(b->angularVelocity, Vec3_Muls(Vec3_Cross(r2, impulseT), b->invInertia));
+		// Angular frictional velocity
+		localTorqueA=QuatRotate(QuatInverse(a->orientation), Vec3_Cross(r1, impulseT));
+		localTorqueB=QuatRotate(QuatInverse(b->orientation), Vec3_Cross(r2, impulseT));
+
+		a->angularVelocity=Vec3_Subv(a->angularVelocity, Vec3_Muls(localTorqueA, a->invInertia));
+		b->angularVelocity=Vec3_Addv(b->angularVelocity, Vec3_Muls(localTorqueB, b->invInertia));
 
 		const vec3 correctionVector=Vec3_Muls(normal, penetration/invMassSum*1.0f);
 
@@ -240,8 +252,11 @@ float PhysicsSphereToAABBCollisionResponse(RigidBody_t *sphere, RigidBody_t *aab
 		sphere->velocity=Vec3_Subv(sphere->velocity, Vec3_Muls(impulse, sphere->invMass));
 		aabb->velocity=Vec3_Addv(aabb->velocity, Vec3_Muls(impulse, aabb->invMass));
 
-		sphere->angularVelocity=Vec3_Subv(sphere->angularVelocity, Vec3_Muls(Vec3_Cross(r1, impulse), sphere->invInertia));
-		aabb->angularVelocity=Vec3_Addv(aabb->angularVelocity, Vec3_Muls(Vec3_Cross(r2, impulse), aabb->invInertia));
+		vec3 localTorqueSphere=QuatRotate(QuatInverse(sphere->orientation), Vec3_Cross(r1, impulse));
+		vec3 localTorqueAABB=QuatRotate(QuatInverse(aabb->orientation), Vec3_Cross(r2, impulse));
+
+		sphere->angularVelocity=Vec3_Subv(sphere->angularVelocity, Vec3_Muls(localTorqueSphere, sphere->invInertia));
+		aabb->angularVelocity=Vec3_Addv(aabb->angularVelocity, Vec3_Muls(localTorqueAABB, aabb->invInertia));
 
 		// Calculate tangential velocities
 		vec3 tangentialVel=Vec3_Subv(relativeVel, Vec3_Muls(normal, Vec3_Dot(relativeVel, normal)));
@@ -265,8 +280,11 @@ float PhysicsSphereToAABBCollisionResponse(RigidBody_t *sphere, RigidBody_t *aab
 		sphere->velocity=Vec3_Subv(sphere->velocity, Vec3_Muls(impulseT, sphere->invMass));
 		aabb->velocity=Vec3_Addv(aabb->velocity, Vec3_Muls(impulseT, aabb->invMass));
 
-		sphere->angularVelocity=Vec3_Subv(sphere->angularVelocity, Vec3_Muls(Vec3_Cross(r1, impulseT), sphere->invInertia));
-		aabb->angularVelocity=Vec3_Addv(aabb->angularVelocity, Vec3_Muls(Vec3_Cross(r2, impulseT), aabb->invInertia));
+		localTorqueSphere=QuatRotate(QuatInverse(sphere->orientation), Vec3_Cross(r1, impulseT));
+		localTorqueAABB=QuatRotate(QuatInverse(aabb->orientation), Vec3_Cross(r2, impulseT));
+
+		sphere->angularVelocity=Vec3_Subv(sphere->angularVelocity, Vec3_Muls(localTorqueSphere, sphere->invInertia));
+		aabb->angularVelocity=Vec3_Addv(aabb->angularVelocity, Vec3_Muls(localTorqueAABB, aabb->invInertia));
 
 		const vec3 correctionVector=Vec3_Muls(normal, penetration/invMassSum*1.0f);
 
