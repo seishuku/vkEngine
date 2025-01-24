@@ -88,6 +88,10 @@ BModel_t models[NUM_MODELS];
 BModel_t fighter;
 uint32_t fighterTexture=0;
 
+RigidBody_t cubeBody0;
+RigidBody_t cubeBody1;
+BModel_t cube;
+
 // Texture images
 VkuImage_t textures[NUM_TEXTURES];
 
@@ -311,6 +315,15 @@ void GenerateWorld(void)
 
 		CameraInit(&enemy[i], Vec3_Muls(randomDirection, 1200.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 		InitEnemy(&enemyAI[i], &enemy[i], camera);
+	}
+
+	if(!perFrame[0].cubeInstance.buffer)
+	{
+		for(uint32_t i=0;i<swapchain.numImages;i++)
+		{
+			vkuCreateHostBuffer(&vkContext, &perFrame[i].cubeInstance, sizeof(matrix)*2, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+			perFrame[i].cubeInstancePtr=(matrix *)perFrame[i].cubeInstance.memory->mappedPointer;
+		}
 	}
 }
 //////
@@ -680,84 +693,91 @@ void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *p
 
 void TestCollision(PhysicsObject_t *objA, PhysicsObject_t *objB)
 {
-	if(PhysicsSphereToSphereCollisionResponse(objA->rigidBody, objB->rigidBody)>1.0f)
-	{
-		// If both objects are asteroids
-		if(objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_FIELD)
-		{
-			Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, objB->rigidBody->position);
-		}
-		// If one is an asteroid and one is a player
-		else if((objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)||
-				(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_FIELD))
-		{
-			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, objB->rigidBody->position);
-		}
-		// If both objects are players
-		else if(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)
-		{
-			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, objB->rigidBody->position);
-		}
-		// If it was a projectile colliding with anything
-		else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE||objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
-		{
-			PhysicsObject_t *whichProjectile=NULL;
-			PhysicsObject_t *otherObject=NULL;
+	if(objA->rigidBody->radius&&objB->rigidBody->radius)
+		PhysicsSphereToSphereCollisionResponse(objA->rigidBody, objB->rigidBody);
+	else if(objA->rigidBody->size.x&&objA->rigidBody->size.y&&objA->rigidBody->size.z&&objB->rigidBody->radius)
+		PhysicsSphereToOBBCollisionResponse(objB->rigidBody, objA->rigidBody);
+	else if(objA->rigidBody->radius&&objB->rigidBody->size.x&&objB->rigidBody->size.y&&objB->rigidBody->size.z)
+		PhysicsSphereToOBBCollisionResponse(objA->rigidBody, objB->rigidBody);
 
-			if(objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
-			{
-				whichProjectile=objB;
-				otherObject=objA;
-			}
-			else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
-			{
-				whichProjectile=objA;
-				otherObject=objB;
-			}
-			else
-				return; // SHOULD NEVER BE HERE.
+	//if(PhysicsSphereToSphereCollisionResponse(objA->rigidBody, objB->rigidBody)>1.0f)
+	//{
+	//	// If both objects are asteroids
+	//	if(objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_FIELD)
+	//	{
+	//		Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, objB->rigidBody->position);
+	//	}
+	//	// If one is an asteroid and one is a player
+	//	else if((objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)||
+	//			(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_FIELD))
+	//	{
+	//		Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, objB->rigidBody->position);
+	//	}
+	//	// If both objects are players
+	//	else if(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)
+	//	{
+	//		Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, objB->rigidBody->position);
+	//	}
+	//	// If it was a projectile colliding with anything
+	//	else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE||objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+	//	{
+	//		PhysicsObject_t *whichProjectile=NULL;
+	//		PhysicsObject_t *otherObject=NULL;
 
-			if(otherObject->objectType==PHYSICSOBJECTTYPE_PLAYER)
-			{
-				for(uint32_t i=0;i<NUM_ENEMY;i++)
-				{
-					if(&enemyAI[i].camera->body==otherObject->rigidBody)
-					{
-						enemyAI[i].health-=10.0f;
-						break;
-					}
-				}
-			}
+	//		if(objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+	//		{
+	//			whichProjectile=objB;
+	//			otherObject=objA;
+	//		}
+	//		else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+	//		{
+	//			whichProjectile=objA;
+	//			otherObject=objB;
+	//		}
+	//		else
+	//			return; // SHOULD NEVER BE HERE.
 
-			// It collided, kill it.
-			// Setting this directly to <0.0 seems to cause emitters that won't get removed,
-			//     so setting it to nearly 0.0 allows the natural progression kill it off.
-			// Need to find the source emitter first:
-			for(uint32_t k=0;k<MAX_EMITTERS;k++)
-			{
-				if(emitters[k].life>0.0f)
-				{
-					if(whichProjectile->rigidBody==&emitters[k].body)
-					{
-						emitters[k].life=0.001f;
-						break;
-					}
-				}
-			}
+	//		if(otherObject->objectType==PHYSICSOBJECTTYPE_PLAYER)
+	//		{
+	//			for(uint32_t i=0;i<NUM_ENEMY;i++)
+	//			{
+	//				if(&enemyAI[i].camera->body==otherObject->rigidBody)
+	//				{
+	//					enemyAI[i].health-=10.0f;
+	//					break;
+	//				}
+	//			}
+	//		}
 
-			Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, whichProjectile->rigidBody->position);
+	//		// It collided, kill it.
+	//		// Setting this directly to <0.0 seems to cause emitters that won't get removed,
+	//		//     so setting it to nearly 0.0 allows the natural progression kill it off.
+	//		// Need to find the source emitter first:
+	//		for(uint32_t k=0;k<MAX_EMITTERS;k++)
+	//		{
+	//			if(emitters[k].life>0.0f)
+	//			{
+	//				if(whichProjectile->rigidBody==&emitters[k].body)
+	//				{
+	//					emitters[k].life=0.001f;
+	//					break;
+	//				}
+	//			}
+	//		}
 
-			ParticleSystem_AddEmitter(&particleSystem,
-									  whichProjectile->rigidBody->position,	// Position
-									  Vec3(100.0f, 12.0f, 5.0f),	// Start color
-									  Vec3(0.0f, 0.0f, 0.0f),		// End color
-									  5.0f,						// Radius of particles
-									  1000,						// Number of particles in system
-									  PARTICLE_EMITTER_ONCE,		// Type?
-									  ExplodeEmitterCallback		// Callback for particle generation
-			);
-		}
-	}
+	//		Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, whichProjectile->rigidBody->position);
+
+	//		ParticleSystem_AddEmitter(&particleSystem,
+	//								  whichProjectile->rigidBody->position,	// Position
+	//								  Vec3(100.0f, 12.0f, 5.0f),	// Start color
+	//								  Vec3(0.0f, 0.0f, 0.0f),		// End color
+	//								  5.0f,						// Radius of particles
+	//								  1000,						// Number of particles in system
+	//								  PARTICLE_EMITTER_ONCE,		// Type?
+	//								  ExplodeEmitterCallback		// Callback for particle generation
+	//		);
+	//	}
+	//}
 }
 
 SpatialHash_t spatialHash;
@@ -788,6 +808,9 @@ void Thread_Physics(void *arg)
 				AddPhysicsObject(&netCameras[i].body, PHYSICSOBJECTTYPE_PLAYER);
 		}
 	}
+
+	AddPhysicsObject(&cubeBody0, PHYSICSOBJECTTYPE_FIELD);
+	AddPhysicsObject(&cubeBody1, PHYSICSOBJECTTYPE_FIELD);
 	//////
 
 	SpatialHash_Clear(&spatialHash);
@@ -893,7 +916,7 @@ void Thread_Physics(void *arg)
 	{
 		for(uint32_t i=0;i<NUM_ENEMY;i++)
 		{
-			UpdateEnemy(&enemyAI[i], camera);
+			//UpdateEnemy(&enemyAI[i], camera);
 
 			const float scale=(1.0f/fighter.radius)*enemy[i].body.radius;
 			matrix local=MatrixScale(scale, scale, scale);
@@ -942,6 +965,23 @@ void Thread_Physics(void *arg)
 		local=MatrixMult(local, MatrixTranslatev(fighter.center));
 		local=MatrixMult(local, QuatToMatrix(camera.body.orientation));
 		perFrame[index].fighterInstancePtr[0]=MatrixMult(local, MatrixTranslatev(camera.body.position));
+	}
+
+	{
+		//const float scale=cubeBody.radius;
+		matrix local=MatrixScalev(cubeBody0.size);
+		local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
+		local=MatrixMult(local, MatrixTranslatev(cube.center));
+		local=MatrixMult(local, QuatToMatrix(cubeBody0.orientation));
+		perFrame[index].cubeInstancePtr[0]=MatrixMult(local, MatrixTranslatev(cubeBody0.position));
+	}
+	{
+		//const float scale=cubeBody.radius;
+		matrix local=MatrixScalev(cubeBody1.size);
+		local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
+		local=MatrixMult(local, MatrixTranslatev(cube.center));
+		local=MatrixMult(local, QuatToMatrix(cubeBody1.orientation));
+		perFrame[index].cubeInstancePtr[1]=MatrixMult(local, MatrixTranslatev(cubeBody1.position));
 	}
 
 	// Update camera and modelview matrix
@@ -1370,17 +1410,55 @@ bool Init(void)
 		return false;
 	}
 
-	uint32_t TriangleCount=0;
-
-	for(uint32_t i=0;i<NUM_MODELS;i++)
+	if(LoadBModel(&cube, "assets/cube.bmodel"))
+		BuildMemoryBuffersBModel(&vkContext, &cube);
+	else
 	{
-		for(uint32_t j=0;j<models[i].numMesh;j++)
-			TriangleCount+=models[i].mesh[j].numFace;
+		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/cube.bmodel\n");
+		return false;
 	}
 
-	TriangleCount*=NUM_ASTEROIDS;
+	{
+		const float radius=20.0f;
+		const float mass=(1.0f/3000.0f)*(1.33333333f*PI*radius)*10.0f;
+		const float inertia=0.4f*mass*(radius*radius);
 
-	DBGPRINTF(DEBUG_ERROR, "\nNot an error, just a total triangle count: %d\n\n", TriangleCount);
+		cubeBody0=(RigidBody_t)
+		{
+			.position=Vec3(-12.0f, 0.0f, 0.0f),
+
+			.velocity=Vec3b(0.0f),
+			.force=Vec3b(0.0f),
+			.mass=mass*10,
+			.invMass=1.0f/mass,
+
+			.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
+			.angularVelocity=Vec3b(0.0f),
+			.inertia=inertia,
+			.invInertia=1.0f/inertia,
+
+			//.radius=radius,
+			.size=Vec3(radius/2, radius/2, radius/2),
+		};
+
+		cubeBody1=(RigidBody_t)
+		{
+			.position=Vec3(12.0f, 0.0f, 0.0f),
+
+			.velocity=Vec3b(0.0f),
+			.force=Vec3b(0.0f),
+			.mass=mass*10,
+			.invMass=1.0f/mass,
+
+			.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
+			.angularVelocity=Vec3b(0.0f),
+			.inertia=inertia,
+			.invInertia=1.0f/inertia,
+
+			//.radius=radius,
+			.size=Vec3(radius/2, radius/2, radius/2),
+		};
+	}
 
 	// Load textures
 	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID1], "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
@@ -1409,6 +1487,9 @@ bool Init(void)
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER7_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER8], "assets/wilko.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER8_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+
+	Image_Upload(&vkContext, &textures[TEXTURE_CUBE], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	Image_Upload(&vkContext, &textures[TEXTURE_CUBE_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 
 	GenNebulaVolume(&textures[TEXTURE_VOLUME]);
 
@@ -1870,6 +1951,13 @@ void Destroy(void)
 		vkuDestroyBuffer(&vkContext, &fighter.mesh[j].indexBuffer);
 
 	FreeBModel(&fighter);
+
+	vkuDestroyBuffer(&vkContext, &cube.vertexBuffer);
+
+	for(uint32_t j=0;j<cube.numMesh;j++)
+		vkuDestroyBuffer(&vkContext, &cube.mesh[j].indexBuffer);
+
+	FreeBModel(&cube);
 	//////////
 
 	// Shadow map destruction

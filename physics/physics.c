@@ -197,7 +197,7 @@ float PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 	return 0.0f;
 }
 
-float PhysicsSphereToAABBCollisionResponse(RigidBody_t *sphere, RigidBody_t *aabb)
+float PhysicsSphereToOBBCollisionResponse(RigidBody_t *sphere, RigidBody_t *aabb)
 {
 	// Calculate the half extents of the AABB
 	const vec3 half=Vec3_Muls(aabb->size, 0.5f);
@@ -289,7 +289,7 @@ float PhysicsSphereToAABBCollisionResponse(RigidBody_t *sphere, RigidBody_t *aab
 		const vec3 correctionVector=Vec3_Muls(normal, penetration/invMassSum*1.0f);
 
 		sphere->position=Vec3_Subv(sphere->position, Vec3_Muls(correctionVector, sphere->invMass));
-		//aabb->position=Vec3_Addv(aabb->position, Vec3_Muls(correctionVector, aabb->invMass));
+		aabb->position=Vec3_Addv(aabb->position, Vec3_Muls(correctionVector, aabb->invMass));
 
 		return sqrtf(-relativeSpeed);
 	}

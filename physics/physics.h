@@ -7,10 +7,10 @@
 #define WORLD_SCALE 1000.0f
 #define EXPLOSION_POWER (50.0f*WORLD_SCALE)
 
+#pragma pack(push,1)
 typedef struct RigidBody_s
 {
 	vec3 position;
-
 	vec3 velocity;
 	vec3 force;
 	float mass, invMass;
@@ -20,12 +20,13 @@ typedef struct RigidBody_s
 	float inertia, invInertia;
 
 	float radius;	// radius if it's a sphere
-	vec3 size;		// bounding box if it's an AABB
+	vec3 size;		// bounding box if it's an OBB
 } RigidBody_t;
+#pragma pack(pop)
 
 void PhysicsIntegrate(RigidBody_t *body, const float dt);
 void PhysicsExplode(RigidBody_t *body);
 float PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b);
-float PhysicsSphereToAABBCollisionResponse(RigidBody_t *sphere, RigidBody_t *aabb);
+float PhysicsSphereToOBBCollisionResponse(RigidBody_t *sphere, RigidBody_t *aabb);
 
 #endif

@@ -33,6 +33,9 @@ typedef struct
 
 	VkuBuffer_t fighterInstance;
 	matrix *fighterInstancePtr;
+
+	VkuBuffer_t cubeInstance;
+	matrix *cubeInstancePtr;
 	//////
 
 	VkFramebuffer compositeFramebuffer[2];
