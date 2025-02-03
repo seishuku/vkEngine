@@ -126,6 +126,24 @@ vec4 QuatSlerp(const vec4 qa, const vec4 qb, const float t)
 	return Vec4_Addv(Vec4_Muls(qa, k0), Vec4_Muls(q1, k1));
 }
 
+void QuatAxes(vec4 q, vec3 *axes)
+{
+	float xx=q.x*q.x;
+	float yy=q.y*q.y;
+	float zz=q.z*q.z;
+	float xy=q.x*q.y;
+	float xz=q.x*q.z;
+	float yz=q.y*q.z;
+	float wx=q.w*q.x;
+	float wy=q.w*q.y;
+	float wz=q.w*q.z;
+
+	// (column-major order)
+	axes[0]=Vec3(1.0f-2.0f*(yy+zz), 2.0f*(xy+wz), 2.0f*(xz-wy));
+	axes[1]=Vec3(2.0f*(xy-wz), 1.0f-2.0f*(xx+zz), 2.0f*(yz+wx));
+	axes[2]=Vec3(2.0f*(xz+wy), 2.0f*(yz-wx), 1.0f-2.0f*(xx+yy));
+}
+
 matrix QuatToMatrix(const vec4 q)
 {
 	float norm=sqrtf(Vec4_Dot(q, q)), s=0.0f;

@@ -699,6 +699,8 @@ void TestCollision(PhysicsObject_t *objA, PhysicsObject_t *objB)
 		PhysicsSphereToOBBCollisionResponse(objB->rigidBody, objA->rigidBody);
 	else if(objA->rigidBody->radius&&objB->rigidBody->size.x&&objB->rigidBody->size.y&&objB->rigidBody->size.z)
 		PhysicsSphereToOBBCollisionResponse(objA->rigidBody, objB->rigidBody);
+	else if(objA->rigidBody->size.x&&objA->rigidBody->size.y&&objA->rigidBody->size.z&&objB->rigidBody->size.x&&objB->rigidBody->size.y&&objB->rigidBody->size.z)
+		PhysicsOBBToOBBCollisionResponse(objA->rigidBody, objB->rigidBody);
 
 	//if(PhysicsSphereToSphereCollisionResponse(objA->rigidBody, objB->rigidBody)>1.0f)
 	//{
@@ -1298,7 +1300,7 @@ bool Init(void)
 
 	vkuMemAllocator_Init(&vkContext);
 
-	CameraInit(&camera, Vec3(0.0f, 0.0f, -1000.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
+	CameraInit(&camera, Vec3(0.0f, 0.0f, -100.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 
 	if(!Audio_Init())
 	{

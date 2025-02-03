@@ -27,6 +27,12 @@ bool SpatialHash_AddPhysicsObject(SpatialHash_t *spatialHash, PhysicsObject_t *p
 	int32_t hz=(int32_t)(physicsObject->rigidBody->position.z/GRID_SIZE);
 	uint32_t index=hashFunction(hx, hy, hz);
 
+	if(index>HASH_TABLE_SIZE)
+	{
+		DBGPRINTF(DEBUG_ERROR, "Invalid hash index.\n");
+		return false;
+	}
+
 	if(spatialHash->hashTable[index].numObjects<100)
 	{
 		spatialHash->hashTable[index].objects[spatialHash->hashTable[index].numObjects++]=physicsObject;
@@ -63,6 +69,13 @@ void SpatialHash_TestObjects(SpatialHash_t *spatialHash, PhysicsObject_t *physic
 	for(uint32_t j=0;j<27;j++)
 	{
 		uint32_t hashIndex=hashFunction(hx+offsets[j][0], hy+offsets[j][1], hz+offsets[j][2]);
+
+		if(hashIndex>HASH_TABLE_SIZE)
+		{
+			DBGPRINTF(DEBUG_ERROR, "Invalid hash index.\n");
+			return;
+		}
+
 		Cell_t *neighborCell=&spatialHash->hashTable[hashIndex];
 
 		// Iterate over objects in the neighbor cell

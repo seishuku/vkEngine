@@ -207,6 +207,7 @@ vec4 QuatMultiply(const vec4 a, const vec4 b);
 vec4 QuatInverse(const vec4 q);
 vec3 QuatRotate(const vec4 q, const vec3 v);
 vec4 QuatSlerp(const vec4 qa, const vec4 qb, const float t);
+void QuatAxes(vec4 q, vec3 *axes);
 matrix QuatToMatrix(const vec4 in);
 vec4 MatrixToQuat(const matrix m);
 

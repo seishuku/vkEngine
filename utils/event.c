@@ -45,6 +45,8 @@ extern Console_t console;
 extern bool isControlPressed;
 extern bool pausePhysics;
 
+extern RigidBody_t cubeBody0, cubeBody1;
+
 //////////////////////////////
 
 // Emitter callback for the launched emitter's particles
@@ -175,6 +177,15 @@ bool Event_Trigger(EventID ID, void *arg)
 					break;
 				case KB_P:		GenerateWorld();		break;
 				case KB_O:		pausePhysics=!pausePhysics; break;
+				case KB_I:		cubeBody0.position=Vec3(-12.0f, 0.0f, 0.0f);
+								cubeBody0.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+								cubeBody0.velocity=Vec3b(0.0f);
+								cubeBody0.angularVelocity=Vec3b(0.0f);
+								cubeBody1.position=Vec3(12.0f, 0.0f, 0.0f);
+								cubeBody1.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+								cubeBody1.velocity=Vec3b(0.0f);
+								cubeBody1.angularVelocity=Vec3b(0.0f);
+								break;
 				case KB_W:		camera.key_w=true;		break;
 				case KB_S:		camera.key_s=true;		break;
 				case KB_A:		camera.key_a=true;		break;

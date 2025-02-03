@@ -245,6 +245,15 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 		vkCmdDrawIndexed(commandBuffer, fighter.mesh[j].numFace*3, 2, 0, 0, 0);
 	}
 
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &cube.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[frameIndex].cubeInstance.buffer, &(VkDeviceSize) { 0 });
+
+	for(uint32_t j=0;j<cube.numMesh;j++)
+	{
+		vkCmdBindIndexBuffer(commandBuffer, cube.mesh[j].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(commandBuffer, cube.mesh[j].numFace*3, 2, 0, 0, 0);
+	}
+
 	vkCmdEndRenderPass(commandBuffer);
 }
 
