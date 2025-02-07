@@ -3,11 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <float.h>
-#include "../system/threads.h"
 #include "physics.h"
-
-extern ThreadWorker_t threadPhysics;
-extern bool pausePhysics;
 
 static void ApplyConstraints(RigidBody_t *body)
 {
@@ -66,6 +62,47 @@ static vec4 IntegrateAngularVelocity(const vec4 q, const vec3 w, const float dt)
 	Vec4_Normalize(&result);
 
 	return result;
+}
+
+void PhysicsIntegrate(RigidBody_t *body, const float dt)
+{
+	//const vec3 gravity=Vec3(0.0f, 9.81f*WORLD_SCALE, 0.0f);
+	const vec3 gravity=Vec3b(0.0f);
+
+	// Apply gravity
+	body->force=Vec3_Addv(body->force, Vec3_Muls(gravity, body->mass));
+
+	// Implicit Euler integration of position and velocity
+	// Velocity+=Force/Mass*dt
+	// Position+=Velocity*dt
+
+	body->velocity=Vec3_Addv(body->velocity, Vec3_Muls(body->force, body->invMass*dt));
+	body->position=Vec3_Addv(body->position, Vec3_Muls(body->velocity, dt));
+
+	body->force=Vec3b(0.0f);
+
+	// Integrate angular velocity using quaternions
+	body->orientation=IntegrateAngularVelocity(body->orientation, body->angularVelocity, dt);
+
+	ApplyConstraints(body);
+}
+
+void PhysicsExplode(RigidBody_t *body)
+{
+	const vec3 explosion_center={ 0.0f, 0.0f, 0.0f };
+
+	// Calculate direction from explosion center to fragment
+	vec3 direction=Vec3_Subv(body->position, explosion_center);
+	Vec3_Normalize(&direction);
+
+	// Calculate acceleration and impulse force
+	const vec3 acceleration=Vec3_Muls(direction, EXPLOSION_POWER);
+
+	// F=M*A bla bla...
+	const vec3 force=Vec3_Muls(acceleration, body->mass);
+
+	// Add it into object's velocity
+	body->velocity=Vec3_Addv(body->velocity, force);
 }
 
 static float ResolveCollision(RigidBody_t *a, RigidBody_t *b, const vec3 contact, const vec3 normal, const float penetration)
@@ -146,93 +183,65 @@ static float ResolveCollision(RigidBody_t *a, RigidBody_t *b, const vec3 contact
 	return sqrtf(-relativeSpeed);
 }
 
-void PhysicsIntegrate(RigidBody_t *body, const float dt)
-{
-	//const vec3 gravity=Vec3(0.0f, 9.81f*WORLD_SCALE, 0.0f);
-	const vec3 gravity=Vec3b(0.0f);
-
-	// Apply gravity
-	body->force=Vec3_Addv(body->force, Vec3_Muls(gravity, body->mass));
-
-	// Implicit Euler integration of position and velocity
-	// Velocity+=Force/Mass*dt
-	// Position+=Velocity*dt
-
-	body->velocity=Vec3_Addv(body->velocity, Vec3_Muls(body->force, body->invMass*dt));
-	body->position=Vec3_Addv(body->position, Vec3_Muls(body->velocity, dt));
-
-	body->force=Vec3b(0.0f);
-
-	// Integrate angular velocity using quaternions
-	body->orientation=IntegrateAngularVelocity(body->orientation, body->angularVelocity, dt);
-
-	ApplyConstraints(body);
-}
-
-void PhysicsExplode(RigidBody_t *body)
-{
-	const vec3 explosion_center={ 0.0f, 0.0f, 0.0f };
-
-	// Calculate direction from explosion center to fragment
-	vec3 direction=Vec3_Subv(body->position, explosion_center);
-	Vec3_Normalize(&direction);
-
-	// Calculate acceleration and impulse force
-	const vec3 acceleration=Vec3_Muls(direction, EXPLOSION_POWER);
-
-	// F=M*A bla bla...
-	const vec3 force=Vec3_Muls(acceleration, body->mass);
-
-	// Add it into object's velocity
-	body->velocity=Vec3_Addv(body->velocity, force);
-}
-
-float PhysicsSphereToSphereCollisionResponse(RigidBody_t *a, RigidBody_t *b)
+static float SphereToSphereCollision(RigidBody_t *a, RigidBody_t *b)
 {
 	const vec3 relativePosition=Vec3_Subv(b->position, a->position);
 	const float distanceSq=Vec3_Dot(relativePosition, relativePosition);
 	const float radiiSum=a->radius+b->radius;
 
-	if(distanceSq&&distanceSq<radiiSum*radiiSum)
+	if(distanceSq<FLT_EPSILON||distanceSq>radiiSum*radiiSum)
 	{
-		const float distance=sqrtf(distanceSq);
-		const vec3 normal=Vec3_Muls(relativePosition, 1.0f/distance);
-
-		// Point of contact
-		const float penetration=fabsf(distance-radiiSum)*0.5f;
-		const vec3 contact=Vec3_Addv(a->position, Vec3_Muls(normal, a->radius-penetration));
-
-		return ResolveCollision(a, b, contact, normal, penetration);
+		// No collision
+		return 0.0f;
 	}
 
-	return 0.0f;
+	// Penetration
+	const float distance=sqrtf(distanceSq);
+	const float penetration=fabsf(distance-radiiSum)*0.5f;
+
+	// Normal
+	const vec3 normal=Vec3_Muls(relativePosition, 1.0f/distance);
+
+	// Contact point
+	const vec3 contact=Vec3_Addv(a->position, Vec3_Muls(normal, a->radius-penetration));
+
+	return ResolveCollision(a, b, contact, normal, penetration);
 }
 
-float PhysicsSphereToOBBCollisionResponse(RigidBody_t *sphere, RigidBody_t *obb)
+static float SphereToOBBCollision(RigidBody_t *sphere, RigidBody_t *obb)
 {
-	const vec3 obbRelativePosition=QuatRotate(QuatInverse(obb->orientation), Vec3_Subv(sphere->position, obb->position));
-	const vec3 pointOnBox=Vec3_Clampv(obbRelativePosition, Vec3_Muls(obb->size, -0.5f), Vec3_Muls(obb->size, 0.5f));
-	const vec3 closestPoint=Vec3_Addv(obb->position, QuatRotate(obb->orientation, pointOnBox));
+	vec3 axes[3];
+	QuatAxes(obb->orientation, axes);
 
-	vec3 relativePosition=Vec3_Subv(closestPoint, sphere->position);
+	const vec3 relativeCenter=Vec3_Subv(sphere->position, obb->position);
+	vec3 closestPoint=obb->position;
+	closestPoint=Vec3_Addv(closestPoint, Vec3_Muls(axes[0], fmaxf(-obb->size.x, fminf(Vec3_Dot(relativeCenter, axes[0]), obb->size.x))));
+	closestPoint=Vec3_Addv(closestPoint, Vec3_Muls(axes[1], fmaxf(-obb->size.y, fminf(Vec3_Dot(relativeCenter, axes[1]), obb->size.y))));
+	closestPoint=Vec3_Addv(closestPoint, Vec3_Muls(axes[2], fmaxf(-obb->size.z, fminf(Vec3_Dot(relativeCenter, axes[2]), obb->size.z))));
+
+	const vec3 relativePosition=Vec3_Subv(sphere->position, closestPoint);
 	const float distanceSq=Vec3_Dot(relativePosition, relativePosition);
 
-	if(distanceSq&&distanceSq<=sphere->radius*sphere->radius)
+	if(distanceSq<FLT_EPSILON||distanceSq>sphere->radius*sphere->radius)
 	{
-		const float distance=sqrtf(distanceSq);
-		const vec3 normal=Vec3_Muls(relativePosition, 1.0f/distance);
-
-		// Point of contact
-		const float penetration=fabsf(distance-sphere->radius)*0.5f;
-		const vec3 contact=Vec3_Addv(sphere->position, Vec3_Muls(normal, penetration));
-
-		return ResolveCollision(sphere, obb, contact, normal, penetration);
+		// No collision
+		return 0.0f;
 	}
 
-	return 0.0f;
+	// Penetration
+	const float distance=sqrtf(distanceSq);
+	const float penetration=sphere->radius-distance;
+
+	// Normal
+	const vec3 normal=Vec3_Muls(relativePosition, 1.0f/distance);
+
+	// Contact point
+	const vec3 contact=Vec3_Subv(closestPoint, Vec3_Muls(normal, penetration*0.5f));
+
+	return ResolveCollision(obb, sphere, contact, normal, penetration);
 }
 
-float PhysicsOBBToOBBCollisionResponse(RigidBody_t *a, RigidBody_t *b)
+static float OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 {
 	// Extract axes
 	vec3 axesA[3], axesB[3];
@@ -261,7 +270,7 @@ float PhysicsOBBToOBBCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 			vec3 axis=Vec3_Cross(axesA[i], axesB[j]);
 			const float lengthSq=Vec3_Dot(axis, axis);
 
-			if(lengthSq>FLT_EPSILON*FLT_EPSILON)
+			if(lengthSq>FLT_EPSILON)
 				axes[axisCount++]=Vec3_Muls(axis, 1.0f/sqrtf(lengthSq));
 		}
 	}
@@ -274,8 +283,8 @@ float PhysicsOBBToOBBCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 	for(uint32_t i=0;i<axisCount;i++)
 	{
 		// Project OBBs onto axis
-		const float rA=a->size.x*fabsf(Vec3_Dot(axesA[0], axes[i]))+a->size.y*fabsf(Vec3_Dot(axesA[1], axes[i]))+a->size.z*fabsf(Vec3_Dot(axesA[2], axes[i]));
-		const float rB=b->size.x*fabsf(Vec3_Dot(axesB[0], axes[i]))+b->size.y*fabsf(Vec3_Dot(axesB[1], axes[i]))+b->size.z*fabsf(Vec3_Dot(axesB[2], axes[i]));
+		const float rA=fabsf(Vec3_Dot(axesA[0], axes[i]))*a->size.x+fabsf(Vec3_Dot(axesA[1], axes[i]))*a->size.y+fabsf(Vec3_Dot(axesA[2], axes[i]))*a->size.z;
+		const float rB=fabsf(Vec3_Dot(axesB[0], axes[i]))*b->size.x+fabsf(Vec3_Dot(axesB[1], axes[i]))*b->size.y+fabsf(Vec3_Dot(axesB[2], axes[i]))*b->size.z;
 		const float distance=fabsf(Vec3_Dot(relativePosition, axes[i]));
 
 		const float overlap=rA+rB-distance;
@@ -305,4 +314,18 @@ float PhysicsOBBToOBBCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 	const vec3 contact=Vec3_Muls(Vec3_Addv(pointA, pointB), 0.5f);
 
 	return ResolveCollision(a, b, contact, normal, penetration);
+}
+
+float PhysicsCollisionResponse(RigidBody_t *a, RigidBody_t *b)
+{
+	if(a->type==RIGIDBODY_SPHERE&&b->type==RIGIDBODY_SPHERE)
+		return SphereToSphereCollision(a, b);
+	else if(a->type==RIGIDBODY_SPHERE&&b->type==RIGIDBODY_OBB)
+		return SphereToOBBCollision(a, b);
+	else if(a->type==RIGIDBODY_OBB&&b->type==RIGIDBODY_SPHERE)
+		return SphereToOBBCollision(b, a);
+	else if(a->type==RIGIDBODY_OBB&&b->type==RIGIDBODY_OBB)
+		return OBBToOBBCollision(b, a);
+
+	return 0.0f;
 }

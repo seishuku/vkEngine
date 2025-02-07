@@ -199,41 +199,6 @@ void CameraCheckCollision(Camera_t *camera, float *vertex, uint32_t *face, int32
 	}
 }
 
-bool SphereBBOXIntersection(const vec3 center, const float radius, const vec3 bbMin, const vec3 bbMax)
-{
-	float dmin=0.0f;
-	const float radiusSq=radius*radius;
-
-	if(center.x<bbMin.x)
-		dmin+=(center.x-bbMin.x)*(center.x-bbMin.x);
-	else
-	{
-		if(center.x>bbMax.x)
-			dmin+=(center.x-bbMax.x)*(center.x-bbMax.x);
-	}
-
-	if(center.y<bbMin.y)
-		dmin+=(center.y-bbMin.y)*(center.y-bbMin.y);
-	else
-	{
-		if(center.y>bbMax.y)
-			dmin+=(center.y-bbMax.y)*(center.y-bbMax.y);
-	}
-
-	if(center.z<bbMin.z)
-		dmin+=(center.z-bbMin.z)*(center.z-bbMin.z);
-	else
-	{
-		if(center.z>bbMax.z)
-			dmin+=(center.z-bbMax.z)*(center.z-bbMax.z);
-	}
-
-	if(dmin<=radiusSq)
-		return true;
-
-	return false;
-}
-
 // Actual camera stuff
 void CameraInit(Camera_t *camera, const vec3 position, const vec3 up, const vec3 forward)
 {
@@ -260,6 +225,7 @@ void CameraInit(Camera_t *camera, const vec3 position, const vec3 up, const vec3
 	camera->body.orientation=MatrixToQuat(cameraOrientation);
 	camera->body.angularVelocity=Vec3b(0.0f);
 
+	camera->body.type=RIGIDBODY_SPHERE,
 	camera->body.radius=10.0f;
 
 	camera->body.mass=(1.0f/6000.0f)*(1.33333333f*PI*camera->body.radius);

@@ -290,6 +290,8 @@ void GenerateWorld(void)
 
 		asteroids[i].inertia=0.4f*asteroids[i].mass*(asteroids[i].radius*asteroids[i].radius);
 		asteroids[i].invInertia=1.0f/asteroids[i].inertia;
+
+		asteroids[i].type=RIGIDBODY_SPHERE;
 	}
 	//////
 
@@ -693,93 +695,84 @@ void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *p
 
 void TestCollision(PhysicsObject_t *objA, PhysicsObject_t *objB)
 {
-	if(objA->rigidBody->radius&&objB->rigidBody->radius)
-		PhysicsSphereToSphereCollisionResponse(objA->rigidBody, objB->rigidBody);
-	else if(objA->rigidBody->size.x&&objA->rigidBody->size.y&&objA->rigidBody->size.z&&objB->rigidBody->radius)
-		PhysicsSphereToOBBCollisionResponse(objB->rigidBody, objA->rigidBody);
-	else if(objA->rigidBody->radius&&objB->rigidBody->size.x&&objB->rigidBody->size.y&&objB->rigidBody->size.z)
-		PhysicsSphereToOBBCollisionResponse(objA->rigidBody, objB->rigidBody);
-	else if(objA->rigidBody->size.x&&objA->rigidBody->size.y&&objA->rigidBody->size.z&&objB->rigidBody->size.x&&objB->rigidBody->size.y&&objB->rigidBody->size.z)
-		PhysicsOBBToOBBCollisionResponse(objA->rigidBody, objB->rigidBody);
+	if(PhysicsCollisionResponse(objA->rigidBody, objB->rigidBody)>1.0f)
+	{
+		// If both objects are asteroids
+		if(objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_FIELD)
+		{
+			Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, objB->rigidBody->position);
+		}
+		// If one is an asteroid and one is a player
+		else if((objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)||
+				(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_FIELD))
+		{
+			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, objB->rigidBody->position);
+		}
+		// If both objects are players
+		else if(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)
+		{
+			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, objB->rigidBody->position);
+		}
+		// If it was a projectile colliding with anything
+		else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE||objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+		{
+			PhysicsObject_t *whichProjectile=NULL;
+			PhysicsObject_t *otherObject=NULL;
 
-	//if(PhysicsSphereToSphereCollisionResponse(objA->rigidBody, objB->rigidBody)>1.0f)
-	//{
-	//	// If both objects are asteroids
-	//	if(objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_FIELD)
-	//	{
-	//		Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, objB->rigidBody->position);
-	//	}
-	//	// If one is an asteroid and one is a player
-	//	else if((objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)||
-	//			(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_FIELD))
-	//	{
-	//		Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, objB->rigidBody->position);
-	//	}
-	//	// If both objects are players
-	//	else if(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)
-	//	{
-	//		Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, objB->rigidBody->position);
-	//	}
-	//	// If it was a projectile colliding with anything
-	//	else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE||objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
-	//	{
-	//		PhysicsObject_t *whichProjectile=NULL;
-	//		PhysicsObject_t *otherObject=NULL;
+			if(objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+			{
+				whichProjectile=objB;
+				otherObject=objA;
+			}
+			else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+			{
+				whichProjectile=objA;
+				otherObject=objB;
+			}
+			else
+				return; // SHOULD NEVER BE HERE.
 
-	//		if(objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
-	//		{
-	//			whichProjectile=objB;
-	//			otherObject=objA;
-	//		}
-	//		else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
-	//		{
-	//			whichProjectile=objA;
-	//			otherObject=objB;
-	//		}
-	//		else
-	//			return; // SHOULD NEVER BE HERE.
+			if(otherObject->objectType==PHYSICSOBJECTTYPE_PLAYER)
+			{
+				for(uint32_t i=0;i<NUM_ENEMY;i++)
+				{
+					if(&enemyAI[i].camera->body==otherObject->rigidBody)
+					{
+						enemyAI[i].health-=10.0f;
+						break;
+					}
+				}
+			}
 
-	//		if(otherObject->objectType==PHYSICSOBJECTTYPE_PLAYER)
-	//		{
-	//			for(uint32_t i=0;i<NUM_ENEMY;i++)
-	//			{
-	//				if(&enemyAI[i].camera->body==otherObject->rigidBody)
-	//				{
-	//					enemyAI[i].health-=10.0f;
-	//					break;
-	//				}
-	//			}
-	//		}
+			// It collided, kill it.
+			// Setting this directly to <0.0 seems to cause emitters that won't get removed,
+			//     so setting it to nearly 0.0 allows the natural progression kill it off.
+			// Need to find the source emitter first:
+			for(uint32_t k=0;k<MAX_EMITTERS;k++)
+			{
+				if(emitters[k].life>0.0f)
+				{
+					if(whichProjectile->rigidBody==&emitters[k].body)
+					{
+						emitters[k].life=0.001f;
+						break;
+					}
+				}
+			}
 
-	//		// It collided, kill it.
-	//		// Setting this directly to <0.0 seems to cause emitters that won't get removed,
-	//		//     so setting it to nearly 0.0 allows the natural progression kill it off.
-	//		// Need to find the source emitter first:
-	//		for(uint32_t k=0;k<MAX_EMITTERS;k++)
-	//		{
-	//			if(emitters[k].life>0.0f)
-	//			{
-	//				if(whichProjectile->rigidBody==&emitters[k].body)
-	//				{
-	//					emitters[k].life=0.001f;
-	//					break;
-	//				}
-	//			}
-	//		}
+			Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, whichProjectile->rigidBody->position);
 
-	//		Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, whichProjectile->rigidBody->position);
-
-	//		ParticleSystem_AddEmitter(&particleSystem,
-	//								  whichProjectile->rigidBody->position,	// Position
-	//								  Vec3(100.0f, 12.0f, 5.0f),	// Start color
-	//								  Vec3(0.0f, 0.0f, 0.0f),		// End color
-	//								  5.0f,						// Radius of particles
-	//								  1000,						// Number of particles in system
-	//								  PARTICLE_EMITTER_ONCE,		// Type?
-	//								  ExplodeEmitterCallback		// Callback for particle generation
-	//		);
-	//	}
-	//}
+			ParticleSystem_AddEmitter(&particleSystem,
+									  whichProjectile->rigidBody->position,	// Position
+									  Vec3(100.0f, 12.0f, 5.0f),	// Start color
+									  Vec3(0.0f, 0.0f, 0.0f),		// End color
+									  5.0f,						// Radius of particles
+									  1000,						// Number of particles in system
+									  PARTICLE_EMITTER_ONCE,		// Type?
+									  ExplodeEmitterCallback		// Callback for particle generation
+			);
+		}
+	}
 }
 
 SpatialHash_t spatialHash;
@@ -870,42 +863,46 @@ void Thread_Physics(void *arg)
 			// Fire "laser beam"
 			if(isControlPressed)
 			{
-				float distance=raySphereIntersect(camera.body.position, camera.forward, physicsObjects[i].rigidBody->position, physicsObjects[i].rigidBody->radius);
-
-				if(distance>0.0f)
+				if(physicsObjects[i].rigidBody->type==RIGIDBODY_SPHERE)
 				{
-					// This is a bit hacky, can't add particleBody as a physics object due to scope lifetime, so test in place.
-					RigidBody_t particleBody;
+					float distance=raySphereIntersect(camera.body.position, camera.forward, physicsObjects[i].rigidBody->position, physicsObjects[i].rigidBody->radius);
 
-					particleBody.position=Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, distance));
-					particleBody.velocity=Vec3_Muls(camera.forward, 300.0f);
-
-					particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-					particleBody.angularVelocity=Vec3b(0.0f);
-
-					particleBody.radius=2.0f;
-
-					particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*10000.0f;
-					particleBody.invMass=1.0f/particleBody.mass;
-
-					particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
-					particleBody.invInertia=1.0f/particleBody.inertia;
-
-					if(PhysicsSphereToSphereCollisionResponse(&particleBody, physicsObjects[i].rigidBody)>1.0f)
+					if(distance>0.0f)
 					{
-						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, particleBody.position);
+						// This is a bit hacky, can't add particleBody as a physics object due to scope lifetime, so test in place.
+						RigidBody_t particleBody;
 
-						ParticleSystem_AddEmitter
-						(
-							&particleSystem,
-							particleBody.position,		// Position
-							Vec3(100.0f, 12.0f, 5.0f),	// Start color
-							Vec3(0.0f, 0.0f, 0.0f),		// End color
-							5.0f,						// Radius of particles
-							1000,						// Number of particles in system
-							PARTICLE_EMITTER_ONCE,		// Type?
-							ExplodeEmitterCallback		// Callback for particle generation
-						);
+						particleBody.position=Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, distance));
+						particleBody.velocity=Vec3_Muls(camera.forward, 300.0f);
+
+						particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+						particleBody.angularVelocity=Vec3b(0.0f);
+
+						particleBody.type=RIGIDBODY_SPHERE;
+						particleBody.radius=2.0f;
+
+						particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*10000.0f;
+						particleBody.invMass=1.0f/particleBody.mass;
+
+						particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
+						particleBody.invInertia=1.0f/particleBody.inertia;
+
+						if(PhysicsCollisionResponse(&particleBody, physicsObjects[i].rigidBody)>1.0f)
+						{
+							Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, particleBody.position);
+
+							ParticleSystem_AddEmitter
+							(
+								&particleSystem,
+								particleBody.position,		// Position
+								Vec3(100.0f, 12.0f, 5.0f),	// Start color
+								Vec3(0.0f, 0.0f, 0.0f),		// End color
+								5.0f,						// Radius of particles
+								1000,						// Number of particles in system
+								PARTICLE_EMITTER_ONCE,		// Type?
+								ExplodeEmitterCallback		// Callback for particle generation
+							);
+						}
 					}
 				}
 			}
@@ -1439,7 +1436,7 @@ bool Init(void)
 			.inertia=inertia,
 			.invInertia=1.0f/inertia,
 
-			//.radius=radius,
+			.type=RIGIDBODY_OBB,
 			.size=Vec3(radius/2, radius/2, radius/2),
 		};
 
@@ -1457,7 +1454,7 @@ bool Init(void)
 			.inertia=inertia,
 			.invInertia=1.0f/inertia,
 
-			//.radius=radius,
+			.type=RIGIDBODY_OBB,
 			.size=Vec3(radius/2, radius/2, radius/2),
 		};
 	}
@@ -1565,6 +1562,7 @@ bool Init(void)
 			.inertia=inertia,
 			.invInertia=1.0f/inertia,
 
+			.type=RIGIDBODY_SPHERE,
 			.radius=5.0f,
 		};
 	}
