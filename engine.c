@@ -88,8 +88,8 @@ BModel_t models[NUM_MODELS];
 BModel_t fighter;
 uint32_t fighterTexture=0;
 
-RigidBody_t cubeBody0;
-RigidBody_t cubeBody1;
+//#define NUM_CUBE 14
+RigidBody_t cubeBody[NUM_CUBE];
 BModel_t cube;
 
 // Texture images
@@ -172,6 +172,54 @@ LineGraph_t frameTimes, audioTimes, physicsTimes;
 
 void RecreateSwapchain(void);
 bool CreateFramebuffers(uint32_t eye);
+
+void ResetPhysicsCubes(void)
+{
+	const float radius=20.0f;
+	const float mass=(1.0f/3000.0f)*(1.33333333f*PI*radius)*10.0f;
+	const float inertia=0.4f*mass*(radius*radius);
+
+	const uint32_t layers=4;
+	const uint32_t cubesPerLayer=4;
+	const float spacing=radius*1.01f;
+
+	uint32_t index=0;
+	for(uint32_t y=0;y<layers;y++)
+	{
+		for(uint32_t x=0;x<cubesPerLayer-y; x++)
+		{
+			for(uint32_t z=0;z<cubesPerLayer-y;z++)
+			{
+				if(index>=NUM_CUBE) break;
+
+				float offsetX=(cubesPerLayer-y-1)*spacing*0.5f;
+				float offsetZ=(cubesPerLayer-y-1)*spacing*0.5f;
+
+				cubeBody[index++]=(RigidBody_t)
+				{
+					.position=Vec3(
+						x*spacing-offsetX,
+						(y*spacing)-(layers*radius/2),
+						z*spacing-offsetZ
+					),
+
+					.velocity=Vec3b(0.0f),
+					.force=Vec3b(0.0f),
+					.mass=mass*10,
+					.invMass=1.0f/mass,
+
+					.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
+					.angularVelocity=Vec3b(0.0f),
+					.inertia=inertia,
+					.invInertia=1.0f/inertia,
+
+					.type=RIGIDBODY_OBB,
+					.size=Vec3(radius/2, radius/2, radius/2),
+				};
+			}
+		}
+	}
+}
 
 // Build up random data for skybox and asteroid field
 void GenerateWorld(void)
@@ -323,10 +371,12 @@ void GenerateWorld(void)
 	{
 		for(uint32_t i=0;i<swapchain.numImages;i++)
 		{
-			vkuCreateHostBuffer(&vkContext, &perFrame[i].cubeInstance, sizeof(matrix)*2, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+			vkuCreateHostBuffer(&vkContext, &perFrame[i].cubeInstance, sizeof(matrix)*NUM_CUBE, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 			perFrame[i].cubeInstancePtr=(matrix *)perFrame[i].cubeInstance.memory->mappedPointer;
 		}
 	}
+
+	ResetPhysicsCubes();
 }
 //////
 
@@ -804,8 +854,8 @@ void Thread_Physics(void *arg)
 		}
 	}
 
-	AddPhysicsObject(&cubeBody0, PHYSICSOBJECTTYPE_FIELD);
-	AddPhysicsObject(&cubeBody1, PHYSICSOBJECTTYPE_FIELD);
+	for(uint32_t i=0;i<NUM_CUBE;i++)
+		AddPhysicsObject(&cubeBody[i], PHYSICSOBJECTTYPE_FIELD);
 	//////
 
 	SpatialHash_Clear(&spatialHash);
@@ -863,46 +913,48 @@ void Thread_Physics(void *arg)
 			// Fire "laser beam"
 			if(isControlPressed)
 			{
+				float distance=0.0f;
+
 				if(physicsObjects[i].rigidBody->type==RIGIDBODY_SPHERE)
+					distance=raySphereIntersect(camera.body.position, camera.forward, physicsObjects[i].rigidBody->position, physicsObjects[i].rigidBody->radius);
+				else if(physicsObjects[i].rigidBody->type==RIGIDBODY_OBB)
+					distance=rayOBBIntersect(camera.body.position, camera.forward, physicsObjects[i].rigidBody->position, physicsObjects[i].rigidBody->size, physicsObjects[i].rigidBody->orientation);
+
+				if(distance>0.0f)
 				{
-					float distance=raySphereIntersect(camera.body.position, camera.forward, physicsObjects[i].rigidBody->position, physicsObjects[i].rigidBody->radius);
+					// This is a bit hacky, can't add particleBody as a physics object due to scope lifetime, so test in place.
+					RigidBody_t particleBody;
 
-					if(distance>0.0f)
+					particleBody.position=Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, distance*0.99f));
+					particleBody.velocity=Vec3_Muls(camera.forward, 300.0f);
+
+					particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+					particleBody.angularVelocity=Vec3b(0.0f);
+
+					particleBody.type=RIGIDBODY_SPHERE;
+					particleBody.radius=2.0f;
+
+					particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*1000.0f;
+					particleBody.invMass=1.0f/particleBody.mass;
+
+					particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
+					particleBody.invInertia=1.0f/particleBody.inertia;
+
+					if(PhysicsCollisionResponse(&particleBody, physicsObjects[i].rigidBody)>1.0f)
 					{
-						// This is a bit hacky, can't add particleBody as a physics object due to scope lifetime, so test in place.
-						RigidBody_t particleBody;
+						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, particleBody.position);
 
-						particleBody.position=Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, distance));
-						particleBody.velocity=Vec3_Muls(camera.forward, 300.0f);
-
-						particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-						particleBody.angularVelocity=Vec3b(0.0f);
-
-						particleBody.type=RIGIDBODY_SPHERE;
-						particleBody.radius=2.0f;
-
-						particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*10000.0f;
-						particleBody.invMass=1.0f/particleBody.mass;
-
-						particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
-						particleBody.invInertia=1.0f/particleBody.inertia;
-
-						if(PhysicsCollisionResponse(&particleBody, physicsObjects[i].rigidBody)>1.0f)
-						{
-							Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, particleBody.position);
-
-							ParticleSystem_AddEmitter
-							(
-								&particleSystem,
-								particleBody.position,		// Position
-								Vec3(100.0f, 12.0f, 5.0f),	// Start color
-								Vec3(0.0f, 0.0f, 0.0f),		// End color
-								5.0f,						// Radius of particles
-								1000,						// Number of particles in system
-								PARTICLE_EMITTER_ONCE,		// Type?
-								ExplodeEmitterCallback		// Callback for particle generation
-							);
-						}
+						ParticleSystem_AddEmitter
+						(
+							&particleSystem,
+							particleBody.position,		// Position
+							Vec3(100.0f, 12.0f, 5.0f),	// Start color
+							Vec3(0.0f, 0.0f, 0.0f),		// End color
+							5.0f,						// Radius of particles
+							1000,						// Number of particles in system
+							PARTICLE_EMITTER_ONCE,		// Type?
+							ExplodeEmitterCallback		// Callback for particle generation
+						);
 					}
 				}
 			}
@@ -966,21 +1018,13 @@ void Thread_Physics(void *arg)
 		perFrame[index].fighterInstancePtr[0]=MatrixMult(local, MatrixTranslatev(camera.body.position));
 	}
 
+	for(uint32_t i=0;i<NUM_CUBE;i++)
 	{
-		//const float scale=cubeBody.radius;
-		matrix local=MatrixScalev(cubeBody0.size);
+		matrix local=MatrixScalev(cubeBody[i].size);
 		local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
 		local=MatrixMult(local, MatrixTranslatev(cube.center));
-		local=MatrixMult(local, QuatToMatrix(cubeBody0.orientation));
-		perFrame[index].cubeInstancePtr[0]=MatrixMult(local, MatrixTranslatev(cubeBody0.position));
-	}
-	{
-		//const float scale=cubeBody.radius;
-		matrix local=MatrixScalev(cubeBody1.size);
-		local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
-		local=MatrixMult(local, MatrixTranslatev(cube.center));
-		local=MatrixMult(local, QuatToMatrix(cubeBody1.orientation));
-		perFrame[index].cubeInstancePtr[1]=MatrixMult(local, MatrixTranslatev(cubeBody1.position));
+		local=MatrixMult(local, QuatToMatrix(cubeBody[i].orientation));
+		perFrame[index].cubeInstancePtr[i]=MatrixMult(local, MatrixTranslatev(cubeBody[i].position));
 	}
 
 	// Update camera and modelview matrix
@@ -1415,48 +1459,6 @@ bool Init(void)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/cube.bmodel\n");
 		return false;
-	}
-
-	{
-		const float radius=20.0f;
-		const float mass=(1.0f/3000.0f)*(1.33333333f*PI*radius)*10.0f;
-		const float inertia=0.4f*mass*(radius*radius);
-
-		cubeBody0=(RigidBody_t)
-		{
-			.position=Vec3(-12.0f, 0.0f, 0.0f),
-
-			.velocity=Vec3b(0.0f),
-			.force=Vec3b(0.0f),
-			.mass=mass*10,
-			.invMass=1.0f/mass,
-
-			.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
-			.angularVelocity=Vec3b(0.0f),
-			.inertia=inertia,
-			.invInertia=1.0f/inertia,
-
-			.type=RIGIDBODY_OBB,
-			.size=Vec3(radius/2, radius/2, radius/2),
-		};
-
-		cubeBody1=(RigidBody_t)
-		{
-			.position=Vec3(12.0f, 0.0f, 0.0f),
-
-			.velocity=Vec3b(0.0f),
-			.force=Vec3b(0.0f),
-			.mass=mass*10,
-			.invMass=1.0f/mass,
-
-			.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
-			.angularVelocity=Vec3b(0.0f),
-			.inertia=inertia,
-			.invInertia=1.0f/inertia,
-
-			.type=RIGIDBODY_OBB,
-			.size=Vec3(radius/2, radius/2, radius/2),
-		};
 	}
 
 	// Load textures

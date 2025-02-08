@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <float.h>
 #include "math.h"
 
 // Some fast approx. trig. functions
@@ -158,13 +159,40 @@ float Lerp(const float a, const float b, const float t)
 	return t*(b-a)+a;
 }
 
-float raySphereIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 sphereCenter, float sphereRadius)
+float rayOBBIntersect(const vec3 rayOrigin, const vec3 rayDirection, const vec3 obbCenter, const vec3 obbHalfSize, const vec4 obbOrientation)
 {
-	vec3 oc=Vec3_Subv(rayOrigin, sphereCenter);
-	float a=Vec3_Dot(rayDirection, rayDirection);
-	float b=2.0f*Vec3_Dot(oc, rayDirection);
-	float c=Vec3_Dot(oc, oc)-sphereRadius*sphereRadius;
-	float discriminant=b*b-4*a*c;
+	// Transform ray into OBB local space using inverse rotation
+	const vec4 invOrientation=QuatInverse(obbOrientation);
+	const vec3 localRayOrigin=QuatRotate(invOrientation, Vec3_Subv(rayOrigin, obbCenter));
+	const vec3 localRayDir=QuatRotate(invOrientation, rayDirection);
+
+	// Compute intersection of ray with all six bbox planes
+	const vec3 invR=Vec3(1.0f/localRayDir.x, 1.0f/localRayDir.y, 1.0f/localRayDir.z);
+
+	const vec3 tbot=Vec3_Mulv(Vec3_Subv(Vec3_Muls(obbHalfSize, -1.0f), localRayOrigin), invR);
+	const vec3 ttop=Vec3_Mulv(Vec3_Subv(Vec3_Muls(obbHalfSize, 1.0f), localRayOrigin), invR);
+
+	// Reorder intersections to find smallest and largest on each axis
+	const vec3 tmin=Vec3(fminf(ttop.x, tbot.x), fminf(ttop.y, tbot.y), fminf(ttop.z, tbot.z));
+	const vec3 tmax=Vec3(fmaxf(ttop.x, tbot.x), fmaxf(ttop.y, tbot.y), fmaxf(ttop.z, tbot.z));
+
+	// Find the largest tmin and the smallest tmax
+	const float t0=fmaxf(fmaxf(tmin.x, tmin.y), tmin.z);
+	const float t1=fminf(fminf(tmax.x, tmax.y), tmax.z);
+
+	if(t0>t1||t1<0.0f)
+		return -1.0f;
+
+	return t0;
+}
+
+float raySphereIntersect(const vec3 rayOrigin, const vec3 rayDirection, const vec3 sphereCenter, const float sphereRadius)
+{
+	const vec3 oc=Vec3_Subv(rayOrigin, sphereCenter);
+	const float a=Vec3_Dot(rayDirection, rayDirection);
+	const float b=2.0f*Vec3_Dot(oc, rayDirection);
+	const float c=Vec3_Dot(oc, oc)-sphereRadius*sphereRadius;
+	const float discriminant=b*b-4*a*c;
 
 	if(discriminant<0.0f)
 		return -1.0f;
@@ -172,7 +200,7 @@ float raySphereIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 sphereCenter, f
 		return (-b-sqrtf(discriminant))/(2.0f*a);
 }
 
-uint32_t planeSphereIntersect(vec4 plane, vec3 center, float radius, vec3 *intersectionA, vec3 *intersectionB)
+uint32_t planeSphereIntersect(const vec4 plane, const vec3 center, const float radius, vec3 *intersectionA, vec3 *intersectionB)
 {
 	const vec3 planeVec3=Vec3(plane.x, plane.y, plane.z);
 	const float planeSphereSqDist=Vec3_Dot(planeVec3, center)+plane.w;

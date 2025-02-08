@@ -198,7 +198,9 @@ uint32_t IsPower2(uint32_t value);
 uint32_t NextPower2(uint32_t value);
 int32_t ComputeLog(uint32_t value);
 float Lerp(const float a, const float b, const float t);
+float rayOBBIntersect(const vec3 rayOrigin, const vec3 rayDirection, const vec3 obbCenter, const vec3 obbHalfSize, const vec4 obbOrientation);
 float raySphereIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 sphereCenter, float sphereRadius);
+uint32_t planeSphereIntersect(const vec4 plane, const vec3 center, const float radius, vec3 *intersectionA, vec3 *intersectionB);
 
 vec4 QuatAngle(const float angle, const float x, const float y, const float z);
 vec4 QuatAnglev(const float angle, const vec3 v);

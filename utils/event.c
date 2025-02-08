@@ -20,6 +20,7 @@
 extern uint32_t renderWidth, renderHeight;
 
 void GenerateWorld(void);
+void ResetPhysicsCubes(void);
 
 extern Camera_t camera;
 
@@ -175,17 +176,10 @@ bool Event_Trigger(EventID ID, void *arg)
 				case KB_SPACE:
 					FireParticleEmitter(Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, camera.body.radius)), camera.forward);
 					break;
-				case KB_P:		GenerateWorld();		break;
-				case KB_O:		pausePhysics=!pausePhysics; break;
-				case KB_I:		cubeBody0.position=Vec3(-12.0f, 0.0f, 0.0f);
-								cubeBody0.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-								cubeBody0.velocity=Vec3b(0.0f);
-								cubeBody0.angularVelocity=Vec3b(0.0f);
-								cubeBody1.position=Vec3(12.0f, 0.0f, 0.0f);
-								cubeBody1.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-								cubeBody1.velocity=Vec3b(0.0f);
-								cubeBody1.angularVelocity=Vec3b(0.0f);
-								break;
+				case KB_I:
+					ResetPhysicsCubes();				break;
+				case KB_O:		GenerateWorld();		break;
+				case KB_P:		pausePhysics=!pausePhysics; break;
 				case KB_W:		camera.key_w=true;		break;
 				case KB_S:		camera.key_s=true;		break;
 				case KB_A:		camera.key_a=true;		break;

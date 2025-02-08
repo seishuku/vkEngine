@@ -217,6 +217,6 @@ void DrawLighting(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, V
 	for(uint32_t j=0;j<cube.numMesh;j++)
 	{
 		vkCmdBindIndexBuffer(commandBuffer, cube.mesh[j].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-		vkCmdDrawIndexed(commandBuffer, cube.mesh[j].numFace*3, 2, 0, 0, 0);
+		vkCmdDrawIndexed(commandBuffer, cube.mesh[j].numFace*3, NUM_CUBE, 0, 0, 0);
 	}
 }
