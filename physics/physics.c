@@ -107,6 +107,10 @@ void PhysicsExplode(RigidBody_t *body)
 
 static float ResolveCollision(RigidBody_t *a, RigidBody_t *b, const vec3 contact, const vec3 normal, const float penetration)
 {
+	// Pre-calculate inverse orientation quats
+	const vec4 invOrientationA=QuatInverse(a->orientation);
+	const vec4 invOrientationB=QuatInverse(b->orientation);
+
 	// Torque arms
 	const vec3 r1=Vec3_Subv(contact, a->position);
 	const vec3 r2=Vec3_Subv(contact, b->position);
@@ -138,8 +142,8 @@ static float ResolveCollision(RigidBody_t *a, RigidBody_t *b, const vec3 contact
 	b->velocity=Vec3_Addv(b->velocity, Vec3_Muls(impulse, b->invMass));
 
 	// Transform torque to local space
-	vec3 localTorqueA=QuatRotate(QuatInverse(a->orientation), Vec3_Cross(r1, impulse));
-	vec3 localTorqueB=QuatRotate(QuatInverse(b->orientation), Vec3_Cross(r2, impulse));
+	vec3 localTorqueA=QuatRotate(invOrientationA, Vec3_Cross(r1, impulse));
+	vec3 localTorqueB=QuatRotate(invOrientationB, Vec3_Cross(r2, impulse));
 
 	// Angular velocity
 	a->angularVelocity=Vec3_Subv(a->angularVelocity, Vec3_Muls(localTorqueA, a->invInertia));
@@ -155,12 +159,7 @@ static float ResolveCollision(RigidBody_t *a, RigidBody_t *b, const vec3 contact
 	const float friction=sqrtf(0.5f*0.5f);
 	const float maxjT=friction*j;
 
-	float jT=-Vec3_Dot(relativeVel, tangentialVel)/(invMassSum+Vec3_Dot(tangentialVel, Vec3_Addv(d1T, d2T)));
-
-	if(jT>maxjT)
-		jT=maxjT;
-	else if(jT<-maxjT)
-		jT=-maxjT;
+	const float jT=clampf(-Vec3_Dot(relativeVel, tangentialVel)/(invMassSum+Vec3_Dot(tangentialVel, Vec3_Addv(d1T, d2T))), -maxjT, maxjT);
 
 	const vec3 impulseT=Vec3_Muls(tangentialVel, jT);
 
@@ -169,8 +168,8 @@ static float ResolveCollision(RigidBody_t *a, RigidBody_t *b, const vec3 contact
 	b->velocity=Vec3_Addv(b->velocity, Vec3_Muls(impulseT, b->invMass));
 
 	// Angular frictional velocity
-	localTorqueA=QuatRotate(QuatInverse(a->orientation), Vec3_Cross(r1, impulseT));
-	localTorqueB=QuatRotate(QuatInverse(b->orientation), Vec3_Cross(r2, impulseT));
+	localTorqueA=QuatRotate(invOrientationA, Vec3_Cross(r1, impulseT));
+	localTorqueB=QuatRotate(invOrientationB, Vec3_Cross(r2, impulseT));
 
 	a->angularVelocity=Vec3_Subv(a->angularVelocity, Vec3_Muls(localTorqueA, a->invInertia));
 	b->angularVelocity=Vec3_Addv(b->angularVelocity, Vec3_Muls(localTorqueB, b->invInertia));
@@ -254,12 +253,8 @@ static float OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 	// List of axes to test, at minimum test base axes of A and B OBBs
 	uint32_t axisCount=6;
 	vec3 axes[15]={
-		axesA[0],
-		axesA[1],
-		axesA[2],
-		axesB[0],
-		axesB[1],
-		axesB[2],
+		axesA[0], axesA[1], axesA[2],
+		axesB[0], axesB[1], axesB[2],
 	};
 
 	// Cross products add additional axes to test
@@ -268,10 +263,10 @@ static float OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 		for(uint32_t j=0;j<3;j++)
 		{
 			vec3 axis=Vec3_Cross(axesA[i], axesB[j]);
-			const float lengthSq=Vec3_Dot(axis, axis);
+			const float length=Vec3_Normalize(&axis);
 
-			if(lengthSq>FLT_EPSILON)
-				axes[axisCount++]=Vec3_Muls(axis, 1.0f/sqrtf(lengthSq));
+			if(length>FLT_EPSILON)
+				axes[axisCount++]=axis;
 		}
 	}
 
