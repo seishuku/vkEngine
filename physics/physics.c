@@ -17,7 +17,7 @@ static void ApplyConstraints(RigidBody_t *body)
 	// Check for collision with outer boundary sphere and reflect velocity if needed
 	vec3 normal=Vec3_Subv(body->position, center);
 
-	float distanceSq=Vec3_Dot(normal, normal);
+	float distanceSq=Vec3_LengthSq(normal);
 	const float radiiSum=(maxRadius*maxRadius)-(body->radius*body->radius);
 
 	if(distanceSq>radiiSum)
@@ -185,7 +185,7 @@ static float ResolveCollision(RigidBody_t *a, RigidBody_t *b, const vec3 contact
 static float SphereToSphereCollision(RigidBody_t *a, RigidBody_t *b)
 {
 	const vec3 relativePosition=Vec3_Subv(b->position, a->position);
-	const float distanceSq=Vec3_Dot(relativePosition, relativePosition);
+	const float distanceSq=Vec3_LengthSq(relativePosition);
 	const float radiiSum=a->radius+b->radius;
 
 	if(distanceSq<FLT_EPSILON||distanceSq>radiiSum*radiiSum)
@@ -219,7 +219,7 @@ static float SphereToOBBCollision(RigidBody_t *sphere, RigidBody_t *obb)
 	closestPoint=Vec3_Addv(closestPoint, Vec3_Muls(axes[2], fmaxf(-obb->size.z, fminf(Vec3_Dot(relativeCenter, axes[2]), obb->size.z))));
 
 	const vec3 relativePosition=Vec3_Subv(sphere->position, closestPoint);
-	const float distanceSq=Vec3_Dot(relativePosition, relativePosition);
+	const float distanceSq=Vec3_LengthSq(relativePosition);
 
 	if(distanceSq<FLT_EPSILON||distanceSq>sphere->radius*sphere->radius)
 	{

@@ -72,6 +72,11 @@ float Vec3_Length(const vec3 Vector)
 	return sqrtf(Vec3_Dot(Vector, Vector));
 }
 
+float Vec3_LengthSq(const vec3 Vector)
+{
+	return Vec3_Dot(Vector, Vector);
+}
+
 float Vec3_Distance(const vec3 Vector1, const vec3 Vector2)
 {
 	return Vec3_Length(Vec3_Subv(Vector2, Vector1));
