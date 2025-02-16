@@ -196,7 +196,9 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 		{
 			.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 			.pNext=VK_NULL_HANDLE,
+			.flags=0,
 			.image=newImage[i],
+			.viewType=VK_IMAGE_VIEW_TYPE_2D,
 			.format=swapchain->surfaceFormat.format,
 			.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
 			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
@@ -204,8 +206,6 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 			.subresourceRange.levelCount=1,
 			.subresourceRange.baseArrayLayer=0,
 			.subresourceRange.layerCount=1,
-			.viewType=VK_IMAGE_VIEW_TYPE_2D,
-			.flags=0,
 		}, VK_NULL_HANDLE, &newImageView[i]);
 	}
 
