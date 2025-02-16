@@ -373,3 +373,15 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# vkEngine specific exclusions
+vkEngine
+vkEngine.apk
+vkEngine.exe
+my-release-key.keystore
+
+# Ignore the submodules
+deps/ogg
+deps/OpenXR-SDK
+deps/portaudio
+deps/vorbis

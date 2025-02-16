@@ -9,15 +9,16 @@
 #include "../vulkan/vulkan.h"
 #include "bmodel.h"
 
-const uint32_t BMDL_MAGIC='B'|'M'<<8|'D'<<16|'L'<<24;
-const uint32_t MESH_MAGIC='M'|'E'<<8|'S'<<16|'H'<<24;
-const uint32_t MATL_MAGIC='M'|'A'<<8|'T'<<16|'L'<<24;
-const uint32_t VERT_MAGIC='V'|'E'<<8|'R'<<16|'T'<<24;
-const uint32_t TEXC_MAGIC='T'|'E'<<8|'X'<<16|'C'<<24;
-const uint32_t TANG_MAGIC='T'|'A'<<8|'N'<<16|'G'<<24;
-const uint32_t BNRM_MAGIC='B'|'N'<<8|'R'<<16|'M'<<24;
-const uint32_t NORM_MAGIC='N'|'O'<<8|'R'<<16|'M'<<24;
-
+enum : uint32_t {
+	BMDL_MAGIC='B'|'M'<<8|'D'<<16|'L'<<24,
+	MESH_MAGIC='M'|'E'<<8|'S'<<16|'H'<<24,
+	MATL_MAGIC='M'|'A'<<8|'T'<<16|'L'<<24,
+	VERT_MAGIC='V'|'E'<<8|'R'<<16|'T'<<24,
+	TEXC_MAGIC='T'|'E'<<8|'X'<<16|'C'<<24,
+	TANG_MAGIC='T'|'A'<<8|'N'<<16|'G'<<24,
+	BNRM_MAGIC='B'|'N'<<8|'R'<<16|'M'<<24,
+	NORM_MAGIC='N'|'O'<<8|'R'<<16|'M'<<24
+};
 static void CalculateTangent(BModel_t *model)
 {
 	if(model->UV)

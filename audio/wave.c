@@ -11,10 +11,12 @@
 #include "audio.h"
 
 // Chunk magic markers
-static const uint32_t RIFF_MAGIC='R'|'I'<<8|'F'<<16|'F'<<24;
-static const uint32_t WAVE_MAGIC='W'|'A'<<8|'V'<<16|'E'<<24;
-static const uint32_t FMT_MAGIC ='f'|'m'<<8|'t'<<16|' '<<24;
-static const uint32_t DATA_MAGIC='d'|'a'<<8|'t'<<16|'a'<<24;
+enum : uint32_t {
+	RIFF_MAGIC='R'|'I'<<8|'F'<<16|'F'<<24,
+	WAVE_MAGIC='W'|'A'<<8|'V'<<16|'E'<<24,
+	FMT_MAGIC ='f'|'m'<<8|'t'<<16|' '<<24,
+	DATA_MAGIC='d'|'a'<<8|'t'<<16|'a'<<24
+};
 
 typedef struct RIFFChunk_s
 {
@@ -122,11 +124,9 @@ uint32_t WavWrite(const char *filename, int16_t *samples, uint32_t numSamples, u
 	RIFFChunk_t RIFF={ RIFF_MAGIC, dataSize+44-8 };
 	fwrite(&RIFF, sizeof(RIFFChunk_t), 1, stream);
 
-	// Write WAVE
-	fwrite(&WAVE_MAGIC, 1, sizeof(uint32_t), stream);
+	// Write WAVE and Format chunks
+	fwrite(&(uint32_t[2]){WAVE_MAGIC, FMT_MAGIC}, sizeof(uint32_t), 2, stream);
 
-	// Write format chunk
-	fwrite(&FMT_MAGIC, 1, sizeof(uint32_t), stream);
 	uint32_t fmtSize=sizeof(WaveFormat_t);
 	fwrite(&fmtSize, sizeof(uint32_t), 1, stream);
 	WaveFormat_t format=
@@ -141,7 +141,7 @@ uint32_t WavWrite(const char *filename, int16_t *samples, uint32_t numSamples, u
 	fwrite(&format, sizeof(WaveFormat_t), 1, stream);
 
 	// Write data chunk
-	fwrite(&DATA_MAGIC, sizeof(uint32_t), 1, stream);
+	fwrite(&(uint32_t){DATA_MAGIC}, sizeof(uint32_t), 1, stream);
 	fwrite(&dataSize, sizeof(uint32_t), 1, stream);
 	fwrite(samples, dataSize, 1, stream);
 
