@@ -8,6 +8,10 @@ This started long long ago in 2004, with OpenGL and ATI GPU demos... My only gam
 
 I also have the [OpenGL version](https://github.com/seishuku/Engine), this is a *far* more evolved codebase than that though, the OpenGL version I should archive the repo as I haven't touched it in quite some time.
 
+I love doing everything my self with as little external library dependencies as possible.<br>
+This is also an on-going learning experience for me and for anyone else that can learn from my code, I try to keep it clean and readable.<br>
+Very much "Building square wheels to better appreciate the round ones."
+
 To-do (in no particular order):
 - Improve audio (needs pops/clicks fixed)
 - Improve physics (more collision object support?)
@@ -25,4 +29,4 @@ External dependencies for building this (versions as of this writing, newer *sho
  - portaudio 2.0
  - Vulkan 1.3.231.1
 
-(note: cmake should automatically fetch these dependencites)
+(note: recursive clone to fetch dependency submodules)
