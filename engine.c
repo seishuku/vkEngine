@@ -1923,11 +1923,12 @@ void Destroy(void)
 	Font_Destroy(&font);
 	//////////
 
-	// Asteroid and fighter instance buffer destruction
+	// Instance buffer destruction
 	for(uint32_t i=0;i<swapchain.numImages;i++)
 	{
 		vkuDestroyBuffer(&vkContext, &perFrame[i].asteroidInstance);
 		vkuDestroyBuffer(&vkContext, &perFrame[i].fighterInstance);
+		vkuDestroyBuffer(&vkContext, &perFrame[i].cubeInstance);
 	}
 	//////////
 
