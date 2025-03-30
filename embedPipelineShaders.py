@@ -34,12 +34,13 @@ def replace_stage_files_with_base64(input_file, shader_path=None):
     with open(input_file, 'r') as f:
         content = f.read()
 
-    # Pattern to match addStage statements
-    stage_pattern = re.compile(r'addStage\("([^"]*)",\s*(\w+)\)')
+    # Pattern to match addStage statements (both file-based and base64)
+    stage_pattern = re.compile(r'addStage\(([^,]+),\s*([^\)]+)\)')
 
     def replacer(match):
-        # Extract the stage type
+        # Extract the stage type and the first argument (file name or base64 content)
         stage_type = match.group(2)
+        first_arg = match.group(1)
 
         # Get the file extension based on the stage type
         extension = STAGE_EXTENSIONS.get(stage_type)

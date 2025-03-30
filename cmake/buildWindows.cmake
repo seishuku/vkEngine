@@ -17,7 +17,6 @@ function("buildWindows")
     endif()
 
     add_executable(${CMAKE_PROJECT_NAME} ${PROJECT_SOURCES})
-    add_dependencies(${CMAKE_PROJECT_NAME} ShaderCompilation)
 
     target_link_libraries(
         ${CMAKE_PROJECT_NAME} PUBLIC

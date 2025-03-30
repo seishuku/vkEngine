@@ -36,7 +36,6 @@ function("buildAndroid")
 	)
 
 	add_library(${CMAKE_PROJECT_NAME} SHARED ${PROJECT_SOURCES})
-	add_dependencies(${CMAKE_PROJECT_NAME} ShaderCompilation)
 
 	target_link_libraries(
 		${CMAKE_PROJECT_NAME} PUBLIC
