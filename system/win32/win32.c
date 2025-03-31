@@ -8,6 +8,7 @@
 #include "../../vulkan/vulkan.h"
 #include "../../math/math.h"
 #include "../../camera/camera.h"
+#include "../../utils/config.h"
 #include "../../utils/list.h"
 #include "../../utils/event.h"
 #include "../../vr/vr.h"
@@ -27,7 +28,8 @@ extern VkuContext_t vkContext;
 
 extern VkuSwapchain_t swapchain;
 
-static uint32_t winWidth=1920, winHeight=1080;
+Config_t config={ .windowWidth=1920, .windowHeight=1080, .msaaSamples=4, .deviceIndex=0 };
+
 extern uint32_t renderWidth, renderHeight;
 
 float fps=0.0f, fTimeStep=0.0f, fTime=0.0f;
@@ -127,8 +129,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			break;
 
 		case WM_SIZE:
-			winWidth=LOWORD(lParam);
-			winHeight=HIWORD(lParam);
+			config.windowWidth=LOWORD(lParam);
+			config.windowHeight=HIWORD(lParam);
 			break;
 
 		case WM_ACTIVATE:
@@ -159,21 +161,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					toggleFullscreen=false;
 					DBGPRINTF(DEBUG_INFO, "Going full screen...\n");
 
-					OldWidth=winWidth;
-					OldHeight=winHeight;
+					OldWidth=config.windowWidth;
+					OldHeight=config.windowHeight;
 
-					winWidth=GetSystemMetrics(SM_CXSCREEN);
-					winHeight=GetSystemMetrics(SM_CYSCREEN);
-					SetWindowPos(vkContext.hWnd, HWND_TOPMOST, 0, 0, winWidth, winHeight, 0);
+					config.windowWidth=GetSystemMetrics(SM_CXSCREEN);
+					config.windowHeight=GetSystemMetrics(SM_CYSCREEN);
+					SetWindowPos(vkContext.hWnd, HWND_TOPMOST, 0, 0, config.windowWidth, config.windowHeight, 0);
 				}
 				else
 				{
 					toggleFullscreen=true;
 					DBGPRINTF(DEBUG_INFO, "Going windowed...\n");
 
-					winWidth=OldWidth;
-					winHeight=OldHeight;
-					SetWindowPos(vkContext.hWnd, HWND_TOPMOST, 0, 0, winWidth, winHeight, 0);
+					config.windowWidth=OldWidth;
+					config.windowHeight=OldHeight;
+					SetWindowPos(vkContext.hWnd, HWND_TOPMOST, 0, 0, config.windowWidth, config.windowHeight, 0);
 				}
 			}
 			break;
@@ -440,6 +442,12 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
+	if(!Config_ReadINI(&config, "config.ini"))
+	{
+		DBGPRINTF(DEBUG_ERROR, "Unable to read config.ini.\n");
+		return -1;
+	}
+
 	RegisterClass(&(WNDCLASS)
 	{
 		.style=CS_VREDRAW|CS_HREDRAW|CS_OWNDC,
@@ -456,7 +464,7 @@ int main(int argc, char **argv)
 
 	RECT Rect;
 
-	SetRect(&Rect, 0, 0, winWidth, winHeight);
+	SetRect(&Rect, 0, 0, config.windowWidth, config.windowHeight);
 	AdjustWindowRect(&Rect, WS_POPUP, FALSE);
 
 	vkContext.hWnd=CreateWindow(szAppName, szAppName, WS_POPUP|WS_CLIPSIBLINGS, 0, 0, Rect.right-Rect.left, Rect.bottom-Rect.top, NULL, NULL, hInstance, NULL);
@@ -500,9 +508,9 @@ int main(int argc, char **argv)
 	{
 		renderWidth=xrContext.swapchainExtent.width;
 		renderHeight=xrContext.swapchainExtent.height;
-		winWidth=renderWidth;
-		winHeight=renderHeight;
-		MoveWindow(vkContext.hWnd, 0, 0, winWidth/2, winHeight/2, TRUE);
+		config.windowWidth=renderWidth;
+		config.windowHeight=renderHeight;
+		MoveWindow(vkContext.hWnd, 0, 0, config.windowWidth/2, config.windowHeight/2, TRUE);
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Initializing Vulkan resources...\n");

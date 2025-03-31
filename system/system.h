@@ -5,6 +5,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include "memzone.h"
+#include "../utils/config.h"
+
+extern Config_t config;
 
 #ifndef DEBUG_ERROR
 #define DEBUG_ERROR "\x1B[91m"

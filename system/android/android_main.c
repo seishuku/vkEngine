@@ -12,6 +12,7 @@
 #include "../../vulkan/vulkan.h"
 #include "../../math/math.h"
 #include "../../vr/vr.h"
+#include "../../utils/config.h"
 #include "../../utils/event.h"
 
 MemZone_t *zone;
@@ -26,7 +27,8 @@ extern VkuContext_t vkContext;
 
 extern VkuSwapchain_t swapchain;
 
-static uint32_t winWidth, winHeight;
+Config_t config={ .windowWidth=1920, .windowHeight=1080, .msaaSamples=4, .deviceIndex=0 };
+
 extern uint32_t renderWidth, renderHeight;
 
 float fps=0.0f, fTimeStep=0.0f, fTime=0.0;
@@ -71,20 +73,20 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 						case AMOTION_EVENT_ACTION_DOWN:
 							MouseEvent.button|=MOUSE_TOUCH;
 							MouseEvent.dx=(int)(AMotionEvent_getX(event, 0)/scale);
-							MouseEvent.dy=winHeight-(int)(AMotionEvent_getY(event, 0)/scale);
+							MouseEvent.dy=config.windowHeight-(int)(AMotionEvent_getY(event, 0)/scale);
 							Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
 							break;
 
 						case AMOTION_EVENT_ACTION_UP:
 							MouseEvent.button&=~MOUSE_TOUCH;
 							MouseEvent.dx=(int)(AMotionEvent_getX(event, 0)/scale);
-							MouseEvent.dy=winHeight-(int)(AMotionEvent_getY(event, 0)/scale);
+							MouseEvent.dy=config.windowHeight-(int)(AMotionEvent_getY(event, 0)/scale);
 							Event_Trigger(EVENT_MOUSEUP, &MouseEvent);
 							break;
 
 						case AMOTION_EVENT_ACTION_MOVE:
 							MouseEvent.dx=(int)(AMotionEvent_getX(event, 0)/scale);
-							MouseEvent.dy=winHeight-(int)(AMotionEvent_getY(event, 0)/scale);
+							MouseEvent.dy=config.windowHeight-(int)(AMotionEvent_getY(event, 0)/scale);
 							Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
 							break;
 					}
@@ -183,9 +185,9 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 	switch(cmd)
 	{
 		case APP_CMD_INIT_WINDOW:
-			winWidth=ANativeWindow_getWidth(app->window)/scale;
-			winHeight=ANativeWindow_getHeight(app->window)/scale;
-			ANativeWindow_setBuffersGeometry(app->window, winWidth, winHeight, 0);
+			config.windowWidth=ANativeWindow_getWidth(app->window)/scale;
+			config.windowHeight=ANativeWindow_getHeight(app->window)/scale;
+			ANativeWindow_setBuffersGeometry(app->window, config.windowWidth, config.windowHeight, 0);
 
 			vkContext.window=app->window;
 
@@ -197,6 +199,12 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 				DBGPRINTF(DEBUG_ERROR, "\t...zone allocation failed!\n");
 				appState.app->destroyRequested=true;
 				ANativeActivity_finish(app->activity);
+				return;
+			}
+
+			if(!Config_ReadINI(&config, "config.ini"))
+			{
+				DBGPRINTF(DEBUG_ERROR, "Unable to read config.ini.\n");
 				return;
 			}
 

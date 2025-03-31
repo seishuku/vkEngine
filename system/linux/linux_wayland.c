@@ -18,6 +18,7 @@
 #include "../../vulkan/vulkan.h"
 #include "../../math/math.h"
 #include "../../camera/camera.h"
+#include "../../utils/config.h"
 #include "../../utils/list.h"
 #include "../../utils/event.h"
 #include "../../vr/vr.h"
@@ -39,7 +40,8 @@ extern VkuMemZone_t vkZone;
 
 extern VkuSwapchain_t swapchain;
 
-static uint32_t winWidth=1920, winHeight=1080;
+Config_t config={ .windowWidth=1920, .windowHeight=1080, .msaaSamples=4, .deviceIndex=0 };
+
 extern uint32_t renderWidth, renderHeight;
 
 float fps=0.0f, fTimeStep=0.0f, fTime=0.0f;
@@ -344,7 +346,13 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	DBGPRINTF(DEBUG_INFO, "Opening Wayland display...\n");
+    if(!Config_ReadINI(&config, "config.ini"))
+    {
+        DBGPRINTF(DEBUG_ERROR, "Unable to read config.ini.\n");
+        return -1;
+    }
+    
+    DBGPRINTF(DEBUG_INFO, "Opening Wayland display...\n");
     vkContext.wlDisplay=wl_display_connect(NULL);
 
 	if(vkContext.wlDisplay==NULL)
@@ -385,8 +393,8 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-    swapchain.extent.width=winWidth;
-    swapchain.extent.height=winHeight;
+    swapchain.extent.width=config.windowWidth;
+    swapchain.extent.height=config.windowHeight;
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Swapchain...\n");
 	if(!vkuCreateSwapchain(&vkContext, &swapchain, VK_TRUE))
@@ -410,8 +418,8 @@ int main(int argc, char** argv)
 	{
 		renderWidth=xrContext.swapchainExtent.width;
 		renderHeight=xrContext.swapchainExtent.height;
-		winWidth=renderWidth;
-		winHeight=renderHeight;
+		config.windowWidth=renderWidth;
+		config.windowHeight=renderHeight;
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Initializing Vulkan resources...\n");

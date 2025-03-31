@@ -14,6 +14,7 @@
 #include "../../vulkan/vulkan.h"
 #include "../../math/math.h"
 #include "../../camera/camera.h"
+#include "../../utils/config.h"
 #include "../../utils/list.h"
 #include "../../utils/event.h"
 #include "../../vr/vr.h"
@@ -37,7 +38,8 @@ extern VkuMemZone_t vkZone;
 
 extern VkuSwapchain_t swapchain;
 
-static uint32_t winWidth=1920, winHeight=1080;
+Config_t config={ .windowWidth=1920, .windowHeight=1080, .msaaSamples=4, .deviceIndex=0 };
+
 extern uint32_t renderWidth, renderHeight;
 
 float fps=0.0f, fTimeStep=0.0f, fTime=0.0f;
@@ -75,8 +77,8 @@ void EventLoop(void)
 					break;
 
 				case ConfigureNotify:
-					winWidth=event.xconfigure.width;
-					winHeight=event.xconfigure.height;
+					config.windowWidth=event.xconfigure.width;
+					config.windowHeight=event.xconfigure.height;
 					break;
 			}
 
@@ -100,7 +102,7 @@ void EventLoop(void)
 
 							Event_Trigger(EVENT_MOUSEMOVE, &mouseEvent);
 
-							XWarpPointer(vkContext.display, None, vkContext.window, 0, 0, 0, 0, winWidth/2, winHeight/2);
+							XWarpPointer(vkContext.display, None, vkContext.window, 0, 0, 0, 0, config.windowWidth/2, config.windowHeight/2);
 							XFlush(vkContext.display);
 						}
 						break;
@@ -317,6 +319,12 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
+	if(!Config_ReadINI(&config, "config.ini"))
+	{
+		DBGPRINTF(DEBUG_ERROR, "Unable to read config.ini.\n");
+		return -1;
+	}
+
 	DBGPRINTF(DEBUG_INFO, "Opening X display...\n");
 	vkContext.display=XOpenDisplay(NULL);
 
@@ -331,11 +339,11 @@ int main(int argc, char **argv)
 	Window Root=RootWindow(vkContext.display, Screen);
 
 	DBGPRINTF(DEBUG_INFO, "Creating X11 Window...\n");
-	vkContext.window=XCreateSimpleWindow(vkContext.display, Root, 10, 10, winWidth, winHeight, 1, BlackPixel(vkContext.display, Screen), WhitePixel(vkContext.display, Screen));
+	vkContext.window=XCreateSimpleWindow(vkContext.display, Root, 10, 10, config.windowWidth, config.windowHeight, 1, BlackPixel(vkContext.display, Screen), WhitePixel(vkContext.display, Screen));
 	XSelectInput(vkContext.display, vkContext.window, StructureNotifyMask|PointerMotionMask|ExposureMask|ButtonPressMask|KeyPressMask|KeyReleaseMask);
 	XStoreName(vkContext.display, vkContext.window, szAppName);
 
-	XWarpPointer(vkContext.display, None, vkContext.window, 0, 0, 0, 0, winWidth/2, winHeight/2);
+	XWarpPointer(vkContext.display, None, vkContext.window, 0, 0, 0, 0, config.windowWidth/2, config.windowHeight/2);
 	XFixesHideCursor(vkContext.display, vkContext.window);
 
 	register_input(vkContext.display, vkContext.window);
@@ -379,9 +387,9 @@ int main(int argc, char **argv)
 	{
 		renderWidth=xrContext.swapchainExtent.width;
 		renderHeight=xrContext.swapchainExtent.height;
-		winWidth=renderWidth;
-		winHeight=renderHeight;
-		XMoveResizeWindow(vkContext.display, vkContext.window, 0, 0, winWidth/2, winHeight/2);
+		config.windowWidth=renderWidth;
+		config.windowHeight=renderHeight;
+		XMoveResizeWindow(vkContext.display, vkContext.window, 0, 0, config.windowWidth/2, config.windowHeight/2);
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Initializing Vulkan resources...\n");
