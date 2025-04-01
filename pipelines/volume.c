@@ -1,3 +1,4 @@
+#include "../system/system.h"
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
 #include "../utils/pipeline.h"
@@ -9,17 +10,11 @@
 #define USE_COMPUTE_SHADER
 
 extern VkuContext_t vkContext;
-extern VkSampleCountFlags MSAA;
-extern VkFormat colorFormat;
-extern VkFormat depthFormat;
 extern VkuImage_t depthImage[2];
 extern VkRenderPass renderPass;
 
 extern UI_t UI;
 extern uint32_t colorShiftID;
-
-extern uint32_t renderWidth;
-extern uint32_t renderHeight;
 
 // Volume rendering vulkan stuff
 Pipeline_t volumePipeline;
@@ -394,8 +389,8 @@ void DrawVolume(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkD
 	} PC;
 
 	PC.uFrame=uFrame++;
-	PC.uWidth=renderWidth;
-	PC.uHeight=renderHeight;
+	PC.uWidth=config.renderWidth;
+	PC.uHeight=config.renderHeight;
 	PC.fShift=UI_GetBarGraphValue(&UI, colorShiftID);
 
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipeline.pipeline.pipeline);

@@ -13,7 +13,6 @@
 #include "console/console.h"
 #include "font/font.h"
 #include "image/image.h"
-#include "lights/lights.h"
 #include "math/math.h"
 #include "model/bmodel.h"
 #include "network/network.h"
@@ -44,11 +43,7 @@
 
 extern bool isDone;
 
-// Render size
-uint32_t renderWidth=1920, renderHeight=1080;
-
-// external switch from system for if VR was initialized
-extern bool isVR;
+// VR context (if running in VR mode)
 XruContext_t xrContext;
 
 // Vulkan instance handle and context structs
@@ -101,16 +96,11 @@ Sample_t sounds[NUM_SOUNDS];
 // Vulkan swapchain helper struct
 VkuSwapchain_t swapchain;
 
-// Multisample anti-alias sample count
-VkSampleCountFlagBits MSAA=VK_SAMPLE_COUNT_4_BIT;
+// Color buffer left and right images
+VkuImage_t colorImage[2];
 
-// Colorbuffer image and format
-VkFormat colorFormat=VK_FORMAT_R16G16B16A16_SFLOAT;
-VkuImage_t colorImage[2];		// left and right eye color buffer
-
-// Depth buffer image and format
-VkFormat depthFormat=VK_FORMAT_D32_SFLOAT;
-VkuImage_t depthImage[2];		// left and right eye depth buffers
+// Depth buffer left and right images
+VkuImage_t depthImage[2];
 
 // Framebuffers, per-eye
 VkFramebuffer framebuffer[2];
@@ -537,8 +527,8 @@ void Thread_Main(void *arg)
 		}
 	});
 
-	vkCmdSetViewport(data->perFrame[data->index].secCommandBuffer[data->eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
-	vkCmdSetScissor(data->perFrame[data->index].secCommandBuffer[data->eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
+	vkCmdSetViewport(data->perFrame[data->index].secCommandBuffer[data->eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)config.renderWidth, (float)config.renderHeight, 0.0f, 1.0f });
+	vkCmdSetScissor(data->perFrame[data->index].secCommandBuffer[data->eye], 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth, config.renderHeight } });
 
 	////// Skybox/skysphere
 	DrawSkybox(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, data->perFrame[data->index].descriptorPool[data->eye]);
@@ -571,7 +561,7 @@ void Thread_Main(void *arg)
 #endif
 
 	// Draw VR "hands"
-	if(isVR)
+	if(config.isVR)
 	{
 		struct
 		{
@@ -652,8 +642,8 @@ void Thread_Particles(void *arg)
 		}
 	});
 
-	vkCmdSetViewport(data->perFrame[data->index].secCommandBuffer[data->eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
-	vkCmdSetScissor(data->perFrame[data->index].secCommandBuffer[data->eye], 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
+	vkCmdSetViewport(data->perFrame[data->index].secCommandBuffer[data->eye], 0, 1, &(VkViewport) { 0.0f, 0, (float)config.renderWidth, (float)config.renderHeight, 0.0f, 1.0f });
+	vkCmdSetScissor(data->perFrame[data->index].secCommandBuffer[data->eye], 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth, config.renderHeight } });
 
 	ParticleSystem_Draw(&particleSystem, data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye);
 
@@ -689,7 +679,7 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=renderPass,
 		.framebuffer=framebuffer[eye],
-		.renderArea=(VkRect2D){ { 0, 0 }, { renderWidth, renderHeight } },
+		.renderArea=(VkRect2D){ { 0, 0 }, { config.renderWidth, config.renderHeight } },
 		.clearValueCount=2,
 		.pClearValues=(VkClearValue[]){ {{{ 0.0f, 0.0f, 0.0f, 1.0f }}}, {{{ 0.0f, 0 }}} },
 	}, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
@@ -1063,7 +1053,7 @@ void Render(void)
 	vkWaitForFences(vkContext.device, 1, &perFrame[index].frameFence, VK_TRUE, UINT64_MAX);
 
 	// Handle VR frame start
-	if(isVR)
+	if(config.isVR)
 	{
 		if(!VR_StartFrame(&xrContext))
 		{
@@ -1158,7 +1148,7 @@ void Render(void)
 			return;
 		}
 
-		projection[0]=MatrixInfPerspective(90.0f, (float)renderWidth/renderHeight, 0.01f);
+		projection[0]=MatrixInfPerspective(90.0f, (float)config.renderWidth/config.renderHeight, 0.01f);
 		headPose=MatrixIdentity();
 
 		// TODO: Find a better place for gamepad input handling!
@@ -1176,7 +1166,7 @@ void Render(void)
 
 	Audio_SetStreamVolume(0, UI_GetBarGraphValue(&UI, volumeID));
 
-	Font_Print(&font, 16.0f, renderWidth-400.0f, renderHeight-50.0f-16.0f, "Current track: %s", GetCurrentMusicTrack());
+	Font_Print(&font, 16.0f, config.renderWidth-400.0f, config.renderHeight-50.0f-16.0f, "Current track: %s", GetCurrentMusicTrack());
 
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
@@ -1195,7 +1185,7 @@ void Render(void)
 
 	EyeRender(index, 0, headPose);
 
-	if(isVR)
+	if(config.isVR)
 		EyeRender(index, 1, headPose);
 
 	// Final drawing compositing
@@ -1203,7 +1193,7 @@ void Render(void)
 	//////
 
 	// Other eye compositing
-	if(isVR)
+	if(config.isVR)
 		CompositeDraw(index, 1);
 
 	// Reset the font text collection for the next frame
@@ -1227,7 +1217,7 @@ void Render(void)
 		.pCommandBuffers=&perFrame[index].commandBuffer,
 	};
 
-	if(isVR)
+	if(config.isVR)
 	{
 		SubmitInfo.waitSemaphoreCount=0;
 		SubmitInfo.pWaitSemaphores=VK_NULL_HANDLE;
@@ -1238,7 +1228,7 @@ void Render(void)
 	vkQueueSubmit(vkContext.graphicsQueue, 1, &SubmitInfo, perFrame[index].frameFence);
 
 	// Handle VR frame end
-	if(isVR)
+	if(config.isVR)
 	{
 		VR_EndFrame(&xrContext);
 		index=(index+1)%xrContext.swapchain[0].numImages;
@@ -1320,7 +1310,6 @@ void Console_CmdExplode(Console_t *console, const char *param)
 	ParticleSystem_ResetEmitter(&particleSystem, em);
 }
 
-bool vkuMemAllocator_Init(VkuContext_t *context);
 
 // Initialization call from system main
 bool Init(void)
@@ -1330,7 +1319,7 @@ bool Init(void)
 	RandomSeed(seed);
 
 	// TODO: This is a hack, fix it proper.
-	if(isVR)
+	if(config.isVR)
 		swapchain.numImages=xrContext.swapchain[0].numImages;
 
 	ConsoleInit(&console);
@@ -1519,16 +1508,16 @@ bool Init(void)
 	CreateCompositeFramebuffers(0);
 
 	// Second eye framebuffer for VR
-	if(isVR)
+	if(config.isVR)
 	{
 		CreateFramebuffers(1);
 		CreateCompositeFramebuffers(1);
 	}
 
 	CreateLineGraphPipeline();
-	CreateLineGraph(&frameTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, renderHeight-32.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
-	CreateLineGraph(&audioTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, renderHeight-48.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
-	CreateLineGraph(&physicsTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, renderHeight-64.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
+	CreateLineGraph(&frameTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, config.renderHeight-32.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
+	CreateLineGraph(&audioTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, config.renderHeight-48.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
+	CreateLineGraph(&physicsTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, config.renderHeight-64.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
 
 	// Set up particle system
 	if(!ParticleSystem_Init(&particleSystem))
@@ -1571,39 +1560,39 @@ bool Init(void)
 
 	Font_Init(&font);
 
-	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)renderWidth, (float)renderHeight));
+	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)config.renderWidth, (float)config.renderHeight));
 
 #ifdef ANDROID
-	UI_AddButton(&UI, Vec2(0.0f, renderHeight-50.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), "Random", (UIControlCallback)GenerateWorld);
-	UI_AddButton(&UI, Vec2(0.0f, renderHeight-100.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), "Fire", (UIControlCallback)Fire);
+	UI_AddButton(&UI, Vec2(0.0f, config.renderHeight-50.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), "Random", (UIControlCallback)GenerateWorld);
+	UI_AddButton(&UI, Vec2(0.0f, config.renderHeight-100.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), "Fire", (UIControlCallback)Fire);
 #endif
 
 	UI_AddButton(&UI,
-				 Vec2(renderWidth-400.0f, renderHeight-50.0f),	// Position
+				 Vec2(config.renderWidth-400.0f, config.renderHeight-50.0f),	// Position
 				 Vec2(100.0f, 50.0f),					// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Play",								// Title text
 				 StartStreamCallback);					// Callback
 	UI_AddButton(&UI,
-				 Vec2(renderWidth-300.0f, renderHeight-50.0f),	// Position
+				 Vec2(config.renderWidth-300.0f, config.renderHeight-50.0f),	// Position
 				 Vec2(100.0f, 50.0f),					// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Pause",								// Title text
 				 StopStreamCallback);					// Callback
 	UI_AddButton(&UI,
-				 Vec2(renderWidth-200.0f, renderHeight-50.0f),	// Position
+				 Vec2(config.renderWidth-200.0f, config.renderHeight-50.0f),	// Position
 				 Vec2(100.0f, 50.0f),					// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Prev",								// Title text
 				 PrevTrackCallback);					// Callback
 	UI_AddButton(&UI,
-				 Vec2(renderWidth-100.0f, renderHeight-50.0f),	// Position
+				 Vec2(config.renderWidth-100.0f, config.renderHeight-50.0f),	// Position
 				 Vec2(100.0f, 50.0f),					// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Next",								// Title text
 				 NextTrackCallback);					// Callback
 	volumeID=UI_AddBarGraph(&UI,
-							Vec2(renderWidth-400.0f, renderHeight-50.0f-16.0f-30.0f),// Position
+							Vec2(config.renderWidth-400.0f, config.renderHeight-50.0f-16.0f-30.0f),// Position
 							Vec2(400.0f, 30.0f),		// Size
 							Vec3(0.25f, 0.25f, 0.25f),	// Color
 							"Volume",					// Title text
@@ -1611,16 +1600,16 @@ bool Init(void)
 							0.0f, 1.0f, 0.125f);		// min/max/initial value
 
 	colorShiftID=UI_AddBarGraph(&UI,
-							Vec2(renderWidth-400.0f, renderHeight-50.0f-16.0f-30.0f-50.0f),// Position
+							Vec2(config.renderWidth-400.0f, config.renderHeight-50.0f-16.0f-30.0f-50.0f),// Position
 							Vec2(400.0f, 30.0f),		// Size
 							Vec3(0.25f, 0.25f, 0.25f),	// Color
 							"Cloud Color Shift",		// Title text
 							false,						// Read-only
 							0.0f, 1.0f, 0.45f);			// min/max/initial value
 
-	UI_AddSprite(&UI, Vec2((float)renderWidth/2.0f, (float)renderHeight/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &textures[TEXTURE_CROSSHAIR], 0.0f);
+	UI_AddSprite(&UI, Vec2((float)config.renderWidth/2.0f, (float)config.renderHeight/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &textures[TEXTURE_CROSSHAIR], 0.0f);
 
-	consoleBackground=UI_AddSprite(&UI, Vec2((float)renderWidth/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2((float)renderWidth, 16.0f*6.0f), Vec3(1.0f, 1.0f, 1.0f), &textures[TEXTURE_FIGHTER1], 0.0f);
+	consoleBackground=UI_AddSprite(&UI, Vec2((float)config.renderWidth/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2((float)config.renderWidth, 16.0f*6.0f), Vec3(1.0f, 1.0f, 1.0f), &textures[TEXTURE_FIGHTER1], 0.0f);
 
 	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3(1.0f, 1.0f, 1.0f));
 
@@ -1724,9 +1713,9 @@ bool CreateFramebuffers(uint32_t eye)
 	VkImageFormatProperties imageFormatProps;
 	VkResult result;
 
-	depthFormat=VK_FORMAT_D32_SFLOAT;
+	config.depthFormat=VK_FORMAT_D32_SFLOAT;
 	result=vkGetPhysicalDeviceImageFormatProperties(vkContext.physicalDevice,
-													depthFormat,
+													config.depthFormat,
 													VK_IMAGE_TYPE_2D,
 													VK_IMAGE_TILING_OPTIMAL,
 													VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
@@ -1735,8 +1724,8 @@ bool CreateFramebuffers(uint32_t eye)
 
 	if(result!=VK_SUCCESS)
 	{
-		depthFormat=VK_FORMAT_D24_UNORM_S8_UINT;
-		result=vkGetPhysicalDeviceImageFormatProperties(vkContext.physicalDevice, depthFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT, 0, &imageFormatProps);
+		config.depthFormat=VK_FORMAT_D24_UNORM_S8_UINT;
+		result=vkGetPhysicalDeviceImageFormatProperties(vkContext.physicalDevice, config.depthFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT, 0, &imageFormatProps);
 
 		if(result!=VK_SUCCESS)
 		{
@@ -1745,9 +1734,9 @@ bool CreateFramebuffers(uint32_t eye)
 		}
 	}
 
-	vkuCreateTexture2D(&vkContext, &colorImage[eye], renderWidth, renderHeight, colorFormat, MSAA);
-	vkuCreateTexture2D(&vkContext, &depthImage[eye], renderWidth, renderHeight, depthFormat, MSAA);
-	vkuCreateTexture2D(&vkContext, &colorResolve[eye], renderWidth, renderHeight, colorFormat, VK_SAMPLE_COUNT_1_BIT);
+	vkuCreateTexture2D(&vkContext, &colorImage[eye], config.renderWidth, config.renderHeight, config.colorFormat, config.MSAA);
+	vkuCreateTexture2D(&vkContext, &depthImage[eye], config.renderWidth, config.renderHeight, config.depthFormat, config.MSAA);
+	vkuCreateTexture2D(&vkContext, &colorResolve[eye], config.renderWidth, config.renderHeight, config.colorFormat, VK_SAMPLE_COUNT_1_BIT);
 
 	VkCommandBuffer commandBuffer=vkuOneShotCommandBufferBegin(&vkContext);
 	vkuTransitionLayout(commandBuffer, colorImage[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -1761,8 +1750,8 @@ bool CreateFramebuffers(uint32_t eye)
 		.renderPass=renderPass,
 		.attachmentCount=3,
 		.pAttachments=(VkImageView[]){ colorImage[eye].imageView, depthImage[eye].imageView, colorResolve[eye].imageView },
-		.width=renderWidth,
-		.height=renderHeight,
+		.width=config.renderWidth,
+		.height=config.renderHeight,
 		.layers=1,
 	}, 0, &framebuffer[eye]);
 
@@ -1777,7 +1766,7 @@ void DestroyFramebuffers(void)
 
 	vkDestroyFramebuffer(vkContext.device, framebuffer[0], VK_NULL_HANDLE);
 
-	if(isVR)
+	if(config.isVR)
 	{
 		vkuDestroyImageBuffer(&vkContext, &colorImage[1]);
 		vkuDestroyImageBuffer(&vkContext, &depthImage[1]);
@@ -1815,17 +1804,17 @@ void RecreateSwapchain(void)
 	// Recreate the swapchain, vkuCreateSwapchain will see that there is an existing swapchain and deal accordingly.
 	vkuCreateSwapchain(&vkContext, &swapchain, VK_TRUE);
 
-	renderWidth=max(2, swapchain.extent.width);
-	renderHeight=max(2, swapchain.extent.height);
+	config.renderWidth=max(2, swapchain.extent.width);
+	config.renderHeight=max(2, swapchain.extent.height);
 
-	UI.size.x=(float)renderWidth;
-	UI.size.y=(float)renderHeight;
+	UI.size.x=(float)config.renderWidth;
+	UI.size.y=(float)config.renderHeight;
 
 	// Recreate the framebuffer
 	CreateFramebuffers(0);
 	CreateCompositeFramebuffers(0);
 
-	if(isVR)
+	if(config.isVR)
 	{
 		CreateFramebuffers(1);
 		CreateCompositeFramebuffers(1);
@@ -1854,7 +1843,7 @@ void Destroy(void)
 	Zone_Free(zone, sounds[SOUND_EXPLODE2].data);
 	Zone_Free(zone, sounds[SOUND_EXPLODE3].data);
 
-	if(isVR)
+	if(config.isVR)
 		VR_Destroy(&xrContext);
 
 	for(uint32_t i=0;i<NUM_THREADS;i++)
@@ -1982,7 +1971,7 @@ void Destroy(void)
 
 	vkDestroyFramebuffer(vkContext.device, framebuffer[0], VK_NULL_HANDLE);
 
-	if(isVR)
+	if(config.isVR)
 	{
 		vkuDestroyImageBuffer(&vkContext, &colorImage[1]);
 		vkuDestroyImageBuffer(&vkContext, &colorResolve[1]);

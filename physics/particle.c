@@ -15,8 +15,6 @@
 
 // External data from engine.c
 extern VkuContext_t vkContext;
-extern VkSampleCountFlags MSAA;
-extern VkFormat ColorFormat, DepthFormat;
 
 extern VkRenderPass renderPass;
 extern VkuSwapchain_t swapchain;

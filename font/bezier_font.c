@@ -12,10 +12,7 @@
 #include "font.h"
 
 extern VkuContext_t Context;
-extern VkSampleCountFlags MSAA;
 extern VkuSwapchain_t Swapchain;
-
-extern uint32_t Width, Height;
 
 VkPipelineLayout FontPipelineLayout;
 VkuPipeline_t FontPipeline;

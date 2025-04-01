@@ -16,9 +16,6 @@
 #include "../console/console.h"
 #include "event.h"
 
-// External data from engine.c
-extern uint32_t renderWidth, renderHeight;
-
 void GenerateWorld(void);
 void ResetPhysicsCubes(void);
 
@@ -274,8 +271,8 @@ bool Event_Trigger(EventID ID, void *arg)
 			// Calculate relative movement
 			mousePosition=Vec2_Add(mousePosition, (float)mouseEvent->dx, (float)mouseEvent->dy);
 
-			mousePosition.x=clampf(mousePosition.x, 0.0f, (float)renderWidth);
-			mousePosition.y=clampf(mousePosition.y, 0.0f, (float)renderHeight);
+			mousePosition.x=clampf(mousePosition.x, 0.0f, (float)config.renderWidth);
+			mousePosition.y=clampf(mousePosition.y, 0.0f, (float)config.renderHeight);
 
 			UI_UpdateCursorPosition(&UI, cursorID, mousePosition);
 

@@ -14,11 +14,8 @@
 extern VkuContext_t vkContext;
 extern VkuSwapchain_t swapchain;
 extern XruContext_t xrContext;
-extern bool isVR;
 
 extern float fps, fTimeStep, audioTime, physicsTime;
-extern uint32_t renderWidth, renderHeight;
-extern VkFormat colorFormat;
 
 VkuImage_t colorResolve[2];		// left and right eye MSAA resolve color buffer
 VkuImage_t colorBlur[2];		// left and right eye blur color buffer
@@ -53,7 +50,7 @@ bool CreateThresholdPipeline(void)
 		.pAttachments=(VkAttachmentDescription[])
 		{
 			{
-				.format=colorFormat,
+				.format=config.colorFormat,
 				.samples=VK_SAMPLE_COUNT_1_BIT,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
@@ -104,7 +101,7 @@ bool CreateGaussianPipeline(void)
 		.pAttachments=(VkAttachmentDescription[])
 		{
 			{
-				.format=colorFormat,
+				.format=config.colorFormat,
 				.samples=VK_SAMPLE_COUNT_1_BIT,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
@@ -148,8 +145,8 @@ bool CreateGaussianPipeline(void)
 
 void CreateCompositeFramebuffers(uint32_t eye)
 {
-	vkuCreateTexture2D(&vkContext, &colorTemp[eye], renderWidth>>2, renderHeight>>2, colorFormat, VK_SAMPLE_COUNT_1_BIT);
-	vkuCreateTexture2D(&vkContext, &colorBlur[eye], renderWidth>>2, renderHeight>>2, colorFormat, VK_SAMPLE_COUNT_1_BIT);
+	vkuCreateTexture2D(&vkContext, &colorTemp[eye], config.renderWidth>>2, config.renderHeight>>2, config.colorFormat, VK_SAMPLE_COUNT_1_BIT);
+	vkuCreateTexture2D(&vkContext, &colorBlur[eye], config.renderWidth>>2, config.renderHeight>>2, config.colorFormat, VK_SAMPLE_COUNT_1_BIT);
 
 	VkCommandBuffer commandBuffer=vkuOneShotCommandBufferBegin(&vkContext);
 	vkuTransitionLayout(commandBuffer, colorTemp[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -163,8 +160,8 @@ void CreateCompositeFramebuffers(uint32_t eye)
 		.renderPass=thresholdRenderPass,
 		.attachmentCount=1,
 		.pAttachments=(VkImageView[]){ colorBlur[eye].imageView },
-		.width=renderWidth>>2,
-		.height=renderHeight>>2,
+		.width=config.renderWidth>>2,
+		.height=config.renderHeight>>2,
 		.layers=1,
 	}, 0, &thresholdFramebuffer[eye]);
 
@@ -175,8 +172,8 @@ void CreateCompositeFramebuffers(uint32_t eye)
 		.renderPass=gaussianRenderPass,
 		.attachmentCount=1,
 		.pAttachments=(VkImageView[]){ colorTemp[eye].imageView },
-		.width=renderWidth>>2,
-		.height=renderHeight>>2,
+		.width=config.renderWidth>>2,
+		.height=config.renderHeight>>2,
 		.layers=1,
 	}, 0, &gaussianFramebufferTemp[eye]);
 
@@ -187,12 +184,12 @@ void CreateCompositeFramebuffers(uint32_t eye)
 		.renderPass=gaussianRenderPass,
 		.attachmentCount=1,
 		.pAttachments=(VkImageView[]){ colorBlur[eye].imageView },
-		.width=renderWidth>>2,
-		.height=renderHeight>>2,
+		.width=config.renderWidth>>2,
+		.height=config.renderHeight>>2,
 		.layers=1,
 	}, 0, &gaussianFramebufferBlur[eye]);
 
-	if(!isVR)
+	if(!config.isVR)
 	{
 		// Compositing pipeline images, these are the actual swapchain framebuffers that will get presented
 		for(uint32_t i=0;i<swapchain.numImages;i++)
@@ -203,8 +200,8 @@ void CreateCompositeFramebuffers(uint32_t eye)
 				.renderPass=compositeRenderPass,
 				.attachmentCount=1,
 				.pAttachments=(VkImageView[]){ swapchain.imageView[i] },
-				.width=renderWidth,
-				.height=renderHeight,
+				.width=config.renderWidth,
+				.height=config.renderHeight,
 				.layers=1,
 			}, 0, &perFrame[i].compositeFramebuffer[0]);
 		}
@@ -220,8 +217,8 @@ void CreateCompositeFramebuffers(uint32_t eye)
 				.renderPass=compositeRenderPass,
 				.attachmentCount=1,
 				.pAttachments=(VkImageView[]){ xrContext.swapchain[0].imageView[i] },
-				.width=renderWidth,
-				.height=renderHeight,
+				.width=config.renderWidth,
+				.height=config.renderHeight,
 				.layers=1,
 			}, 0, &perFrame[i].compositeFramebuffer[0]);
 
@@ -231,8 +228,8 @@ void CreateCompositeFramebuffers(uint32_t eye)
 				.renderPass=compositeRenderPass,
 				.attachmentCount=1,
 				.pAttachments=(VkImageView[]){ xrContext.swapchain[1].imageView[i] },
-				.width=renderWidth,
-				.height=renderHeight,
+				.width=config.renderWidth,
+				.height=config.renderHeight,
 				.layers=1,
 			}, 0, &perFrame[i].compositeFramebuffer[1]);
 		}
@@ -245,7 +242,7 @@ bool CreateCompositePipeline(void)
 	VkFormat surfaceFormat=VK_FORMAT_UNDEFINED;
 
 	// VR gets rendered directly to HMD, desktop needs to be presented
-	if(!isVR)
+	if(!config.isVR)
 	{
 		attachementFinalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		surfaceFormat=swapchain.surfaceFormat.format;
@@ -313,7 +310,7 @@ void DestroyCompositeFramebuffers(void)
 	vkuDestroyImageBuffer(&vkContext, &colorBlur[0]);
 	vkuDestroyImageBuffer(&vkContext, &colorTemp[0]);
 
-	if(isVR)
+	if(config.isVR)
 	{
 		vkuDestroyImageBuffer(&vkContext, &colorBlur[1]);
 		vkuDestroyImageBuffer(&vkContext, &colorTemp[1]);
@@ -322,7 +319,7 @@ void DestroyCompositeFramebuffers(void)
 	// Thresholding
 	vkDestroyFramebuffer(vkContext.device, thresholdFramebuffer[0], VK_NULL_HANDLE);
 
-	if(isVR)
+	if(config.isVR)
 		vkDestroyFramebuffer(vkContext.device, thresholdFramebuffer[1], VK_NULL_HANDLE);
 	//////
 
@@ -330,7 +327,7 @@ void DestroyCompositeFramebuffers(void)
 	vkDestroyFramebuffer(vkContext.device, gaussianFramebufferTemp[0], VK_NULL_HANDLE);
 	vkDestroyFramebuffer(vkContext.device, gaussianFramebufferBlur[0], VK_NULL_HANDLE);
 
-	if(isVR)
+	if(config.isVR)
 	{
 		vkDestroyFramebuffer(vkContext.device, gaussianFramebufferTemp[1], VK_NULL_HANDLE);
 		vkDestroyFramebuffer(vkContext.device, gaussianFramebufferBlur[1], VK_NULL_HANDLE);
@@ -342,7 +339,7 @@ void DestroyCompositeFramebuffers(void)
 	{
 		vkDestroyFramebuffer(vkContext.device, perFrame[i].compositeFramebuffer[0], VK_NULL_HANDLE);
 
-		if(isVR)
+		if(config.isVR)
 			vkDestroyFramebuffer(vkContext.device, perFrame[i].compositeFramebuffer[1], VK_NULL_HANDLE);
 	}
 	//////
@@ -380,11 +377,11 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=thresholdRenderPass,
 		.framebuffer=thresholdFramebuffer[eye],
-		.renderArea={ { 0, 0 }, { renderWidth>>2, renderHeight>>2 } },
+		.renderArea={ { 0, 0 }, { config.renderWidth>>2, config.renderHeight>>2 } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
-	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)(renderWidth>>2), (float)(renderHeight>>2), 0.0f, 1.0f });
-	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth>>2, renderHeight>>2 } });
+	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)(config.renderWidth>>2), (float)(config.renderHeight>>2), 0.0f, 1.0f });
+	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth>>2, config.renderHeight>>2 } });
 
 	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, thresholdPipeline.pipeline.pipeline);
 
@@ -406,11 +403,11 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=gaussianRenderPass,
 		.framebuffer=gaussianFramebufferTemp[eye],
-		.renderArea={ { 0, 0 }, { renderWidth>>2, renderHeight>>2 } },
+		.renderArea={ { 0, 0 }, { config.renderWidth>>2, config.renderHeight>>2 } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
-	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)(renderWidth>>2), (float)(renderHeight>>2), 0.0f, 1.0f });
-	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth>>2, renderHeight>>2 } });
+	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)(config.renderWidth>>2), (float)(config.renderHeight>>2), 0.0f, 1.0f });
+	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth>>2, config.renderHeight>>2 } });
 
 	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipeline.pipeline);
 
@@ -434,7 +431,7 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=gaussianRenderPass,
 		.framebuffer=gaussianFramebufferBlur[eye],
-		.renderArea={ { 0, 0 }, { renderWidth>>2, renderHeight>>2 } },
+		.renderArea={ { 0, 0 }, { config.renderWidth>>2, config.renderHeight>>2 } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
 	vkCmdPushConstants(perFrame[index].commandBuffer, gaussianPipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &(vec2){ 0.0f, 1.0f });
@@ -460,11 +457,11 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 		.framebuffer=perFrame[index].compositeFramebuffer[eye],
 		.clearValueCount=1,
 		.pClearValues=(VkClearValue[]){ {{{ 0.0f, 0.0f, 0.0f, 1.0f }}} },
-		.renderArea={ { 0, 0 }, { renderWidth, renderHeight } },
+		.renderArea={ { 0, 0 }, { config.renderWidth, config.renderHeight } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
-	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)renderWidth, (float)renderHeight, 0.0f, 1.0f });
-	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { renderWidth, renderHeight } });
+	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)config.renderWidth, (float)config.renderHeight, 0.0f, 1.0f });
+	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth, config.renderHeight } });
 
 	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipeline.pipeline.pipeline);
 
@@ -485,8 +482,8 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	} PC;
 
 	PC.uFrame=uFrame++;
-	PC.uSize[0]=renderWidth;
-	PC.uSize[1]=renderHeight;
+	PC.uSize[0]=config.renderWidth;
+	PC.uSize[1]=config.renderHeight;
 
 	vkCmdPushConstants(perFrame[index].commandBuffer, compositePipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PC), &PC);
 
@@ -496,7 +493,7 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	UI_Draw(&UI, index, eye, fTimeStep);
 
 	// Draw text in the compositing renderpass
-	Font_Print(&font, 16.0f, 0.0f, (float)renderHeight-16.0f, "FPS: %0.1f\n\x1B[33mFrame time: %0.3fms\nAudio time: %0.3fms\nPhysics time: %0.3fms", fps, fTimeStep*1000.0f, audioTime*1000.0f, physicsTime*1000.0f);
+	Font_Print(&font, 16.0f, 0.0f, (float)config.renderHeight-16.0f, "FPS: %0.1f\n\x1B[33mFrame time: %0.3fms\nAudio time: %0.3fms\nPhysics time: %0.3fms", fps, fTimeStep*1000.0f, audioTime*1000.0f, physicsTime*1000.0f);
 
 	Font_Draw(&font, index, eye);
 

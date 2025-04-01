@@ -13,13 +13,11 @@
 
 // external Vulkan data and font
 extern VkuContext_t vkContext;
-extern VkSampleCountFlags MSAA;
 extern VkuSwapchain_t swapchain;
 extern VkRenderPass compositeRenderPass;
 
 extern Font_t font;
 
-extern bool isVR;
 extern VkuSwapchain_t swapchain;
 extern XruContext_t xrContext;
 extern matrix modelView, projection[2], headPose;
@@ -518,7 +516,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 
 	float z=-1.0f;
 
-	if(isVR)
+	if(config.isVR)
 		z=-1.5f;
 
 	UIPC.viewport=UI->size;

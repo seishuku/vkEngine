@@ -13,9 +13,7 @@
 
 extern VkuContext_t vkContext;
 extern VkRenderPass renderPass;
-extern VkSampleCountFlags MSAA;
 extern VkuSwapchain_t swapchain;
-extern VkFormat colorFormat, depthFormat;
 
 Pipeline_t skyboxPipeline;
 

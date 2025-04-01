@@ -7,9 +7,6 @@
 
 extern VkuContext_t vkContext;
 extern VkuSwapchain_t swapchain;
-extern VkSampleCountFlags MSAA;
-extern VkFormat colorFormat;
-extern VkFormat depthFormat;
 extern VkRenderPass renderPass;
 
 //VkPipelineLayout spherePipelineLayout;

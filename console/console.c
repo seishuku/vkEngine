@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "../system/system.h"
 #include "../font/font.h"
 #include "console.h"
 
@@ -300,7 +301,6 @@ void ConsoleKeyInput(Console_t *console, char key)
 
 #include "../ui/ui.h"
 
-extern uint32_t renderWidth;
 extern uint32_t consoleBackground;
 extern UI_t UI;
 
@@ -314,7 +314,7 @@ void ConsoleDraw(Console_t *console)
         return;
     }
     else
-        UI_UpdateSpriteSize(&UI, consoleBackground, Vec2((float)renderWidth, 16.0f*6.0f));
+        UI_UpdateSpriteSize(&UI, consoleBackground, Vec2((float)config.renderWidth, 16.0f*6.0f));
 
     const int maxLines=5;
     uint32_t startLine=(console->numLine>maxLines+console->scrollbackOffset)?console->numLine-maxLines-console->scrollbackOffset:0;

@@ -2,7 +2,7 @@
 #include "../system/system.h"
 
 #ifdef WIN32
-#include <winsock2.h>
+#include <winsock.h>
 #else
 #include <sys/socket.h>
 #include <sys/unistd.h>

@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
-#include "vulkan/vulkan.h"
+#include "../system/system.h"
+#include "../vulkan/vulkan.h"
 #include "../math/math.h"
 #include "../utils/pipeline.h"
 #include "../vr/vr.h"
@@ -9,12 +10,7 @@
 
 extern VkuContext_t vkContext;
 extern VkuSwapchain_t swapchain;
-extern VkSampleCountFlags MSAA;
-extern VkFormat colorFormat;
-extern VkFormat depthFormat;
 extern VkRenderPass compositeRenderPass;
-extern uint32_t renderWidth, renderHeight;
-extern bool isVR;
 extern XruContext_t xrContext;
 extern matrix modelView, projection[2], headPose;
 
@@ -100,13 +96,13 @@ void DrawLineGraph(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, 
 
 	float z=-1.0f;
 
-	if(isVR)
+	if(config.isVR)
 	{
 		z=-1.5f;
 		linePC.extent=(VkExtent2D){ xrContext.swapchainExtent.width, xrContext.swapchainExtent.height };
 	}
 	else
-		linePC.extent=(VkExtent2D){ renderWidth, renderHeight };
+		linePC.extent=(VkExtent2D){ config.renderWidth, config.renderHeight };
 
 	linePC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale((float)linePC.extent.width/(float)linePC.extent.height, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[eye]);
 	linePC.color=lineGraph->color;

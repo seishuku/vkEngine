@@ -147,12 +147,9 @@ VkBool32 vkuCreateContext(VkInstance instance, VkuContext_t *context)
 		DBGPRINTF(DEBUG_INFO, "\t#%d: %s VendorID: 0x%0.4X ProductID: 0x%0.4X\n", i, deviceProperties.deviceName, deviceProperties.vendorID, deviceProperties.deviceID);
 	}
 
-	// Select which device to use
-	uint32_t deviceIndex=0;
-
 	// Get the number of queue families for this device
 	uint32_t queueFamilyCount=0;
-	vkGetPhysicalDeviceQueueFamilyProperties(deviceHandles[deviceIndex], &queueFamilyCount, VK_NULL_HANDLE);
+	vkGetPhysicalDeviceQueueFamilyProperties(deviceHandles[context->deviceIndex], &queueFamilyCount, VK_NULL_HANDLE);
 
 	// Allocate the memory for the structs 
 	VkQueueFamilyProperties *queueFamilyProperties=(VkQueueFamilyProperties *)Zone_Malloc(zone, sizeof(VkQueueFamilyProperties)*queueFamilyCount);
@@ -165,7 +162,7 @@ VkBool32 vkuCreateContext(VkInstance instance, VkuContext_t *context)
 	}
 
 	// Get the queue family properties
-	vkGetPhysicalDeviceQueueFamilyProperties(deviceHandles[deviceIndex], &queueFamilyCount, queueFamilyProperties);
+	vkGetPhysicalDeviceQueueFamilyProperties(deviceHandles[context->deviceIndex], &queueFamilyCount, queueFamilyProperties);
 
 	// Find a queue index on a device that supports both graphics rendering and present support
 	for(uint32_t i=0;i<queueFamilyCount;i++)
@@ -214,7 +211,7 @@ VkBool32 vkuCreateContext(VkInstance instance, VkuContext_t *context)
 	// Done with queue family properties
 	Zone_Free(zone, queueFamilyProperties);
 
-	context->physicalDevice=deviceHandles[deviceIndex];
+	context->physicalDevice=deviceHandles[context->deviceIndex];
 
 	// Free allocated handles
 	Zone_Free(zone, deviceHandles);

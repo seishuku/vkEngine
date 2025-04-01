@@ -208,6 +208,8 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 				return;
 			}
 
+			vkContext.deviceIndex=0;
+
 			DBGPRINTF(DEBUG_INFO, "Creating Vulkan instance...\n");
 			if(!vkuCreateInstance(&vkInstance))
 			{

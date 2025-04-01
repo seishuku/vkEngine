@@ -28,7 +28,6 @@ static int _xi_opcode=0;
 bool isDone=false;
 bool toggleFullscreen=true;
 
-bool isVR=true;
 extern XruContext_t xrContext;
 
 extern VkInstance vkInstance;
@@ -37,10 +36,6 @@ extern VkuContext_t vkContext;
 extern VkuMemZone_t vkZone;
 
 extern VkuSwapchain_t swapchain;
-
-Config_t config={ .windowWidth=1920, .windowHeight=1080, .msaaSamples=4, .deviceIndex=0 };
-
-extern uint32_t renderWidth, renderHeight;
 
 float fps=0.0f, fTimeStep=0.0f, fTime=0.0f;
 
@@ -358,6 +353,8 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
+	vkContext.deviceIndex=config.deviceIndex;
+
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Context...\n");
 	if(!vkuCreateContext(vkInstance, &vkContext))
 	{
@@ -373,22 +370,22 @@ int main(int argc, char **argv)
 	}
 	else
 	{
-		renderWidth=swapchain.extent.width;
-		renderHeight=swapchain.extent.height;
+		config.renderWidth=swapchain.extent.width;
+		config.renderHeight=swapchain.extent.height;
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Initializing VR...\n");
 	if(!VR_Init(&xrContext, vkInstance, &vkContext))
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
-		isVR=false;
+		config.isVR=false;
 	}
 	else
 	{
-		renderWidth=xrContext.swapchainExtent.width;
-		renderHeight=xrContext.swapchainExtent.height;
-		config.windowWidth=renderWidth;
-		config.windowHeight=renderHeight;
+		config.renderWidth=xrContext.swapchainExtent.width;
+		config.renderHeight=xrContext.swapchainExtent.height;
+		config.windowWidth=config.renderWidth;
+		config.windowHeight=config.renderHeight;
 		XMoveResizeWindow(vkContext.display, vkContext.window, 0, 0, config.windowWidth/2, config.windowHeight/2);
 	}
 

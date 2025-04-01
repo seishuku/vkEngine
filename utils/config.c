@@ -3,8 +3,11 @@
 #include <stdio.h>
 #include <string.h>
 #include "../system/system.h"
+#include "../vulkan/vulkan.h"
 #include "tokenizer.h"
 #include "config.h"
+
+Config_t config={ .windowWidth=1920, .windowHeight=1080, .msaaSamples=4, .deviceIndex=0 };
 
 static const char *keywords[]=
 {
@@ -37,6 +40,25 @@ static void printToken(const char *msg, const Token_t *token)
 
 bool Config_ReadINI(Config_t *config, const char *filename)
 {
+	///////// Set up some defaults
+
+	// Configurable from config file
+	config->windowWidth=1920;
+	config->windowHeight=1080;
+	config->msaaSamples=4;
+	config->deviceIndex=0;
+
+	// System state
+	config->renderWidth=1920;
+	config->renderHeight=1080;
+
+	config->MSAA=VK_SAMPLE_COUNT_4_BIT;
+	config->colorFormat=VK_FORMAT_R16G16B16A16_SFLOAT;
+	config->depthFormat=VK_FORMAT_D32_SFLOAT;
+
+	config->isVR=false;
+	/////////
+
 	FILE *stream=NULL;
 
 	if((stream=fopen(filename, "rb"))==NULL)
@@ -53,8 +75,6 @@ bool Config_ReadINI(Config_t *config, const char *filename)
 
 	fread(buffer, 1, length, stream);
 	buffer[length]='\0';
-
-	memset(config, 0, sizeof(Config_t));
 
 	Tokenizer_t tokenizer;
 	Tokenizer_Init(&tokenizer, length, buffer, sizeof(keywords)/sizeof(keywords[0]), keywords);

@@ -22,13 +22,8 @@
 
 // external Vulkan context data/functions for this module:
 extern VkuContext_t vkContext;
-extern VkSampleCountFlags MSAA;
-extern uint32_t renderWidth, renderHeight;
-//extern VkuSwapchain_t swapchain;
-
 extern VkRenderPass compositeRenderPass;
 
-extern bool isVR;
 extern XruContext_t xrContext;
 extern matrix modelView, projection[2], headPose;
 // ---
@@ -305,13 +300,13 @@ void Font_Draw(Font_t *font, uint32_t index, uint32_t eye)
 
 	float z=-1.0f;
 
-	if(isVR)
+	if(config.isVR)
 	{
 		z=-1.5f;
 		fontPC.extent=(VkExtent2D){ xrContext.swapchainExtent.width, xrContext.swapchainExtent.height };
 	}
 	else
-		fontPC.extent=(VkExtent2D){ renderWidth, renderHeight };
+		fontPC.extent=(VkExtent2D){ config.renderWidth, config.renderHeight };
 
 	fontPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale((float)fontPC.extent.width/(float)fontPC.extent.height, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[eye]);
 

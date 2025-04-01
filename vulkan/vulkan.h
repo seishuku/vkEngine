@@ -95,6 +95,7 @@ typedef struct
 	VkDeviceSize hostMemSize, localMemSize;
 	uint32_t hostMemIndex, localMemIndex;
 
+	uint32_t deviceIndex;
 	VkPhysicalDevice physicalDevice;
 	VkDevice device;
 
