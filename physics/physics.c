@@ -324,3 +324,18 @@ float PhysicsCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 
 	return 0.0f;
 }
+
+void SpringIntegrate(Spring_t *s, vec3 target, float dt)
+{
+	vec3 displacement=Vec3_Subv(s->position, target);
+	const float length=Vec3_Normalize(&displacement);
+
+	const float stretch=length-s->length;
+	const vec3 force=Vec3_Muls(displacement, -s->stiffness*stretch);
+	const vec3 dampingForce=Vec3_Muls(s->velocity, -s->damping);
+
+	vec3 acceleration=Vec3_Muls(Vec3_Addv(force, dampingForce), s->invMass);
+
+	s->velocity=Vec3_Addv(s->velocity, Vec3_Muls(acceleration, dt));
+	s->position=Vec3_Addv(s->position, Vec3_Muls(s->velocity, dt));
+}

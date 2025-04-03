@@ -28,8 +28,12 @@ bool CreateSkyboxPipeline(void)
 		perFrame[i].skyboxUBO[1]=(Skybox_UBO_t *)perFrame[i].skyboxUBOBuffer[1].memory->mappedPointer;
 	}
 
+	PipelineOverrideRasterizationSamples(config.MSAA);
+
 	if(!CreatePipeline(&vkContext, &skyboxPipeline, renderPass, "pipelines/skybox.pipeline"))
 		return false;
+
+	PipelineOverrideRasterizationSamples(VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);
 
 	return true;
 }

@@ -266,8 +266,12 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 	// Default generic gravity
 	system->gravity=Vec3(0.0f, -9.81f, 0.0f);
 
+	PipelineOverrideRasterizationSamples(config.MSAA);
+
 	if(!CreatePipeline(&vkContext, &particlePipeline, renderPass, "pipelines/particle.pipeline"))
 		return false;
+
+	PipelineOverrideRasterizationSamples(VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);
 
 	// Pre-allocate minimal sized buffers
 	for(uint32_t i=0;i<swapchain.numImages;i++)

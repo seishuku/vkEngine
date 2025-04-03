@@ -157,8 +157,12 @@ bool CreateLightingPipeline(void)
 		perFrame[i].mainUBO[1]=perFrame[i].mainUBOBuffer[1].memory->mappedPointer;
 	}
 
+	PipelineOverrideRasterizationSamples(config.MSAA);
+
 	if(!CreatePipeline(&vkContext, &mainPipeline, renderPass, "pipelines/lighting.pipeline"))
 		return false;
+
+	PipelineOverrideRasterizationSamples(VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);
 
 	return true;
 }

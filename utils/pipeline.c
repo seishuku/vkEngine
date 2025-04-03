@@ -8,6 +8,14 @@
 #include "base64.h"
 #include "pipeline.h"
 
+// TODO: don't like global for this, maybe change to creation flags on CreatePipeline?
+static VkSampleCountFlags rasterizationSamplesOverride=VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM;
+
+void PipelineOverrideRasterizationSamples(const VkSampleCountFlags rasterizationsamples)
+{
+	rasterizationSamplesOverride=rasterizationsamples;
+}
+
 // These are keywords for the pipeline description script
 static const char *keywords[]=
 {
@@ -2936,6 +2944,10 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 
 	vkuPipeline_SetPipelineLayout(&pipeline->pipeline, pipeline->pipelineLayout);
 	vkuPipeline_SetRenderPass(&pipeline->pipeline, renderPass);
+
+	// Probably should do validation checks on this?
+	if(rasterizationSamplesOverride<VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM)
+		pipeline->pipeline.rasterizationSamples=rasterizationSamplesOverride;
 
 	// If the first stage shader is compute, then this must be a compute pipeline
 	if(pipeline->pipeline.stages[0].stage&VK_SHADER_STAGE_COMPUTE_BIT)

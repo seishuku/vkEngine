@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
-#include "vulkan/vulkan.h"
+#include "../system/system.h"
+#include "../vulkan/vulkan.h"
 #include "../math/math.h"
 #include "../utils/pipeline.h"
 #include "../perframe.h"
@@ -13,8 +14,12 @@ Pipeline_t linePipeline;
 
 bool CreateLinePipeline(void)
 {
+	PipelineOverrideRasterizationSamples(config.MSAA);
+
 	if(!CreatePipeline(&vkContext, &linePipeline, renderPass, "pipelines/line.pipeline"))
 		return false;
+
+	PipelineOverrideRasterizationSamples(VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);
 
 	return true;
 }

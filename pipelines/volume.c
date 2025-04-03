@@ -364,8 +364,12 @@ VkBool32 GenNebulaVolume(VkuImage_t *image)
 // Create functions for volume rendering
 bool CreateVolumePipeline(void)
 {
+	PipelineOverrideRasterizationSamples(config.MSAA);
+
 	if(!CreatePipeline(&vkContext, &volumePipeline, renderPass, "pipelines/volume.pipeline"))
 		return false;
+
+	PipelineOverrideRasterizationSamples(VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);
 
 	return true;
 }

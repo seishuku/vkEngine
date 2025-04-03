@@ -4,6 +4,7 @@
 #include <string.h>
 #include "../system/system.h"
 #include "../vulkan/vulkan.h"
+#include "pipeline.h"
 #include "tokenizer.h"
 #include "config.h"
 
@@ -45,7 +46,6 @@ bool Config_ReadINI(Config_t *config, const char *filename)
 	// Configurable from config file
 	config->windowWidth=1920;
 	config->windowHeight=1080;
-	config->msaaSamples=4;
 	config->deviceIndex=0;
 
 	// System state
@@ -191,7 +191,19 @@ bool Config_ReadINI(Config_t *config, const char *filename)
 									token=Tokenizer_GetNext(&tokenizer);
 
 									if(token->type==TOKEN_INT&&param==0)
-										config->msaaSamples=(uint32_t)token->ival;
+									{
+										switch(token->ival)
+										{
+											case 1:		config->MSAA=VK_SAMPLE_COUNT_1_BIT;		break;
+											case 2:		config->MSAA=VK_SAMPLE_COUNT_2_BIT;		break;
+											case 4:		config->MSAA=VK_SAMPLE_COUNT_4_BIT;		break;
+											case 8:		config->MSAA=VK_SAMPLE_COUNT_8_BIT;		break;
+											case 16:	config->MSAA=VK_SAMPLE_COUNT_16_BIT;	break;
+											case 32:	config->MSAA=VK_SAMPLE_COUNT_32_BIT;	break;
+											case 64:	config->MSAA=VK_SAMPLE_COUNT_64_BIT;	break;
+											default:	config->MSAA=VK_SAMPLE_COUNT_1_BIT;		break;
+										}
+									}
 									else
 									{
 										printToken("Unexpected token ", token);
@@ -211,7 +223,7 @@ bool Config_ReadINI(Config_t *config, const char *filename)
 
 									if(param>1)
 									{
-										DBGPRINTF(DEBUG_ERROR, "Too many params msaaSamples(samples)\n");
+										DBGPRINTF(DEBUG_ERROR, "Too many params msaaSamples(value), valid values are 1, 2, 4, 8, 16, 32, 64 (some may not be supported by hardware)\n");
 										return false;
 									}
 								}

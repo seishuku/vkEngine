@@ -13,6 +13,7 @@ typedef struct
 	VkuPipeline_t pipeline;
 } Pipeline_t;
 
+void PipelineOverrideRasterizationSamples(const VkSampleCountFlags rasterizationsamples);
 bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass renderPass, const char *filename);
 void DestroyPipeline(VkuContext_t *context, Pipeline_t *pipeline);
 

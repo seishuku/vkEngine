@@ -507,6 +507,8 @@ void Thread_Destructor(void *arg)
 	}
 }
 
+Spring_t testSpring={ 0 };
+
 void Thread_Main(void *arg)
 {
 	ThreadData_t *data=(ThreadData_t *)arg;
@@ -537,6 +539,24 @@ void Thread_Main(void *arg)
 	////// Asteroids
 	DrawLighting(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, data->perFrame[data->index].descriptorPool[data->eye]);
 	//////
+
+	// Draw sprung object
+	{
+		struct
+		{
+			matrix mvp;
+			vec4 color;
+		} spherePC;
+
+		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+		matrix local=MatrixMult(MatrixScale(1.0f, 1.0f, 1.0f), MatrixTranslatev(testSpring.position));
+		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
+		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
+
+		DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
+	}
 
 #if 1
 	if(isControlPressed)
@@ -822,6 +842,8 @@ void Thread_Physics(void *arg)
 {
 	const uint32_t index=*((uint32_t *)arg);
 	double startTime=GetClock();
+
+	SpringIntegrate(&testSpring, camera.body.position, fTimeStep);
 
 	// Set up physics objects to be processed
 	ResetPhysicsObjectList();
@@ -1331,6 +1353,14 @@ bool Init(void)
 	vkuMemAllocator_Init(&vkContext);
 
 	CameraInit(&camera, Vec3(0.0f, 0.0f, -100.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
+
+	testSpring.position=Vec3(0.0f, 0.0f, -100.0f);
+	testSpring.velocity=Vec3b(0.0f);
+	testSpring.stiffness=800.0f;
+	testSpring.damping=2.0f;
+	testSpring.length=10.0f;
+	testSpring.mass=1.0f;
+	testSpring.invMass=1.0f/testSpring.mass;
 
 	if(!Audio_Init())
 	{

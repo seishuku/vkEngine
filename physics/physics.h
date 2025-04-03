@@ -37,4 +37,16 @@ void PhysicsIntegrate(RigidBody_t *body, const float dt);
 void PhysicsExplode(RigidBody_t *body);
 float PhysicsCollisionResponse(RigidBody_t *a, RigidBody_t *b);
 
+typedef struct
+{
+	vec3 position;
+	vec3 velocity;
+	float stiffness;
+	float damping;
+	float length;
+	float mass, invMass;
+} Spring_t;
+
+void SpringIntegrate(Spring_t *spring, vec3 target, float dt);
+
 #endif

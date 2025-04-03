@@ -4,10 +4,8 @@ pipeline {
 
 	pushConstant(0, 80, vertex|fragment)
 
-	subpass(0)
 	topology(triangleStrip)
 	cullMode(back)
-	rasterizationSamples(1)
 
 	blend(true)
 	srcColorBlendFactor(srcAlpha)
