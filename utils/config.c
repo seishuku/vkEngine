@@ -17,27 +17,8 @@ static const char *keywords[]=
 
 	// Subsection definitions
 	"windowSize", "msaaSamples", "deviceIndex",
+	"test1", "test2"
 };
-
-static void printToken(const char *msg, const Token_t *token)
-{
-	if(token==NULL)
-		DBGPRINTF(DEBUG_ERROR, "End token");
-	else if(token->type==TOKEN_STRING)
-		DBGPRINTF(DEBUG_ERROR, "%s string: %s\n", msg, token->string);
-	else if(token->type==TOKEN_QUOTED)
-		DBGPRINTF(DEBUG_ERROR, "%s quoted string: %s\n", msg, token->string);
-	else if(token->type==TOKEN_BOOLEAN)
-		DBGPRINTF(DEBUG_ERROR, "%s boolean string: %s\n", msg, token->string);
-	else if(token->type==TOKEN_KEYWORD)
-		DBGPRINTF(DEBUG_ERROR, "%s keyword string: %s\n", msg, token->string);
-	else if(token->type==TOKEN_FLOAT)
-		DBGPRINTF(DEBUG_ERROR, "%s floating point number: %lf\n", msg, token->fval);
-	else if(token->type==TOKEN_INT)
-		DBGPRINTF(DEBUG_ERROR, "%s integer number: %lld\n", msg, token->ival);
-	else if(token->type==TOKEN_DELIMITER)
-		DBGPRINTF(DEBUG_ERROR, "%s delimiter: %c\n", msg, token->string[0]);
-}
 
 bool Config_ReadINI(Config_t *config, const char *filename)
 {
@@ -99,7 +80,7 @@ bool Config_ReadINI(Config_t *config, const char *filename)
 
 				if(token->type!=TOKEN_DELIMITER&&token->string[0]!='{')
 				{
-					printToken("Unexpected token ", token);
+					Tokenizer_PrintToken("Unexpected token ", token);
 					return false;
 				}
 
@@ -114,172 +95,64 @@ bool Config_ReadINI(Config_t *config, const char *filename)
 					{
 						if(strcmp(token->string, "windowSize")==0)
 						{
-							int32_t param=0;
+							int32_t width=0, height=0;
 
-							// First token should be a left parenthesis '('
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type!=TOKEN_DELIMITER&&token->string[0]!='(')
-							{
-								printToken("Unexpected token ", token);
+							if(!Tokenizer_ArgumentHelper(&tokenizer, "ii", &width, &height))
 								return false;
-							}
+
+							if(width>=0&&width<7680)
+								config->windowWidth=width;
 							else
 							{
-								// Loop until right parenthesis ')' or until break condition
-								while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-								{
-									Zone_Free(zone, token);
-									token=Tokenizer_GetNext(&tokenizer);
+								DBGPRINTF(DEBUG_ERROR, "Config window width out of range.\n");
+								return false;
+							}
 
-									if(token->type==TOKEN_INT&&param==0)
-										config->windowWidth=(uint32_t)token->ival;
-									else if(token->type==TOKEN_INT&&param==1)
-										config->windowHeight=(uint32_t)token->ival;
-									else
-									{
-										printToken("Unexpected token ", token);
-										return false;
-									}
-
-									Zone_Free(zone, token);
-									token=Tokenizer_GetNext(&tokenizer);
-
-									if(token->type==TOKEN_DELIMITER)
-									{
-										// Still expecting more parameters, error.
-										if(token->string[0]!=','&&param<1)
-										{
-											DBGPRINTF(DEBUG_ERROR, "Missing comma\n");
-											return false;
-										}
-										// End of expected parameters, end.
-										else if(token->string[0]==')'&&param==2)
-											break;
-										else
-											param++;
-									}
-
-									if(param>2)
-									{
-										DBGPRINTF(DEBUG_ERROR, "Too many params windowSize(width, height)\n");
-										return false;
-									}
-								}
+							if(height>=0&&height<4320)
+								config->windowHeight=height;
+							else
+							{
+								DBGPRINTF(DEBUG_ERROR, "Config window height out of range.\n");
+								return false;
 							}
 						}
 						else if(strcmp(token->string, "msaaSamples")==0)
 						{
-							int32_t param=0;
+							int32_t msaaSamples=0;
 
-							// First token should be a left parenthesis '('
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type!=TOKEN_DELIMITER&&token->string[0]!='(')
-							{
-								printToken("Unexpected token ", token);
+							if(!Tokenizer_ArgumentHelper(&tokenizer, "i", &msaaSamples))
 								return false;
-							}
-							else
+
+							switch(msaaSamples)
 							{
-								// Loop until right parenthesis ')' or until break condition
-								while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-								{
-									Zone_Free(zone, token);
-									token=Tokenizer_GetNext(&tokenizer);
-
-									if(token->type==TOKEN_INT&&param==0)
-									{
-										switch(token->ival)
-										{
-											case 1:		config->MSAA=VK_SAMPLE_COUNT_1_BIT;		break;
-											case 2:		config->MSAA=VK_SAMPLE_COUNT_2_BIT;		break;
-											case 4:		config->MSAA=VK_SAMPLE_COUNT_4_BIT;		break;
-											case 8:		config->MSAA=VK_SAMPLE_COUNT_8_BIT;		break;
-											case 16:	config->MSAA=VK_SAMPLE_COUNT_16_BIT;	break;
-											case 32:	config->MSAA=VK_SAMPLE_COUNT_32_BIT;	break;
-											case 64:	config->MSAA=VK_SAMPLE_COUNT_64_BIT;	break;
-											default:	config->MSAA=VK_SAMPLE_COUNT_1_BIT;		break;
-										}
-									}
-									else
-									{
-										printToken("Unexpected token ", token);
-										return false;
-									}
-
-									Zone_Free(zone, token);
-									token=Tokenizer_GetNext(&tokenizer);
-
-									if(token->type==TOKEN_DELIMITER)
-									{
-										if(token->string[0]==')'&&param==1)
-											break;
-										else
-											param++;
-									}
-
-									if(param>1)
-									{
-										DBGPRINTF(DEBUG_ERROR, "Too many params msaaSamples(value), valid values are 1, 2, 4, 8, 16, 32, 64 (some may not be supported by hardware)\n");
-										return false;
-									}
-								}
+								case 1:		config->MSAA=VK_SAMPLE_COUNT_1_BIT;		break;
+								case 2:		config->MSAA=VK_SAMPLE_COUNT_2_BIT;		break;
+								case 4:		config->MSAA=VK_SAMPLE_COUNT_4_BIT;		break;
+								case 8:		config->MSAA=VK_SAMPLE_COUNT_8_BIT;		break;
+								case 16:	config->MSAA=VK_SAMPLE_COUNT_16_BIT;	break;
+								case 32:	config->MSAA=VK_SAMPLE_COUNT_32_BIT;	break;
+								case 64:	config->MSAA=VK_SAMPLE_COUNT_64_BIT;	break;
+								default:	config->MSAA=VK_SAMPLE_COUNT_1_BIT;		break;
 							}
 						}
 						else if(strcmp(token->string, "deviceIndex")==0)
 						{
-							int32_t param=0;
+							int32_t deviceIndex=0;
 
-							// First token should be a left parenthesis '('
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type!=TOKEN_DELIMITER&&token->string[0]!='(')
-							{
-								printToken("Unexpected token ", token);
+							if(!Tokenizer_ArgumentHelper(&tokenizer, "i", &deviceIndex))
 								return false;
-							}
+
+							if(deviceIndex>=0&&deviceIndex<4)
+								config->deviceIndex=deviceIndex;
 							else
 							{
-								// Loop until right parenthesis ')' or until break condition
-								while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-								{
-									Zone_Free(zone, token);
-									token=Tokenizer_GetNext(&tokenizer);
-
-									if(token->type==TOKEN_INT&&param==0)
-										config->deviceIndex=(uint32_t)token->ival;
-									else
-									{
-										printToken("Unexpected token ", token);
-										return false;
-									}
-
-									Zone_Free(zone, token);
-									token=Tokenizer_GetNext(&tokenizer);
-
-									if(token->type==TOKEN_DELIMITER)
-									{
-										if(token->string[0]==')'&&param==1)
-											break;
-										else
-											param++;
-									}
-
-									if(param>1)
-									{
-										DBGPRINTF(DEBUG_ERROR, "Too many params deviceIndex(index)\n");
-										return false;
-									}
-								}
+								DBGPRINTF(DEBUG_ERROR, "Config device index out of range.\n");
+								return false;
 							}
 						}
 						else
 						{
-							printToken("Unknown token ", token);
+							Tokenizer_PrintToken("Unknown token ", token);
 							return false;
 						}
 					}

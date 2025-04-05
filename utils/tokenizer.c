@@ -300,3 +300,144 @@ Token_t *Tokenizer_PeekNext(Tokenizer_t *context)
 
 	return result;
 }
+
+void Tokenizer_PrintToken(const char *msg, const Token_t *token)
+{
+	if(token==NULL)
+		DBGPRINTF(DEBUG_ERROR, "End token");
+	else if(token->type==TOKEN_STRING)
+		DBGPRINTF(DEBUG_ERROR, "%s string: %s\n", msg, token->string);
+	else if(token->type==TOKEN_QUOTED)
+		DBGPRINTF(DEBUG_ERROR, "%s quoted string: %s\n", msg, token->string);
+	else if(token->type==TOKEN_BOOLEAN)
+		DBGPRINTF(DEBUG_ERROR, "%s boolean string: %s\n", msg, token->string);
+	else if(token->type==TOKEN_KEYWORD)
+		DBGPRINTF(DEBUG_ERROR, "%s keyword string: %s\n", msg, token->string);
+	else if(token->type==TOKEN_FLOAT)
+		DBGPRINTF(DEBUG_ERROR, "%s floating point number: %lf\n", msg, token->fval);
+	else if(token->type==TOKEN_INT)
+		DBGPRINTF(DEBUG_ERROR, "%s integer number: %lld\n", msg, token->ival);
+	else if(token->type==TOKEN_DELIMITER)
+		DBGPRINTF(DEBUG_ERROR, "%s delimiter: %c\n", msg, token->string[0]);
+}
+
+bool Tokenizer_ArgumentHelper(Tokenizer_t *tokenizer, char *fmt, ...)
+{
+	char *pFmt=fmt;
+	va_list ap;
+
+	va_start(ap, fmt);
+
+	// First token should be a left parenthesis '('
+	Token_t *token=Tokenizer_GetNext(tokenizer);
+
+	if(token->type!=TOKEN_DELIMITER&&token->string[0]!='(')
+	{
+		Tokenizer_PrintToken("Unexpected token ", token);
+		return false;
+	}
+	else
+	{
+		// Loop until right parenthesis ')' or until break condition
+		while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
+		{
+			Zone_Free(zone, token);
+			token=Tokenizer_GetNext(tokenizer);
+
+			void *arg=va_arg(ap, void *);
+
+			if(arg==NULL)
+			{
+				DBGPRINTF(DEBUG_ERROR, "Got NULL argument pointer.\n");
+				return false;
+			}
+
+			switch(token->type)
+			{
+				case TOKEN_STRING:
+				case TOKEN_QUOTED:
+				{
+					if(*pFmt=='s')
+					{
+						pFmt++;
+
+						int32_t maxLength=strtol(pFmt, &pFmt, 10);
+
+						if(maxLength>0)
+						{
+							strncpy((char *)arg, token->string, maxLength);
+							((char *)arg)[maxLength-1]='\0';
+						}
+					}
+					else
+						DBGPRINTF(DEBUG_ERROR, "Type mismatch!\n");
+					break;
+				}
+
+				case TOKEN_BOOLEAN:
+				{
+					if(*pFmt=='b')
+					{
+						pFmt++;
+						*(bool *)arg=token->boolean;
+					}
+					else
+						DBGPRINTF(DEBUG_ERROR, "Type mismatch!\n");
+					break;
+				}
+
+				case TOKEN_FLOAT:
+				{
+					if(*pFmt=='f')
+					{
+						pFmt++;
+						*(float *)arg=(float)token->fval;
+					}
+					else
+						DBGPRINTF(DEBUG_ERROR, "Type mismatch!\n");
+					break;
+				}
+
+				case TOKEN_INT:
+				{
+					if(*pFmt=='i')
+					{
+						pFmt++;
+						*(uint32_t *)arg=(uint32_t)token->ival;
+					}
+					else
+						DBGPRINTF(DEBUG_ERROR, "Type mismatch!\n");
+					break;
+				}
+
+				default:
+					Tokenizer_PrintToken("Unexpected token ", token);
+					return false;
+			}
+
+			Zone_Free(zone, token);
+			token=Tokenizer_GetNext(tokenizer);
+
+			if(token->type==TOKEN_DELIMITER)
+			{
+				if(token->string[0]!=','&&*pFmt!='\0')
+				{
+					DBGPRINTF(DEBUG_ERROR, "Too few arguments, missing comma.\n");
+					return false;
+				}
+				else if(token->string[0]==','&&*pFmt=='\0')
+				{
+					DBGPRINTF(DEBUG_ERROR, "Too many arguments.\n");
+					return false;
+				}
+				else if(token->string[0]==')'&&*pFmt=='\0')
+					break;
+			}
+		}
+	}
+
+	va_end(ap);
+	Zone_Free(zone, token);
+
+	return true;
+}

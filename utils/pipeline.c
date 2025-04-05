@@ -11,9 +11,9 @@
 // TODO: don't like global for this, maybe change to creation flags on CreatePipeline?
 static VkSampleCountFlags rasterizationSamplesOverride=VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM;
 
-void PipelineOverrideRasterizationSamples(const VkSampleCountFlags rasterizationsamples)
+void PipelineOverrideRasterizationSamples(const VkSampleCountFlags rasterizationSamples)
 {
-	rasterizationSamplesOverride=rasterizationsamples;
+	rasterizationSamplesOverride=rasterizationSamples;
 }
 
 // These are keywords for the pipeline description script
@@ -52,26 +52,6 @@ static const char *keywords[]=
 	// base64 encoded shader binary
 	"base64",
 };
-
-static void printToken(const char *msg, const Token_t *token)
-{
-	if(token==NULL)
-		DBGPRINTF(DEBUG_ERROR, "End token");
-	else if(token->type==TOKEN_STRING)
-		DBGPRINTF(DEBUG_ERROR, "%s string: %s\n", msg, token->string);
-	else if(token->type==TOKEN_QUOTED)
-		DBGPRINTF(DEBUG_ERROR, "%s quoted string: %s\n", msg, token->string);
-	else if(token->type==TOKEN_BOOLEAN)
-		DBGPRINTF(DEBUG_ERROR, "%s boolean string: %s\n", msg, token->string);
-	else if(token->type==TOKEN_KEYWORD)
-		DBGPRINTF(DEBUG_ERROR, "%s keyword string: %s\n", msg, token->string);
-	else if(token->type==TOKEN_FLOAT)
-		DBGPRINTF(DEBUG_ERROR, "%s floating point number: %lf\n", msg, token->fval);
-	else if(token->type==TOKEN_INT)
-		DBGPRINTF(DEBUG_ERROR, "%s integer number: %lld\n", msg, token->ival);
-	else if(token->type==TOKEN_DELIMITER)
-		DBGPRINTF(DEBUG_ERROR, "%s delimiter: %c\n", msg, token->string[0]);
-}
 
 bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass renderPass, const char *filename)
 {
@@ -123,7 +103,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 
 				if(token->type!=TOKEN_DELIMITER&&token->string[0]!='{')
 				{
-					printToken("Unexpected token ", token);
+					Tokenizer_PrintToken("Unexpected token ", token);
 					return false;
 				}
 
@@ -150,7 +130,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 
 							if(token->type!=TOKEN_DELIMITER&&token->string[0]!='(')
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 							else
@@ -204,13 +184,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 											stage|=VK_SHADER_STAGE_COMPUTE_BIT;
 										else
 										{
-											printToken("Unknown parameter ", token);
+											Tokenizer_PrintToken("Unknown parameter ", token);
 											return false;
 										}
 									}
 									else
 									{
-										printToken("Unexpected token ", token);
+										Tokenizer_PrintToken("Unexpected token ", token);
 										return false;
 									}
 
@@ -246,11 +226,10 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									return false;
 								}
 							}
-
 						}
 						else
 						{
-							printToken("Unknown token ", token);
+							Tokenizer_PrintToken("Unknown token ", token);
 							return false;
 						}
 					}
@@ -276,7 +255,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 
 				if(token->type!=TOKEN_DELIMITER&&token->string[0]!='{')
 				{
-					printToken("Unexpected token ", token);
+					Tokenizer_PrintToken("Unexpected token ", token);
 					return false;
 				}
 
@@ -350,13 +329,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									stage=VK_SHADER_STAGE_COMPUTE_BIT;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -429,13 +408,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									inputRate=VK_VERTEX_INPUT_RATE_INSTANCE;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -652,7 +631,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									format=VK_FORMAT_R64G64B64A64_SFLOAT;
 								else
 								{
-									printToken("Unknown format parameter ", token);
+									Tokenizer_PrintToken("Unknown format parameter ", token);
 									return false;
 								}
 							}
@@ -660,7 +639,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								offset=(uint32_t)token->ival;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -709,7 +688,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								pipeline->pipeline.subpass=(uint32_t)token->ival;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -720,7 +699,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -761,13 +740,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -778,7 +757,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -802,7 +781,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -813,7 +792,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -837,7 +816,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -848,7 +827,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -872,7 +851,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -883,7 +862,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -910,13 +889,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.polygonMode=VK_POLYGON_MODE_POINT;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -927,7 +906,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -956,13 +935,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.cullMode=VK_CULL_MODE_FRONT_AND_BACK;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -973,7 +952,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -998,13 +977,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.cullMode=VK_FRONT_FACE_CLOCKWISE;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1015,7 +994,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1039,7 +1018,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1050,7 +1029,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1071,7 +1050,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								pipeline->pipeline.depthBiasConstantFactor=(float)token->fval;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1082,7 +1061,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1103,7 +1082,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								pipeline->pipeline.depthBiasClamp=(float)token->fval;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1114,7 +1093,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1135,7 +1114,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								pipeline->pipeline.depthBiasSlopeFactor=(float)token->fval;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1146,7 +1125,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1167,7 +1146,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								pipeline->pipeline.lineWidth=(float)token->fval;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1178,7 +1157,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1202,7 +1181,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1213,7 +1192,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1237,7 +1216,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1248,7 +1227,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1285,13 +1264,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_ALWAYS;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1302,7 +1281,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1326,7 +1305,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1337,7 +1316,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1361,7 +1340,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1372,7 +1351,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1393,7 +1372,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								pipeline->pipeline.minDepthBounds=(float)token->fval;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1404,7 +1383,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1425,7 +1404,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								pipeline->pipeline.maxDepthBounds=(float)token->fval;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1436,7 +1415,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1473,13 +1452,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1490,7 +1469,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1527,13 +1506,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1544,7 +1523,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1581,13 +1560,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1598,7 +1577,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1635,13 +1614,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_ALWAYS;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1652,7 +1631,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1673,7 +1652,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								pipeline->pipeline.frontStencilCompareMask=(uint32_t)token->ival;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1684,7 +1663,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1705,7 +1684,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								pipeline->pipeline.frontStencilWriteMask=(uint32_t)token->ival;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1716,7 +1695,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1737,7 +1716,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								pipeline->pipeline.frontStencilReference=(uint32_t)token->ival;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1748,7 +1727,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1785,13 +1764,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1802,7 +1781,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1839,13 +1818,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1856,7 +1835,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1893,13 +1872,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1910,7 +1889,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1947,13 +1926,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_ALWAYS;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1964,7 +1943,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -1985,7 +1964,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								pipeline->pipeline.backStencilCompareMask=(uint32_t)token->ival;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -1996,7 +1975,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2017,7 +1996,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								pipeline->pipeline.backStencilWriteMask=(uint32_t)token->ival;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2028,7 +2007,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2049,7 +2028,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								pipeline->pipeline.backStencilReference=(uint32_t)token->ival;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2060,7 +2039,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2095,13 +2074,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_64_BIT;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2112,7 +2091,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2136,7 +2115,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2147,7 +2126,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2166,7 +2145,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								pipeline->pipeline.minSampleShading=(float)token->fval;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2177,7 +2156,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2187,7 +2166,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 						Zone_Free(zone, token);
 						token=Tokenizer_GetNext(&tokenizer);
 
-						printToken("sampleMask not implemented! ", token);
+						Tokenizer_PrintToken("sampleMask not implemented! ", token);
 					}
 					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "alphaToCoverage")==0)
 					{
@@ -2208,7 +2187,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2219,7 +2198,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2243,7 +2222,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2254,7 +2233,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2278,7 +2257,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2289,7 +2268,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2340,13 +2319,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_SET;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2357,7 +2336,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2381,7 +2360,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2392,7 +2371,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2451,13 +2430,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2468,7 +2447,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2527,13 +2506,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2544,7 +2523,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2573,13 +2552,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.colorBlendOp=VK_BLEND_OP_MAX;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2590,7 +2569,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2649,13 +2628,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2666,7 +2645,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2725,13 +2704,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2742,7 +2721,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2773,13 +2752,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.alphaBlendOp=VK_BLEND_OP_MAX;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2790,7 +2769,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 								break;
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2821,13 +2800,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pipeline.colorWriteMask|=VK_COLOR_COMPONENT_A_BIT;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
@@ -2843,7 +2822,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 						}
@@ -2883,13 +2862,13 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									pipeline->pushConstant.stageFlags|=VK_SHADER_STAGE_COMPUTE_BIT;
 								else
 								{
-									printToken("Unknown parameter ", token);
+									Tokenizer_PrintToken("Unknown parameter ", token);
 									return false;
 								}
 							}
 							else
 							{
-								printToken("Unexpected token ", token);
+								Tokenizer_PrintToken("Unexpected token ", token);
 								return false;
 							}
 
