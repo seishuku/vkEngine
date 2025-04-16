@@ -753,8 +753,10 @@ void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *p
 	particle->life=RandFloat()*0.5f+0.01f;
 }
 
-void TestCollision(PhysicsObject_t *objA, PhysicsObject_t *objB)
+void TestCollision(void *a, void *b)
 {
+	PhysicsObject_t *objA=(PhysicsObject_t *)a, *objB=(PhysicsObject_t *)b;
+
 	if(PhysicsCollisionResponse(objA->rigidBody, objB->rigidBody)>1.0f)
 	{
 		// If both objects are asteroids
@@ -873,7 +875,7 @@ void Thread_Physics(void *arg)
 	SpatialHash_Clear(&spatialHash);
 
 	for(uint32_t i=0;i<numPhysicsObjects;i++)
-		SpatialHash_AddPhysicsObject(&spatialHash, &physicsObjects[i]);
+		SpatialHash_AddObject(&spatialHash, physicsObjects[i].rigidBody->position, &physicsObjects[i]);
 
 	if(!pausePhysics)
 	{
@@ -919,7 +921,7 @@ void Thread_Physics(void *arg)
 		{
 			PhysicsIntegrate(physicsObjects[i].rigidBody, fTimeStep);
 
-			SpatialHash_TestObjects(&spatialHash, &physicsObjects[i], TestCollision);
+			SpatialHash_TestObjects(&spatialHash, physicsObjects[i].rigidBody->position, &physicsObjects[i], TestCollision);
 
 #if 1
 			// Fire "laser beam"
@@ -1588,6 +1590,8 @@ bool Init(void)
 		};
 	}
 
+	SpatialHash_Create(&spatialHash, NUM_ASTEROIDS/2, 50.0f);
+
 	Font_Init(&font);
 
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)config.renderWidth, (float)config.renderHeight));
@@ -1915,6 +1919,10 @@ void Destroy(void)
 
 	// Compositing pipeline
 	DestroyComposite();
+	//////////
+
+	// Spatial hash for collision destruction
+	SpatialHash_Destroy(&spatialHash);
 	//////////
 
 	// Particle system destruction

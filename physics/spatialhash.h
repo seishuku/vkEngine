@@ -1,27 +1,27 @@
 #ifndef __SPATIALHASH_H__
 #define __SPATIALHASH_H__
 
-#ifndef HASH_TABLE_SIZE
-#define HASH_TABLE_SIZE (NUM_ASTEROIDS/2)
-#endif
-
-#ifndef GRID_SIZE
-#define GRID_SIZE 50.0f
-#endif
+#include <stdbool.h>
+#include <stdint.h>
+#include "../math/math.h"
 
 typedef struct
 {
 	uint32_t numObjects;
-	PhysicsObject_t *objects[100];
+	void *objects[100];
 } Cell_t;
 
 typedef struct
 {
-	Cell_t hashTable[HASH_TABLE_SIZE];
+	uint32_t hashTableSize;
+	float gridSize, invGridSize;
+	Cell_t *hashTable;
 } SpatialHash_t;
 
+bool SpatialHash_Create(SpatialHash_t *spatialHash, const uint32_t tableSize, const float gridSize);
+void SpatialHash_Destroy(SpatialHash_t *spatialHash);
 void SpatialHash_Clear(SpatialHash_t *spatialHash);
-bool SpatialHash_AddPhysicsObject(SpatialHash_t *spatialHash, PhysicsObject_t *physicsObject);
-void SpatialHash_TestObjects(SpatialHash_t *spatialHash, PhysicsObject_t *physicsObject, void (*collisionFunc)(PhysicsObject_t *objA, PhysicsObject_t *objB));
+bool SpatialHash_AddObject(SpatialHash_t *spatialHash, const vec3 value, void *object);
+void SpatialHash_TestObjects(SpatialHash_t *spatialHash, vec3 value, void *a, void (*testFunc)(void *a, void *b));
 
 #endif
