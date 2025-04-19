@@ -13,8 +13,7 @@ bool SpatialHash_Create(SpatialHash_t *spatialHash, const uint32_t tableSize, co
 	if(!tableSize)
 		return false;
 
-	// TODO: Should smaller grid sizes be allowed?
-	if(gridSize<1.0f)
+	if(gridSize<=0.0f)
 		return false;
 
 	spatialHash->gridSize=gridSize;

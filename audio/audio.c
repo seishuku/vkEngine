@@ -14,6 +14,7 @@
 #include "../system/system.h"
 #include "../math/math.h"
 #include "../camera/camera.h"
+#include "../utils/spatialhash.h"
 #include "qoa.h"
 #include "audio.h"
 
@@ -34,6 +35,8 @@ typedef struct
 
 static const uint32_t HRIR_MAGIC='H'|'R'<<8|'I'<<16|'R'<<24;
 
+static SpatialHash_t HRIRHash;
+
 static struct
 {
 	uint32_t magic;
@@ -44,6 +47,8 @@ static struct
 	uint32_t *indices;
 	HRIR_Vertex_t *vertices;
 } sphere;
+
+static float HRIRWindow[MAX_HRIR_SAMPLES]={ 0 };
 
 #define MAX_CHANNELS 128
 
@@ -101,6 +106,22 @@ static vec2 CalculateBarycentric(const vec3 p, const vec3 a, const vec3 b, const
 	return Vec2((d11*d20-d01*d21)*invDenom, (d00*d21-d01*d20)*invDenom);
 }
 
+static float maxDistanceSq=-1.0f;
+static uint32_t triangleIndex=-1;
+
+static void HRIR_FindBestTriangle(void *a, void *b)
+{
+	const vec3 *position=(vec3 *)a;
+	const uint32_t tri=*(uint32_t *)b;
+	const float d=Vec3_Dot(*position, sphere.vertices[3*tri].normal);
+
+	if(d>maxDistanceSq)
+	{
+		maxDistanceSq=d;
+		triangleIndex=tri;
+	}
+}
+
 // HRIR sample interpolation, takes world-space position as input.
 // HRIR samples are taken as float, but interpolated output is int16.
 static void HRIRInterpolate(vec3 xyz)
@@ -115,28 +136,18 @@ static void HRIRInterpolate(vec3 xyz)
 	// Calculate distance fall-off
 	float falloffDist=fmaxf(0.0f, 1.0f-Vec3_Length(Vec3_Muls(relPosition, invRadius)));
 
-	// Normalize also returns the length of the vector...
 	Vec3_Normalize(&position);
 
-	// Find closest triangle to the sound direction
-	float maxDistanceSq=-1.0f;
-	int32_t triangleIndex=-1;
+	maxDistanceSq=-1.0f;
+	triangleIndex=-1;
 
-	for(uint32_t i=0;i<sphere.numIndex;i+=3)
-	{
-		const float distanceSq=Vec3_Dot(position, sphere.vertices[sphere.indices[i+0]].normal);
-
-		if(distanceSq>maxDistanceSq)
-		{
-			maxDistanceSq=distanceSq;
-			triangleIndex=i;
-		}
-	}
+	// Query spatial hash for nearby triangles
+	SpatialHash_TestObjects(&HRIRHash, position, &position, HRIR_FindBestTriangle);
 
 	// Calculate the barycentric coordinates and use them to interpolate the HRIR samples.
-	const HRIR_Vertex_t *v0=&sphere.vertices[sphere.indices[triangleIndex+0]];
-	const HRIR_Vertex_t *v1=&sphere.vertices[sphere.indices[triangleIndex+1]];
-	const HRIR_Vertex_t *v2=&sphere.vertices[sphere.indices[triangleIndex+2]];
+	const HRIR_Vertex_t *v0=&sphere.vertices[triangleIndex+0];
+	const HRIR_Vertex_t *v1=&sphere.vertices[triangleIndex+1];
+	const HRIR_Vertex_t *v2=&sphere.vertices[triangleIndex+2];
 	const vec2 g=Vec2_Clamp(CalculateBarycentric(position, v0->vertex, v1->vertex, v2->vertex), 0.0f, 1.0f);
 	const vec3 coords=Vec3(g.x, g.y, 1.0f-g.x-g.y);
 
@@ -147,8 +158,7 @@ static void HRIRInterpolate(vec3 xyz)
 			const vec3 left=Vec3(v0->left[i], v1->left[i], v2->left[i]);
 			const vec3 right=Vec3(v0->right[i], v1->right[i], v2->right[i]);
 			const float gain=4.0f;
-			const float window=0.5f*(0.5f-cosf(2.0f*PI*(float)i/(sphere.sampleLength-1)));
-			const float final=falloffDist*gain*window*INT16_MAX;
+			const float final=falloffDist*gain*HRIRWindow[i]*INT16_MAX;
 
 			HRIRKernel[2*i+0]=(int16_t)(final*Vec3_Dot(left, coords));
 			HRIRKernel[2*i+1]=(int16_t)(final*Vec3_Dot(right, coords));
@@ -443,6 +453,11 @@ static bool HRIR_Init(void)
 
 	fclose(stream);
 
+	if(!SpatialHash_Create(&HRIRHash, 512, 2.0f))
+		return false;
+
+	SpatialHash_Clear(&HRIRHash);
+
 	// Pre-calculate the normal vector of the HRIR sphere triangles
 	for(uint32_t i=0;i<sphere.numIndex;i+=3)
 	{
@@ -455,7 +470,12 @@ static bool HRIR_Init(void)
 		v0->normal=Vec3_Addv(v0->normal, normal);
 		v1->normal=Vec3_Addv(v1->normal, normal);
 		v2->normal=Vec3_Addv(v2->normal, normal);
+
+		SpatialHash_AddObject(&HRIRHash, Vec3_Muls(normal, 100.0f), &sphere.indices[i]);
 	}
+
+	for(uint32_t i=0;i<sphere.sampleLength;i++)
+		HRIRWindow[i]=0.5f*(0.5f-cosf(2.0f*PI*(float)i/(sphere.sampleLength-1)));
 
 	return true;
 }
@@ -562,6 +582,8 @@ void Audio_Destroy(void)
 	// Clean up HRIR data
 	Zone_Free(zone, sphere.indices);
 	Zone_Free(zone, sphere.vertices);
+
+	SpatialHash_Destroy(&HRIRHash);
 
 #ifdef ANDROID
 	// Shut down Android Audio

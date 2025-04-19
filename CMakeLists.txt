@@ -35,7 +35,6 @@ set(PROJECT_SOURCES
 	physics/particle.c
 	physics/physics.c
 	physics/physicslist.c
-	physics/spatialhash.c
 	pipelines/composite.c
 	pipelines/lighting.c
 	pipelines/line.c
@@ -57,6 +56,7 @@ set(PROJECT_SOURCES
 	utils/event.c
 	utils/list.c
 	utils/pipeline.c
+	utils/spatialhash.c
 	utils/spvparse.c
 	utils/tokenizer.c
 	vr/vr.c
