@@ -13,6 +13,7 @@ fetchDeps()
 
 set(PROJECT_SOURCES
 	audio/audio.c
+	audio/dsp.c
 	audio/music.c
 	audio/qoa.c
 	audio/sfx.c

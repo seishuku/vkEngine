@@ -16,6 +16,7 @@
 #include "../camera/camera.h"
 #include "../utils/spatialhash.h"
 #include "qoa.h"
+#include "dsp.h"
 #include "audio.h"
 
 float audioTime=0.0;
@@ -285,6 +286,8 @@ static void Audio_FillBuffer(void *buffer, uint32_t length)
 		}
 	}
 
+	DSP_Process(out, length);
+
 	size_t remainingData=min(MAX_STREAM_SAMPLES-streamBuffer.position, length);
 
 	for(uint32_t i=0;i<MAX_AUDIO_STREAMS;i++)
@@ -493,6 +496,16 @@ int Audio_Init(void)
 		DBGPRINTF(DEBUG_ERROR, "Audio: HRIR failed to initialize.\n");
 		return false;
 	}
+
+	if(!DSP_Init())
+	{
+		DBGPRINTF(DEBUG_ERROR, "Audio: DSP failed to initialize.\n");
+		return false;
+	}
+
+	DSP_AddEffect(DSP_Reverb);
+	DSP_AddEffect(DSP_LowPass);
+	DSP_AddEffect(DSP_Overdrive);
 
 #ifdef ANDROID
 	AAudioStreamBuilder *streamBuilder;
