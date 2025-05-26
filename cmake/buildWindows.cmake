@@ -1,6 +1,9 @@
 function("buildWindows")
-	add_definitions(-DWIN32 -D_CRT_SECURE_NO_WARNINGS -D_CONSOLE)
-	list(APPEND PROJECT_SOURCES system/win32/win32.c)
+	set(PA_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+	add_subdirectory(deps/portaudio)
+
+    add_definitions(-DWIN32 -D_CRT_SECURE_NO_WARNINGS -D_CONSOLE)
+	list(APPEND PROJECT_SOURCES audio/backend/portaudio.c system/win32/win32.c)
 
     if(CMAKE_C_COMPILER_ID OR CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")

@@ -1,4 +1,7 @@
 function("buildLinux")
+	find_package(PipeWire REQUIRED)
+	list(APPEND PROJECT_SOURCES audio/backend/pipewire.c)
+
 	if(WAYLAND)
 		add_definitions(-DLINUX -DWAYLAND -g)
 		list(APPEND PROJECT_SOURCES system/linux/linux_wayland.c system/linux/wayland/xdg-shell.c system/linux/wayland/relative-pointer.c)
@@ -22,8 +25,8 @@ function("buildLinux")
 		Vulkan::Vulkan
 		OpenXR::openxr_loader
 		Vorbis::vorbisfile
+		PipeWire::PipeWire
 		m
-		portaudio_static 
 	)
 
 	if(WAYLAND)

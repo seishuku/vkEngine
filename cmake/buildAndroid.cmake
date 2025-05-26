@@ -30,6 +30,7 @@ function("buildAndroid")
 	add_link_options(-Wl,--no-undefined)
 
 	list(APPEND PROJECT_SOURCES
+		audio/backend/android.c
 		system/android/android_fopen.c
 		system/android/android_main.c
 		system/android/android_native_app_glue.c

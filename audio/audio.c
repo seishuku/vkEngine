@@ -1,9 +1,3 @@
-#ifdef ANDROID
-#include <aaudio/AAudio.h>
-#else
-#include <portaudio.h>
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,12 +14,6 @@
 #include "audio.h"
 
 float audioTime=0.0;
-
-#ifdef ANDROID
-static AAudioStream *audioStream=NULL;
-#else
-static PaStream *audioStream=NULL;
-#endif
 
 // HRIR sphere model and audio samples
 typedef struct
@@ -212,7 +200,8 @@ static void MixAudio(int16_t *dst, const int16_t *src, const size_t length, cons
 	}
 }
 
-static void Audio_FillBuffer(void *buffer, uint32_t length)
+// Callback function for when audio driver needs more data.
+void Audio_FillBuffer(void *buffer, uint32_t length)
 {
 	const double startTime=GetClock();
 
@@ -310,23 +299,6 @@ static void Audio_FillBuffer(void *buffer, uint32_t length)
 
 	audioTime=(float)(GetClock()-startTime);
 }
-
-// Callback functions for when audio driver needs more data.
-#ifdef ANDROID
-static aaudio_data_callback_result_t Audio_Callback(AAudioStream *stream, void *userData, void *audioData, int32_t numFrames)
-{
-	Audio_FillBuffer(audioData, numFrames);
-
-	return AAUDIO_CALLBACK_RESULT_CONTINUE;
-}
-#else
-static int Audio_Callback(const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData)
-{
-	Audio_FillBuffer(outputBuffer, framesPerBuffer);
-
-	return paContinue;
-}
-#endif
 
 // Add a sound to first open channel.
 uint32_t Audio_PlaySample(Sample_t *sample, const bool looping, const float volume, vec3 position)
@@ -508,83 +480,11 @@ int Audio_Init(void)
 	DSP_AddEffect(DSP_Overdrive);
 
 #ifdef ANDROID
-	AAudioStreamBuilder *streamBuilder;
-
-	if(AAudio_createStreamBuilder(&streamBuilder)!=AAUDIO_OK)
-	{
-		DBGPRINTF(DEBUG_ERROR, "Audio: Error creating stream builder\n");
-		return false;
-	}
-
-	AAudioStreamBuilder_setFormat(streamBuilder, AAUDIO_FORMAT_PCM_I16);
-	AAudioStreamBuilder_setChannelCount(streamBuilder, 2);
-	AAudioStreamBuilder_setSampleRate(streamBuilder, AUDIO_SAMPLE_RATE);
-	AAudioStreamBuilder_setPerformanceMode(streamBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-	AAudioStreamBuilder_setDataCallback(streamBuilder, Audio_Callback, NULL);
-
-	// Opens the stream.
-	if(AAudioStreamBuilder_openStream(streamBuilder, &audioStream)!=AAUDIO_OK)
-	{
-		DBGPRINTF(DEBUG_ERROR, "Audio: Error opening stream\n");
-		return false;
-	}
-
-	if(AAudioStream_getSampleRate(audioStream)!=AUDIO_SAMPLE_RATE)
-	{
-		DBGPRINTF(DEBUG_ERROR, "Audio: Sample rate mismatch\n");
-		return false;
-	}
-
-	// Sets the buffer size. 
-	AAudioStream_setBufferSizeInFrames(audioStream, AAudioStream_getFramesPerBurst(audioStream)*MAX_AUDIO_SAMPLES);
-
-	// Starts the stream.
-	if(AAudioStream_requestStart(audioStream)!=AAUDIO_OK)
-	{
-		DBGPRINTF(DEBUG_ERROR, "Audio: Error starting stream\n");
-		return false;
-	}
-
-	AAudioStreamBuilder_delete(streamBuilder);
-#else
-	// Initialize PortAudio
-	if(Pa_Initialize()!=paNoError)
-	{
-		DBGPRINTF(DEBUG_ERROR, "Audio: PortAudio failed to initialize.\n");
-		return false;
-	}
-
-	PaStreamParameters outputParameters={ 0 };
-	// Set up output device parameters
-	outputParameters.device=Pa_GetDefaultOutputDevice();
-
-	if(outputParameters.device==paNoDevice)
-	{
-		DBGPRINTF(DEBUG_ERROR, "Audio: No default output device.\n");
-		Pa_Terminate();
-		return false;
-	}
-
-	outputParameters.channelCount=2;
-	outputParameters.sampleFormat=paInt16;
-	outputParameters.suggestedLatency=Pa_GetDeviceInfo(outputParameters.device)->defaultLowOutputLatency;
-	outputParameters.hostApiSpecificStreamInfo=NULL;
-
-	// Open audio stream
-	if(Pa_OpenStream(&audioStream, NULL, &outputParameters, AUDIO_SAMPLE_RATE, MAX_AUDIO_SAMPLES, paNoFlag, Audio_Callback, NULL)!=paNoError)
-	{
-		DBGPRINTF(DEBUG_ERROR, "Audio: Unable to open PortAudio stream.\n");
-		Pa_Terminate();
-		return false;
-	}
-
-	// Start audio stream
-	if(Pa_StartStream(audioStream)!=paNoError)
-	{
-		DBGPRINTF(DEBUG_ERROR, "Audio: Unable to start PortAudio Stream.\n");
-		Pa_Terminate();
-		return false;
-	}
+	AudioAndroid_Init();#
+#elif WIN32
+	AudioPortAudio_Init();
+#elif LINUX
+	AudioPipeWire_Init();
 #endif
 
 	return true;
@@ -599,15 +499,11 @@ void Audio_Destroy(void)
 	SpatialHash_Destroy(&HRIRHash);
 
 #ifdef ANDROID
-	// Shut down Android Audio
-	AAudioStream_requestStop(audioStream);
-	AAudioStream_close(audioStream);
-#else
-	// Shut down PortAudio
-	Pa_AbortStream(audioStream);
-	Pa_StopStream(audioStream);
-	Pa_CloseStream(audioStream);
-	Pa_Terminate();
+	AudioAndroid_Destroy();
+#elif WIN32
+	AudioPortAudio_Destroy();
+#elif LINUX
+	AudioPipeWire_Destroy();
 #endif
 }
 

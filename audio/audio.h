@@ -113,6 +113,7 @@ typedef struct
 	float hpfCutoffSweep;
 } WaveParams_t;
 
+void Audio_FillBuffer(void *buffer, uint32_t length);
 bool Audio_LoadStatic(const char *filename, Sample_t *sample);
 uint32_t Audio_PlaySample(Sample_t *sample, const bool looping, const float volume, vec3 position);
 void Audio_UpdateXYZPosition(uint32_t slot, vec3 position);
@@ -129,5 +130,13 @@ uint32_t WavWrite(const char *filename, int16_t *samples, uint32_t numSamples, u
 
 void ResetWaveSample(WaveParams_t *params);
 float GenerateWaveSample(WaveParams_t *params);
+
+// Backend functions
+bool AudioAndroid_Init(void);
+void AudioAndroid_Destroy(void);
+bool AudioPipeWire_Init(void);
+void AudioPipeWire_Destroy(void);
+bool AudioPortAudio_Init(void);
+void AudioPortAudio_Destroy(void);
 
 #endif
