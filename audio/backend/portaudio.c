@@ -4,6 +4,8 @@
 #include "../../system/system.h"
 #include "../audio.h"
 
+static PaStream *audioStream=NULL;
+
 static int Pa_Callback(const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData)
 {
 	Audio_FillBuffer(outputBuffer, framesPerBuffer);
@@ -51,6 +53,8 @@ bool AudioPortAudio_Init(void)
 		Pa_Terminate();
 		return false;
 	}
+
+	return true;
 }
 
 void AudioPortAudio_Destroy(void)
