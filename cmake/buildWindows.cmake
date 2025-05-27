@@ -1,6 +1,6 @@
 function("buildWindows")
 	set(PA_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-	add_subdirectory(deps/portaudio)
+	add_subdirectory(deps/portaudio EXCLUDE_FROM_ALL)
 
     add_definitions(-DWIN32 -D_CRT_SECURE_NO_WARNINGS -D_CONSOLE)
 	list(APPEND PROJECT_SOURCES audio/backend/portaudio.c system/win32/win32.c)

@@ -1,9 +1,9 @@
-﻿cmake_minimum_required (VERSION 3.8)
+﻿cmake_minimum_required (VERSION 3.10)
 
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED True)
 
-project("vkEngine" LANGUAGES C)
+project("vkEngine" LANGUAGES C VERSION 0.0.5)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include("fetchDeps")
@@ -95,3 +95,29 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Android")
 endif()
 
 buildShaders()
+
+install(TARGETS ${CMAKE_PROJECT_NAME} DESTINATION .)
+
+install(DIRECTORY assets/ DESTINATION assets)
+install(DIRECTORY pipelines/ DESTINATION pipelines FILES_MATCHING PATTERN "*.pipeline")
+install(FILES config.ini README.md LICENSE DESTINATION .)
+
+include(InstallRequiredSystemLibraries)
+
+set(CPACK_PACKAGE_NAME "vkEngine")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_CONTACT "nitrogl@gmail.com")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "vkEngine - Not a demo, demo.")
+set(CPACK_PACKAGE_VENDOR "NitroGL")
+
+if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+    set(CPACK_GENERATOR "ZIP")
+elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    set(CPACK_GENERATOR "TGZ")
+elseif(CMAKE_SYSTEM_NAME MATCHES "Android")
+	message("???")
+endif()
+
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
+
+include(CPack)

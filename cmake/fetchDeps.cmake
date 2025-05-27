@@ -7,14 +7,14 @@ function(fetchDeps)
 	find_program(GLSLC NAMES glslc HINTS Vulkan::glslc)
 
 	message(STATUS "${PROJECT_NAME}: Fetching OpenXR...")
-	add_subdirectory(deps/OpenXR-SDK)
+	add_subdirectory(deps/OpenXR-SDK EXCLUDE_FROM_ALL)
 
 	set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 	set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 
 	message(STATUS "${PROJECT_NAME}: Fetching OGG...")
-	add_subdirectory(deps/ogg)
+	add_subdirectory(deps/ogg EXCLUDE_FROM_ALL)
 
 	message(STATUS "${PROJECT_NAME}: Fetching Vorbis...")
-	add_subdirectory(deps/vorbis)
+	add_subdirectory(deps/vorbis EXCLUDE_FROM_ALL)
 endFunction()

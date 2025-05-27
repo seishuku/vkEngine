@@ -87,10 +87,6 @@ static void handleShellSurfaceConfigure(void *data, struct xdg_surface *shellSur
 
 static void handleToplevelConfigure(void *data, struct xdg_toplevel *toplevel, int32_t width, int32_t height, struct wl_array *states)
 {
-    if(width!=0&&height!=0)
-    {
-        printf("%d %d", width, height);
-    }
 }
 
 static void handleToplevelClose(void *data, struct xdg_toplevel *toplevel)
