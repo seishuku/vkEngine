@@ -136,7 +136,10 @@ bool AudioAndroid_Init(void);
 void AudioAndroid_Destroy(void);
 bool AudioPipeWire_Init(void);
 void AudioPipeWire_Destroy(void);
-bool AudioPortAudio_Init(void);
-void AudioPortAudio_Destroy(void);
+bool AudioWASAPI_Init(void);
+void AudioWASAPI_Destroy(void);
+
+//bool AudioPortAudio_Init(void);
+//void AudioPortAudio_Destroy(void);
 
 #endif

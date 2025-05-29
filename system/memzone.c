@@ -56,6 +56,9 @@ void Zone_Destroy(MemZone_t *zone)
 
 void *Zone_Malloc(MemZone_t *zone, size_t size)
 {
+	if(!Zone_VerifyHeap(zone))
+		return NULL;
+
 	size+=sizeof(size_t);	// Block header
 	size=(size+7)&~7;		// Align to 8-byte boundary
 
@@ -372,6 +375,12 @@ void Zone_Free(MemZone_t *zone, void *ptr)
 // Walk the blocks in the heap and verify that none go out of bounds
 bool Zone_VerifyHeap(MemZone_t *zone)
 {
+	if(!zone)
+	{
+		DBGPRINTF(DEBUG_ERROR, "ZONE IS NULL.\n");
+		return false;
+	}
+
 	size_t *block=zone->memory;
 	size_t *endZone=(size_t *)((uint8_t *)zone->memory+zone->size);
 

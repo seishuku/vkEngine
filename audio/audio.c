@@ -480,9 +480,9 @@ int Audio_Init(void)
 	DSP_AddEffect(DSP_Overdrive);
 
 #ifdef ANDROID
-	AudioAndroid_Init();#
+	AudioAndroid_Init();
 #elif WIN32
-	AudioPortAudio_Init();
+	AudioWASAPI_Init();
 #elif LINUX
 	AudioPipeWire_Init();
 #endif
@@ -492,19 +492,20 @@ int Audio_Init(void)
 
 void Audio_Destroy(void)
 {
+	// Destroy backend
+#ifdef ANDROID
+	AudioAndroid_Destroy();
+#elif WIN32
+	AudioWASAPI_Destroy();
+#elif LINUX
+	AudioPipeWire_Destroy();
+#endif
+
 	// Clean up HRIR data
 	Zone_Free(zone, sphere.indices);
 	Zone_Free(zone, sphere.vertices);
 
 	SpatialHash_Destroy(&HRIRHash);
-
-#ifdef ANDROID
-	AudioAndroid_Destroy();
-#elif WIN32
-	AudioPortAudio_Destroy();
-#elif LINUX
-	AudioPipeWire_Destroy();
-#endif
 }
 
 // Simple resample and conversion function to the audio engine's common format (44.1KHz/16bit).
