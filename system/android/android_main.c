@@ -27,8 +27,6 @@ extern VkuContext_t vkContext;
 
 extern VkuSwapchain_t swapchain;
 
-Config_t config={ .windowWidth=1920, .windowHeight=1080, .msaaSamples=4, .deviceIndex=0 };
-
 extern uint32_t renderWidth, renderHeight;
 
 float fps=0.0f, fTimeStep=0.0f, fTime=0.0;
@@ -238,8 +236,8 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			}
 			else
 			{
-				renderWidth=swapchain.extent.width;
-				renderHeight=swapchain.extent.height;
+				config.renderWidth=swapchain.extent.width;
+				config.renderHeight=swapchain.extent.height;
 			}
 
 			DBGPRINTF(DEBUG_INFO, "Initializing VR...\n");
@@ -250,8 +248,8 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			}
 			else
 			{
-				renderWidth=xrContext.swapchainExtent.width;
-				renderHeight=xrContext.swapchainExtent.height;
+				config.renderWidth=xrContext.swapchainExtent.width;
+				config.renderHeight=xrContext.swapchainExtent.height;
 			}
 
 			DBGPRINTF(DEBUG_INFO, "Init...\n");
