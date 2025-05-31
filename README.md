@@ -26,7 +26,6 @@ External dependencies for building this (versions as of this writing, newer *sho
  - libvorbis 1.3.7
  - libogg 1.3.5
  - OpenXR 1.2
- - portaudio 2.0
  - Vulkan 1.3.231.1
 
 (note: recursive clone to fetch dependency submodules)
