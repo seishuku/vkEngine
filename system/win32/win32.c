@@ -427,8 +427,8 @@ int main(int argc, char **argv)
 	SetConsoleMode(hOutput, dwMode|ENABLE_PROCESSED_OUTPUT|ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 #endif
 
-	DBGPRINTF(DEBUG_INFO, "Allocating zone memory...\n");
-	zone=Zone_Init(256*1000*1000);
+	DBGPRINTF(DEBUG_INFO, "Allocating zone memory (%dMiB)...\n", MEMZONE_SIZE/1024/1024);
+	zone=Zone_Init(MEMZONE_SIZE);
 
 	if(zone==NULL)
 	{

@@ -328,8 +328,8 @@ static void handleSeatCapabilities(void *data, struct wl_seat *seat, uint32_t ca
 
 int main(int argc, char** argv)
 {
-    DBGPRINTF(DEBUG_INFO, "Allocating zone memory...\n");
-	zone=Zone_Init(256*1000*1000);
+    DBGPRINTF(DEBUG_INFO, "Allocating zone memory (%dMiB)...\n", MEMZONE_SIZE/1024/1024);
+    zone=Zone_Init(MEMZONE_SIZE);
 
 	if(zone==NULL)
 	{

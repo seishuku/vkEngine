@@ -52,7 +52,8 @@ static DWORD WINAPI AudioThreadProc(LPVOID arg)
 
 	return 0;
 }
-
+#include <functiondiscoverykeys_devpkey.h>
+ 
 bool AudioWASAPI_Init(void)
 {
 	if(FAILED(CoInitializeEx(NULL, COINIT_MULTITHREADED)))
@@ -65,6 +66,35 @@ bool AudioWASAPI_Init(void)
 	IMMDevice *device=NULL;
 	if(FAILED(IMMDeviceEnumerator_GetDefaultAudioEndpoint(devEnumerator, eRender, eConsole, &device)))
 		return false;
+
+	LPWSTR deviceID=NULL;
+	if(SUCCEEDED(IMMDevice_GetId(device, &deviceID)))
+	{
+		wchar_t wbuffer[500];
+		char buffer[500];
+		swprintf(wbuffer, 500, L"WASAPI Device ID: %s\n", deviceID);
+		wcstombs(buffer, wbuffer, 500);
+		DBGPRINTF(DEBUG_INFO, "%s", buffer);
+		CoTaskMemFree(deviceID);
+	}
+
+	IPropertyStore *props=NULL;
+	if(SUCCEEDED(IMMDevice_OpenPropertyStore(device, STGM_READ, &props)))
+	{
+		PROPVARIANT nameProp;
+		PropVariantInit(&nameProp);
+
+		if(SUCCEEDED(IPropertyStore_GetValue(props, &PKEY_Device_FriendlyName, &nameProp)))
+		{
+			wchar_t wbuffer[500];
+			char buffer[500];
+			swprintf(wbuffer, 500, L"WASAPI Device Name: %s\n", nameProp.pwszVal);
+			wcstombs(buffer, wbuffer, 500);
+			DBGPRINTF(DEBUG_INFO, "%s", buffer);
+		}
+
+		PropVariantClear(&nameProp);
+	}
 
 	if(FAILED(IMMDevice_Activate(device, &IID_IAudioClient2, CLSCTX_INPROC_SERVER, NULL, (void **)&audioClient)))
 		return false;
@@ -102,6 +132,14 @@ bool AudioWASAPI_Init(void)
 
 	if(FAILED(hr=IAudioClient2_Initialize(audioClient, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, minimumPeriod, 0, (WAVEFORMATEX *)mixFormat, NULL)))
 		return false;
+	
+	DBGPRINTF(DEBUG_INFO, "WASAPI Mix Format:\n"
+			  "\tSample Rate     : %luHz\n"
+			  "\tChannels        : %u\n"
+			  "\tBits per Sample : %u\n",
+			  mixFormat->Format.nSamplesPerSec,
+			  mixFormat->Format.nChannels,
+			  mixFormat->Format.wBitsPerSample);
 
 	IAudioClient2_SetEventHandle(audioClient, audioEvent);
 
