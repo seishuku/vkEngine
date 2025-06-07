@@ -327,24 +327,24 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 				// Print the text centered
 				Font_Print(&font,
 						   textSize,
-						   control->position.x-(textLength*textSize)*0.5f+control->barGraph.size.x*0.5f,
-						   control->position.y-(textSize*0.5f)+(control->barGraph.size.y*0.5f),
-						   "%s", control->barGraph.titleText);
+						   control->position.x-(textLength*textSize)*0.5f+control->button.size.x*0.5f,
+						   control->position.y-(textSize*0.5f)+(control->button.size.y*0.5f),
+						   "%s", control->button.titleText);
 
 				// Left justified
 				//Font_Print(&Font,
 				//	textSize,
 				//	control->position.x,
-				//	control->position.y-(textSize*0.5f)+control->barGraph.size.y*0.5f,
-				//	"%s", control->barGraph.titleText
+				//	control->position.y-(textSize*0.5f)+control->button.size.y*0.5f,
+				//	"%s", control->button.titleText
 				//);
 
 				// right justified
 				//Font_Print(&Font,
 				//	textSize,
-				//	control->position.x-(textLength*textSize)+control->barGraph.size.x,
-				//	control->position.y-(textSize*0.5f)+control->barGraph.size.y*0.5f,
-				//	"%s", control->barGraph.titleText
+				//	control->position.x-(textLength*textSize)+control->button.size.x,
+				//	control->position.y-(textSize*0.5f)+control->button.size.y*0.5f,
+				//	"%s", control->button.titleText
 				//);
 
 				instance->positionSize.x=control->position.x+control->button.size.x*0.5f;
