@@ -14,13 +14,13 @@ layout (push_constant) uniform ubo {
 	vec2 Viewport;	// Window width/height
 };
 
-const uint UI_CONTROL_BUTTON=0;
-const uint UI_CONTROL_CHECKBOX=1;
-const uint UI_CONTROL_BARGRAPH=2;
-const uint UI_CONTROL_SPRITE=3;
-const uint UI_CONTROL_CURSOR=4;
-const uint UI_CONTROL_WINDOW=5;
-const uint UI_CONTROL_TEXT=6;
+const uint UI_CONTROL_BUTTON	=0;
+const uint UI_CONTROL_CHECKBOX	=1;
+const uint UI_CONTROL_BARGRAPH	=2;
+const uint UI_CONTROL_SPRITE	=3;
+const uint UI_CONTROL_CURSOR	=4;
+const uint UI_CONTROL_WINDOW	=5;
+const uint UI_CONTROL_TEXT		=6;
 
 float sdfDistance(float dist)
 {
@@ -513,7 +513,7 @@ void main()
 			float dist_shadow=roundedRect(uv+vec2(0.02), aspect-0.04, corner_radius);
 			float shadow=sdfDistance(dist_shadow);
 
-			vec3 outer=mix(vec3(0.25)*shadow, vec3(1.0)*ring, 0.5);
+			vec3 outer=mix(Color.xyz*0.25*shadow, Color.xyz*ring, 0.75);
 			float outer_alpha=sdfDistance(min(dist_ring, dist_shadow));
 
 			Output=vec4(outer, outer_alpha);
@@ -584,7 +584,7 @@ void main()
 			float dist_shadow=roundedRect(uv+vec2(0.02), aspect-0.04, 0);
 			float shadow=sdfDistance(dist_shadow);
 
-			vec3 outer=mix(vec3(0.25)*shadow, vec3(1.0)*ring, 0.5);
+			vec3 outer=mix(Color.xyz*0.25*shadow, Color.xyz*ring, 0.75);
 			float outer_alpha=sdfDistance(min(dist_ring, dist_shadow));
 
 			Output=vec4(outer, outer_alpha);

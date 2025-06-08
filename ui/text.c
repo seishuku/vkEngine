@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include "../math/math.h"
 #include "../utils/list.h"
 #include "../font/font.h"
@@ -121,6 +122,28 @@ bool UI_UpdateTextTitleText(UI_t *UI, uint32_t ID, const char *titleText)
 	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
 	{
 		strncpy(Control->text.titleText, titleText, UI_CONTROL_TITLETEXT_MAX);
+		return true;
+	}
+
+	// Not found
+	return false;
+}
+
+bool UI_UpdateTextTitleTextf(UI_t *UI, uint32_t ID, const char *titleText, ...)
+{
+	if(UI==NULL||ID==UINT32_MAX)
+		return false;
+
+	// Search list
+	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+
+	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
+	{
+		va_list	ap;
+		va_start(ap, titleText);
+		vsnprintf(Control->text.titleText, UI_CONTROL_TITLETEXT_MAX-1, titleText, ap);
+		va_end(ap);
+
 		return true;
 	}
 

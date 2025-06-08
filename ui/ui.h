@@ -193,6 +193,7 @@ bool UI_UpdateTextPosition(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_UpdateTextSize(UI_t *UI, uint32_t ID, float size);
 bool UI_UpdateTextColor(UI_t *UI, uint32_t ID, vec3 color);
 bool UI_UpdateTextTitleText(UI_t *UI, uint32_t ID, const char *titleText);
+bool UI_UpdateTextTitleTextf(UI_t *UI, uint32_t ID, const char *titleText, ...);
 
 uint32_t UI_TestHit(UI_t *UI, vec2 position);
 bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 position);

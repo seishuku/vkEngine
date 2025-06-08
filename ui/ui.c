@@ -179,115 +179,6 @@ UI_Control_t *UI_FindControlByID(UI_t *UI, uint32_t ID)
 	return NULL;
 }
 
-static uint32_t UI_TestControlHit(UI_Control_t *control, vec2 position)
-{
-	switch(control->type)
-	{
-		case UI_CONTROL_BUTTON:
-		{
-			if(position.x>=control->position.x&&position.x<=control->position.x+control->button.size.x&&
-				position.y>=control->position.y&&position.y<=control->position.y+control->button.size.y)
-			{
-				// TODO: This could potentionally be an issue if the callback blocks
-				if(control->button.callback)
-					control->button.callback(NULL);
-
-				return control->ID;
-			}
-			break;
-		}
-
-		case UI_CONTROL_CHECKBOX:
-		{
-			if(Vec2_DistanceSq(control->position, position)<=control->checkBox.radius*control->checkBox.radius)
-			{
-				control->checkBox.value=!control->checkBox.value;
-				return control->ID;
-			}
-			break;
-		}
-
-		// Only return the ID of this control
-		case UI_CONTROL_BARGRAPH:
-		{
-			if(!control->barGraph.Readonly)
-			{
-				// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
-				if(position.x>=control->position.x&&position.x<=control->position.x+control->barGraph.size.x&&
-					position.y>=control->position.y&&position.y<=control->position.y+control->barGraph.size.y)
-					return control->ID;
-			}
-			break;
-		}
-
-		case UI_CONTROL_SPRITE:
-			break;
-
-		case UI_CONTROL_CURSOR:
-			break;
-
-		case UI_CONTROL_WINDOW:
-		{
-			// Hit test children
-			for(uint32_t j=0;j<List_GetCount(&control->window.children);j++)
-			{
-				UI_Control_t *child=List_GetPointer(&control->window.children, j);
-				vec2 childPos=Vec2_Addv(control->position, child->position);
-
-				switch(child->type)
-				{
-					case UI_CONTROL_BUTTON:
-					{
-						if(position.x>=childPos.x&&position.x<=childPos.x+child->button.size.x&&
-							position.y>=childPos.y&&position.y<=childPos.y+child->button.size.y)
-						{
-							// TODO: This could potentionally be an issue if the callback blocks
-							if(child->button.callback)
-								child->button.callback(NULL);
-
-							return child->ID;
-						}
-						break;
-					}
-
-					case UI_CONTROL_CHECKBOX:
-					{
-						if(Vec2_DistanceSq(childPos, position)<=child->checkBox.radius*child->checkBox.radius)
-						{
-							child->checkBox.value=!child->checkBox.value;
-							return child->ID;
-						}
-						break;
-					}
-
-					// Only return the ID of this control
-					case UI_CONTROL_BARGRAPH:
-					{
-						if(!child->barGraph.Readonly)
-						{
-							// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
-							if(position.x>=childPos.x&&position.x<=childPos.x+child->barGraph.size.x&&
-								position.y>=childPos.y&&position.y<=childPos.y+child->barGraph.size.y)
-								return child->ID;
-						}
-						break;
-					}
-
-					default:
-						break;
-				}
-			}
-			break;
-		}
-
-		default:
-			break;
-	}
-
-	// Nothing found
-	return UINT32_MAX;
-}
-
 // Checks hit on UI controls, also processes certain controls, intended to be used on mouse button down events
 // Returns ID of hit, otherwise returns UINT32_MAX
 // Position is the cursor position to test against UI controls
@@ -307,10 +198,112 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 
 		// Only test non-child controls here
 		if(!control->child)
-			hitID=UI_TestControlHit(control, position);
+			continue;
 
-		if(hitID!=UINT32_MAX)
-			return hitID;
+		switch(control->type)
+		{
+			case UI_CONTROL_BUTTON:
+			{
+				if(position.x>=control->position.x&&position.x<=control->position.x+control->button.size.x&&
+					position.y>=control->position.y&&position.y<=control->position.y+control->button.size.y)
+				{
+					// TODO: This could potentionally be an issue if the callback blocks
+					if(control->button.callback)
+						control->button.callback(NULL);
+
+					return control->ID;
+				}
+				break;
+			}
+
+			case UI_CONTROL_CHECKBOX:
+			{
+				if(Vec2_DistanceSq(control->position, position)<=control->checkBox.radius*control->checkBox.radius)
+				{
+					control->checkBox.value=!control->checkBox.value;
+					return control->ID;
+				}
+				break;
+			}
+
+			// Only return the ID of this control
+			case UI_CONTROL_BARGRAPH:
+			{
+				if(!control->barGraph.Readonly)
+				{
+					// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
+					if(position.x>=control->position.x&&position.x<=control->position.x+control->barGraph.size.x&&
+						position.y>=control->position.y&&position.y<=control->position.y+control->barGraph.size.y)
+						return control->ID;
+				}
+				break;
+			}
+
+			case UI_CONTROL_SPRITE:
+				break;
+
+			case UI_CONTROL_CURSOR:
+				break;
+
+			case UI_CONTROL_WINDOW:
+			{
+				// Hit test children
+				for(uint32_t j=0;j<List_GetCount(&control->window.children);j++)
+				{
+					uint32_t *childID=List_GetPointer(&control->window.children, j);
+					UI_Control_t *child=UI_FindControlByID(UI, *childID);
+
+					vec2 childPos=Vec2_Addv(control->position, child->position);
+
+					switch(child->type)
+					{
+						case UI_CONTROL_BUTTON:
+						{
+							if(position.x>=childPos.x&&position.x<=childPos.x+child->button.size.x&&
+								position.y>=childPos.y&&position.y<=childPos.y+child->button.size.y)
+							{
+								// TODO: This could potentionally be an issue if the callback blocks
+								if(child->button.callback)
+									child->button.callback(NULL);
+
+								return child->ID;
+							}
+							break;
+						}
+
+						case UI_CONTROL_CHECKBOX:
+						{
+							if(Vec2_DistanceSq(childPos, position)<=child->checkBox.radius*child->checkBox.radius)
+							{
+								child->checkBox.value=!child->checkBox.value;
+								return child->ID;
+							}
+							break;
+						}
+
+						// Only return the ID of this control
+						case UI_CONTROL_BARGRAPH:
+						{
+							if(!child->barGraph.Readonly)
+							{
+								// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
+								if(position.x>=childPos.x&&position.x<=childPos.x+child->barGraph.size.x&&
+									position.y>=childPos.y&&position.y<=childPos.y+child->barGraph.size.y)
+									return child->ID;
+							}
+							break;
+						}
+
+						default:
+							break;
+					}
+				}
+				break;
+			}
+
+			default:
+				break;
+		}
 	}
 
 	// Nothing found, empty list
@@ -359,36 +352,7 @@ bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 position)
 			break;
 
 		case UI_CONTROL_WINDOW:
-		{
-			// Hit test children
-			for(uint32_t j=0;j<List_GetCount(&control->window.children);j++)
-			{
-				UI_Control_t *child=List_GetPointer(&control->window.children, j);
-				vec2 childPos=Vec2_Addv(control->position, child->position);
-
-				switch(child->type)
-				{
-					case UI_CONTROL_BARGRAPH:
-					{
-						if(!child->barGraph.Readonly)
-						{
-							// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
-							if(position.x>=childPos.x&&position.x<=childPos.x+child->barGraph.size.x&&
-								position.y>=childPos.y&&position.y<=childPos.y+child->barGraph.size.y)
-							{
-								child->barGraph.value=((position.x-childPos.x)/child->barGraph.size.x)*(child->barGraph.Max-child->barGraph.Min)+child->barGraph.Min;
-								printf("hit ");
-							}
-						}
-						break;
-					}
-
-					default:
-						break;
-				}
-			}
 			break;
-		}
 
 		default:
 			break;
@@ -473,8 +437,23 @@ static bool UI_AddControlInstance(UI_Instance_t *instance, UI_Control_t *control
 			return true;
 		}
 
-		case UI_CONTROL_SPRITE:
 		case UI_CONTROL_WINDOW:
+		{
+			instance->positionSize.x=(control->position.x-10)+(control->window.size.x+20)*0.5f;
+			instance->positionSize.y=(control->position.y-10)-(control->window.size.y-20)*0.5f;
+			instance->positionSize.z=control->window.size.x+20;
+			instance->positionSize.w=control->window.size.y+20;
+
+			instance->colorValue.x=control->color.x;
+			instance->colorValue.y=control->color.y;
+			instance->colorValue.z=control->color.z;
+			instance->colorValue.w=0.0f;
+
+			instance->type=UI_CONTROL_WINDOW;
+			return true;
+		}
+
+		case UI_CONTROL_SPRITE:
 		case UI_CONTROL_TEXT:
 		default:
 			return false;
@@ -498,29 +477,21 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 
 		if(control->type==UI_CONTROL_WINDOW)
 		{
-			instance->positionSize.x=control->position.x+control->window.size.x*0.5f;
-			instance->positionSize.y=control->position.y+control->window.size.y*0.5f;
-			instance->positionSize.z=control->window.size.x;
-			instance->positionSize.w=control->window.size.y;
-
-			instance->colorValue.x=control->color.x;
-			instance->colorValue.y=control->color.y;
-			instance->colorValue.z=control->color.z;
-			instance->colorValue.w=0.0f;
-
-			instance->type=UI_CONTROL_WINDOW;
+			UI_AddControlInstance(instance, control, dt);
 			instance++;
 			instanceCount++;
 
 			for(uint32_t j=0;j<List_GetCount(&control->window.children);j++)
 			{
-				UI_Control_t *child=List_GetPointer(&control->window.children, j);
+				uint32_t *childID=List_GetPointer(&control->window.children, j);
+				UI_Control_t *child=UI_FindControlByID(UI, *childID);
 
 				if(child->type==UI_CONTROL_TEXT)
 				{
 					const float sx=control->position.x+child->position.x;
 					float x=sx;
 					float y=control->position.y+child->position.y;
+					vec3 color=child->color;
 
 					// Loop through the text string until EOL
 					for(char *ptr=child->text.titleText;*ptr!='\0';ptr++)
@@ -541,30 +512,27 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 						}
 
 						// ANSI color escape codes
-						// I'm sure there's a better way to do this!
-						// But it works, so whatever.
-						// if(*ptr=='\x1B')
-						// {
-						// 	ptr++;
-						// 		 if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ r=0.0f; g=0.0f; b=0.0f; } // BLACK
-						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ r=0.5f; g=0.0f; b=0.0f; } // DARK RED
-						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ r=0.0f; g=0.5f; b=0.0f; } // DARK GREEN
-						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ r=0.5f; g=0.5f; b=0.0f; } // DARK YELLOW
-						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ r=0.0f; g=0.0f; b=0.5f; } // DARK BLUE
-						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ r=0.5f; g=0.0f; b=0.5f; } // DARK MAGENTA
-						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ r=0.0f; g=0.5f; b=0.5f; } // DARK CYAN
-						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ r=0.5f; g=0.5f; b=0.5f; } // GREY
-						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ r=0.5f; g=0.5f; b=0.5f; } // GREY
-						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ r=1.0f; g=0.0f; b=0.0f; } // RED
-						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ r=0.0f; g=1.0f; b=0.0f; } // GREEN
-						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ r=1.0f; g=1.0f; b=0.0f; } // YELLOW
-						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ r=0.0f; g=0.0f; b=1.0f; } // BLUE
-						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ r=1.0f; g=0.0f; b=1.0f; } // MAGENTA
-						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ r=0.0f; g=1.0f; b=1.0f; } // CYAN
-						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ r=1.0f; g=1.0f; b=1.0f; } // WHITE
-						// 	ptr+=4;
-						// 	font->numChar-=5;
-						// }
+						if(*ptr=='\x1B')
+						{
+							ptr++;
+								 if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.0f; color.z=0.0f; ptr+=4; } // BLACK
+							else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.0f; color.z=0.0f; ptr+=4; } // DARK RED
+							else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.5f; color.z=0.0f; ptr+=4; } // DARK GREEN
+							else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.5f; color.z=0.0f; ptr+=4; } // DARK YELLOW
+							else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.0f; color.z=0.5f; ptr+=4; } // DARK BLUE
+							else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.0f; color.z=0.5f; ptr+=4; } // DARK MAGENTA
+							else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.5f; color.z=0.5f; ptr+=4; } // DARK CYAN
+							else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.5f; color.z=0.5f; ptr+=4; } // GREY
+							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.5f; color.z=0.5f; ptr+=4; } // GREY
+							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ color.x=1.0f; color.y=0.0f; color.z=0.0f; ptr+=4; } // RED
+							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=1.0f; color.z=0.0f; ptr+=4; } // GREEN
+							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ color.x=1.0f; color.y=1.0f; color.z=0.0f; ptr+=4; } // YELLOW
+							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.0f; color.z=1.0f; ptr+=4; } // BLUE
+							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ color.x=1.0f; color.y=0.0f; color.z=1.0f; ptr+=4; } // MAGENTA
+							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=1.0f; color.z=1.0f; ptr+=4; } // CYAN
+							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ color.x=1.0f; color.y=1.0f; color.z=1.0f; ptr+=4; } // WHITE
+							else if(*(ptr+0)=='['&&*(ptr+1)=='0'&&*(ptr+2)=='m')				{ color=child->color; ptr+=3; }					  // CANCEL COLOR
+						}
 
 						// Advance one character
 						x+=Font_CharacterBaseWidth(*ptr)*child->text.size;
@@ -574,10 +542,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 						instance->positionSize.z=(float)(*ptr);
 						instance->positionSize.w=child->text.size;
 
-						instance->colorValue.x=1.0f;
-						instance->colorValue.y=1.0f;
-						instance->colorValue.z=1.0f;
-						instance->colorValue.w=0.0f;
+						instance->colorValue=Vec4_Vec3(color, 0.0f);
 
 						instance->type=UI_CONTROL_TEXT;
 						instance++;
@@ -598,6 +563,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 			const float sx=control->position.x;
 			float x=control->position.x;
 			float y=control->position.y;
+			vec3 color=control->color;
 
 			// Loop through the text string until EOL
 			for(char *ptr=control->text.titleText;*ptr!='\0';ptr++)
@@ -618,30 +584,27 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 				}
 
 				// ANSI color escape codes
-				// I'm sure there's a better way to do this!
-				// But it works, so whatever.
-				// if(*ptr=='\x1B')
-				// {
-				// 	ptr++;
-				// 		 if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ r=0.0f; g=0.0f; b=0.0f; } // BLACK
-				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ r=0.5f; g=0.0f; b=0.0f; } // DARK RED
-				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ r=0.0f; g=0.5f; b=0.0f; } // DARK GREEN
-				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ r=0.5f; g=0.5f; b=0.0f; } // DARK YELLOW
-				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ r=0.0f; g=0.0f; b=0.5f; } // DARK BLUE
-				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ r=0.5f; g=0.0f; b=0.5f; } // DARK MAGENTA
-				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ r=0.0f; g=0.5f; b=0.5f; } // DARK CYAN
-				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ r=0.5f; g=0.5f; b=0.5f; } // GREY
-				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ r=0.5f; g=0.5f; b=0.5f; } // GREY
-				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ r=1.0f; g=0.0f; b=0.0f; } // RED
-				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ r=0.0f; g=1.0f; b=0.0f; } // GREEN
-				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ r=1.0f; g=1.0f; b=0.0f; } // YELLOW
-				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ r=0.0f; g=0.0f; b=1.0f; } // BLUE
-				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ r=1.0f; g=0.0f; b=1.0f; } // MAGENTA
-				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ r=0.0f; g=1.0f; b=1.0f; } // CYAN
-				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ r=1.0f; g=1.0f; b=1.0f; } // WHITE
-				// 	ptr+=4;
-				// 	font->numChar-=5;
-				// }
+				if(*ptr=='\x1B')
+				{
+					ptr++;
+						if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.0f; color.z=0.0f; ptr+=4; } // BLACK
+					else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.0f; color.z=0.0f; ptr+=4; } // DARK RED
+					else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.5f; color.z=0.0f; ptr+=4; } // DARK GREEN
+					else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.5f; color.z=0.0f; ptr+=4; } // DARK YELLOW
+					else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.0f; color.z=0.5f; ptr+=4; } // DARK BLUE
+					else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.0f; color.z=0.5f; ptr+=4; } // DARK MAGENTA
+					else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.5f; color.z=0.5f; ptr+=4; } // DARK CYAN
+					else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.5f; color.z=0.5f; ptr+=4; } // GREY
+					else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.5f; color.z=0.5f; ptr+=4; } // GREY
+					else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ color.x=1.0f; color.y=0.0f; color.z=0.0f; ptr+=4; } // RED
+					else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=1.0f; color.z=0.0f; ptr+=4; } // GREEN
+					else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ color.x=1.0f; color.y=1.0f; color.z=0.0f; ptr+=4; } // YELLOW
+					else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.0f; color.z=1.0f; ptr+=4; } // BLUE
+					else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ color.x=1.0f; color.y=0.0f; color.z=1.0f; ptr+=4; } // MAGENTA
+					else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=1.0f; color.z=1.0f; ptr+=4; } // CYAN
+					else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ color.x=1.0f; color.y=1.0f; color.z=1.0f; ptr+=4; } // WHITE
+					else if(*(ptr+0)=='['&&*(ptr+1)=='0'&&*(ptr+2)=='m')				{ color=control->color; ptr+=3; }					  // CANCEL COLOR
+				}
 
 				// Advance one character
 				x+=Font_CharacterBaseWidth(*ptr)*control->text.size;
@@ -651,10 +614,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 				instance->positionSize.z=(float)(*ptr);
 				instance->positionSize.w=control->text.size;
 
-				instance->colorValue.x=1.0f;
-				instance->colorValue.y=1.0f;
-				instance->colorValue.z=1.0f;
-				instance->colorValue.w=0.0f;
+				instance->colorValue=Vec4_Vec3(color, 0.0f);
 
 				instance->type=UI_CONTROL_TEXT;
 				instance++;
