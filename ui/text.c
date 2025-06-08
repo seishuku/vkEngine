@@ -6,9 +6,7 @@
 #include "../font/font.h"
 #include "ui.h"
 
-// Add a cursor to the UI.
-// Returns an ID, or UINT32_MAX on failure.
-uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color)
+uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, const char *titleText)
 {
 	uint32_t ID=UI->baseID++;
 
@@ -17,13 +15,15 @@ uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color)
 
 	UI_Control_t Control=
 	{
-		.type=UI_CONTROL_CURSOR,
+		.type=UI_CONTROL_TEXT,
 		.ID=ID,
 		.position=position,
 		.color=color,
 		.child=false,
-		.cursor.radius=radius,
+		.text.size=size,
 	};
+
+	strncpy(Control.text.titleText, titleText, UI_CONTROL_TITLETEXT_MAX);
 
 	if(!List_Add(&UI->controls, &Control))
 		return UINT32_MAX;
@@ -33,10 +33,7 @@ uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color)
 	return ID;
 }
 
-// Update UI cursor parameters.
-// Returns true on success, false on failure.
-// Also individual parameter update functions.
-bool UI_UpdateCursor(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color)
+bool UI_UpdateText(UI_t *UI, uint32_t ID, vec2 position, float size, vec3 color, const char *titleText)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -44,12 +41,13 @@ bool UI_UpdateCursor(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 co
 	// Search list
 	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CURSOR)
+	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
 	{
 		Control->position=position;
 		Control->color=color;
 
-		Control->cursor.radius=radius;
+		strncpy(Control->text.titleText, titleText, UI_CONTROL_TITLETEXT_MAX);
+		Control->text.size=size;
 
 		return true;
 	}
@@ -58,7 +56,7 @@ bool UI_UpdateCursor(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 co
 	return false;
 }
 
-bool UI_UpdateCursorPosition(UI_t *UI, uint32_t ID, vec2 position)
+bool UI_UpdateTextPosition(UI_t *UI, uint32_t ID, vec2 position)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -66,7 +64,7 @@ bool UI_UpdateCursorPosition(UI_t *UI, uint32_t ID, vec2 position)
 	// Search list
 	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CURSOR)
+	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
 	{
 		Control->position=position;
 		return true;
@@ -76,7 +74,7 @@ bool UI_UpdateCursorPosition(UI_t *UI, uint32_t ID, vec2 position)
 	return false;
 }
 
-bool UI_UpdateCursorRadius(UI_t *UI, uint32_t ID, float radius)
+bool UI_UpdateTextSize(UI_t *UI, uint32_t ID, float size)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -84,9 +82,9 @@ bool UI_UpdateCursorRadius(UI_t *UI, uint32_t ID, float radius)
 	// Search list
 	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CURSOR)
+	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
 	{
-		Control->cursor.radius=radius;
+		Control->text.size=size;
 		return true;
 	}
 
@@ -94,7 +92,7 @@ bool UI_UpdateCursorRadius(UI_t *UI, uint32_t ID, float radius)
 	return false;
 }
 
-bool UI_UpdateCursorColor(UI_t *UI, uint32_t ID, vec3 color)
+bool UI_UpdateTextColor(UI_t *UI, uint32_t ID, vec3 color)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -102,9 +100,27 @@ bool UI_UpdateCursorColor(UI_t *UI, uint32_t ID, vec3 color)
 	// Search list
 	UI_Control_t *Control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CURSOR)
+	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
 	{
 		Control->color=color;
+		return true;
+	}
+
+	// Not found
+	return false;
+}
+
+bool UI_UpdateTextTitleText(UI_t *UI, uint32_t ID, const char *titleText)
+{
+	if(UI==NULL||ID==UINT32_MAX)
+		return false;
+
+	// Search list
+	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+
+	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
+	{
+		strncpy(Control->text.titleText, titleText, UI_CONTROL_TITLETEXT_MAX);
 		return true;
 	}
 

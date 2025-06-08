@@ -19,6 +19,7 @@ uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, const ch
 		.ID=ID,
 		.position=position,
 		.color=color,
+		.child=false,
 		.barGraph.size=size,
 		.barGraph.Readonly=Readonly,
 		.barGraph.Min=Min,
@@ -27,12 +28,26 @@ uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, const ch
 		.barGraph.curValue=value
 	};
 
-	snprintf(Control.barGraph.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
-
 	if(!List_Add(&UI->controls, &Control))
 		return UINT32_MAX;
 
 	UI->controlsHashtable[ID]=List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
+
+	// TODO:
+	// This is bit annoying...
+	// The control's title text needs to be added after the actual control, otherwise it will be rendered under this control.
+	// I suppose this would be fixed with proper render order sorting, maybe later.
+
+	// Get base length of title text
+	const float textLength=Font_StringBaseWidth(titleText);
+
+	// Scale text size based on the base control size and length of text, but no bigger than 80% of button height
+	const float textSize=fminf(size.x/textLength*0.8f, size.y*0.8f);
+
+	// Print the text centered
+	vec2 textPosition=Vec2(position.x-(textLength*textSize)*0.5f+size.x*0.5f, position.y+(size.y*0.5f));
+
+	UI->controlsHashtable[ID]->barGraph.titleTextID=UI_AddText(UI, textPosition, textSize, Vec3(1.0f, 1.0f, 1.0f), titleText);
 
 	return ID;
 }
@@ -50,7 +65,11 @@ bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 col
 		Control->position=position;
 		Control->color=color;
 
-		snprintf(Control->barGraph.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
+		const float textLength=Font_StringBaseWidth(titleText);
+		const float textSize=fminf(size.x/textLength*0.8f, size.y*0.8f);
+		vec2 textPosition=Vec2(position.x-(textLength*textSize)*0.5f+size.x*0.5f, position.y+(size.y*0.5f));
+		UI_UpdateText(UI, Control->barGraph.titleTextID, textPosition, textSize, Vec3(1.0f, 1.0f, 1.0f), titleText);
+
 		Control->barGraph.size=size;
 		Control->barGraph.Readonly=Readonly;
 		Control->barGraph.Min=Min;
@@ -75,6 +94,15 @@ bool UI_UpdateBarGraphPosition(UI_t *UI, uint32_t ID, vec2 position)
 	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
 	{
 		Control->position=position;
+
+		UI_Control_t *textControl=UI_FindControlByID(UI, Control->barGraph.titleTextID);
+
+		const float textLength=Font_StringBaseWidth(textControl->text.titleText);
+		const float textSize=fminf(Control->barGraph.size.x/textLength*0.8f, Control->barGraph.size.y*0.8f);
+		vec2 textPosition=Vec2(Control->position.x-(textLength*textSize)*0.5f+Control->barGraph.size.x*0.5f, Control->position.y+(Control->barGraph.size.y*0.5f));
+		UI_UpdateTextPosition(UI, Control->barGraph.titleTextID, textPosition);
+		UI_UpdateTextSize(UI, Control->barGraph.titleTextID, textSize);
+
 		return true;
 	}
 
@@ -93,6 +121,15 @@ bool UI_UpdateBarGraphSize(UI_t *UI, uint32_t ID, vec2 size)
 	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
 	{
 		Control->barGraph.size=size;
+
+		UI_Control_t *textControl=UI_FindControlByID(UI, Control->barGraph.titleTextID);
+
+		const float textLength=Font_StringBaseWidth(textControl->text.titleText);
+		const float textSize=fminf(Control->barGraph.size.x/textLength*0.8f, Control->barGraph.size.y*0.8f);
+		vec2 textPosition=Vec2(Control->position.x-(textLength*textSize)*0.5f+Control->barGraph.size.x*0.5f, Control->position.y+(Control->barGraph.size.y*0.5f));
+		UI_UpdateTextPosition(UI, Control->barGraph.titleTextID, textPosition);
+		UI_UpdateTextSize(UI, Control->barGraph.titleTextID, textSize);
+
 		return true;
 	}
 
@@ -128,7 +165,7 @@ bool UI_UpdateBarGraphTitleText(UI_t *UI, uint32_t ID, const char *titleText)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
 	{
-		snprintf(Control->barGraph.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
+		UI_UpdateTextTitleText(UI, Control->barGraph.titleTextID, titleText);
 		return true;
 	}
 

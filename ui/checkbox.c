@@ -21,16 +21,26 @@ uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, const
 		.ID=ID,
 		.position=position,
 		.color=color,
+		.child=false,
 		.checkBox.radius=radius,
 		.checkBox.value=value
 	};
-
-	snprintf(Control.checkBox.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
 
 	if(!List_Add(&UI->controls, &Control))
 		return UINT32_MAX;
 
 	UI->controlsHashtable[ID]=List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
+
+	// TODO:
+	// This is bit annoying...
+	// The control's title text needs to be added after the actual control, otherwise it will be rendered under this control.
+	// I suppose this would be fixed with proper render order sorting, maybe later.
+
+	// Text size is the radius of the checkbox, placed radius length away horizontally, centered vertically
+	UI->controlsHashtable[ID]->checkBox.titleTextID=UI_AddText(UI,
+		Vec2(position.x+radius, position.y-(radius/2.0f)), radius,
+		Vec3(1.0f, 1.0f, 1.0f),
+		titleText);
 
 	return ID;
 }
@@ -51,7 +61,10 @@ bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 
 		Control->position=position;
 		Control->color=color;
 
-		snprintf(Control->checkBox.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
+		UI_UpdateText(UI, Control->checkBox.titleTextID,
+			Vec2(position.x+radius, position.y-(radius/2.0f)), radius,
+			Vec3(1.0f, 1.0f, 1.0f),
+			titleText);
 		Control->checkBox.radius=radius;
 		Control->checkBox.value=value;
 
@@ -73,6 +86,8 @@ bool UI_UpdateCheckBoxPosition(UI_t *UI, uint32_t ID, vec2 position)
 	if(Control!=NULL&&Control->type==UI_CONTROL_CHECKBOX)
 	{
 		Control->position=position;
+		UI_UpdateTextPosition(UI, Control->checkBox.titleTextID,
+			Vec2(Control->position.x+Control->checkBox.radius, Control->position.y-(Control->checkBox.radius/2.0f)));
 		return true;
 	}
 
@@ -91,6 +106,9 @@ bool UI_UpdateCheckBoxRadius(UI_t *UI, uint32_t ID, float radius)
 	if(Control!=NULL&&Control->type==UI_CONTROL_CHECKBOX)
 	{
 		Control->checkBox.radius=radius;
+		UI_UpdateTextPosition(UI, Control->checkBox.titleTextID,
+			Vec2(Control->position.x+Control->checkBox.radius, Control->position.y-(Control->checkBox.radius/2.0f)));
+		UI_UpdateTextSize(UI, Control->checkBox.titleTextID, Control->checkBox.radius);
 		return true;
 	}
 
@@ -126,7 +144,7 @@ bool UI_UpdateCheckBoxTitleText(UI_t *UI, uint32_t ID, const char *titleText)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_CHECKBOX)
 	{
-		snprintf(Control->checkBox.titleText, UI_CONTROL_TITLETEXT_MAX, "%s", titleText);
+		UI_UpdateTextTitleText(UI, Control->checkBox.titleTextID, titleText);
 		return true;
 	}
 

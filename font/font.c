@@ -5,7 +5,7 @@
 	  the other contains instancing data for character position, size, and color.
 	Font is completely internal to the fragment shader, no external texture.
 
-	SDF font design courtesy of André van Kammen (https://www.shadertoy.com/view/4s3XDn)
+	SDF font design courtesy of Andrï¿½ van Kammen (https://www.shadertoy.com/view/4s3XDn)
 */
 #include <stdlib.h>
 #include <stdio.h>
@@ -79,7 +79,7 @@ bool Font_Init(Font_t *font)
 }
 
 // Returns normalized (base) spacing for each character, to be later scaled by a size
-float Font_CharacterBaseWidth(const char ch)
+const float Font_CharacterBaseWidth(const char ch)
 {
 	switch(ch)
 	{

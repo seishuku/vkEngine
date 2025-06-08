@@ -51,7 +51,9 @@ set(PROJECT_SOURCES
 	ui/checkbox.c
 	ui/cursor.c
 	ui/sprite.c
+	ui/text.c
 	ui/ui.c
+	ui/window.c
 	utils/base64.c
 	utils/config.c
 	utils/event.c

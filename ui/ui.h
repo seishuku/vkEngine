@@ -21,6 +21,8 @@ typedef enum
 	UI_CONTROL_BARGRAPH,
 	UI_CONTROL_SPRITE,
 	UI_CONTROL_CURSOR,
+	UI_CONTROL_WINDOW,
+	UI_CONTROL_TEXT,
 	UI_NUM_CONTROLTYPE
 } UI_ControlType;
 
@@ -31,6 +33,7 @@ typedef struct
 	uint32_t ID;
 	vec2 position;
 	vec3 color;
+	bool child;
 
 	// Specific to type
 	union
@@ -38,7 +41,7 @@ typedef struct
 		// Button type
 		struct
 		{
-			char titleText[UI_CONTROL_TITLETEXT_MAX];
+			uint32_t titleTextID;
 			vec2 size;
 			UIControlCallback callback;
 		} button;
@@ -46,7 +49,7 @@ typedef struct
 		// CheckBox type, should this also have a callback for flexibility?
 		struct
 		{
-			char titleText[UI_CONTROL_TITLETEXT_MAX];
+			uint32_t titleTextID;
 			float radius;
 			bool value;
 		} checkBox;
@@ -54,7 +57,7 @@ typedef struct
 		// BarGraph type
 		struct
 		{
-			char titleText[UI_CONTROL_TITLETEXT_MAX];
+			uint32_t titleTextID;
 			vec2 size;
 			bool Readonly;
 			float Min, Max, value, curValue;
@@ -73,6 +76,22 @@ typedef struct
 		{
 			float radius;
 		} cursor;
+
+		// Window type
+		struct
+		{
+			uint32_t titleTextID;
+			vec2 size;
+			List_t children;
+		} window;
+
+		// Text type
+		struct
+		{
+			char titleText[UI_CONTROL_TITLETEXT_MAX];
+			float size;
+		} text;
+		
 	};
 } UI_Control_t;
 
@@ -159,6 +178,21 @@ bool UI_UpdateCursor(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 co
 bool UI_UpdateCursorPosition(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_UpdateCursorRadius(UI_t *UI, uint32_t ID, float radius);
 bool UI_UpdateCursorColor(UI_t *UI, uint32_t ID, vec3 color);
+
+uint32_t UI_AddWindow(UI_t *UI, vec2 position, vec2 size, vec3 color, const char *titleText);
+bool UI_UpdateWindow(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, const char *titleText);
+bool UI_UpdateWindowPosition(UI_t *UI, uint32_t ID, vec2 position);
+bool UI_UpdateWindowSize(UI_t *UI, uint32_t ID, vec2 size);
+bool UI_UpdateWindowColor(UI_t *UI, uint32_t ID, vec3 color);
+bool UI_UpdateWindowTitleText(UI_t *UI, uint32_t ID, const char *titleText);
+bool UI_WindowAddControl(UI_t *UI, uint32_t ID, uint32_t childID);
+
+uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, const char *titleText);
+bool UI_UpdateText(UI_t *UI, uint32_t ID, vec2 position, float size, vec3 color, const char *titleText);
+bool UI_UpdateTextPosition(UI_t *UI, uint32_t ID, vec2 position);
+bool UI_UpdateTextSize(UI_t *UI, uint32_t ID, float size);
+bool UI_UpdateTextColor(UI_t *UI, uint32_t ID, vec3 color);
+bool UI_UpdateTextTitleText(UI_t *UI, uint32_t ID, const char *titleText);
 
 uint32_t UI_TestHit(UI_t *UI, vec2 position);
 bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 position);

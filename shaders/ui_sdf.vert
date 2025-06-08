@@ -22,6 +22,8 @@ const uint UI_CONTROL_CHECKBOX=1;
 const uint UI_CONTROL_BARGRAPH=2;
 const uint UI_CONTROL_SPRITE=3;
 const uint UI_CONTROL_CURSOR=4;
+const uint UI_CONTROL_WINDOW=5;
+const uint UI_CONTROL_TEXT=6;
 
 vec2 rotate(vec2 v, float a)
 {
@@ -33,7 +35,12 @@ vec2 rotate(vec2 v, float a)
 
 void main()
 {
-	vec2 Vert=vVert.xy*InstancePos.zw;
+	vec2 Vert=vVert.xy;
+
+	if(InstanceType.x==UI_CONTROL_TEXT)
+		Vert*=InstancePos.w;
+	else
+		Vert*=InstancePos.zw;
 
 	if(InstanceType.x==UI_CONTROL_SPRITE)
 		Vert=rotate(Vert, InstanceColor.w);

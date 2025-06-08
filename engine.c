@@ -138,6 +138,7 @@ uint32_t volumeID=UINT32_MAX;
 uint32_t cursorID=UINT32_MAX;
 uint32_t colorShiftID=UINT32_MAX;
 uint32_t consoleBackground=UINT32_MAX;
+uint32_t currentTrack=UINT32_MAX;
 //////
 
 Console_t console;
@@ -1190,7 +1191,11 @@ void Render(void)
 
 	Audio_SetStreamVolume(0, UI_GetBarGraphValue(&UI, volumeID));
 
-	Font_Print(&font, 16.0f, config.renderWidth-400.0f, config.renderHeight-50.0f-16.0f, "Current track: %s", GetCurrentMusicTrack());
+	{
+		char temp[256]={ 0 };
+		snprintf(temp, 255, "Current track: %s", GetCurrentMusicTrack());
+		UI_UpdateTextTitleText(&UI, currentTrack, temp);
+	}
 
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
@@ -1601,45 +1606,57 @@ bool Init(void)
 	UI_AddButton(&UI, Vec2(0.0f, config.renderHeight-100.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), "Fire", (UIControlCallback)Fire);
 #endif
 
-	UI_AddButton(&UI,
-				 Vec2(config.renderWidth-400.0f, config.renderHeight-50.0f),	// Position
-				 Vec2(100.0f, 50.0f),					// Size
+	vec2 startPos=Vec2(config.renderWidth-400, config.renderHeight);
+
+	// uint32_t window=UI_AddWindow(&UI, Vec2_Addv(startPos, Vec2(0, -128)), Vec2(400, 128), Vec3(1.0, 1.0, 1.0), "Window");
+
+	uint32_t playButton=UI_AddButton(&UI,
+				 Vec2_Addv(startPos, Vec2(0, -50)),		// Position
+				 Vec2(100, 50),							// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Play",								// Title text
 				 StartStreamCallback);					// Callback
-	UI_AddButton(&UI,
-				 Vec2(config.renderWidth-300.0f, config.renderHeight-50.0f),	// Position
-				 Vec2(100.0f, 50.0f),					// Size
+	uint32_t pauseButton=UI_AddButton(&UI,
+				 Vec2_Addv(startPos, Vec2(100, -50)),	// Position
+				 Vec2(100, 50),							// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Pause",								// Title text
 				 StopStreamCallback);					// Callback
-	UI_AddButton(&UI,
-				 Vec2(config.renderWidth-200.0f, config.renderHeight-50.0f),	// Position
-				 Vec2(100.0f, 50.0f),					// Size
+	uint32_t prevButton=UI_AddButton(&UI,
+				 Vec2_Addv(startPos, Vec2(200, -50)),	// Position
+				 Vec2(100, 50),							// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Prev",								// Title text
 				 PrevTrackCallback);					// Callback
-	UI_AddButton(&UI,
-				 Vec2(config.renderWidth-100.0f, config.renderHeight-50.0f),	// Position
-				 Vec2(100.0f, 50.0f),					// Size
+	uint32_t nextButton=UI_AddButton(&UI,
+				 Vec2_Addv(startPos, Vec2(300, -50)),	// Position
+				 Vec2(100, 50),							// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
 				 "Next",								// Title text
 				 NextTrackCallback);					// Callback
+	currentTrack=UI_AddText(&UI, Vec2_Addv(startPos, Vec2(0, -58)), 16.0f, Vec3(1.0f, 1.0f, 1.0f), "NULL");
 	volumeID=UI_AddBarGraph(&UI,
-							Vec2(config.renderWidth-400.0f, config.renderHeight-50.0f-16.0f-30.0f),// Position
-							Vec2(400.0f, 30.0f),		// Size
-							Vec3(0.25f, 0.25f, 0.25f),	// Color
-							"Volume",					// Title text
-							false,						// Read-only
-							0.0f, 1.0f, 0.125f);		// min/max/initial value
-
+				Vec2_Addv(startPos, Vec2(0, -96)),		// Position
+				Vec2(400, 30),							// Size
+				Vec3(0.25f, 0.25f, 0.25f),				// Color
+				"Volume",								// Title text
+				false,									// Read-only
+				0.0f, 1.0f, 0.125f);					// min/max/initial value
 	colorShiftID=UI_AddBarGraph(&UI,
-							Vec2(config.renderWidth-400.0f, config.renderHeight-50.0f-16.0f-30.0f-50.0f),// Position
-							Vec2(400.0f, 30.0f),		// Size
-							Vec3(0.25f, 0.25f, 0.25f),	// Color
-							"Cloud Color Shift",		// Title text
-							false,						// Read-only
-							0.0f, 1.0f, 0.45f);			// min/max/initial value
+				Vec2_Addv(startPos, Vec2(0, -128)),		// Position
+				Vec2(400, 30),							// Size
+				Vec3(0.25f, 0.25f, 0.25f),				// Color
+				"Cloud Color Shift",					// Title text
+				false,									// Read-only
+				0.0f, 1.0f, 0.45f);						// min/max/initial value
+
+	// UI_WindowAddControl(&UI, window, playButton);
+	// UI_WindowAddControl(&UI, window, pauseButton);
+	// UI_WindowAddControl(&UI, window, prevButton);
+	// UI_WindowAddControl(&UI, window, nextButton);
+	// UI_WindowAddControl(&UI, window, currentTrack);
+	// UI_WindowAddControl(&UI, window, volumeID);
+	// UI_WindowAddControl(&UI, window, colorShiftID);
 
 	UI_AddSprite(&UI, Vec2((float)config.renderWidth/2.0f, (float)config.renderHeight/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &textures[TEXTURE_CROSSHAIR], 0.0f);
 

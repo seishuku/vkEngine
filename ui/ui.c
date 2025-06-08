@@ -171,12 +171,121 @@ UI_Control_t *UI_FindControlByID(UI_t *UI, uint32_t ID)
 	if(UI==NULL||ID>=UI_HASHTABLE_MAX||ID==UINT32_MAX)
 		return NULL;
 
-	UI_Control_t *Control=UI->controlsHashtable[ID];
+	UI_Control_t *control=UI->controlsHashtable[ID];
 
-	if(Control->ID==ID)
-		return Control;
+	if(control->ID==ID)
+		return control;
 
 	return NULL;
+}
+
+static uint32_t UI_TestControlHit(UI_Control_t *control, vec2 position)
+{
+	switch(control->type)
+	{
+		case UI_CONTROL_BUTTON:
+		{
+			if(position.x>=control->position.x&&position.x<=control->position.x+control->button.size.x&&
+				position.y>=control->position.y&&position.y<=control->position.y+control->button.size.y)
+			{
+				// TODO: This could potentionally be an issue if the callback blocks
+				if(control->button.callback)
+					control->button.callback(NULL);
+
+				return control->ID;
+			}
+			break;
+		}
+
+		case UI_CONTROL_CHECKBOX:
+		{
+			if(Vec2_DistanceSq(control->position, position)<=control->checkBox.radius*control->checkBox.radius)
+			{
+				control->checkBox.value=!control->checkBox.value;
+				return control->ID;
+			}
+			break;
+		}
+
+		// Only return the ID of this control
+		case UI_CONTROL_BARGRAPH:
+		{
+			if(!control->barGraph.Readonly)
+			{
+				// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
+				if(position.x>=control->position.x&&position.x<=control->position.x+control->barGraph.size.x&&
+					position.y>=control->position.y&&position.y<=control->position.y+control->barGraph.size.y)
+					return control->ID;
+			}
+			break;
+		}
+
+		case UI_CONTROL_SPRITE:
+			break;
+
+		case UI_CONTROL_CURSOR:
+			break;
+
+		case UI_CONTROL_WINDOW:
+		{
+			// Hit test children
+			for(uint32_t j=0;j<List_GetCount(&control->window.children);j++)
+			{
+				UI_Control_t *child=List_GetPointer(&control->window.children, j);
+				vec2 childPos=Vec2_Addv(control->position, child->position);
+
+				switch(child->type)
+				{
+					case UI_CONTROL_BUTTON:
+					{
+						if(position.x>=childPos.x&&position.x<=childPos.x+child->button.size.x&&
+							position.y>=childPos.y&&position.y<=childPos.y+child->button.size.y)
+						{
+							// TODO: This could potentionally be an issue if the callback blocks
+							if(child->button.callback)
+								child->button.callback(NULL);
+
+							return child->ID;
+						}
+						break;
+					}
+
+					case UI_CONTROL_CHECKBOX:
+					{
+						if(Vec2_DistanceSq(childPos, position)<=child->checkBox.radius*child->checkBox.radius)
+						{
+							child->checkBox.value=!child->checkBox.value;
+							return child->ID;
+						}
+						break;
+					}
+
+					// Only return the ID of this control
+					case UI_CONTROL_BARGRAPH:
+					{
+						if(!child->barGraph.Readonly)
+						{
+							// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
+							if(position.x>=childPos.x&&position.x<=childPos.x+child->barGraph.size.x&&
+								position.y>=childPos.y&&position.y<=childPos.y+child->barGraph.size.y)
+								return child->ID;
+						}
+						break;
+					}
+
+					default:
+						break;
+				}
+			}
+			break;
+		}
+
+		default:
+			break;
+	}
+
+	// Nothing found
+	return UINT32_MAX;
 }
 
 // Checks hit on UI controls, also processes certain controls, intended to be used on mouse button down events
@@ -193,61 +302,18 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 	// Loop through all controls in the UI
 	for(uint32_t i=0;i<List_GetCount(&UI->controls);i++)
 	{
-		UI_Control_t *Control=List_GetPointer(&UI->controls, i);
+		UI_Control_t *control=List_GetPointer(&UI->controls, i);
+		uint32_t hitID=UINT32_MAX;
 
-		switch(Control->type)
-		{
-			case UI_CONTROL_BUTTON:
-			{
-				if(position.x>=Control->position.x&&position.x<=Control->position.x+Control->button.size.x&&
-				   position.y>=Control->position.y&&position.y<=Control->position.y+Control->button.size.y)
-				{
-					// TODO: This could potentionally be an issue if the callback blocks
-					if(Control->button.callback)
-						Control->button.callback(NULL);
+		// Only test non-child controls here
+		if(!control->child)
+			hitID=UI_TestControlHit(control, position);
 
-					return Control->ID;
-				}
-				break;
-			}
-
-			case UI_CONTROL_CHECKBOX:
-			{
-				vec2 Normal=Vec2_Subv(Control->position, position);
-
-				if(Vec2_Dot(Normal, Normal)<=Control->checkBox.radius*Control->checkBox.radius)
-				{
-					Control->checkBox.value=!Control->checkBox.value;
-					return Control->ID;
-				}
-				break;
-			}
-
-			// Only return the ID of this control
-			case UI_CONTROL_BARGRAPH:
-			{
-				if(!Control->barGraph.Readonly)
-				{
-					// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
-					if(position.x>=Control->position.x&&position.x<=Control->position.x+Control->barGraph.size.x&&
-					   position.y>=Control->position.y&&position.y<=Control->position.y+Control->barGraph.size.y)
-						return Control->ID;
-				}
-				break;
-			}
-
-			case UI_CONTROL_SPRITE:
-				break;
-
-			case UI_CONTROL_CURSOR:
-				break;
-
-			default:
-				break;
-		}
+		if(hitID!=UINT32_MAX)
+			return hitID;
 	}
 
-	// Nothing found
+	// Nothing found, empty list
 	return UINT32_MAX;
 }
 
@@ -263,12 +329,12 @@ bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 position)
 	position=Vec2_Addv(position, UI->position);
 
 	// Get the control from the ID
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control==NULL)
+	if(control==NULL)
 		return false;
 
-	switch(Control->type)
+	switch(control->type)
 	{
 		case UI_CONTROL_BUTTON:
 			break;
@@ -277,12 +343,12 @@ bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 position)
 			break;
 
 		case UI_CONTROL_BARGRAPH:
-			if(!Control->barGraph.Readonly)
+			if(!control->barGraph.Readonly)
 			{
 				// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
-				if(position.x>=Control->position.x&&position.x<=Control->position.x+Control->barGraph.size.x&&
-					position.y>=Control->position.y&&position.y<=Control->position.y+Control->barGraph.size.y)
-					Control->barGraph.value=((position.x-Control->position.x)/Control->barGraph.size.x)*(Control->barGraph.Max-Control->barGraph.Min)+Control->barGraph.Min;
+				if(position.x>=control->position.x&&position.x<=control->position.x+control->barGraph.size.x&&
+					position.y>=control->position.y&&position.y<=control->position.y+control->barGraph.size.y)
+					control->barGraph.value=((position.x-control->position.x)/control->barGraph.size.x)*(control->barGraph.Max-control->barGraph.Min)+control->barGraph.Min;
 			}
 			break;
 
@@ -292,11 +358,127 @@ bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 position)
 		case UI_CONTROL_CURSOR:
 			break;
 
+		case UI_CONTROL_WINDOW:
+		{
+			// Hit test children
+			for(uint32_t j=0;j<List_GetCount(&control->window.children);j++)
+			{
+				UI_Control_t *child=List_GetPointer(&control->window.children, j);
+				vec2 childPos=Vec2_Addv(control->position, child->position);
+
+				switch(child->type)
+				{
+					case UI_CONTROL_BARGRAPH:
+					{
+						if(!child->barGraph.Readonly)
+						{
+							// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
+							if(position.x>=childPos.x&&position.x<=childPos.x+child->barGraph.size.x&&
+								position.y>=childPos.y&&position.y<=childPos.y+child->barGraph.size.y)
+							{
+								child->barGraph.value=((position.x-childPos.x)/child->barGraph.size.x)*(child->barGraph.Max-child->barGraph.Min)+child->barGraph.Min;
+								printf("hit ");
+							}
+						}
+						break;
+					}
+
+					default:
+						break;
+				}
+			}
+			break;
+		}
+
 		default:
 			break;
 	}
 
 	return true;
+}
+
+static bool UI_AddControlInstance(UI_Instance_t *instance, UI_Control_t *control, float dt)
+{
+	switch(control->type)
+	{
+		case UI_CONTROL_BUTTON:
+		{
+			instance->positionSize.x=control->position.x+control->button.size.x*0.5f;
+			instance->positionSize.y=control->position.y+control->button.size.y*0.5f;
+			instance->positionSize.z=control->button.size.x;
+			instance->positionSize.w=control->button.size.y;
+
+			instance->colorValue.x=control->color.x;
+			instance->colorValue.y=control->color.y;
+			instance->colorValue.z=control->color.z;
+			instance->colorValue.w=0.0f;
+
+			instance->type=UI_CONTROL_BUTTON;
+			return true;
+		}
+
+		case UI_CONTROL_CHECKBOX:
+		{
+			instance->positionSize.x=control->position.x;
+			instance->positionSize.y=control->position.y;
+			instance->positionSize.z=control->checkBox.radius*2;
+			instance->positionSize.w=control->checkBox.radius*2;
+
+			instance->colorValue.x=control->color.x;
+			instance->colorValue.y=control->color.y;
+			instance->colorValue.z=control->color.z;
+
+			if(control->checkBox.value)
+				instance->colorValue.w=1.0f;
+			else
+				instance->colorValue.w=0.0f;
+
+			instance->type=UI_CONTROL_CHECKBOX;
+			return true;
+		}
+
+		case UI_CONTROL_BARGRAPH:
+		{
+			const float speed=10.0f;
+			control->barGraph.curValue+=(control->barGraph.value-control->barGraph.curValue)*(1-exp(-speed*dt));
+			float normalize_value=(control->barGraph.curValue-control->barGraph.Min)/(control->barGraph.Max-control->barGraph.Min);
+
+			instance->positionSize.x=control->position.x+control->barGraph.size.x*0.5f;
+			instance->positionSize.y=control->position.y+control->barGraph.size.y*0.5f;
+			instance->positionSize.z=control->barGraph.size.x;
+			instance->positionSize.w=control->barGraph.size.y;
+
+			instance->colorValue.x=control->color.x;
+			instance->colorValue.y=control->color.y;
+			instance->colorValue.z=control->color.z;
+			instance->colorValue.w=normalize_value;
+
+			instance->type=UI_CONTROL_BARGRAPH;
+			return true;
+		}
+
+		case UI_CONTROL_CURSOR:
+		{
+			instance->positionSize.x=control->position.x+control->cursor.radius;
+			instance->positionSize.y=control->position.y-control->cursor.radius;
+			instance->positionSize.z=control->cursor.radius*2;
+			instance->positionSize.w=control->cursor.radius*2;
+
+			instance->colorValue.x=control->color.x;
+			instance->colorValue.y=control->color.y;
+			instance->colorValue.z=control->color.z;
+			instance->colorValue.w=0.0f;
+
+			instance->type=UI_CONTROL_CURSOR;
+			return true;
+		}
+
+		case UI_CONTROL_SPRITE:
+		case UI_CONTROL_WINDOW:
+		case UI_CONTROL_TEXT:
+		default:
+			return false;
+	}	
 }
 
 bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
@@ -314,158 +496,178 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 	{
 		UI_Control_t *control=List_GetPointer(&UI->controls, i);
 
-		switch(control->type)
+		if(control->type==UI_CONTROL_WINDOW)
 		{
-			case UI_CONTROL_BUTTON:
+			instance->positionSize.x=control->position.x+control->window.size.x*0.5f;
+			instance->positionSize.y=control->position.y+control->window.size.y*0.5f;
+			instance->positionSize.z=control->window.size.x;
+			instance->positionSize.w=control->window.size.y;
+
+			instance->colorValue.x=control->color.x;
+			instance->colorValue.y=control->color.y;
+			instance->colorValue.z=control->color.z;
+			instance->colorValue.w=0.0f;
+
+			instance->type=UI_CONTROL_WINDOW;
+			instance++;
+			instanceCount++;
+
+			for(uint32_t j=0;j<List_GetCount(&control->window.children);j++)
 			{
-				// Get base length of title text
-				float textLength=Font_StringBaseWidth(control->button.titleText);
+				UI_Control_t *child=List_GetPointer(&control->window.children, j);
 
-				// Scale text size based on the button size and length of text, but no bigger than 80% of button height
-				float textSize=fminf(control->button.size.x/textLength*0.8f, control->button.size.y*0.8f);
+				if(child->type==UI_CONTROL_TEXT)
+				{
+					const float sx=control->position.x+child->position.x;
+					float x=sx;
+					float y=control->position.y+child->position.y;
 
-				// Print the text centered
-				Font_Print(&font,
-						   textSize,
-						   control->position.x-(textLength*textSize)*0.5f+control->button.size.x*0.5f,
-						   control->position.y-(textSize*0.5f)+(control->button.size.y*0.5f),
-						   "%s", control->button.titleText);
+					// Loop through the text string until EOL
+					for(char *ptr=child->text.titleText;*ptr!='\0';ptr++)
+					{
+						// Decrement 'y' for any CR's
+						if(*ptr=='\n')
+						{
+							x=sx;
+							y-=child->text.size;
+							continue;
+						}
 
-				// Left justified
-				//Font_Print(&Font,
-				//	textSize,
-				//	control->position.x,
-				//	control->position.y-(textSize*0.5f)+control->button.size.y*0.5f,
-				//	"%s", control->button.titleText
-				//);
+						// Just advance spaces instead of rendering empty quads
+						if(*ptr==' ')
+						{
+							x+=Font_CharacterBaseWidth(*ptr)*child->text.size;
+							continue;
+						}
 
-				// right justified
-				//Font_Print(&Font,
-				//	textSize,
-				//	control->position.x-(textLength*textSize)+control->button.size.x,
-				//	control->position.y-(textSize*0.5f)+control->button.size.y*0.5f,
-				//	"%s", control->button.titleText
-				//);
+						// ANSI color escape codes
+						// I'm sure there's a better way to do this!
+						// But it works, so whatever.
+						// if(*ptr=='\x1B')
+						// {
+						// 	ptr++;
+						// 		 if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ r=0.0f; g=0.0f; b=0.0f; } // BLACK
+						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ r=0.5f; g=0.0f; b=0.0f; } // DARK RED
+						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ r=0.0f; g=0.5f; b=0.0f; } // DARK GREEN
+						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ r=0.5f; g=0.5f; b=0.0f; } // DARK YELLOW
+						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ r=0.0f; g=0.0f; b=0.5f; } // DARK BLUE
+						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ r=0.5f; g=0.0f; b=0.5f; } // DARK MAGENTA
+						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ r=0.0f; g=0.5f; b=0.5f; } // DARK CYAN
+						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ r=0.5f; g=0.5f; b=0.5f; } // GREY
+						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ r=0.5f; g=0.5f; b=0.5f; } // GREY
+						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ r=1.0f; g=0.0f; b=0.0f; } // RED
+						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ r=0.0f; g=1.0f; b=0.0f; } // GREEN
+						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ r=1.0f; g=1.0f; b=0.0f; } // YELLOW
+						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ r=0.0f; g=0.0f; b=1.0f; } // BLUE
+						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ r=1.0f; g=0.0f; b=1.0f; } // MAGENTA
+						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ r=0.0f; g=1.0f; b=1.0f; } // CYAN
+						// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ r=1.0f; g=1.0f; b=1.0f; } // WHITE
+						// 	ptr+=4;
+						// 	font->numChar-=5;
+						// }
 
-				instance->positionSize.x=control->position.x+control->button.size.x*0.5f;
-				instance->positionSize.y=control->position.y+control->button.size.y*0.5f;
-				instance->positionSize.z=control->button.size.x;
-				instance->positionSize.w=control->button.size.y;
+						// Advance one character
+						x+=Font_CharacterBaseWidth(*ptr)*child->text.size;
 
-				instance->colorValue.x=control->color.x;
-				instance->colorValue.y=control->color.y;
-				instance->colorValue.z=control->color.z;
+						instance->positionSize.x=x-((Font_CharacterBaseWidth(*ptr)*0.5f)*child->text.size); // TODO: SDF render is centered X/Y, this offsets by half
+						instance->positionSize.y=y;
+						instance->positionSize.z=(float)(*ptr);
+						instance->positionSize.w=child->text.size;
+
+						instance->colorValue.x=1.0f;
+						instance->colorValue.y=1.0f;
+						instance->colorValue.z=1.0f;
+						instance->colorValue.w=0.0f;
+
+						instance->type=UI_CONTROL_TEXT;
+						instance++;
+						instanceCount++;
+					}
+				}
+				else if(UI_AddControlInstance(instance, child, dt))
+				{
+					instance->positionSize.x+=control->position.x;
+					instance->positionSize.y+=control->position.y;
+					instance++;
+					instanceCount++;
+				}
+			}
+		}
+		else if(control->type==UI_CONTROL_TEXT)
+		{
+			const float sx=control->position.x;
+			float x=control->position.x;
+			float y=control->position.y;
+
+			// Loop through the text string until EOL
+			for(char *ptr=control->text.titleText;*ptr!='\0';ptr++)
+			{
+				// Decrement 'y' for any CR's
+				if(*ptr=='\n')
+				{
+					x=sx;
+					y-=control->text.size;
+					continue;
+				}
+
+				// Just advance spaces instead of rendering empty quads
+				if(*ptr==' ')
+				{
+					x+=Font_CharacterBaseWidth(*ptr)*control->text.size;
+					continue;
+				}
+
+				// ANSI color escape codes
+				// I'm sure there's a better way to do this!
+				// But it works, so whatever.
+				// if(*ptr=='\x1B')
+				// {
+				// 	ptr++;
+				// 		 if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ r=0.0f; g=0.0f; b=0.0f; } // BLACK
+				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ r=0.5f; g=0.0f; b=0.0f; } // DARK RED
+				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ r=0.0f; g=0.5f; b=0.0f; } // DARK GREEN
+				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ r=0.5f; g=0.5f; b=0.0f; } // DARK YELLOW
+				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ r=0.0f; g=0.0f; b=0.5f; } // DARK BLUE
+				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ r=0.5f; g=0.0f; b=0.5f; } // DARK MAGENTA
+				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ r=0.0f; g=0.5f; b=0.5f; } // DARK CYAN
+				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ r=0.5f; g=0.5f; b=0.5f; } // GREY
+				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ r=0.5f; g=0.5f; b=0.5f; } // GREY
+				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ r=1.0f; g=0.0f; b=0.0f; } // RED
+				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ r=0.0f; g=1.0f; b=0.0f; } // GREEN
+				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ r=1.0f; g=1.0f; b=0.0f; } // YELLOW
+				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ r=0.0f; g=0.0f; b=1.0f; } // BLUE
+				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ r=1.0f; g=0.0f; b=1.0f; } // MAGENTA
+				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ r=0.0f; g=1.0f; b=1.0f; } // CYAN
+				// 	else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ r=1.0f; g=1.0f; b=1.0f; } // WHITE
+				// 	ptr+=4;
+				// 	font->numChar-=5;
+				// }
+
+				// Advance one character
+				x+=Font_CharacterBaseWidth(*ptr)*control->text.size;
+
+				instance->positionSize.x=x-((Font_CharacterBaseWidth(*ptr)*0.5f)*control->text.size); // TODO: SDF render is centered X/Y, this offsets by half
+				instance->positionSize.y=y;
+				instance->positionSize.z=(float)(*ptr);
+				instance->positionSize.w=control->text.size;
+
+				instance->colorValue.x=1.0f;
+				instance->colorValue.y=1.0f;
+				instance->colorValue.z=1.0f;
 				instance->colorValue.w=0.0f;
 
-				instance->type=UI_CONTROL_BUTTON;
+				instance->type=UI_CONTROL_TEXT;
 				instance++;
 				instanceCount++;
-				break;
 			}
-
-			case UI_CONTROL_CHECKBOX:
+		}
+		else
+		{
+			if(!control->child&&UI_AddControlInstance(instance, control, dt))
 			{
-				// Text size is the radius of the checkbox, placed radius length away horizontally, centered vertically
-				Font_Print(&font,
-						   control->checkBox.radius,
-						   control->position.x+control->checkBox.radius,
-						   control->position.y-(control->checkBox.radius/2.0f),
-						   "%s", control->checkBox.titleText);
-
-				instance->positionSize.x=control->position.x;
-				instance->positionSize.y=control->position.y;
-				instance->positionSize.z=control->checkBox.radius*2;
-				instance->positionSize.w=control->checkBox.radius*2;
-
-				instance->colorValue.x=control->color.x;
-				instance->colorValue.y=control->color.y;
-				instance->colorValue.z=control->color.z;
-
-				if(control->checkBox.value)
-					instance->colorValue.w=1.0f;
-				else
-					instance->colorValue.w=0.0f;
-
-				instance->type=UI_CONTROL_CHECKBOX;
 				instance++;
 				instanceCount++;
-				break;
 			}
-
-			case UI_CONTROL_BARGRAPH:
-			{
-				// Get base length of title text
-				float textLength=Font_StringBaseWidth(control->barGraph.titleText);
-
-				// Scale text size based on the button size and length of text, but no bigger than 80% of button height
-				float textSize=fminf(control->barGraph.size.x/textLength*0.8f, control->barGraph.size.y*0.8f);
-
-				// Print the text centered
-				Font_Print(&font,
-						   textSize,
-						   control->position.x-(textLength*textSize)*0.5f+control->barGraph.size.x*0.5f,
-						   control->position.y-(textSize*0.5f)+(control->barGraph.size.y*0.5f),
-						   "%s", control->barGraph.titleText);
-
-				// Left justified
-				//Font_Print(
-				//	textSize,
-				//	control->position.x,
-				//	control->position.y-(textSize*0.5f)+control->barGraph.size.y*0.5f,
-				//	"%s", control->barGraph.titleText
-				//);
-
-				// right justified
-				//Font_Print(
-				//	textSize,
-				//	control->position.x-(textLength*textSize)+control->barGraph.size.x,
-				//	control->position.y-(textSize*0.5f)+control->barGraph.size.y*0.5f,
-				//	"%s", control->barGraph.titleText
-				//);
-
-				const float speed=10.0f;
-				control->barGraph.curValue+=(control->barGraph.value-control->barGraph.curValue)*(1-exp(-speed*dt));
-				float normalize_value=(control->barGraph.curValue-control->barGraph.Min)/(control->barGraph.Max-control->barGraph.Min);
-
-				instance->positionSize.x=control->position.x+control->barGraph.size.x*0.5f;
-				instance->positionSize.y=control->position.y+control->barGraph.size.y*0.5f;
-				instance->positionSize.z=control->barGraph.size.x;
-				instance->positionSize.w=control->barGraph.size.y;
-
-				instance->colorValue.x=control->color.x;
-				instance->colorValue.y=control->color.y;
-				instance->colorValue.z=control->color.z;
-				instance->colorValue.w=normalize_value;
-
-				instance->type=UI_CONTROL_BARGRAPH;
-				instance++;
-				instanceCount++;
-				break;
-			}
-
-			case UI_CONTROL_SPRITE:
-				break;
-
-			case UI_CONTROL_CURSOR:
-			{
-				instance->positionSize.x=control->position.x+control->cursor.radius;
-				instance->positionSize.y=control->position.y-control->cursor.radius;
-				instance->positionSize.z=control->cursor.radius*2;
-				instance->positionSize.w=control->cursor.radius*2;
-
-				instance->colorValue.x=control->color.x;
-				instance->colorValue.y=control->color.y;
-				instance->colorValue.z=control->color.z;
-				instance->colorValue.w=0.0f;
-
-				instance->type=UI_CONTROL_CURSOR;
-				instance++;
-				instanceCount++;
-				break;
-			}
-
-			default:
-				break;
 		}
 	}
 
@@ -528,11 +730,11 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 	uint32_t spriteCount=instanceCount;
 	for(uint32_t i=0;i<controlCount;i++)
 	{
-		UI_Control_t *Control=List_GetPointer(&UI->controls, i);
+		UI_Control_t *control=List_GetPointer(&UI->controls, i);
 
-		if(Control->type==UI_CONTROL_SPRITE)
+		if(control->type==UI_CONTROL_SPRITE)
 		{
-			vkuDescriptorSet_UpdateBindingImageInfo(&UI->pipeline.descriptorSet, 0, Control->sprite.image->sampler, Control->sprite.image->imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			vkuDescriptorSet_UpdateBindingImageInfo(&UI->pipeline.descriptorSet, 0, control->sprite.image->sampler, control->sprite.image->imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			vkuAllocateUpdateDescriptorSet(&UI->pipeline.descriptorSet, perFrame[index].descriptorPool);
 			vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipelineLayout, 0, 1, &UI->pipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 

@@ -22,7 +22,7 @@ typedef struct
 } Font_t;
 
 bool Font_Init(Font_t *font);
-float Font_CharacterBaseWidth(const char ch);
+const float Font_CharacterBaseWidth(const char ch);
 float Font_StringBaseWidth(const char *string);
 void Font_Print(Font_t *font, float size, float x, float y, const char *string, ...);
 void Font_Draw(Font_t *font, uint32_t index, uint32_t eye);
