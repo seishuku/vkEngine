@@ -24,7 +24,7 @@ uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, VkuImage_t
 		.ID=ID,
 		.position=position,
 		.color=color,
-		.child=false,
+		.childParentID=UINT32_MAX,
 		.sprite.image=image,
 		.sprite.size=size,
 		.sprite.rotation=rotation

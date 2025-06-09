@@ -33,7 +33,7 @@ typedef struct
 	uint32_t ID;
 	vec2 position;
 	vec3 color;
-	bool child;
+	uint32_t childParentID;
 
 	// Specific to type
 	union

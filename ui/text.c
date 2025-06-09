@@ -20,7 +20,7 @@ uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, const char 
 		.ID=ID,
 		.position=position,
 		.color=color,
-		.child=false,
+		.childParentID=UINT32_MAX,
 		.text.size=size,
 	};
 

@@ -147,6 +147,15 @@ bool UI_Init(UI_t *UI, vec2 position, vec2 size)
 
 void UI_Destroy(UI_t *UI)
 {
+	// Find any window controls and delete children list
+	for(uint32_t i=0;i<List_GetCount(&UI->controls);i++)
+	{
+		UI_Control_t *control=(UI_Control_t *)List_GetPointer(&UI->controls, i);
+
+		if(control->type==UI_CONTROL_WINDOW)
+			List_Destroy(&control->window.children);
+	}
+
 	List_Destroy(&UI->controls);
 
 	vkuDestroyBuffer(&vkContext, &UI->instanceBuffer);
@@ -160,14 +169,6 @@ void UI_Destroy(UI_t *UI)
 
 UI_Control_t *UI_FindControlByID(UI_t *UI, uint32_t ID)
 {
-	//for(uint32_t i=0;i<List_GetCount(&UI->controls);i++)
-	//{
-	//	UI_Control_t *control=(UI_Control_t *)List_GetPointer(&UI->controls, i);
-
-	//	// Check for matching ID and type
-	//	if(control->ID==ID)
-	//		return control;
-	//}
 	if(UI==NULL||ID>=UI_HASHTABLE_MAX||ID==UINT32_MAX)
 		return NULL;
 
@@ -197,7 +198,7 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 		uint32_t hitID=UINT32_MAX;
 
 		// Only test non-child controls here
-		if(!control->child)
+		if(control->childParentID!=UINT32_MAX)
 			continue;
 
 		switch(control->type)
@@ -313,16 +314,25 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 // Processes hit on certain UI controls by ID (returned by UI_TestHit), intended to be used by "mouse move" events.
 // Returns false on error
 // Position is the cursor position to modify UI controls
-bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 position)
+bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 hitPos)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
 
 	// offset by UI position
-	position=Vec2_Addv(position, UI->position);
+	vec2 position=Vec2_Addv(hitPos, UI->position);
 
 	// Get the control from the ID
 	UI_Control_t *control=UI_FindControlByID(UI, ID);
+
+	// If this control has a parent ID set, then it's a child control
+	//	so we must offset by the parent position
+	//	(subtract, because need to be in "parent" space)
+	if(control->childParentID!=UINT32_MAX)
+	{
+		UI_Control_t *parent=UI_FindControlByID(UI, control->childParentID);
+		position=Vec2_Subv(position, parent->position);
+	}
 
 	if(control==NULL)
 		return false;
@@ -361,43 +371,51 @@ bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 position)
 	return true;
 }
 
-static bool UI_AddControlInstance(UI_Instance_t *instance, UI_Control_t *control, float dt)
+static bool UI_AddControlInstance(UI_Instance_t **instance, uint32_t *instanceCount, UI_Control_t *control, vec2 offset, float dt)
 {
 	switch(control->type)
 	{
 		case UI_CONTROL_BUTTON:
 		{
-			instance->positionSize.x=control->position.x+control->button.size.x*0.5f;
-			instance->positionSize.y=control->position.y+control->button.size.y*0.5f;
-			instance->positionSize.z=control->button.size.x;
-			instance->positionSize.w=control->button.size.y;
+			(*instance)->positionSize.x=offset.x+(control->position.x+control->button.size.x*0.5f);
+			(*instance)->positionSize.y=offset.y+(control->position.y+control->button.size.y*0.5f);
+			(*instance)->positionSize.z=control->button.size.x;
+			(*instance)->positionSize.w=control->button.size.y;
 
-			instance->colorValue.x=control->color.x;
-			instance->colorValue.y=control->color.y;
-			instance->colorValue.z=control->color.z;
-			instance->colorValue.w=0.0f;
+			(*instance)->colorValue.x=control->color.x;
+			(*instance)->colorValue.y=control->color.y;
+			(*instance)->colorValue.z=control->color.z;
+			(*instance)->colorValue.w=0.0f;
 
-			instance->type=UI_CONTROL_BUTTON;
+			(*instance)->type=UI_CONTROL_BUTTON;
+
+			(*instance)++;
+			(*instanceCount)++;
+
 			return true;
 		}
 
 		case UI_CONTROL_CHECKBOX:
 		{
-			instance->positionSize.x=control->position.x;
-			instance->positionSize.y=control->position.y;
-			instance->positionSize.z=control->checkBox.radius*2;
-			instance->positionSize.w=control->checkBox.radius*2;
+			(*instance)->positionSize.x=offset.x+control->position.x;
+			(*instance)->positionSize.y=offset.y+control->position.y;
+			(*instance)->positionSize.z=control->checkBox.radius*2;
+			(*instance)->positionSize.w=control->checkBox.radius*2;
 
-			instance->colorValue.x=control->color.x;
-			instance->colorValue.y=control->color.y;
-			instance->colorValue.z=control->color.z;
+			(*instance)->colorValue.x=control->color.x;
+			(*instance)->colorValue.y=control->color.y;
+			(*instance)->colorValue.z=control->color.z;
 
 			if(control->checkBox.value)
-				instance->colorValue.w=1.0f;
+				(*instance)->colorValue.w=1.0f;
 			else
-				instance->colorValue.w=0.0f;
+				(*instance)->colorValue.w=0.0f;
 
-			instance->type=UI_CONTROL_CHECKBOX;
+			(*instance)->type=UI_CONTROL_CHECKBOX;
+
+			(*instance)++;
+			(*instanceCount)++;
+
 			return true;
 		}
 
@@ -407,162 +425,69 @@ static bool UI_AddControlInstance(UI_Instance_t *instance, UI_Control_t *control
 			control->barGraph.curValue+=(control->barGraph.value-control->barGraph.curValue)*(1-exp(-speed*dt));
 			float normalize_value=(control->barGraph.curValue-control->barGraph.Min)/(control->barGraph.Max-control->barGraph.Min);
 
-			instance->positionSize.x=control->position.x+control->barGraph.size.x*0.5f;
-			instance->positionSize.y=control->position.y+control->barGraph.size.y*0.5f;
-			instance->positionSize.z=control->barGraph.size.x;
-			instance->positionSize.w=control->barGraph.size.y;
+			(*instance)->positionSize.x=offset.x+(control->position.x+control->barGraph.size.x*0.5f);
+			(*instance)->positionSize.y=offset.y+(control->position.y+control->barGraph.size.y*0.5f);
+			(*instance)->positionSize.z=control->barGraph.size.x;
+			(*instance)->positionSize.w=control->barGraph.size.y;
 
-			instance->colorValue.x=control->color.x;
-			instance->colorValue.y=control->color.y;
-			instance->colorValue.z=control->color.z;
-			instance->colorValue.w=normalize_value;
+			(*instance)->colorValue.x=control->color.x;
+			(*instance)->colorValue.y=control->color.y;
+			(*instance)->colorValue.z=control->color.z;
+			(*instance)->colorValue.w=normalize_value;
 
-			instance->type=UI_CONTROL_BARGRAPH;
+			(*instance)->type=UI_CONTROL_BARGRAPH;
+
+			(*instance)++;
+			(*instanceCount)++;
+
 			return true;
 		}
 
 		case UI_CONTROL_CURSOR:
 		{
-			instance->positionSize.x=control->position.x+control->cursor.radius;
-			instance->positionSize.y=control->position.y-control->cursor.radius;
-			instance->positionSize.z=control->cursor.radius*2;
-			instance->positionSize.w=control->cursor.radius*2;
+			(*instance)->positionSize.x=offset.x+(control->position.x+control->cursor.radius);
+			(*instance)->positionSize.y=offset.y+(control->position.y-control->cursor.radius);
+			(*instance)->positionSize.z=control->cursor.radius*2;
+			(*instance)->positionSize.w=control->cursor.radius*2;
 
-			instance->colorValue.x=control->color.x;
-			instance->colorValue.y=control->color.y;
-			instance->colorValue.z=control->color.z;
-			instance->colorValue.w=0.0f;
+			(*instance)->colorValue.x=control->color.x;
+			(*instance)->colorValue.y=control->color.y;
+			(*instance)->colorValue.z=control->color.z;
+			(*instance)->colorValue.w=0.0f;
 
-			instance->type=UI_CONTROL_CURSOR;
+			(*instance)->type=UI_CONTROL_CURSOR;
+
+			(*instance)++;
+			(*instanceCount)++;
+
 			return true;
 		}
 
 		case UI_CONTROL_WINDOW:
 		{
-			instance->positionSize.x=(control->position.x-10)+(control->window.size.x+20)*0.5f;
-			instance->positionSize.y=(control->position.y-10)-(control->window.size.y-20)*0.5f;
-			instance->positionSize.z=control->window.size.x+20;
-			instance->positionSize.w=control->window.size.y+20;
+			(*instance)->positionSize.x=offset.x+((control->position.x-10)+(control->window.size.x+20)*0.5f);
+			(*instance)->positionSize.y=offset.y+((control->position.y-10)-(control->window.size.y-20)*0.5f);
+			(*instance)->positionSize.z=control->window.size.x+20;
+			(*instance)->positionSize.w=control->window.size.y+20;
 
-			instance->colorValue.x=control->color.x;
-			instance->colorValue.y=control->color.y;
-			instance->colorValue.z=control->color.z;
-			instance->colorValue.w=0.0f;
+			(*instance)->colorValue.x=control->color.x;
+			(*instance)->colorValue.y=control->color.y;
+			(*instance)->colorValue.z=control->color.z;
+			(*instance)->colorValue.w=0.0f;
 
-			instance->type=UI_CONTROL_WINDOW;
+			(*instance)->type=UI_CONTROL_WINDOW;
+
+			(*instance)++;
+			(*instanceCount)++;
+
 			return true;
 		}
 
-		case UI_CONTROL_SPRITE:
 		case UI_CONTROL_TEXT:
-		default:
-			return false;
-	}	
-}
-
-bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
-{
-	if(UI==NULL)
-		return false;
-
-	UI_Instance_t *instance=(UI_Instance_t *)UI->instanceBufferPtr;
-	uint32_t instanceCount=0;
-
-	const size_t controlCount=List_GetCount(&UI->controls);
-
-	// Build a list of instanceable UI controls
-	for(uint32_t i=0;i<controlCount;i++)
-	{
-		UI_Control_t *control=List_GetPointer(&UI->controls, i);
-
-		if(control->type==UI_CONTROL_WINDOW)
 		{
-			UI_AddControlInstance(instance, control, dt);
-			instance++;
-			instanceCount++;
-
-			for(uint32_t j=0;j<List_GetCount(&control->window.children);j++)
-			{
-				uint32_t *childID=List_GetPointer(&control->window.children, j);
-				UI_Control_t *child=UI_FindControlByID(UI, *childID);
-
-				if(child->type==UI_CONTROL_TEXT)
-				{
-					const float sx=control->position.x+child->position.x;
-					float x=sx;
-					float y=control->position.y+child->position.y;
-					vec3 color=child->color;
-
-					// Loop through the text string until EOL
-					for(char *ptr=child->text.titleText;*ptr!='\0';ptr++)
-					{
-						// Decrement 'y' for any CR's
-						if(*ptr=='\n')
-						{
-							x=sx;
-							y-=child->text.size;
-							continue;
-						}
-
-						// Just advance spaces instead of rendering empty quads
-						if(*ptr==' ')
-						{
-							x+=Font_CharacterBaseWidth(*ptr)*child->text.size;
-							continue;
-						}
-
-						// ANSI color escape codes
-						if(*ptr=='\x1B')
-						{
-							ptr++;
-								 if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.0f; color.z=0.0f; ptr+=4; } // BLACK
-							else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.0f; color.z=0.0f; ptr+=4; } // DARK RED
-							else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.5f; color.z=0.0f; ptr+=4; } // DARK GREEN
-							else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.5f; color.z=0.0f; ptr+=4; } // DARK YELLOW
-							else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.0f; color.z=0.5f; ptr+=4; } // DARK BLUE
-							else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.0f; color.z=0.5f; ptr+=4; } // DARK MAGENTA
-							else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.5f; color.z=0.5f; ptr+=4; } // DARK CYAN
-							else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.5f; color.z=0.5f; ptr+=4; } // GREY
-							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.5f; color.z=0.5f; ptr+=4; } // GREY
-							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ color.x=1.0f; color.y=0.0f; color.z=0.0f; ptr+=4; } // RED
-							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=1.0f; color.z=0.0f; ptr+=4; } // GREEN
-							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ color.x=1.0f; color.y=1.0f; color.z=0.0f; ptr+=4; } // YELLOW
-							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='4'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.0f; color.z=1.0f; ptr+=4; } // BLUE
-							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ color.x=1.0f; color.y=0.0f; color.z=1.0f; ptr+=4; } // MAGENTA
-							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=1.0f; color.z=1.0f; ptr+=4; } // CYAN
-							else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ color.x=1.0f; color.y=1.0f; color.z=1.0f; ptr+=4; } // WHITE
-							else if(*(ptr+0)=='['&&*(ptr+1)=='0'&&*(ptr+2)=='m')				{ color=child->color; ptr+=3; }					  // CANCEL COLOR
-						}
-
-						// Advance one character
-						x+=Font_CharacterBaseWidth(*ptr)*child->text.size;
-
-						instance->positionSize.x=x-((Font_CharacterBaseWidth(*ptr)*0.5f)*child->text.size); // TODO: SDF render is centered X/Y, this offsets by half
-						instance->positionSize.y=y;
-						instance->positionSize.z=(float)(*ptr);
-						instance->positionSize.w=child->text.size;
-
-						instance->colorValue=Vec4_Vec3(color, 0.0f);
-
-						instance->type=UI_CONTROL_TEXT;
-						instance++;
-						instanceCount++;
-					}
-				}
-				else if(UI_AddControlInstance(instance, child, dt))
-				{
-					instance->positionSize.x+=control->position.x;
-					instance->positionSize.y+=control->position.y;
-					instance++;
-					instanceCount++;
-				}
-			}
-		}
-		else if(control->type==UI_CONTROL_TEXT)
-		{
-			const float sx=control->position.x;
-			float x=control->position.x;
-			float y=control->position.y;
+			const float sx=offset.x+control->position.x;
+			float x=sx;
+			float y=offset.y+control->position.y;
 			vec3 color=control->color;
 
 			// Loop through the text string until EOL
@@ -587,7 +512,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 				if(*ptr=='\x1B')
 				{
 					ptr++;
-						if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.0f; color.z=0.0f; ptr+=4; } // BLACK
+						 if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='0'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.0f; color.z=0.0f; ptr+=4; } // BLACK
 					else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='1'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.0f; color.z=0.0f; ptr+=4; } // DARK RED
 					else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='2'&&*(ptr+3)=='m')	{ color.x=0.0f; color.y=0.5f; color.z=0.0f; ptr+=4; } // DARK GREEN
 					else if(*(ptr+0)=='['&&*(ptr+1)=='3'&&*(ptr+2)=='3'&&*(ptr+3)=='m')	{ color.x=0.5f; color.y=0.5f; color.z=0.0f; ptr+=4; } // DARK YELLOW
@@ -609,24 +534,54 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 				// Advance one character
 				x+=Font_CharacterBaseWidth(*ptr)*control->text.size;
 
-				instance->positionSize.x=x-((Font_CharacterBaseWidth(*ptr)*0.5f)*control->text.size); // TODO: SDF render is centered X/Y, this offsets by half
-				instance->positionSize.y=y;
-				instance->positionSize.z=(float)(*ptr);
-				instance->positionSize.w=control->text.size;
+				(*instance)->positionSize.x=x-((Font_CharacterBaseWidth(*ptr)*0.5f)*control->text.size); // TODO: SDF render is centered X/Y, this offsets by half
+				(*instance)->positionSize.y=y;
+				(*instance)->positionSize.z=(float)(*ptr);
+				(*instance)->positionSize.w=control->text.size;
 
-				instance->colorValue=Vec4_Vec3(color, 0.0f);
+				(*instance)->colorValue=Vec4_Vec3(color, 0.0f);
 
-				instance->type=UI_CONTROL_TEXT;
-				instance++;
-				instanceCount++;
+				(*instance)->type=UI_CONTROL_TEXT;
+
+				(*instance)++;
+				(*instanceCount)++;
 			}
+
+			return true;
 		}
-		else
+
+		case UI_CONTROL_SPRITE:
+		default:
+			return false;
+	}	
+}
+
+bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
+{
+	if(UI==NULL)
+		return false;
+
+	UI_Instance_t *instance=(UI_Instance_t *)UI->instanceBufferPtr;
+	uint32_t instanceCount=0;
+
+	const size_t controlCount=List_GetCount(&UI->controls);
+
+	// Build a list of instanceable UI controls
+	for(uint32_t i=0;i<controlCount;i++)
+	{
+		UI_Control_t *control=List_GetPointer(&UI->controls, i);
+
+		if(control->childParentID==UINT32_MAX)
+			UI_AddControlInstance(&instance, &instanceCount, control, Vec2b(0.0f), dt);
+
+		if(control->type==UI_CONTROL_WINDOW)
 		{
-			if(!control->child&&UI_AddControlInstance(instance, control, dt))
+			for(uint32_t j=0;j<List_GetCount(&control->window.children);j++)
 			{
-				instance++;
-				instanceCount++;
+				uint32_t *childID=List_GetPointer(&control->window.children, j);
+				UI_Control_t *child=UI_FindControlByID(UI, *childID);
+
+				UI_AddControlInstance(&instance, &instanceCount, child, control->position, dt);
 			}
 		}
 	}

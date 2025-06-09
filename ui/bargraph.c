@@ -19,7 +19,7 @@ uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, const ch
 		.ID=ID,
 		.position=position,
 		.color=color,
-		.child=false,
+		.childParentID=UINT32_MAX,
 		.barGraph.size=size,
 		.barGraph.Readonly=Readonly,
 		.barGraph.Min=Min,

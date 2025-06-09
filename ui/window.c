@@ -19,7 +19,7 @@ uint32_t UI_AddWindow(UI_t *UI, vec2 position, vec2 size, vec3 color, const char
 		.ID=ID,
 		.position=position,
 		.color=color,
-		.child=false,
+		.childParentID=UINT32_MAX,
 		.window.size=size,
 	};
 
@@ -149,10 +149,10 @@ bool UI_WindowAddControl(UI_t *UI, uint32_t ID, uint32_t childID)
 
 		if(childControl!=NULL&&childControl->type!=UI_CONTROL_WINDOW)
 		{
-			childControl->child=true;
+			childControl->childParentID=ID;
 
 			if(childControl->type==UI_CONTROL_BUTTON||childControl->type==UI_CONTROL_BARGRAPH||childControl->type==UI_CONTROL_CHECKBOX)
-				UI->controlsHashtable[childControl->button.titleTextID]->child=true;
+				UI->controlsHashtable[childControl->button.titleTextID]->childParentID=childID;
 
 			if(List_Add(&Control->window.children, &childID))
 			{

@@ -21,7 +21,7 @@ uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, const char
 		.ID=ID,
 		.position=position,
 		.color=color,
-		.child=false,
+		.childParentID=UINT32_MAX,
 		.button.size=size,
 		.button.callback=callback
 	};
