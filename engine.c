@@ -139,6 +139,7 @@ uint32_t cursorID=UINT32_MAX;
 uint32_t colorShiftID=UINT32_MAX;
 uint32_t consoleBackground=UINT32_MAX;
 uint32_t currentTrack=UINT32_MAX;
+uint32_t windowID=UINT32_MAX;
 //////
 
 Console_t console;
@@ -1602,8 +1603,7 @@ bool Init(void)
 	UI_AddButton(&UI, Vec2(0.0f, config.renderHeight-100.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), "Fire", (UIControlCallback)Fire);
 #endif
 
-	vec2 startPos=Vec2(config.renderWidth-400, config.renderHeight);
-	uint32_t window=UI_AddWindow(&UI, Vec2(400, 400), Vec2(400, 128), Vec3(0.1, 0.1, 0.1), "Window");
+	windowID=UI_AddWindow(&UI, Vec2(config.renderWidth-450, config.windowHeight-50), Vec2(400, 128), Vec3(0.1, 0.1, 0.1), "Controls");
 
 	uint32_t playButton=UI_AddButton(&UI,
 				 Vec2(0, -50),							// Position
@@ -1645,13 +1645,13 @@ bool Init(void)
 				false,									// Read-only
 				0.0f, 1.0f, 0.45f);						// min/max/initial value
 
-	UI_WindowAddControl(&UI, window, playButton);
-	UI_WindowAddControl(&UI, window, pauseButton);
-	UI_WindowAddControl(&UI, window, prevButton);
-	UI_WindowAddControl(&UI, window, nextButton);
-	UI_WindowAddControl(&UI, window, currentTrack);
-	UI_WindowAddControl(&UI, window, volumeID);
-	UI_WindowAddControl(&UI, window, colorShiftID);
+	UI_WindowAddControl(&UI, windowID, playButton);
+	UI_WindowAddControl(&UI, windowID, pauseButton);
+	UI_WindowAddControl(&UI, windowID, prevButton);
+	UI_WindowAddControl(&UI, windowID, nextButton);
+	UI_WindowAddControl(&UI, windowID, currentTrack);
+	UI_WindowAddControl(&UI, windowID, volumeID);
+	UI_WindowAddControl(&UI, windowID, colorShiftID);
 
 	UI_AddSprite(&UI, Vec2((float)config.renderWidth/2.0f, (float)config.renderHeight/2.0f), Vec2(50.0f, 50.0f), Vec3(1.0f, 1.0f, 1.0f), &textures[TEXTURE_CROSSHAIR], 0.0f);
 

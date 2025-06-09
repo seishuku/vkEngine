@@ -195,7 +195,6 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 	for(uint32_t i=0;i<List_GetCount(&UI->controls);i++)
 	{
 		UI_Control_t *control=List_GetPointer(&UI->controls, i);
-		uint32_t hitID=UINT32_MAX;
 
 		// Only test non-child controls here
 		if(control->childParentID!=UINT32_MAX)
@@ -299,6 +298,24 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 							break;
 					}
 				}
+
+				// Didn't hit on any children, so test the window itself
+				vec2 padding=Vec2(control->window.size.x+UI_CONTROL_WINDOW_BORDER*2.0f, control->window.size.y+UI_CONTROL_WINDOW_BORDER*2.0f+UI_CONTROL_WINDOW_TITLEBAR_HEIGHT);
+
+				// Top-left corner of the whole window area (with borders/title bar)
+				vec2 windowTopLeft=Vec2(control->position.x-UI_CONTROL_WINDOW_BORDER*0.5f, control->position.y+UI_CONTROL_WINDOW_TITLEBAR_HEIGHT);
+
+				// Bottom-left corner (where the actual "window" origin would be if drawn centered vertically)
+				vec2 windowBottomLeft=Vec2(windowTopLeft.x, windowTopLeft.y-padding.y);
+
+				// Hit test against this full rectangle
+				if(position.x>=windowBottomLeft.x&&position.x<=windowBottomLeft.x+padding.x&&
+					position.y>=windowBottomLeft.y&&position.y<=windowBottomLeft.y+padding.y)
+				{
+					control->window.hitOffset=Vec2_Subv(position, control->position);
+					return control->ID;
+				}
+
 				break;
 			}
 
@@ -362,7 +379,11 @@ bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 hitPos)
 			break;
 
 		case UI_CONTROL_WINDOW:
+		{
+			control->position=Vec2_Subv(position, control->window.hitOffset);
+			UI_UpdateTextPosition(UI, control->window.titleTextID, Vec2_Add(control->position, 0.0f, 16.0f-(UI_CONTROL_WINDOW_BORDER*0.5f)));
 			break;
+		}
 
 		default:
 			break;
@@ -465,10 +486,10 @@ static bool UI_AddControlInstance(UI_Instance_t **instance, uint32_t *instanceCo
 
 		case UI_CONTROL_WINDOW:
 		{
-			(*instance)->positionSize.x=offset.x+((control->position.x-10)+(control->window.size.x+20)*0.5f);
-			(*instance)->positionSize.y=offset.y+((control->position.y-10)-(control->window.size.y-20)*0.5f);
-			(*instance)->positionSize.z=control->window.size.x+20;
-			(*instance)->positionSize.w=control->window.size.y+20;
+			(*instance)->positionSize.x=offset.x+((control->position.x-(UI_CONTROL_WINDOW_BORDER*0.5f))+(control->window.size.x+UI_CONTROL_WINDOW_BORDER)*0.5f);
+			(*instance)->positionSize.y=offset.y+((control->position.y-((UI_CONTROL_WINDOW_BORDER-UI_CONTROL_WINDOW_TITLEBAR_HEIGHT)*0.5f))-(control->window.size.y-UI_CONTROL_WINDOW_BORDER)*0.5f);
+			(*instance)->positionSize.z=control->window.size.x+(UI_CONTROL_WINDOW_BORDER*2.0f);
+			(*instance)->positionSize.w=control->window.size.y+(UI_CONTROL_WINDOW_BORDER*2.0f)+UI_CONTROL_WINDOW_TITLEBAR_HEIGHT;
 
 			(*instance)->colorValue.x=control->color.x;
 			(*instance)->colorValue.y=control->color.y;
@@ -571,9 +592,11 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 	{
 		UI_Control_t *control=List_GetPointer(&UI->controls, i);
 
+		// Only add controls that are non-child controls
 		if(control->childParentID==UINT32_MAX)
 			UI_AddControlInstance(&instance, &instanceCount, control, Vec2b(0.0f), dt);
 
+		// If it was a window control, add children control instances
 		if(control->type==UI_CONTROL_WINDOW)
 		{
 			for(uint32_t j=0;j<List_GetCount(&control->window.children);j++)
@@ -581,6 +604,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 				uint32_t *childID=List_GetPointer(&control->window.children, j);
 				UI_Control_t *child=UI_FindControlByID(UI, *childID);
 
+				// Add child control instances with offset of parent control
 				UI_AddControlInstance(&instance, &instanceCount, child, control->position, dt);
 			}
 		}

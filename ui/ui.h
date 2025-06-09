@@ -10,6 +10,9 @@
 // Does the callback really need args? (userdata?)
 typedef void (*UIControlCallback)(void *arg);
 
+#define UI_CONTROL_WINDOW_TITLEBAR_HEIGHT 16.0f
+#define UI_CONTROL_WINDOW_BORDER 10.0f
+
 #define UI_CONTROL_TITLETEXT_MAX 128
 
 #define UI_HASHTABLE_MAX 8192
@@ -82,6 +85,7 @@ typedef struct
 		{
 			uint32_t titleTextID;
 			vec2 size;
+			vec2 hitOffset;
 			List_t children;
 		} window;
 

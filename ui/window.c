@@ -21,6 +21,7 @@ uint32_t UI_AddWindow(UI_t *UI, vec2 position, vec2 size, vec3 color, const char
 		.color=color,
 		.childParentID=UINT32_MAX,
 		.window.size=size,
+		.window.hitOffset=Vec2b(0.0f),
 	};
 
 	if(!List_Init(&Control.window.children, sizeof(uint32_t), 0, NULL))
@@ -35,7 +36,7 @@ uint32_t UI_AddWindow(UI_t *UI, vec2 position, vec2 size, vec3 color, const char
 	// This is bit annoying...
 	// The control's title text needs to be added after the actual control, otherwise it will be rendered under this control.
 	// I suppose this would be fixed with proper render order sorting, maybe later.
-	UI->controlsHashtable[ID]->window.titleTextID=UI_AddText(UI, position, 1.0f, color, titleText);
+	UI->controlsHashtable[ID]->window.titleTextID=UI_AddText(UI, Vec2_Add(position, 0.0f, 16.0f-(UI_CONTROL_WINDOW_BORDER*0.5f)), 16.0f, Vec3b(1.0f), titleText);
 
 	return ID;
 }
