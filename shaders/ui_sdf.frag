@@ -498,19 +498,25 @@ float tilde(vec2 uv) {
 
 void main()
 {
-	const float corner_radius=0.2;
-
-	vec2 aspect=vec2(Size.x/Size.y, 1.0);
+	const vec2 aspect=vec2(Size.x/Size.y, 1.0);
     vec2 uv=UV*aspect;
+
+	// Define one pixel on the screen in "widget" space
+	const vec2 onePixel=1.0/Size*aspect;
+
+	// Parameters for widgets
+	const float cornerRadius=onePixel.x*8;
+	const vec2 offset=onePixel*4;
+	const float circleRadius=onePixel.x*1;
 
 	switch(Type)
 	{
 		case UI_CONTROL_BUTTON:
 		{
-			float dist_ring=roundedRect(uv-vec2(0.02), aspect-0.04, corner_radius);
+			float dist_ring=roundedRect(uv-offset, aspect-(offset*2), cornerRadius);
 			float ring=sdfDistance(dist_ring);
 
-			float dist_shadow=roundedRect(uv+vec2(0.02), aspect-0.04, corner_radius);
+			float dist_shadow=roundedRect(uv+offset, aspect-(offset*2), cornerRadius);
 			float shadow=sdfDistance(dist_shadow);
 
 			vec3 outer=mix(Color.xyz*0.25*shadow, Color.xyz*ring, 0.75);
@@ -522,10 +528,10 @@ void main()
 
 		case UI_CONTROL_CHECKBOX:
 		{
-			float dist_ring=abs(circle(uv-vec2(0.01), 0.96))-0.02;
+			float dist_ring=abs(circle(uv-offset, 0.96))-offset.x;
 			float ring=sdfDistance(dist_ring);
 
-			float dist_shadow=abs(circle(uv+vec2(0.01), 0.96))-0.02;
+			float dist_shadow=abs(circle(uv+offset, 0.96))-offset.x;
 			float shadow=sdfDistance(dist_shadow);
 
 			vec3 outer=mix(vec3(0.25)*shadow, vec3(1.0)*ring, 0.5);
@@ -544,10 +550,10 @@ void main()
 
 		case UI_CONTROL_BARGRAPH:
 		{
-			float dist_ring=abs(roundedRect(uv-vec2(0.02), aspect-0.04, corner_radius))-0.04;
+			float dist_ring=abs(roundedRect(uv-(offset*0.5), aspect-offset, cornerRadius))-(offset.x*0.5);
 			float ring=sdfDistance(dist_ring);
 
-			float dist_shadow=abs(roundedRect(uv+vec2(0.02), aspect-0.04, corner_radius))-0.04;
+			float dist_shadow=abs(roundedRect(uv+(offset*0.5), aspect-offset, cornerRadius))-(offset.x*0.5);
 			float shadow=sdfDistance(dist_shadow);
 
 			vec3 outer=mix(vec3(0.25)*shadow, vec3(1.0)*ring, 0.5);
@@ -556,7 +562,7 @@ void main()
 			float center_alpha=0.0;
 
 			if(Color.w>(uv.x/aspect.x)*0.5+0.5)
-				center_alpha=sdfDistance(roundedRect(uv, aspect-0.08, corner_radius-0.04));;
+				center_alpha=sdfDistance(roundedRect(uv, aspect-(offset*2), cornerRadius-offset.x));;
 
 			vec3 center=Color.xyz*center_alpha;
 
@@ -578,10 +584,10 @@ void main()
 
 		case UI_CONTROL_WINDOW:
 		{
-			float dist_ring=roundedRect(uv-vec2(0.02), aspect-0.04, 0);
+			float dist_ring=roundedRect(uv-offset, aspect-(offset*2), 0);
 			float ring=sdfDistance(dist_ring);
 
-			float dist_shadow=roundedRect(uv+vec2(0.02), aspect-0.04, 0);
+			float dist_shadow=roundedRect(uv+offset, aspect-(offset*2), 0);
 			float shadow=sdfDistance(dist_shadow);
 
 			vec3 outer=mix(Color.xyz*0.25*shadow, Color.xyz*ring, 0.75);
