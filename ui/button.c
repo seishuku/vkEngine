@@ -8,7 +8,7 @@
 
 // Add a button to the UI.
 // Returns an ID, or UINT32_MAX on failure.
-uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, const char *titleText, UIControlCallback callback)
+uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, UIControlCallback callback)
 {
 	uint32_t ID=UI->baseID++;
 
@@ -22,6 +22,7 @@ uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, const char
 		.position=position,
 		.color=color,
 		.childParentID=UINT32_MAX,
+		.hidden=hidden,
 		.button.size=size,
 		.button.callback=callback
 	};
@@ -44,7 +45,7 @@ uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, const char
 
 	// Print the text centered
 	vec2 textPosition=Vec2(position.x-(textLength*textSize)*0.5f+size.x*0.5f, position.y+(size.y*0.5f));
-	UI->controlsHashtable[ID]->barGraph.titleTextID=UI_AddText(UI, textPosition, textSize, Vec3(1.0f, 1.0f, 1.0f), titleText);
+	UI->controlsHashtable[ID]->barGraph.titleTextID=UI_AddText(UI, textPosition, textSize, Vec3b(1.0f), hidden, titleText);
 
 	// Left justified
 	//	control->position.x,
@@ -60,7 +61,7 @@ uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, const char
 // Update UI button parameters.
 // Returns true on success, false on failure.
 // Also individual parameter update function as well.
-bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, const char *titleText, UIControlCallback callback)
+bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, UIControlCallback callback)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -72,13 +73,14 @@ bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color
 	{
 		Control->position=position;
 		Control->color=color;
+		Control->hidden=hidden;
 		Control->button.size=size;
 		Control->button.callback=callback;
 
 		float textLength=Font_StringBaseWidth(titleText);
 		float textSize=fminf(Control->button.size.x/textLength*0.8f, Control->button.size.y*0.8f);
 		vec2 textPosition=Vec2(Control->position.x-(textLength*textSize)*0.5f+Control->button.size.x*0.5f, Control->position.y+(Control->button.size.y*0.5f));
-		UI_UpdateText(UI, Control->button.titleTextID, textPosition, textSize, Vec3(1.0f, 1.0f, 1.0f), titleText);
+		UI_UpdateText(UI, Control->button.titleTextID, textPosition, textSize, Vec3b(1.0f), hidden, titleText);
 
 		return true;
 	}
@@ -152,6 +154,26 @@ bool UI_UpdateButtonColor(UI_t *UI, uint32_t ID, vec3 color)
 	if(Control!=NULL&&Control->type==UI_CONTROL_BUTTON)
 	{
 		Control->color=color;
+		return true;
+	}
+
+	// Not found
+	return false;
+}
+
+bool UI_UpdateButtonVisibility(UI_t *UI, uint32_t ID, bool hidden)
+{
+	if(UI==NULL||ID==UINT32_MAX)
+		return false;
+
+	// Search list
+	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+
+	if(Control!=NULL&&Control->type==UI_CONTROL_BUTTON)
+	{
+		Control->hidden=hidden;
+		UI_UpdateTextVisibility(UI, Control->button.titleTextID, hidden);
+
 		return true;
 	}
 

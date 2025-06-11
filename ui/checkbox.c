@@ -8,7 +8,7 @@
 
 // Add a checkbox to the UI.
 // Returns an ID, or UINT32_MAX on failure.
-uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, const char *titleText, bool value)
+uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, bool hidden, const char *titleText, bool value)
 {
 	uint32_t ID=UI->baseID++;
 
@@ -22,6 +22,7 @@ uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, const
 		.position=position,
 		.color=color,
 		.childParentID=UINT32_MAX,
+		.hidden=hidden,
 		.checkBox.radius=radius,
 		.checkBox.value=value
 	};
@@ -40,6 +41,7 @@ uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, const
 	UI->controlsHashtable[ID]->checkBox.titleTextID=UI_AddText(UI,
 		Vec2(position.x+radius, position.y-(radius/2.0f)), radius,
 		Vec3(1.0f, 1.0f, 1.0f),
+		hidden,
 		titleText);
 
 	return ID;
@@ -48,7 +50,7 @@ uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, const
 // Update UI checkbox parameters.
 // Returns true on success, false on failure.
 // Also individual parameter update functions.
-bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, const char *titleText, bool value)
+bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, bool hidden, const char *titleText, bool value)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -60,10 +62,12 @@ bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 
 	{
 		Control->position=position;
 		Control->color=color;
+		Control->hidden=hidden;
 
 		UI_UpdateText(UI, Control->checkBox.titleTextID,
 			Vec2(position.x+radius, position.y-(radius/2.0f)), radius,
 			Vec3(1.0f, 1.0f, 1.0f),
+			hidden,
 			titleText);
 		Control->checkBox.radius=radius;
 		Control->checkBox.value=value;
@@ -127,6 +131,26 @@ bool UI_UpdateCheckBoxColor(UI_t *UI, uint32_t ID, vec3 color)
 	if(Control!=NULL&&Control->type==UI_CONTROL_CHECKBOX)
 	{
 		Control->color=color;
+		return true;
+	}
+
+	// Not found
+	return false;
+}
+
+bool UI_UpdateCheckBoxVisibility(UI_t *UI, uint32_t ID, bool hidden)
+{
+	if(UI==NULL||ID==UINT32_MAX)
+		return false;
+
+	// Search list
+	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+
+	if(Control!=NULL&&Control->type==UI_CONTROL_CHECKBOX)
+	{
+		Control->hidden=hidden;
+		UI_UpdateTextVisibility(UI, Control->checkBox.titleTextID, hidden);
+
 		return true;
 	}
 

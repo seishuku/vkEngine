@@ -310,11 +310,11 @@ void ConsoleDraw(Console_t *console)
 
     if(!console->active)
     {
-        UI_UpdateSpriteSize(&UI, consoleBackground, Vec2(0.0f, 0.0f));
+        UI_UpdateSpriteVisibility(&UI, consoleBackground, true);
         return;
     }
     else
-        UI_UpdateSpriteSize(&UI, consoleBackground, Vec2((float)config.renderWidth, 16.0f*6.0f));
+        UI_UpdateSpriteVisibility(&UI, consoleBackground, false);
 
     const int maxLines=5;
     uint32_t startLine=(console->numLine>maxLines+console->scrollbackOffset)?console->numLine-maxLines-console->scrollbackOffset:0;

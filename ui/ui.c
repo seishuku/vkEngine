@@ -196,8 +196,8 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 	{
 		UI_Control_t *control=List_GetPointer(&UI->controls, i);
 
-		// Only test non-child controls here
-		if(control->childParentID!=UINT32_MAX)
+		// Only test non-child and visible controls here
+		if(control->childParentID!=UINT32_MAX||control->hidden)
 			continue;
 
 		switch(control->type)
@@ -252,6 +252,9 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 				{
 					uint32_t *childID=List_GetPointer(&control->window.children, j);
 					UI_Control_t *child=UI_FindControlByID(UI, *childID);
+
+					if(child->hidden)
+						continue;
 
 					vec2 childPos=Vec2_Addv(control->position, child->position);
 
@@ -592,9 +595,11 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 	{
 		UI_Control_t *control=List_GetPointer(&UI->controls, i);
 
-		// Only add controls that are non-child controls
-		if(control->childParentID==UINT32_MAX)
-			UI_AddControlInstance(&instance, &instanceCount, control, Vec2b(0.0f), dt);
+		// Only add controls that are non-child and visible controls
+		if(control->childParentID!=UINT32_MAX||control->hidden)
+			continue;
+
+		UI_AddControlInstance(&instance, &instanceCount, control, Vec2b(0.0f), dt);
 
 		// If it was a window control, add children control instances
 		if(control->type==UI_CONTROL_WINDOW)
@@ -604,31 +609,10 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 				uint32_t *childID=List_GetPointer(&control->window.children, j);
 				UI_Control_t *child=UI_FindControlByID(UI, *childID);
 
-				// Add child control instances with offset of parent control
-				UI_AddControlInstance(&instance, &instanceCount, child, control->position, dt);
+				// Add child control instances with offset of parent control, but only if visible
+				if(!child->hidden)
+					UI_AddControlInstance(&instance, &instanceCount, child, control->position, dt);
 			}
-		}
-	}
-
-	// At the end of the instance buffer, build a list of non-instanced UI controls
-	for(uint32_t i=0;i<controlCount;i++)
-	{
-		UI_Control_t *control=List_GetPointer(&UI->controls, i);
-
-		if(control->type==UI_CONTROL_SPRITE)
-		{
-			instance->positionSize.x=control->position.x;
-			instance->positionSize.y=control->position.y;
-			instance->positionSize.z=control->sprite.size.x;
-			instance->positionSize.w=control->sprite.size.y;
-
-			instance->colorValue.x=control->color.x;
-			instance->colorValue.y=control->color.y;
-			instance->colorValue.z=control->color.z;
-			instance->colorValue.w=control->sprite.rotation;
-
-			instance->type=UI_CONTROL_SPRITE;
-			instance++;
 		}
 	}
 
@@ -671,8 +655,22 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 	{
 		UI_Control_t *control=List_GetPointer(&UI->controls, i);
 
-		if(control->type==UI_CONTROL_SPRITE)
+		if(control->type==UI_CONTROL_SPRITE&&!control->hidden)
 		{
+			// TODO: This may be a problem on integrated or mobile platforms, flush needed?
+			instance->positionSize.x=control->position.x;
+			instance->positionSize.y=control->position.y;
+			instance->positionSize.z=control->sprite.size.x;
+			instance->positionSize.w=control->sprite.size.y;
+
+			instance->colorValue.x=control->color.x;
+			instance->colorValue.y=control->color.y;
+			instance->colorValue.z=control->color.z;
+			instance->colorValue.w=control->sprite.rotation;
+
+			instance->type=UI_CONTROL_SPRITE;
+			instance++;
+
 			vkuDescriptorSet_UpdateBindingImageInfo(&UI->pipeline.descriptorSet, 0, control->sprite.image->sampler, control->sprite.image->imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			vkuAllocateUpdateDescriptorSet(&UI->pipeline.descriptorSet, perFrame[index].descriptorPool);
 			vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipelineLayout, 0, 1, &UI->pipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);

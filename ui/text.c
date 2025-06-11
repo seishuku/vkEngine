@@ -7,7 +7,7 @@
 #include "../font/font.h"
 #include "ui.h"
 
-uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, const char *titleText)
+uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, bool hidden, const char *titleText)
 {
 	uint32_t ID=UI->baseID++;
 
@@ -21,6 +21,7 @@ uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, const char 
 		.position=position,
 		.color=color,
 		.childParentID=UINT32_MAX,
+		.hidden=hidden,
 		.text.size=size,
 	};
 
@@ -34,7 +35,7 @@ uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, const char 
 	return ID;
 }
 
-bool UI_UpdateText(UI_t *UI, uint32_t ID, vec2 position, float size, vec3 color, const char *titleText)
+bool UI_UpdateText(UI_t *UI, uint32_t ID, vec2 position, float size, vec3 color, bool hidden, const char *titleText)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -46,6 +47,7 @@ bool UI_UpdateText(UI_t *UI, uint32_t ID, vec2 position, float size, vec3 color,
 	{
 		Control->position=position;
 		Control->color=color;
+		Control->hidden=hidden;
 
 		strncpy(Control->text.titleText, titleText, UI_CONTROL_TITLETEXT_MAX);
 		Control->text.size=size;
@@ -104,6 +106,24 @@ bool UI_UpdateTextColor(UI_t *UI, uint32_t ID, vec3 color)
 	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
 	{
 		Control->color=color;
+		return true;
+	}
+
+	// Not found
+	return false;
+}
+
+bool UI_UpdateTextVisibility(UI_t *UI, uint32_t ID, bool hidden)
+{
+	if(UI==NULL||ID==UINT32_MAX)
+		return false;
+
+	// Search list
+	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+
+	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
+	{
+		Control->hidden=hidden;
 		return true;
 	}
 

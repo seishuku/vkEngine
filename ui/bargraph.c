@@ -6,7 +6,7 @@
 #include "../font/font.h"
 #include "ui.h"
 
-uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, const char *titleText, bool Readonly, float Min, float Max, float value)
+uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, bool Readonly, float Min, float Max, float value)
 {
 	uint32_t ID=UI->baseID++;
 
@@ -20,6 +20,7 @@ uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, const ch
 		.position=position,
 		.color=color,
 		.childParentID=UINT32_MAX,
+		.hidden=hidden,
 		.barGraph.size=size,
 		.barGraph.Readonly=Readonly,
 		.barGraph.Min=Min,
@@ -47,12 +48,12 @@ uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, const ch
 	// Print the text centered
 	vec2 textPosition=Vec2(position.x-(textLength*textSize)*0.5f+size.x*0.5f, position.y+(size.y*0.5f));
 
-	UI->controlsHashtable[ID]->barGraph.titleTextID=UI_AddText(UI, textPosition, textSize, Vec3(1.0f, 1.0f, 1.0f), titleText);
+	UI->controlsHashtable[ID]->barGraph.titleTextID=UI_AddText(UI, textPosition, textSize, Vec3b(1.0f), hidden, titleText);
 
 	return ID;
 }
 
-bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, const char *titleText, bool Readonly, float Min, float Max, float value)
+bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, bool Readonly, float Min, float Max, float value)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -64,11 +65,12 @@ bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 col
 	{
 		Control->position=position;
 		Control->color=color;
+		Control->hidden=hidden;
 
 		const float textLength=Font_StringBaseWidth(titleText);
 		const float textSize=fminf(size.x/textLength*0.8f, size.y*0.8f);
 		vec2 textPosition=Vec2(position.x-(textLength*textSize)*0.5f+size.x*0.5f, position.y+(size.y*0.5f));
-		UI_UpdateText(UI, Control->barGraph.titleTextID, textPosition, textSize, Vec3(1.0f, 1.0f, 1.0f), titleText);
+		UI_UpdateText(UI, Control->barGraph.titleTextID, textPosition, textSize, Vec3b(1.0f), hidden, titleText);
 
 		Control->barGraph.size=size;
 		Control->barGraph.Readonly=Readonly;
@@ -148,6 +150,26 @@ bool UI_UpdateBarGraphColor(UI_t *UI, uint32_t ID, vec3 color)
 	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
 	{
 		Control->color=color;
+		return true;
+	}
+
+	// Not found
+	return false;
+}
+
+bool UI_UpdateBarGraphVisibility(UI_t *UI, uint32_t ID, bool hidden)
+{
+	if(UI==NULL||ID==UINT32_MAX)
+		return false;
+
+	// Search list
+	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+
+	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
+	{
+		Control->hidden=hidden;
+		UI_UpdateTextVisibility(UI, Control->barGraph.titleTextID, hidden);
+
 		return true;
 	}
 
