@@ -56,208 +56,223 @@ float triangle(vec2 p, vec2 q)
 	return -sqrt(d.x)*sign(d.y);
 }
 
-// Common functions used by multiple letters
-#define PI 3.1415926
-
-float line(vec2 p, vec2 a, vec2 b) {
+float line(vec2 p, vec2 a, vec2 b)
+{
 	vec2 pa=p-a, ba=b-a;
-	return length(pa-ba*clamp(dot(pa, ba)/dot(ba, ba), 0.0, 1.0));
+    return length(pa-ba*clamp(dot(pa, ba)/dot(ba, ba), 0.0, 1.0));
 }
 
+// These functions are re-used by multiple letters
 float _u(vec2 uv, float w, float v) {
-	return length(vec2(abs(length(vec2(uv.x, max(0.0, -(0.4-v)-uv.y)))-w), max(0.0, uv.y-0.4)));
+    return length(vec2(abs(length(vec2(uv.x, max(0.0, -(0.4-v)-uv.y)))-w), max(0.0, uv.y-0.4)));
 }
 
 float _i(vec2 uv) {
-	return length(vec2(uv.x, max(0.0, abs(uv.y)-0.4)));
+    return length(vec2(uv.x, max(0.0, abs(uv.y)-0.4)));
 }
 
 float _j(vec2 uv) {
-	uv+=vec2(0.2, 0.55);
-	return uv.x>0.0&&uv.y<0.0?abs(length(uv)-0.25):min(length(uv+vec2(0.0, 0.25)), length(vec2(uv.x-0.25, max(0.0, abs(uv.y-0.475)-0.475))));
+    uv+=vec2(0.2, 0.55);
+    return uv.x>0.0&&uv.y<0.0?abs(length(uv)-0.25):min(length(uv+vec2(0.0, 0.25)), length(vec2(uv.x-0.25, max(0.0, abs(uv.y-0.475)-0.475))));
 }
 
 float _l(vec2 uv) {
-	return length(vec2(uv.x, max(0.0, abs(uv.y-0.2)-0.6)));
+    return length(vec2(uv.x, max(0.0, abs(uv.y-0.2)-0.6)));
 }
 
 float _o(vec2 uv) {
-	return abs(length(vec2(uv.x, max(0.0, abs(uv.y)-0.15)))-0.25);
+    return abs(length(vec2(uv.x, max(0.0, abs(uv.y)-0.15)))-0.25);
 }
 
 // Lowercase
-float aa(vec2 uvo) {
-	float a=atan(uvo.x*sign(uvo.y), abs(uvo.y)-0.2);
-	vec2 uv=vec2(uvo.x, a>-PI&&a<-PI*0.5?-abs(uvo.y):abs(uvo.y));
-	return min(min(abs(length(vec2(max(0.0, abs(uv.x)-0.05), uv.y-0.2))-0.2), length(vec2(uvo.x+0.25, uvo.y-0.2))), length(vec2(uvo.x-0.25, max(0.0, abs(uvo.y+0.1)-0.3))));
+float aa(vec2 uv) {
+    uv=-uv;
+    return min(min(abs(length(vec2(max(0.0, abs(uv.x)-0.05), uv.y-0.2))-0.2), length(vec2(uv.x+0.25, max(0.0, abs(uv.y-0.2)-0.2)))), (uv.x<0.0?uv.y<0.0:atan(uv.x, uv.y+0.15)>2.0)?_o(uv):length(vec2(uv.x-0.22734, uv.y+0.254)));
 }
 
 float bb(vec2 uv) {
-	return min(_o(uv), _l(uv+vec2(0.25, 0.0)));
+    return min(_o(uv), _l(uv+vec2(0.25, 0.0)));
 }
 
 float cc(vec2 uv) {
-	return uv.x<0.0||atan(uv.x, abs(uv.y)-0.15)<1.14?_o(uv):min(length(vec2(uv.x+0.25, max(0.0, abs(uv.y)-0.15))), length(uv+vec2(-0.22734, -0.254)));
+    return uv.x<0.0||atan(uv.x, abs(uv.y)-0.15)<1.14?_o(uv):min(length(vec2(uv.x+0.25, max(0.0, abs(uv.y)-0.15))), length(vec2(uv.x-0.22734, abs(uv.y)-0.254)));
 }
 
 float dd(vec2 uv) {
-	return bb(uv*vec2(-1.0, 1.0));
+    return bb(uv*vec2(-1.0, 1.0));
 }
 
 float ee(vec2 uv) {
-	return min(uv.x<0.0||uv.y>0.05||atan(uv.x, uv.y+0.15)>2.0?_o(uv):length(vec2(uv.x-0.22734, uv.y+0.254)), length(vec2(max(0.0, abs(uv.x)-0.25), uv.y-0.05)));
+    return min(uv.x<0.0||uv.y>0.05||atan(uv.x, uv.y+0.15)>2.0?_o(uv):length(vec2(uv.x-0.22734, uv.y+0.254)), length(vec2(max(0.0, abs(uv.x)-0.25), uv.y-0.05)));
 }
 
 float ff(vec2 uv) {
-	return min(_j(vec2(-uv.x+0.05, -uv.y)), length(vec2(max(0.0, abs(-uv.x)-0.25), uv.y-0.4)));
+    return min(_j(vec2(-uv.x+0.05, -uv.y)), length(vec2(max(0.0, abs(uv.x-0.05)-0.25), uv.y-0.4)));
 }
 
 float gg(vec2 uv) {
-	return min(_o(uv), uv.x>0.0||atan(uv.x, uv.y+0.6)<-2.0?_u(uv, 0.25, -0.2):length(uv+vec2(0.23, 0.7)));
+    return min(_o(uv), uv.x>0.0||atan(uv.x, uv.y+0.6)<-2.0?_u(uv, 0.25, -0.2):length(uv+vec2(0.23, 0.7)));
 }
 
 float hh(vec2 uv) {
-	return min(_u(uv*vec2(1.0, -1.0), 0.25, 0.25), _l(uv+vec2(0.25, 0.0)));
+    return min(_u(vec2(uv.x, -uv.y), 0.25, 0.25), _l(vec2(uv.x+0.25, uv.y)));
 }
 
 float ii(vec2 uv) {
-	return min(_i(uv), length(vec2(uv.x, uv.y-0.6)));
+    return min(_i(uv), length(vec2(uv.x, uv.y-0.6)));
 }
 
 float jj(vec2 uv) {
-	return min(_j(uv+vec2(0.05, 0.0)), length(vec2(uv.x, uv.y-0.6)));
+    uv.x+=0.05;
+    return min(_j(uv), length(vec2(uv.x-0.05, uv.y-0.6)));
 }
 
 float kk(vec2 uv) {
-	return min(min(line(uv, vec2(-0.25, -0.1), vec2(0.25, 0.4)), line(uv, vec2(-0.15, 0.0), vec2(0.25, -0.4))), _l(uv+vec2(0.25, 0.0)));
+    return min(min(line(uv, vec2(-0.25, -0.1), vec2(0.25, 0.4)), line(uv, vec2(-0.15, 0.0), vec2(0.25, -0.4))), _l(vec2(uv.x+0.25, uv.y)));
 }
 
 float ll(vec2 uv) {
-	return _l(uv);
+    return _l(uv);
 }
 
 float mm(vec2 uv) {
-	return min(min(_u(-uv-vec2(0.175, 0.0), 0.175, 0.175), _u(-uv+vec2(0.175, 0.0), 0.175, 0.175)), _i(uv+vec2(0.35, 0.0)));
+    return min(min(_u(vec2(uv.x-0.175, -uv.y), 0.175, 0.175), _u(vec2(uv.x+0.175, -uv.y), 0.175, 0.175)), _i(vec2(uv.x+0.35, -uv.y)));
 }
 
 float nn(vec2 uv) {
-	return min(_u(-uv, 0.25, 0.25), _i(uv+vec2(0.25, 0.0)));
+    return min(_u(vec2(uv.x, -uv.y), 0.25, 0.25), _i(vec2(uv.x+0.25, -uv.y)));
 }
 
 float oo(vec2 uv) {
-	return _o(uv);
+    return _o(uv);
 }
 
 float pp(vec2 uv) {
-	return min(_o(uv), _l(uv+vec2(0.25, 0.4)));
+    return min(_o(uv), _l(uv+vec2(0.25, 0.4)));
 }
 
 float qq(vec2 uv) {
-	return pp(vec2(-uv.x, uv.y));
+    return pp(vec2(-uv.x, uv.y));
 }
 
 float rr(vec2 uv) {
-	return min(atan(uv.x-0.05, uv.y-0.15)<1.14&&uv.y>0.?_o(uv-vec2(0.05, 0.0)):length(vec2(uv.x-0.27734, uv.y-0.254)), _i(uv+vec2(0.2, 0.0)));
+    uv.x-=0.05;
+    return min(atan(uv.x, uv.y-0.15)<1.14&&uv.y>0.0?_o(uv):length(vec2(uv.x-0.22734, uv.y-0.254)), _i(vec2(uv.x+0.25, uv.y)));
 }
 
-float ss(vec2 uvo) {
-	float a=atan(uvo.x*sign(uvo.y), abs(uvo.y)-0.2);
-	vec2 uv=vec2(uvo.x, a>PI*0.5&&a<PI?-abs(uvo.y):abs(uvo.y));
-	return min(abs(length(vec2(max(0.0, abs(uv.x)-0.05), uv.y-0.2))-0.2), length(vec2(uvo.x+0.25, uvo.y-0.2)));
+float ss(vec2 uv) {
+    if(uv.y<0.225-uv.x*0.5&&uv.x>0.0||uv.y<-0.225-uv.x*0.5)
+        uv=-uv;
+
+    return atan(uv.x-0.05, uv.y-0.2)<1.14?abs(length(vec2(max(0.0, abs(uv.x)-0.05), uv.y-0.2))-0.2):length(vec2(uv.x-0.231505, uv.y-0.284));
 }
 
 float tt(vec2 uv) {
-	return min(_j(vec2(-uv.x+0.05, uv.y-0.4)), length(vec2(max(0.0, abs(uv.x)-0.25), uv.y-0.4)));
+	uv=vec2(-uv.x+0.05, uv.y-0.4);
+    return min(_j(uv), length(vec2(max(0.0, abs(uv.x-0.05)-0.25), uv.y)));
 }
 
 float uu(vec2 uv) {
-	return _u(uv, 0.25, 0.25);
+    return _u(uv, 0.25, 0.25);
 }
 
 float vv(vec2 uv) {
-	return line(vec2(abs(uv.x), uv.y), vec2(0.25, 0.4), vec2(0.0, -0.4));
+    return line(vec2(abs(uv.x), uv.y), vec2(0.25, 0.4), vec2(0.0, -0.4));
 }
 
 float ww(vec2 uv) {
-	return min(line(vec2(abs(uv.x), uv.y), vec2(0.3, 0.4), vec2(0.2, -0.4)), line(vec2(abs(uv.x), uv.y), vec2(0.2, -0.4), vec2(0.0, 0.1)));
+    uv.x=abs(uv.x);
+	return min(line(uv, vec2(0.3, 0.4), vec2(0.2, -0.4)), line(uv, vec2(0.2, -0.4), vec2(0.0, 0.1)));
 }
 
 float xx(vec2 uv) {
-	return line(abs(uv), vec2(0.0, 0.0), vec2(0.3, 0.4));
+    return line(abs(uv), vec2(0.0, 0.0), vec2(0.3, 0.4));
 }
 
 float yy(vec2 uv) {
-	return min(line(uv, vec2(0.0, -0.2), vec2(-0.3, 0.4)), line(uv, vec2(0.3, 0.4), vec2(-0.3, -0.8)));
+    return min(line(uv, vec2(0.0, -0.2), vec2(-0.3, 0.4)), line(uv, vec2(0.3, 0.4), vec2(-0.3, -0.8)));
 }
 
 float zz(vec2 uv) {
-	return min(length(vec2(max(0.0, abs(uv.x)-0.25), abs(uv.y)-0.4)), line(uv, vec2(0.25, 0.4), vec2(-0.25, -0.4)));
+    return min(length(vec2(max(0.0, abs(uv.x)-0.25), abs(uv.y)-0.4)), line(uv, vec2(0.25, 0.4), vec2(-0.25, -0.4)));
 }
 
 // Uppercase
 float AA(vec2 uv) {
-	return min(length(vec2(abs(length(vec2(uv.x, max(0.0, uv.y-0.35)))-0.25), min(0.0, uv.y+0.4))), length(vec2(max(0.0, abs(uv.x)-0.25), uv.y-0.1)));
+    return min(length(vec2(abs(length(vec2(uv.x, max(0.0, uv.y-0.35)))-0.25), min(0.0, uv.y+0.4))), length(vec2(max(0.0, abs(uv.x)-0.25), uv.y-0.1)));
 }
 
 float BB(vec2 uv) {
-	return min(length(vec2(abs(length(vec2(max(0.0, uv.x), abs(uv.y-0.1)-0.25))-0.25), min(0.0, uv.x+0.25))), length(vec2(uv.x+0.25, max(0.0, abs(uv.y-0.1)-0.5))));
+    uv.y=abs(uv.y-0.1);
+    return min(length(vec2(abs(length(vec2(max(0.0, uv.x), uv.y-0.25))-0.25), min(0.0, uv.x+0.25))), length(vec2(uv.x+0.25, max(0.0, abs(uv.y)-0.5))));
 }
 
 float CC(vec2 uv) {
-	return uv.x<0.0||atan(uv.x, abs(uv.y-0.1)-0.25)<1.14?abs(length(vec2(uv.x, max(0.0, abs(uv.y-0.1)-0.25)))-0.25):min(length(vec2(uv.x+0.25, max(0.0, abs(uv.y-0.1)-0.25))), length(uv+vec2(-0.22734, -0.454)));
+    float x=abs(length(vec2(uv.x, max(0.0, abs(uv.y-0.1)-0.25)))-0.25);
+    uv.y=abs(uv.y-0.1);
+    return uv.x<0.0||atan(uv.x, uv.y-0.25)<1.14?x:min(length(vec2(uv.x+0.25, max(0.0, abs(uv.y)-0.25))), length(uv+vec2(-0.22734, -0.354)));
 }
 
 float DD(vec2 uv) {
-	return min(length(vec2(abs(length(vec2(max(0.0, uv.x), max(0.0, abs(uv.y-0.1)-0.25)))-0.25), min(0.0, uv.x+0.25))), length(vec2(uv.x+0.25, max(0., abs(uv.y-0.1)-0.5))));
+    return min(length(vec2(abs(length(vec2(max(0.0, uv.x), max(0.0, abs(uv.y-0.1)-0.25)))-0.25), min(0.0, uv.x+0.25))), length(vec2(uv.x+0.25, max(0.0, abs(uv.y-0.1)-0.5))));
 }
 
 float EE(vec2 uv) {
-	return min(min(length(vec2(max(0.0, abs(uv.x)-0.25), abs(uv.y-0.1))), length(vec2(max(0.0, abs(uv.x)-0.25), abs(uv.y-0.1)-0.5))), length(vec2(uv.x+0.25, max(0.0, abs(uv.y-0.1)-0.5))));
+    uv.y=abs(uv.y-0.1);
+    return min(min(length(vec2(max(0.0, abs(uv.x)-0.25), uv.y)), length(vec2(max(0.0, abs(uv.x)-0.25), uv.y-0.5))), length(vec2(uv.x+0.25, max(0.0, abs(uv.y)-0.5))));
 }
 
 float FF(vec2 uv) {
-	return min(min(length(vec2(max(0.0, abs(uv.x)-0.25), uv.y-0.1)), length(vec2(max(0.0, abs(uv.x)-0.25), uv.y-0.6))), length(vec2(uv.x+0.25, max(0.0, abs(uv.y-0.1)-0.5))));
+    uv.y-=.1;
+    return min(min(length(vec2(max(0.0, abs(uv.x)-0.25), uv.y)), length(vec2(max(0.0, abs(uv.x)-0.25), uv.y-0.5))), length(vec2(uv.x+0.25, max(0.0, abs(uv.y)-0.5))));
 }
 
 float GG(vec2 uv) {
-	float a=atan(uv.x, max(0.0, abs(uv.y-0.1)-0.25));
-	return min(min(uv.x<0.0||a<1.14||a>3.0?abs(length(vec2(uv.x, max(0.0, abs(uv.y-0.1)-0.25)))-0.25):min(length(vec2(uv.x+0.25, max(0.0, abs(uv.y-0.1)-0.25))), length(uv+vec2(-0.22734, -0.454))), line(uv-vec2(0.0, 0.1), vec2(0.22734, -0.1), vec2(0.22734, -0.354))), line(uv-vec2(0.0, 0.1), vec2(0.22734, -0.1), vec2(0.05, -0.1)));
+    uv.y-=0.1;
+    float a=atan(uv.x, max(0.0, abs(uv.y)-0.25));
+	return min(min(uv.x<0.0||a<1.14||a>3.0?abs(length(vec2(uv.x, max(0.0, abs(uv.y)-0.25)))-0.25):min(length(vec2(uv.x+0.25, max(0.0, abs(uv.y)-0.25))), length(uv+vec2(-0.22734, -0.354))), line(uv, vec2(0.22734, -0.1), vec2(0.22734, -0.354))), line(uv, vec2(0.22734, -0.1), vec2(0.05, -0.1)));
 }
 
 float HH(vec2 uv) {
-	return min(length(vec2(max(0.0, abs(uv.x)-0.25), uv.y-0.1)), length(vec2(abs(uv.x)-0.25, max(0.0, abs(uv.y-0.1)-0.5))));
+    uv.y-=0.1;
+    return min(length(vec2(max(0.0, abs(uv.x)-0.25), uv.y)), length(vec2(abs(uv.x)-0.25, max(0.0, abs(uv.y)-0.5))));
 }
 
 float II(vec2 uv) {
-	return min(length(vec2(uv.x, max(0.0, abs(uv.y-0.1)-0.5))), length(vec2(max(0.0, abs(uv.x)-0.1), abs(uv.y-0.1)-0.5)));
+    uv.y-=0.1;
+    return min(length(vec2(uv.x, max(0.0, abs(uv.y)-0.5))), length(vec2(max(0.0, abs(uv.x)-0.1), abs(uv.y)-0.5)));
 }
 
 float JJ(vec2 uv) {
-	return min(length(vec2(abs(length(vec2(uv.x+0.125, min(0.0, uv.y+0.15)))-0.25), max(0.0, max(-uv.x-0.125, uv.y-0.6)))), length(vec2(max(0.0, abs(uv.x)-0.125), uv.y-0.6)));
+    uv.x+=0.125;
+    return min(length(vec2(abs(length(vec2(uv.x, min(0.0, uv.y+0.15)))-0.25), max(0.0, max(-uv.x, uv.y-0.6)))), length(vec2(max(0.0, abs(uv.x-0.125)-0.125), uv.y-0.6)));
 }
 
 float KK(vec2 uv) {
-	return min(min(line(uv, vec2(-0.25, -0.1), vec2(0.25, 0.6)), line(uv, vec2(-0.1, 0.1), vec2(0.25, -0.4))), length(vec2(uv.x+0.25, max(0.0, abs(uv.y-0.1)-0.5))));
+    return min(min(line(uv, vec2(-0.25, -0.1), vec2(0.25, 0.6)), line(uv, vec2(-0.1, 0.1), vec2(0.25,-0.4))), length(vec2(uv.x+0.25, max(0.0, abs(uv.y-0.1)-0.5))));
 }
 
 float LL(vec2 uv) {
-	return min(length(vec2(max(0.0, abs(uv.x)-0.2), uv.y+0.4)), length(vec2(uv.x+0.2, max(0.0, abs(uv.y-0.1)-0.5))));
+    uv.y-=0.1;
+    return min(length(vec2(max(0.0, abs(uv.x)-0.2), uv.y+0.5)), length(vec2(uv.x+0.2, max(0.0, abs(uv.y)-0.5))));
 }
 
 float MM(vec2 uv) {
-	return min(min(min(length(vec2(uv.x-0.35, max(0.0, abs(uv.y-0.1)-0.5))), line(uv-vec2(0.0, 0.1), vec2(-0.35, 0.5), vec2(0.0, -0.1))), line(uv-vec2(0.0, 0.1), vec2(0.0, -0.1), vec2(0.35, 0.5))), length(vec2(uv.x+0.35, max(0.0, abs(uv.y-0.1)-0.5))));
+    uv.y-=.1;
+    return min(min(min(length(vec2(uv.x-0.35, max(0.0, abs(uv.y)-0.5))), line(uv, vec2(-0.35, 0.5), vec2(0.0, -0.1))), line(uv, vec2(0.0, -0.1), vec2(0.35, 0.5))), length(vec2(uv.x+0.35, max(0.0, abs(uv.y)-0.5))));
 }
 
 float NN(vec2 uv) {
-	return min(min(length(vec2(uv.x-0.25, max(0.0, abs(uv.y-0.1)-0.5))), line(uv-vec2(0.0, 0.1), vec2(-0.25, 0.5), vec2(0.25, -0.5))), length(vec2(uv.x+0.25, max(0.0, abs(uv.y-0.1)-0.5))));
+    uv.y-=0.1;
+    return min(min(length(vec2(uv.x-0.25, max(0.0, abs(uv.y)-0.5))), line(uv, vec2(-0.25, 0.5), vec2(0.25, -0.5))), length(vec2(uv.x+0.25, max(0.0, abs(uv.y)-0.5))));
 }
 
 float OO(vec2 uv) {
-	return abs(length(vec2(uv.x, max(0.0, abs(uv.y-0.1)-0.25)))-0.25);
+    return abs(length(vec2(uv.x, max(0.0, abs(uv.y-0.1)-0.25)))-0.25);
 }
 
 float PP(vec2 uv) {
-	return min(length(vec2(abs(length(vec2(max(0.0, uv.x), uv.y-0.35))-0.25), min(0.0, uv.x+0.25))), length(vec2(uv.x+0.25, max(0.0, abs(uv.y-0.1)-0.5))));
+    return min(length(vec2(abs(length(vec2(max(0.0, uv.x), uv.y-0.35))-0.25), min(0.0, uv.x+0.25))), length(vec2(uv.x+0.25, max(0.0, abs(uv.y-0.1)-0.5))));
 }
 
 float QQ(vec2 uv) {
@@ -265,16 +280,16 @@ float QQ(vec2 uv) {
 }
 
 float RR(vec2 uv) {
-	return min(min(length(vec2(abs(length(vec2(max(0.0, uv.x), uv.y-0.35))-0.25), min(0.0, uv.x+0.25))), length(vec2(uv.x+0.25, max(0.0, abs(uv.y-0.1)-0.5)))), line(uv, vec2(0.0, 0.1), vec2(0.25, -0.4)));
+    return min(min(length(vec2(abs(length(vec2(max(0.0, uv.x), uv.y-0.35))-0.25), min(0.0, uv.x+0.25))), length(vec2(uv.x+0.25, max(0.0, abs(uv.y-0.1)-0.5)))), line(uv, vec2(0.0, 0.1), vec2(0.25,-0.4)));
 }
 
 float SS(vec2 uv) {
-	uv.y-=0.1;
+    uv.y-=0.1;
 
 	if(uv.y<0.275-uv.x*0.5&&uv.x>0.0||uv.y<-0.275-uv.x*0.5)
-		uv=-uv;
+        uv=-uv;
 
-	return atan(uv.x-0.05, uv.y-0.25)<1.14?abs(length(vec2(max(0.0, abs(uv.x)), uv.y-0.25))-0.25):length(vec2(uv.x-0.236, uv.y-0.332));
+    return atan(uv.x-0.05, uv.y-0.25)<1.14?abs(length(vec2(max(0.0, abs(uv.x)), uv.y-0.25))-0.25):length(vec2(uv.x-0.236, uv.y-0.332));
 }
 
 float TT(vec2 uv) {
@@ -302,25 +317,27 @@ float YY(vec2 uv) {
 }
 
 float ZZ(vec2 uv) {
-	return min(length(vec2(max(0.0, abs(uv.x)-0.25), abs(uv.y-0.1)-0.5)), line(uv, vec2(0.25, 0.6), vec2(-0.25, -0.4)));
+    return min(length(vec2(max(0.0, abs(uv.x)-0.25), abs(uv.y-0.1)-0.5)), line(uv, vec2(0.25, 0.6), vec2(-0.25, -0.4)));
 }
 
 // Numbers
 float _11(vec2 uv) {
-	return min(min(line(uv, vec2(-0.2, 0.45), vec2(0.0, 0.6)), length(vec2(uv.x, max(0.0, abs(uv.y-0.1)-0.5)))), length(vec2(max(0.0, abs(uv.x)-0.2), uv.y+0.4)));
+    return min(min(line(uv, vec2(-0.2, 0.45), vec2(0.0, 0.6)), length(vec2(uv.x, max(0.0, abs(uv.y-0.1)-0.5)))), length(vec2(max(0.0, abs(uv.x)-0.2), uv.y+0.4)));
 }
 
 float _22(vec2 uv) {
-	return min(min(line(uv, vec2(0.185, 0.17), vec2(-0.25, -0.4)), length(vec2(max(0.0, abs(uv.x)-0.25), uv.y+0.4))), abs(atan(uv.x+0.025, uv.y-0.35)-0.63)<1.64?abs(length(uv+vec2(0.025, -0.35))-0.275):length(uv+vec2(0.255, -0.55)));
+    float x=min(line(uv, vec2(0.185, 0.17), vec2(-0.25, -0.4)), length(vec2(max(0.0, abs(uv.x)-0.25), uv.y+0.4)));
+    uv+=vec2(0.025, -0.35);
+    return min(x, abs(atan(uv.x, uv.y)-0.63)<1.64?abs(length(uv)-0.275):length(uv+vec2(0.23, -0.15)));
 }
 
 float _33(vec2 uv) {
-	uv.y=abs(uv.y-0.1)-0.25;
-	return atan(uv.x, uv.y)>-1.0?abs(length(uv)-0.25):min(length(uv+vec2(0.211, -0.134)), length(uv+vec2(0.0, 0.25)));
+    uv.y=abs(uv.y-0.1)-0.25;
+    return atan(uv.x, uv.y)>-1.0?abs(length(uv)-0.25):min(length(uv+vec2(0.211, -0.134)), length(uv+vec2(0.0, 0.25)));
 }
 
 float _44(vec2 uv) {
-	return min(min(length(vec2(uv.x-0.15, max(0.0, abs(uv.y-0.1)-0.5))), line(uv, vec2(0.15, 0.6), vec2(-0.25, -0.1))), length(vec2(max(0.0, abs(uv.x)-0.25), uv.y+0.1)));
+    return min(min(length(vec2(uv.x-0.15, max(0.0, abs(uv.y-0.1)-0.5))), line(uv, vec2(0.15, 0.6), vec2(-0.25, -0.1))), length(vec2(max(0.0, abs(uv.x)-0.25), uv.y+0.1)));
 }
 
 float _55(vec2 uv) {
@@ -328,24 +345,27 @@ float _55(vec2 uv) {
 }
 
 float _66(vec2 uv) {
-	uv=-vec2(uv.x, uv.y-0.075);
-	return min(abs(length(vec2(uv.x, max(0.0, abs(uv.y-0.175)-0.05)))-0.25), cos(atan(uv.x, uv.y-0.175+0.45)+0.65)<0.0||(uv.x>0.0&&uv.y<0.0)?abs(length(vec2(uv.x, max(0.0, abs(uv.y)-0.275)))-0.25):length(uv+vec2(0.2, 0.6)));
+    uv.y-=0.075;
+    uv=-uv;
+    float b=abs(length(vec2(uv.x, max(0.0, abs(uv.y)-0.275)))-0.25);
+    uv.y-=0.175;
+    return min(abs(length(vec2(uv.x, max(0.0, abs(uv.y)-0.05)))-0.25), cos(atan(uv.x, uv.y+0.45)+0.65)<0.0||(uv.x>0.0&&uv.y<0.0)?b:length(uv+vec2(0.2, 0.6)));
 }
 
 float _77(vec2 uv) {
-	return min(length(vec2(max(0.0, abs(uv.x)-0.25), uv.y-0.6)), line(uv, vec2(-0.25, -0.39), vec2(0.25, 0.6)));
+    return min(length(vec2(max(0.0, abs(uv.x)-0.25), uv.y-0.6)), line(uv, vec2(-0.25, -0.39), vec2(0.25, 0.6)));
 }
 
 float _88(vec2 uv) {
-	return min(abs(length(vec2(uv.x, abs(uv.y-0.1)-0.245))-0.255), length(vec2(max(0.0, abs(uv.x)-0.08), uv.y-0.1+uv.x*0.07)));
+    return min(abs(length(vec2(uv.x, abs(uv.y-0.1)-0.245))-0.255), length(vec2(max(0.0, abs(uv.x)-0.08), uv.y-0.1+uv.x*0.07)));
 }
 
 float _99(vec2 uv) {
-	return min(abs(length(vec2(uv.x, max(0.0, abs(uv.y-0.35)-0.05)))-0.25), cos(atan(uv.x, uv.y+0.1)+0.65)<0.0||(uv.x>0.0&&uv.y-0.35<0.0)?abs(length(vec2(uv.x, max(0.0, abs(uv.y-0.125)-0.275)))-0.25):length(uv+vec2(0.2, 0.25)));
+    return min(abs(length(vec2(uv.x, max(0.0, abs(uv.y-0.3)-0.05)))-0.25), cos(atan(uv.x, uv.y+0.15)+0.65)<0.0||(uv.x>0.0&&uv.y<0.3)?abs(length(vec2(uv.x, max(0.0, abs(uv.y-0.125)-0.275)))-0.25):length(uv+vec2(0.2, 0.3)));
 }
 
 float _00(vec2 uv) {
-	return abs(length(vec2(uv.x, max(0.0, abs(uv.y-0.1)-0.25)))-0.25);
+    return abs(length(vec2(uv.x, max(0.0, abs(uv.y-0.1)-0.25)))-0.25);
 }
 
 // Special
