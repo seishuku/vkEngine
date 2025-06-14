@@ -234,7 +234,10 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 					// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
 					if(position.x>=control->position.x&&position.x<=control->position.x+control->barGraph.size.x&&
 						position.y>=control->position.y&&position.y<=control->position.y+control->barGraph.size.y)
+					{
+						control->barGraph.value=((position.x-control->position.x)/control->barGraph.size.x)*(control->barGraph.Max-control->barGraph.Min)+control->barGraph.Min;
 						return control->ID;
+					}
 				}
 				break;
 			}
@@ -292,7 +295,10 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 								// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
 								if(position.x>=childPos.x&&position.x<=childPos.x+child->barGraph.size.x&&
 									position.y>=childPos.y&&position.y<=childPos.y+child->barGraph.size.y)
+								{
+									child->barGraph.value=((position.x-childPos.x)/child->barGraph.size.x)*(child->barGraph.Max-child->barGraph.Min)+child->barGraph.Min;
 									return child->ID;
+								}
 							}
 							break;
 						}

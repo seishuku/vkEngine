@@ -24,19 +24,14 @@ const uint UI_CONTROL_TEXT		=6;
 
 float sdfDistance(float dist)
 {
-    vec2 ddist=vec2(dFdx(dist), dFdy(dist));
-	return clamp(1.0-(dist/length(ddist)), 0.0, 1.0);
+	float w=fwidth(dist);
+	return smoothstep(-w, w, -dist);
 }
 
 mat2 rotate(float a)
 {
 	float s=sin(a*0.017453292223), c=cos(a*0.017453292223);
 	return mat2(c, s, -s, c);
-}
-
-float circle(in vec2 p, in float r) 
-{
-    return length(p)-r;
 }
 
 float roundedRect(vec2 p, vec2 s, float r)
@@ -527,66 +522,56 @@ void main()
 	// Parameters for widgets
 	const float cornerRadius=onePixel.x*8;
 	const vec2 offset=onePixel*4;
-	const float circleRadius=onePixel.x*1;
 
 	switch(Type)
 	{
 		case UI_CONTROL_BUTTON:
+		case UI_CONTROL_WINDOW:
 		{
-			float dist_ring=roundedRect(uv-offset, aspect-(offset*2), cornerRadius);
-			float ring=sdfDistance(dist_ring);
+			// Render face
+			float distFace=roundedRect(uv-offset, aspect-(offset*2), cornerRadius);
+			float face=sdfDistance(distFace);
 
-			float dist_shadow=roundedRect(uv+offset, aspect-(offset*2), cornerRadius);
-			float shadow=sdfDistance(dist_shadow);
+			// Render shadow
+			float distShadow=roundedRect(uv+offset, aspect-(offset*2), cornerRadius);
+			float shadow=sdfDistance(distShadow);
 
-			vec3 outer=mix(Color.xyz*0.25*shadow, Color.xyz*ring, 0.75);
-			float outer_alpha=sdfDistance(min(dist_ring, dist_shadow));
+			// Layer the ring and shadow and join both to make the alpha mask
+			vec3 outer=mix(vec3(0.0)*shadow, Color.xyz*face, face);
+			float outerAlpha=sdfDistance(min(distFace, distShadow));
 
-			Output=vec4(outer, outer_alpha);
+			// Add them together and output
+			Output=vec4(outer, outerAlpha);
 			return;
 		}
 
 		case UI_CONTROL_CHECKBOX:
-		{
-			float dist_ring=abs(circle(uv-offset, 0.96))-offset.x;
-			float ring=sdfDistance(dist_ring);
-
-			float dist_shadow=abs(circle(uv+offset, 0.96))-offset.x;
-			float shadow=sdfDistance(dist_shadow);
-
-			vec3 outer=mix(vec3(0.25)*shadow, vec3(1.0)*ring, 0.5);
-			float outer_alpha=sdfDistance(min(dist_ring, dist_shadow));
-
-			float center_alpha=0.0;
-			
-			if(Color.w>0.5)
-				center_alpha=sdfDistance(circle(uv, 0.92));
-
-			vec3 center=Color.xyz*center_alpha;
-
-			Output=vec4(outer+center, outer_alpha+center_alpha);
-			return;
-		}
-
 		case UI_CONTROL_BARGRAPH:
 		{
-			float dist_ring=abs(roundedRect(uv-(offset*0.5), aspect-offset, cornerRadius))-(offset.x*0.5);
-			float ring=sdfDistance(dist_ring);
+			// Get the distance of full filled face
+			float distFace=roundedRect(uv-offset, aspect-(offset*2), cornerRadius);
 
-			float dist_shadow=abs(roundedRect(uv+(offset*0.5), aspect-offset, cornerRadius))-(offset.x*0.5);
-			float shadow=sdfDistance(dist_shadow);
+			// Render a ring from that full face
+			float distRing=abs(distFace)-(offset.x*0.75);
+			float ring=sdfDistance(distRing);
 
-			vec3 outer=mix(vec3(0.25)*shadow, vec3(1.0)*ring, 0.5);
-			float outer_alpha=sdfDistance(min(dist_ring, dist_shadow));
+			// Render a full face shadow section and clip it by the full face
+			float distShadow=max(-distFace, roundedRect(uv+offset, aspect-(offset*1.5), cornerRadius+(offset.x*0.5)));
+			float shadow=sdfDistance(distShadow);
 
-			float center_alpha=0.0;
+			// Layer the ring and shadow and join both to make the alpha mask
+			vec3 outer=mix(vec3(0.0)*shadow, vec3(1.0)*ring, ring);
+			float outerAlpha=sdfDistance(min(distRing, distShadow));
+
+			// Calculate a variable center section that fits just inside the primary section
+			// (or in the case of a checkbox, it's either completely filled or not at the cost of extra math)
+			float centerAlpha=0.0;
 
 			if(Color.w>(uv.x/aspect.x)*0.5+0.5)
-				center_alpha=sdfDistance(roundedRect(uv, aspect-(offset*2), cornerRadius-offset.x));;
+				centerAlpha=sdfDistance(roundedRect(uv-offset, aspect-(offset*3), cornerRadius-offset.x));;
 
-			vec3 center=Color.xyz*center_alpha;
-
-			Output=vec4(outer+center, outer_alpha+center_alpha);
+			// Add them together and output
+			Output=vec4(outer+(Color.xyz*centerAlpha), outerAlpha+centerAlpha);
 			return;
 		}
 
@@ -602,128 +587,112 @@ void main()
 			return;
 		}
 
-		case UI_CONTROL_WINDOW:
-		{
-			float dist_ring=roundedRect(uv-offset, aspect-(offset*2), 0);
-			float ring=sdfDistance(dist_ring);
-
-			float dist_shadow=roundedRect(uv+offset, aspect-(offset*2), 0);
-			float shadow=sdfDistance(dist_shadow);
-
-			vec3 outer=mix(Color.xyz*0.25*shadow, Color.xyz*ring, 0.75);
-			float outer_alpha=sdfDistance(min(dist_ring, dist_shadow));
-
-			Output=vec4(outer, outer_alpha);
-			return;
-		}
-
 		case UI_CONTROL_TEXT:
 		{
 			float dist=1.0;
-			vec2 uv=vec2(UV.xy);
 
 			switch(uint(Size.x))
 			{
-				case 33:	dist=exclamation(uv); break;
-				case 34:	dist=quote(uv); break;
-				case 35:	dist=pound(uv); break;
-				case 36:	dist=dollersign(uv); break;
-				case 37:	dist=percent(uv); break;
-				case 38:	dist=ampersand(uv); break;
-				case 39:	dist=apostrophe(uv); break;
-				case 40:	dist=leftparenthesis(uv); break;
-				case 41:	dist=rightparenthesis(uv); break;
-				case 42:	dist=asterisk(uv); break;
-				case 43:	dist=plus(uv); break;
-				case 44:	dist=comma(uv); break;
-				case 45:	dist=minus(uv); break;
-				case 46:	dist=period(uv); break;
-				case 47:	dist=forwardslash(uv); break;
+				case 33:	dist=exclamation(UV.xy); break;
+				case 34:	dist=quote(UV.xy); break;
+				case 35:	dist=pound(UV.xy); break;
+				case 36:	dist=dollersign(UV.xy); break;
+				case 37:	dist=percent(UV.xy); break;
+				case 38:	dist=ampersand(UV.xy); break;
+				case 39:	dist=apostrophe(UV.xy); break;
+				case 40:	dist=leftparenthesis(UV.xy); break;
+				case 41:	dist=rightparenthesis(UV.xy); break;
+				case 42:	dist=asterisk(UV.xy); break;
+				case 43:	dist=plus(UV.xy); break;
+				case 44:	dist=comma(UV.xy); break;
+				case 45:	dist=minus(UV.xy); break;
+				case 46:	dist=period(UV.xy); break;
+				case 47:	dist=forwardslash(UV.xy); break;
 
-				case 48:    dist=_00(uv); break;
-				case 49:    dist=_11(uv); break;
-				case 50:    dist=_22(uv); break;
-				case 51:    dist=_33(uv); break;
-				case 52:    dist=_44(uv); break;
-				case 53:    dist=_55(uv); break;
-				case 54:    dist=_66(uv); break;
-				case 55:    dist=_77(uv); break;
-				case 56:    dist=_88(uv); break;
-				case 57:    dist=_99(uv); break;
+				case 48:    dist=_00(UV.xy); break;
+				case 49:    dist=_11(UV.xy); break;
+				case 50:    dist=_22(UV.xy); break;
+				case 51:    dist=_33(UV.xy); break;
+				case 52:    dist=_44(UV.xy); break;
+				case 53:    dist=_55(UV.xy); break;
+				case 54:    dist=_66(UV.xy); break;
+				case 55:    dist=_77(UV.xy); break;
+				case 56:    dist=_88(UV.xy); break;
+				case 57:    dist=_99(UV.xy); break;
 
-				case 58:	dist=colon(uv); break;
-				case 59:	dist=semicolon(uv); break;
-				case 60:	dist=less(uv); break;
-				case 61:	dist=_equal(uv); break;
-				case 62:	dist=greater(uv); break;
-				case 63:	dist=question(uv); break;
-				case 64:	dist=at(uv); break;
+				case 58:	dist=colon(UV.xy); break;
+				case 59:	dist=semicolon(UV.xy); break;
+				case 60:	dist=less(UV.xy); break;
+				case 61:	dist=_equal(UV.xy); break;
+				case 62:	dist=greater(UV.xy); break;
+				case 63:	dist=question(UV.xy); break;
+				case 64:	dist=at(UV.xy); break;
 
-				case 65:    dist=AA(uv); break;
-				case 66:    dist=BB(uv); break;
-				case 67:    dist=CC(uv); break;
-				case 68:    dist=DD(uv); break;
-				case 69:    dist=EE(uv); break;
-				case 70:    dist=FF(uv); break;
-				case 71:    dist=GG(uv); break;
-				case 72:    dist=HH(uv); break;
-				case 73:    dist=II(uv); break;
-				case 74:    dist=JJ(uv); break;
-				case 75:    dist=KK(uv); break;
-				case 76:    dist=LL(uv); break;
-				case 77:    dist=MM(uv); break;
-				case 78:    dist=NN(uv); break;
-				case 79:    dist=OO(uv); break;
-				case 80:    dist=PP(uv); break;
-				case 81:    dist=QQ(uv); break;
-				case 82:    dist=RR(uv); break;
-				case 83:    dist=SS(uv); break;
-				case 84:    dist=TT(uv); break;
-				case 85:    dist=UU(uv); break;
-				case 86:    dist=VV(uv); break;
-				case 87:    dist=WW(uv); break;
-				case 88:    dist=XX(uv); break;
-				case 89:    dist=YY(uv); break;
-				case 90:    dist=ZZ(uv); break;
+				case 65:    dist=AA(UV.xy); break;
+				case 66:    dist=BB(UV.xy); break;
+				case 67:    dist=CC(UV.xy); break;
+				case 68:    dist=DD(UV.xy); break;
+				case 69:    dist=EE(UV.xy); break;
+				case 70:    dist=FF(UV.xy); break;
+				case 71:    dist=GG(UV.xy); break;
+				case 72:    dist=HH(UV.xy); break;
+				case 73:    dist=II(UV.xy); break;
+				case 74:    dist=JJ(UV.xy); break;
+				case 75:    dist=KK(UV.xy); break;
+				case 76:    dist=LL(UV.xy); break;
+				case 77:    dist=MM(UV.xy); break;
+				case 78:    dist=NN(UV.xy); break;
+				case 79:    dist=OO(UV.xy); break;
+				case 80:    dist=PP(UV.xy); break;
+				case 81:    dist=QQ(UV.xy); break;
+				case 82:    dist=RR(UV.xy); break;
+				case 83:    dist=SS(UV.xy); break;
+				case 84:    dist=TT(UV.xy); break;
+				case 85:    dist=UU(UV.xy); break;
+				case 86:    dist=VV(UV.xy); break;
+				case 87:    dist=WW(UV.xy); break;
+				case 88:    dist=XX(UV.xy); break;
+				case 89:    dist=YY(UV.xy); break;
+				case 90:    dist=ZZ(UV.xy); break;
 
-				case 91:	dist=leftsquare(uv); break;
-				case 92:	dist=backslash(uv); break;
-				case 93:	dist=rightsquare(uv); break;
-				case 94:	dist=circumflex(uv); break;
-				case 95:	dist=underline(uv); break;
-				case 96:	dist=grave(uv); break;
+				case 91:	dist=leftsquare(UV.xy); break;
+				case 92:	dist=backslash(UV.xy); break;
+				case 93:	dist=rightsquare(UV.xy); break;
+				case 94:	dist=circumflex(UV.xy); break;
+				case 95:	dist=underline(UV.xy); break;
+				case 96:	dist=grave(UV.xy); break;
 
-				case 97:    dist=aa(uv); break;
-				case 98:    dist=bb(uv); break;
-				case 99:    dist=cc(uv); break;
-				case 100:   dist=dd(uv); break;
-				case 101:   dist=ee(uv); break;
-				case 102:   dist=ff(uv); break;
-				case 103:   dist=gg(uv); break;
-				case 104:   dist=hh(uv); break;
-				case 105:   dist=ii(uv); break;
-				case 106:   dist=jj(uv); break;
-				case 107:   dist=kk(uv); break;
-				case 108:   dist=ll(uv); break;
-				case 109:   dist=mm(uv); break;
-				case 110:   dist=nn(uv); break;
-				case 111:   dist=oo(uv); break;
-				case 112:   dist=pp(uv); break;
-				case 113:   dist=qq(uv); break;
-				case 114:   dist=rr(uv); break;
-				case 115:   dist=ss(uv); break;
-				case 116:   dist=tt(uv); break;
-				case 117:   dist=uu(uv); break;
-				case 118:   dist=vv(uv); break;
-				case 119:   dist=ww(uv); break;
-				case 120:   dist=xx(uv); break;
-				case 121:   dist=yy(uv); break;
-				case 122:   dist=zz(uv); break;
+				case 97:    dist=aa(UV.xy); break;
+				case 98:    dist=bb(UV.xy); break;
+				case 99:    dist=cc(UV.xy); break;
+				case 100:   dist=dd(UV.xy); break;
+				case 101:   dist=ee(UV.xy); break;
+				case 102:   dist=ff(UV.xy); break;
+				case 103:   dist=gg(UV.xy); break;
+				case 104:   dist=hh(UV.xy); break;
+				case 105:   dist=ii(UV.xy); break;
+				case 106:   dist=jj(UV.xy); break;
+				case 107:   dist=kk(UV.xy); break;
+				case 108:   dist=ll(UV.xy); break;
+				case 109:   dist=mm(UV.xy); break;
+				case 110:   dist=nn(UV.xy); break;
+				case 111:   dist=oo(UV.xy); break;
+				case 112:   dist=pp(UV.xy); break;
+				case 113:   dist=qq(UV.xy); break;
+				case 114:   dist=rr(UV.xy); break;
+				case 115:   dist=ss(UV.xy); break;
+				case 116:   dist=tt(UV.xy); break;
+				case 117:   dist=uu(UV.xy); break;
+				case 118:   dist=vv(UV.xy); break;
+				case 119:   dist=ww(UV.xy); break;
+				case 120:   dist=xx(UV.xy); break;
+				case 121:   dist=yy(UV.xy); break;
+				case 122:   dist=zz(UV.xy); break;
 
-				case 123:	dist=leftcurly(uv); break;
-				case 124:	dist=pipe(uv); break;
-				case 125:	dist=rightcurly(uv); break;
-				case 126:	dist=tilde(uv); break;
+				case 123:	dist=leftcurly(UV.xy); break;
+				case 124:	dist=pipe(UV.xy); break;
+				case 125:	dist=rightcurly(UV.xy); break;
+				case 126:	dist=tilde(UV.xy); break;
 			};
 
 			Output=vec4(Color.xyz, sdfDistance(dist-0.065));

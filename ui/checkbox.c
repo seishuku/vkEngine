@@ -39,7 +39,7 @@ uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, bool 
 
 	// Text size is the radius of the checkbox, placed radius length away horizontally, centered vertically
 	UI->controlsHashtable[ID]->checkBox.titleTextID=UI_AddText(UI,
-		Vec2(position.x+radius, position.y-(radius/2.0f)), radius,
+		Vec2(position.x+radius, position.y), radius,
 		Vec3(1.0f, 1.0f, 1.0f),
 		hidden,
 		titleText);

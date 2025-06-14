@@ -77,6 +77,7 @@ bool UI_UpdateWindowPosition(UI_t *UI, uint32_t ID, vec2 position)
 
 	if(Control!=NULL&&Control->type==UI_CONTROL_WINDOW)
 	{
+		UI_UpdateTextPosition(UI, Control->window.titleTextID, Vec2_Add(position, 0.0f, 16.0f-(UI_CONTROL_WINDOW_BORDER*0.5f)));
 		Control->position=position;
 		return true;
 	}
