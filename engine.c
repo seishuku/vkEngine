@@ -1156,7 +1156,6 @@ void Render(void)
 	// Handle non-VR frame start
 	{
 		VkResult Result=vkAcquireNextImageKHR(vkContext.device, swapchain.swapchain, UINT64_MAX, perFrame[index].completeSemaphore, VK_NULL_HANDLE, &imageIndex);
-		DBGPRINTF(DEBUG_ERROR, "My frame: %d Swapchain frame: %d\n", index, imageIndex);
 
 		if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
 		{
