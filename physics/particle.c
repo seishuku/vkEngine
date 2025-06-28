@@ -274,7 +274,7 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 	PipelineOverrideRasterizationSamples(VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);
 
 	// Pre-allocate minimal sized buffers
-	for(uint32_t i=0;i<swapchain.numImages;i++)
+	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 		vkuCreateHostBuffer(&vkContext, &system->particleBuffer[i], sizeof(vec4)*2*system->maxParticles, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
 	return true;
@@ -415,7 +415,7 @@ void ParticleSystem_Destroy(ParticleSystem_t *system)
 
 	DestroyPipeline(&vkContext, &particlePipeline);
 
-	for(uint32_t i=0;i<swapchain.numImages;i++)
+	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 		vkuDestroyBuffer(&vkContext, &system->particleBuffer[i]);
 
 	//vkuDestroyImageBuffer(&Context, &particleTexture);

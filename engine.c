@@ -51,7 +51,7 @@ VkInstance vkInstance;
 VkuContext_t vkContext;
 
 // Per-frame data
-PerFrame_t perFrame[VKU_MAX_FRAME_COUNT];
+PerFrame_t perFrame[FRAMES_IN_FLIGHT];
 
 // Camera data
 Camera_t camera;
@@ -251,7 +251,7 @@ void GenerateWorld(void)
 	Skybox_UBO.uStarDensity=8.0f;
 
 	// Copy it out to the other eyes and frames
-	for(uint32_t i=0;i<swapchain.numImages;i++)
+	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 	{
 		memcpy(perFrame[i].skyboxUBO[0], &Skybox_UBO, sizeof(Skybox_UBO_t));
 		memcpy(perFrame[i].skyboxUBO[1], &Skybox_UBO, sizeof(Skybox_UBO_t));
@@ -303,7 +303,7 @@ void GenerateWorld(void)
 	// Set up instance data for asteroid rendering
 	if(!perFrame[0].asteroidInstance.buffer)
 	{
-		for(uint32_t i=0;i<swapchain.numImages;i++)
+		for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 		{
 			vkuCreateHostBuffer(&vkContext, &perFrame[i].asteroidInstance, sizeof(matrix)*NUM_ASTEROIDS, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 			perFrame[i].asteroidInstancePtr=(matrix *)perFrame[i].asteroidInstance.memory->mappedPointer;
@@ -348,7 +348,7 @@ void GenerateWorld(void)
 
 		if(!perFrame[0].fighterInstance.buffer)
 		{
-			for(uint32_t i=0;i<swapchain.numImages;i++)
+			for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 			{
 				vkuCreateHostBuffer(&vkContext, &perFrame[i].fighterInstance, sizeof(matrix)*(2+MAX_CLIENTS), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 				perFrame[i].fighterInstancePtr=(matrix *)perFrame[i].fighterInstance.memory->mappedPointer;
@@ -361,7 +361,7 @@ void GenerateWorld(void)
 
 	if(!perFrame[0].cubeInstance.buffer)
 	{
-		for(uint32_t i=0;i<swapchain.numImages;i++)
+		for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 		{
 			vkuCreateHostBuffer(&vkContext, &perFrame[i].cubeInstance, sizeof(matrix)*NUM_CUBE, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 			perFrame[i].cubeInstancePtr=(matrix *)perFrame[i].cubeInstance.memory->mappedPointer;
@@ -445,7 +445,7 @@ void Thread_Constructor(void *arg)
 {
 	ThreadData_t *data=(ThreadData_t *)arg;
 
-	for(uint32_t Frame=0;Frame<swapchain.numImages;Frame++)
+	for(uint32_t Frame=0;Frame<FRAMES_IN_FLIGHT;Frame++)
 	{
 		for(uint32_t eye=0;eye<2;eye++)
 		{
@@ -499,7 +499,7 @@ void Thread_Destructor(void *arg)
 {
 	ThreadData_t *data=(ThreadData_t *)arg;
 
-	for(uint32_t Frame=0;Frame<swapchain.numImages;Frame++)
+	for(uint32_t Frame=0;Frame<FRAMES_IN_FLIGHT;Frame++)
 	{
 		for(uint32_t eye=0;eye<2;eye++)
 		{
@@ -1071,7 +1071,7 @@ static vec3 lastLeftPosition={ 0.0f, 0.0f, 0.0f };
 // Render call from system main event loop
 void Render(void)
 {
-	static uint32_t index=0, lastImageIndex=0, imageIndex=2;
+	static uint32_t index=0, imageIndex=0;
 
 	Thread_AddJob(&threadPhysics, Thread_Physics, (void *)&index);
 	//Thread_Physics((void *)&index);
@@ -1086,7 +1086,7 @@ void Render(void)
 			// Wait for physics to finish, then dump the frame and start over
 			ThreadBarrier_Wait(&physicsThreadBarrier);
 
-			index=(index+1)%xrContext.swapchain[0].numImages;
+			index=(index+1)%FRAMES_IN_FLIGHT;
 
 			return;
 		}
@@ -1155,11 +1155,8 @@ void Render(void)
 	else
 	// Handle non-VR frame start
 	{
-		lastImageIndex=imageIndex;
-		VkResult Result=vkAcquireNextImageKHR(vkContext.device, swapchain.swapchain, UINT64_MAX, perFrame[index].presentCompleteSemaphore, VK_NULL_HANDLE, &imageIndex);
-
-		if(imageIndex!=((lastImageIndex+1)%swapchain.numImages))
-			DBGPRINTF(DEBUG_ERROR, "FRAME OUT OF ORDER: last Index=%d Index=%d\n", lastImageIndex, imageIndex);
+		VkResult Result=vkAcquireNextImageKHR(vkContext.device, swapchain.swapchain, UINT64_MAX, perFrame[index].completeSemaphore, VK_NULL_HANDLE, &imageIndex);
+		DBGPRINTF(DEBUG_ERROR, "My frame: %d Swapchain frame: %d\n", index, imageIndex);
 
 		if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
 		{
@@ -1169,7 +1166,7 @@ void Render(void)
 			// Wait for physics to finish, then dump the frame and start over
 			ThreadBarrier_Wait(&physicsThreadBarrier);
 
-			index=(index+1)%swapchain.numImages;
+			index=(index+1)%FRAMES_IN_FLIGHT;
 
 			return;
 		}
@@ -1215,12 +1212,12 @@ void Render(void)
 		EyeRender(index, 1, headPose);
 
 	// Final drawing compositing
-	CompositeDraw(index, 0);
+	CompositeDraw(imageIndex, index, 0);
 	//////
 
 	// Other eye compositing
 	if(config.isVR)
-		CompositeDraw(index, 1);
+		CompositeDraw(imageIndex, index, 1);
 
 	// Reset the font text collection for the next frame
 	Font_Reset(&font);
@@ -1236,9 +1233,9 @@ void Render(void)
 		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.pWaitDstStageMask=&(VkPipelineStageFlags) { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT },
 		.waitSemaphoreCount=1,
-		.pWaitSemaphores=&perFrame[index].presentCompleteSemaphore,
+		.pWaitSemaphores=&perFrame[index].completeSemaphore,
 		.signalSemaphoreCount=1,
-		.pSignalSemaphores=&perFrame[index].renderCompleteSemaphore,
+		.pSignalSemaphores=&swapchain.waitSemaphore[imageIndex],
 		.commandBufferCount=1,
 		.pCommandBuffers=&perFrame[index].commandBuffer,
 	};
@@ -1257,7 +1254,7 @@ void Render(void)
 	if(config.isVR)
 	{
 		VR_EndFrame(&xrContext);
-		index=(index+1)%xrContext.swapchain[0].numImages;
+		index=(index+1)%FRAMES_IN_FLIGHT;
 	}
 	else
 	// Handle non-VR frame end
@@ -1267,7 +1264,7 @@ void Render(void)
 		{
 			.sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 			.waitSemaphoreCount=1,
-			.pWaitSemaphores=&perFrame[index].renderCompleteSemaphore,
+			.pWaitSemaphores=&swapchain.waitSemaphore[imageIndex],
 			.swapchainCount=1,
 			.pSwapchains=&swapchain.swapchain,
 			.pImageIndices=&imageIndex,
@@ -1276,7 +1273,7 @@ void Render(void)
 		if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
 			DBGPRINTF(DEBUG_WARNING, "vkQueuePresent out of date or suboptimal...\n");
 
-		index=(index+1)%swapchain.numImages;
+		index=(index+1)%FRAMES_IN_FLIGHT;
 	}
 
 	UpdateLineGraph(&frameTimes, fTimeStep, fTimeStep);
@@ -1666,17 +1663,14 @@ bool Init(void)
 	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3b(1.0f), false);
 
 	// Other per-frame data
-	for(uint32_t i=0;i<swapchain.numImages;i++)
+	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 	{
-		// Create needed fence and semaphores for rendering
+		// Create needed fence and semaphore for rendering
 		// Wait fence for command queue, to signal when we can submit commands again
 		vkCreateFence(vkContext.device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=VK_FENCE_CREATE_SIGNALED_BIT }, VK_NULL_HANDLE, &perFrame[i].frameFence);
 
 		// Semaphore for image presentation, to signal when we can present again
-		vkCreateSemaphore(vkContext.device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &perFrame[i].presentCompleteSemaphore);
-
-		// Semaphore for render complete, to signal when we can render again
-		vkCreateSemaphore(vkContext.device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &perFrame[i].renderCompleteSemaphore);
+		vkCreateSemaphore(vkContext.device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &perFrame[i].completeSemaphore);
 
 		// Per-frame descriptor pool for main thread
 		vkCreateDescriptorPool(vkContext.device, &(VkDescriptorPoolCreateInfo)
@@ -1837,16 +1831,13 @@ void RecreateSwapchain(void)
 	// To resize a surface, we need to destroy and recreate anything that's tied to the surface.
 	// This is basically just the swapchain, framebuffers, depth buffers, and semaphores (since they can't be just reset like fences).
 
-	for(uint32_t i=0;i<swapchain.numImages;i++)
+	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 	{
 		vkDestroyFence(vkContext.device, perFrame[i].frameFence, VK_NULL_HANDLE);
 		vkCreateFence(vkContext.device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=VK_FENCE_CREATE_SIGNALED_BIT }, VK_NULL_HANDLE, &perFrame[i].frameFence);
 
-		vkDestroySemaphore(vkContext.device, perFrame[i].presentCompleteSemaphore, VK_NULL_HANDLE);
-		vkDestroySemaphore(vkContext.device, perFrame[i].renderCompleteSemaphore, VK_NULL_HANDLE);
-
-		vkCreateSemaphore(vkContext.device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &perFrame[i].presentCompleteSemaphore);
-		vkCreateSemaphore(vkContext.device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &perFrame[i].renderCompleteSemaphore);
+		vkDestroySemaphore(vkContext.device, perFrame[i].completeSemaphore, VK_NULL_HANDLE);
+		vkCreateSemaphore(vkContext.device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &perFrame[i].completeSemaphore);
 	}
 
 	// swapchain, framebuffer, and depth buffer destruction
@@ -1969,7 +1960,7 @@ void Destroy(void)
 	//////////
 
 	// Instance buffer destruction
-	for(uint32_t i=0;i<swapchain.numImages;i++)
+	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 	{
 		vkuDestroyBuffer(&vkContext, &perFrame[i].asteroidInstance);
 		vkuDestroyBuffer(&vkContext, &perFrame[i].fighterInstance);
@@ -2038,13 +2029,12 @@ void Destroy(void)
 		vkDestroyFramebuffer(vkContext.device, framebuffer[1], VK_NULL_HANDLE);
 	}
 
-	for(uint32_t i=0;i<swapchain.numImages;i++)
+	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 	{
 		// Destroy sync objects
 		vkDestroyFence(vkContext.device, perFrame[i].frameFence, VK_NULL_HANDLE);
 
-		vkDestroySemaphore(vkContext.device, perFrame[i].presentCompleteSemaphore, VK_NULL_HANDLE);
-		vkDestroySemaphore(vkContext.device, perFrame[i].renderCompleteSemaphore, VK_NULL_HANDLE);
+		vkDestroySemaphore(vkContext.device, perFrame[i].completeSemaphore, VK_NULL_HANDLE);
 
 		// Destroy main thread descriptor pools
 		vkDestroyDescriptorPool(vkContext.device, perFrame[i].descriptorPool, VK_NULL_HANDLE);

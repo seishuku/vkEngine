@@ -14,6 +14,6 @@ bool CreateCompositePipeline(void);
 void CreateCompositeFramebuffers(uint32_t eye);
 void DestroyCompositeFramebuffers(void);
 void DestroyComposite(void);
-void CompositeDraw(uint32_t index, uint32_t eye);
+void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye);
 
 #endif

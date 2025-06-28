@@ -261,6 +261,8 @@ typedef struct
 	uint32_t numImages;
 	VkImage image[VKU_MAX_FRAME_COUNT];
 	VkImageView imageView[VKU_MAX_FRAME_COUNT];
+
+	VkSemaphore waitSemaphore[VKU_MAX_FRAME_COUNT];
 } VkuSwapchain_t;
 
 typedef struct

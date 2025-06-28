@@ -50,10 +50,10 @@ typedef struct
 
 	// Fences/semaphores
 	VkFence frameFence;
-	VkSemaphore presentCompleteSemaphore;
-	VkSemaphore renderCompleteSemaphore;
+	VkSemaphore completeSemaphore;
 } PerFrame_t;
 
-extern PerFrame_t perFrame[VKU_MAX_FRAME_COUNT];
+#define FRAMES_IN_FLIGHT 3
+extern PerFrame_t perFrame[FRAMES_IN_FLIGHT];
 
 #endif

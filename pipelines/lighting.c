@@ -148,7 +148,7 @@ bool CreateLightingPipeline(void)
 		}
 	}, 0, &renderPass);
 
-	for(uint32_t i=0;i<swapchain.numImages;i++)
+	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 	{
 		vkuCreateHostBuffer(&vkContext, &perFrame[i].mainUBOBuffer[0], sizeof(Main_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 		perFrame[i].mainUBO[0]=perFrame[i].mainUBOBuffer[0].memory->mappedPointer;
@@ -169,7 +169,7 @@ bool CreateLightingPipeline(void)
 
 void DestroyLighting(void)
 {
-	for(uint32_t i=0;i<swapchain.numImages;i++)
+	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 	{
 		vkuDestroyBuffer(&vkContext, &perFrame[i].mainUBOBuffer[0]);
 		vkuDestroyBuffer(&vkContext, &perFrame[i].mainUBOBuffer[1]);

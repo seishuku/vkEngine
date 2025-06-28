@@ -365,14 +365,14 @@ void DestroyComposite(void)
 	//////
 }
 
-void CompositeDraw(uint32_t index, uint32_t eye)
+void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye)
 {
 	static uint32_t uFrame=0;
 
 	// Threshold and down sample to 1/4 original image size
 	// Input = colorResolve
 	// Output = colorBlur
-	vkCmdBeginRenderPass(perFrame[index].commandBuffer, &(VkRenderPassBeginInfo)
+	vkCmdBeginRenderPass(perFrame[frameIndex].commandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=thresholdRenderPass,
@@ -380,25 +380,25 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 		.renderArea={ { 0, 0 }, { config.renderWidth>>2, config.renderHeight>>2 } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
-	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)(config.renderWidth>>2), (float)(config.renderHeight>>2), 0.0f, 1.0f });
-	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth>>2, config.renderHeight>>2 } });
+	vkCmdSetViewport(perFrame[frameIndex].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)(config.renderWidth>>2), (float)(config.renderHeight>>2), 0.0f, 1.0f });
+	vkCmdSetScissor(perFrame[frameIndex].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth>>2, config.renderHeight>>2 } });
 
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, thresholdPipeline.pipeline.pipeline);
+	vkCmdBindPipeline(perFrame[frameIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, thresholdPipeline.pipeline.pipeline);
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&thresholdPipeline.descriptorSet, 0, colorResolve[eye].sampler, colorResolve[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-	vkuAllocateUpdateDescriptorSet(&thresholdPipeline.descriptorSet, perFrame[index].descriptorPool);
-	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, thresholdPipeline.pipelineLayout, 0, 1, &thresholdPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+	vkuAllocateUpdateDescriptorSet(&thresholdPipeline.descriptorSet, perFrame[frameIndex].descriptorPool);
+	vkCmdBindDescriptorSets(perFrame[frameIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, thresholdPipeline.pipelineLayout, 0, 1, &thresholdPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
-	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
+	vkCmdDraw(perFrame[frameIndex].commandBuffer, 3, 1, 0, 0);
 
-	vkCmdEndRenderPass(perFrame[index].commandBuffer);
+	vkCmdEndRenderPass(perFrame[frameIndex].commandBuffer);
 	//////
 
 	// Gaussian blur (vertical)
 	// Input = colorBlur
 	// Output = colorTemp
-	vkCmdBeginRenderPass(perFrame[index].commandBuffer, &(VkRenderPassBeginInfo)
+	vkCmdBeginRenderPass(perFrame[frameIndex].commandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=gaussianRenderPass,
@@ -406,27 +406,27 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 		.renderArea={ { 0, 0 }, { config.renderWidth>>2, config.renderHeight>>2 } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
-	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)(config.renderWidth>>2), (float)(config.renderHeight>>2), 0.0f, 1.0f });
-	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth>>2, config.renderHeight>>2 } });
+	vkCmdSetViewport(perFrame[frameIndex].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)(config.renderWidth>>2), (float)(config.renderHeight>>2), 0.0f, 1.0f });
+	vkCmdSetScissor(perFrame[frameIndex].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth>>2, config.renderHeight>>2 } });
 
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipeline.pipeline);
+	vkCmdBindPipeline(perFrame[frameIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipeline.pipeline);
 
-	vkCmdPushConstants(perFrame[index].commandBuffer, gaussianPipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &(vec2){ 1.0f, 0.0 });
+	vkCmdPushConstants(perFrame[frameIndex].commandBuffer, gaussianPipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &(vec2){ 1.0f, 0.0 });
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianPipeline.descriptorSet, 0, colorBlur[eye].sampler, colorBlur[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuAllocateUpdateDescriptorSet(&gaussianPipeline.descriptorSet, perFrame[index].descriptorPool);
+	vkuAllocateUpdateDescriptorSet(&gaussianPipeline.descriptorSet, perFrame[frameIndex].descriptorPool);
 
-	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipelineLayout, 0, 1, &gaussianPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+	vkCmdBindDescriptorSets(perFrame[frameIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipelineLayout, 0, 1, &gaussianPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
-	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
+	vkCmdDraw(perFrame[frameIndex].commandBuffer, 3, 1, 0, 0);
 
-	vkCmdEndRenderPass(perFrame[index].commandBuffer);
+	vkCmdEndRenderPass(perFrame[frameIndex].commandBuffer);
 	//////
 
 	// Gaussian blur (horizontal)
 	// Input = colorTemp
 	// Output = colorBlur
-	vkCmdBeginRenderPass(perFrame[index].commandBuffer, &(VkRenderPassBeginInfo)
+	vkCmdBeginRenderPass(perFrame[frameIndex].commandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=gaussianRenderPass,
@@ -434,45 +434,45 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 		.renderArea={ { 0, 0 }, { config.renderWidth>>2, config.renderHeight>>2 } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
-	vkCmdPushConstants(perFrame[index].commandBuffer, gaussianPipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &(vec2){ 0.0f, 1.0f });
+	vkCmdPushConstants(perFrame[frameIndex].commandBuffer, gaussianPipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &(vec2){ 0.0f, 1.0f });
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianPipeline.descriptorSet, 0, colorTemp[eye].sampler, colorTemp[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuAllocateUpdateDescriptorSet(&gaussianPipeline.descriptorSet, perFrame[index].descriptorPool);
+	vkuAllocateUpdateDescriptorSet(&gaussianPipeline.descriptorSet, perFrame[frameIndex].descriptorPool);
 
-	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipelineLayout, 0, 1, &gaussianPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+	vkCmdBindDescriptorSets(perFrame[frameIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipelineLayout, 0, 1, &gaussianPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
-	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
+	vkCmdDraw(perFrame[frameIndex].commandBuffer, 3, 1, 0, 0);
 
-	vkCmdEndRenderPass(perFrame[index].commandBuffer);
+	vkCmdEndRenderPass(perFrame[frameIndex].commandBuffer);
 	//////
 
 	// Draw final composited image
 	// Input = colorResolve, colorBlur
 	// Output = swapchain
 	// NOTE: ColorResolve should already be in shader read-only
-	vkCmdBeginRenderPass(perFrame[index].commandBuffer, &(VkRenderPassBeginInfo)
+	vkCmdBeginRenderPass(perFrame[frameIndex].commandBuffer, &(VkRenderPassBeginInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=compositeRenderPass,
-		.framebuffer=perFrame[index].compositeFramebuffer[eye],
+		.framebuffer=perFrame[imageIndex].compositeFramebuffer[eye],
 		.clearValueCount=1,
 		.pClearValues=(VkClearValue[]){ {{{ 0.0f, 0.0f, 0.0f, 1.0f }}} },
 		.renderArea={ { 0, 0 }, { config.renderWidth, config.renderHeight } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
-	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)config.renderWidth, (float)config.renderHeight, 0.0f, 1.0f });
-	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth, config.renderHeight } });
+	vkCmdSetViewport(perFrame[frameIndex].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)config.renderWidth, (float)config.renderHeight, 0.0f, 1.0f });
+	vkCmdSetScissor(perFrame[frameIndex].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth, config.renderHeight } });
 
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipeline.pipeline.pipeline);
+	vkCmdBindPipeline(perFrame[frameIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipeline.pipeline.pipeline);
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 0, colorResolve[eye].sampler, colorResolve[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 1, colorBlur[eye].sampler, colorBlur[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 2, depthImage[eye].sampler, depthImage[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 3, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingBufferInfo(&compositePipeline.descriptorSet, 4, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&compositePipeline.descriptorSet, 4, perFrame[frameIndex].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
 
-	vkuAllocateUpdateDescriptorSet(&compositePipeline.descriptorSet, perFrame[index].descriptorPool);
-	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipeline.pipelineLayout, 0, 1, &compositePipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+	vkuAllocateUpdateDescriptorSet(&compositePipeline.descriptorSet, perFrame[frameIndex].descriptorPool);
+	vkCmdBindDescriptorSets(perFrame[frameIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipeline.pipelineLayout, 0, 1, &compositePipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 	struct
 	{
@@ -485,21 +485,21 @@ void CompositeDraw(uint32_t index, uint32_t eye)
 	PC.uSize[0]=config.renderWidth;
 	PC.uSize[1]=config.renderHeight;
 
-	vkCmdPushConstants(perFrame[index].commandBuffer, compositePipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PC), &PC);
+	vkCmdPushConstants(perFrame[frameIndex].commandBuffer, compositePipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PC), &PC);
 
-	vkCmdDraw(perFrame[index].commandBuffer, 3, 1, 0, 0);
+	vkCmdDraw(perFrame[frameIndex].commandBuffer, 3, 1, 0, 0);
 
 	// Draw UI controls
-	UI_Draw(&UI, index, eye, fTimeStep);
+	UI_Draw(&UI, frameIndex, eye, fTimeStep);
 
 	// Draw text in the compositing renderpass
 	Font_Print(&font, 16.0f, 0.0f, (float)config.renderHeight-16.0f, "FPS: %0.1f\n\x1B[33mFrame time: %0.3fms\nAudio time: %0.3fms\nPhysics time: %0.3fms", fps, fTimeStep*1000.0f, audioTime*1000.0f, physicsTime*1000.0f);
 
-	Font_Draw(&font, index, eye);
+	Font_Draw(&font, frameIndex, eye);
 
-	DrawLineGraph(perFrame[index].commandBuffer, 0, 0, &frameTimes);
-	DrawLineGraph(perFrame[index].commandBuffer, 0, 0, &audioTimes);
-	DrawLineGraph(perFrame[index].commandBuffer, 0, 0, &physicsTimes);
+	DrawLineGraph(perFrame[frameIndex].commandBuffer, 0, 0, &frameTimes);
+	DrawLineGraph(perFrame[frameIndex].commandBuffer, 0, 0, &audioTimes);
+	DrawLineGraph(perFrame[frameIndex].commandBuffer, 0, 0, &physicsTimes);
 
-	vkCmdEndRenderPass(perFrame[index].commandBuffer);
+	vkCmdEndRenderPass(perFrame[frameIndex].commandBuffer);
 }

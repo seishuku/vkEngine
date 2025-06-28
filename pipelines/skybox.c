@@ -19,7 +19,7 @@ Pipeline_t skyboxPipeline;
 
 bool CreateSkyboxPipeline(void)
 {
-	for(uint32_t i=0;i<swapchain.numImages;i++)
+	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 	{
 		vkuCreateHostBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[0], sizeof(Skybox_UBO_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 		perFrame[i].skyboxUBO[0]=(Skybox_UBO_t *)perFrame[i].skyboxUBOBuffer[0].memory->mappedPointer;
@@ -40,7 +40,7 @@ bool CreateSkyboxPipeline(void)
 
 void DestroySkybox(void)
 {
-	for(uint32_t i=0;i<swapchain.numImages;i++)
+	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 	{
 		vkuDestroyBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[0]);
 		vkuDestroyBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[1]);

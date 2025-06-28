@@ -225,6 +225,9 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 	{
 		swapchain->image[i]=newImage[i];
 		swapchain->imageView[i]=newImageView[i];
+
+		// Semaphore for waiting on when we can draw to this image again
+		vkCreateSemaphore(context->device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &swapchain->waitSemaphore[i]);
 	}
 
 	if(oldSwapchain.swapchain)
@@ -239,7 +242,11 @@ void vkuDestroySwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain)
 		return;
 
 	for(uint32_t i=0;i<swapchain->numImages;i++)
+	{
+		vkDestroySemaphore(context->device, swapchain->waitSemaphore[i], VK_NULL_HANDLE);
+
 		vkDestroyImageView(context->device, swapchain->imageView[i], VK_NULL_HANDLE);
+	}
 
 	vkDestroySwapchainKHR(context->device, swapchain->swapchain, VK_NULL_HANDLE);
 	swapchain->swapchain=VK_NULL_HANDLE;
