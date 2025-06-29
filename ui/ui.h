@@ -42,6 +42,15 @@ typedef struct
 	// Specific to type
 	union
 	{
+		// BarGraph type
+		struct
+		{
+			uint32_t titleTextID;
+			vec2 size;
+			bool readonly;
+			float min, max, value, curValue;
+		} barGraph;
+
 		// Button type
 		struct
 		{
@@ -58,14 +67,11 @@ typedef struct
 			bool value;
 		} checkBox;
 
-		// BarGraph type
+		// Cursor type
 		struct
 		{
-			uint32_t titleTextID;
-			vec2 size;
-			bool Readonly;
-			float Min, Max, value, curValue;
-		} barGraph;
+			float radius;
+		} cursor;
 
 		// Sprite type
 		struct
@@ -75,11 +81,13 @@ typedef struct
 			float rotation;
 		} sprite;
 
-		// Cursor type
+		// Text type
 		struct
 		{
-			float radius;
-		} cursor;
+			char *titleText;
+			uint32_t titleTextLength;
+			float size;
+		} text;
 
 		// Window type
 		struct
@@ -89,14 +97,6 @@ typedef struct
 			vec2 hitOffset;
 			List_t children;
 		} window;
-
-		// Text type
-		struct
-		{
-			char titleText[UI_CONTROL_TITLETEXT_MAX];
-			float size;
-		} text;
-		
 	};
 } UI_Control_t;
 

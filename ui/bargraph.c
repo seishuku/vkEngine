@@ -6,14 +6,14 @@
 #include "../font/font.h"
 #include "ui.h"
 
-uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, bool Readonly, float Min, float Max, float value)
+uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, bool readonly, float min, float max, float value)
 {
 	uint32_t ID=UI->baseID++;
 
 	if(ID==UINT32_MAX||ID>=UI_HASHTABLE_MAX)
 		return UINT32_MAX;
 
-	UI_Control_t Control=
+	UI_Control_t control=
 	{
 		.type=UI_CONTROL_BARGRAPH,
 		.ID=ID,
@@ -22,14 +22,14 @@ uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hid
 		.childParentID=UINT32_MAX,
 		.hidden=hidden,
 		.barGraph.size=size,
-		.barGraph.Readonly=Readonly,
-		.barGraph.Min=Min,
-		.barGraph.Max=Max,
+		.barGraph.readonly=readonly,
+		.barGraph.min=min,
+		.barGraph.max=max,
 		.barGraph.value=value,
-		.barGraph.curValue=value
+		.barGraph.curValue=value,
 	};
 
-	if(!List_Add(&UI->controls, &Control))
+	if(!List_Add(&UI->controls, &control))
 		return UINT32_MAX;
 
 	UI->controlsHashtable[ID]=List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
@@ -59,24 +59,24 @@ bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 col
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
+	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
 	{
-		Control->position=position;
-		Control->color=color;
-		Control->hidden=hidden;
+		control->position=position;
+		control->color=color;
+		control->hidden=hidden;
 
 		const float textLength=Font_StringBaseWidth(titleText);
 		const float textSize=fminf(size.x/textLength*0.8f, size.y*0.8f);
 		vec2 textPosition=Vec2(position.x-(textLength*textSize)*0.5f+size.x*0.5f, position.y+(size.y*0.5f));
-		UI_UpdateText(UI, Control->barGraph.titleTextID, textPosition, textSize, Vec3b(1.0f), hidden, titleText);
+		UI_UpdateText(UI, control->barGraph.titleTextID, textPosition, textSize, Vec3b(1.0f), hidden, titleText);
 
-		Control->barGraph.size=size;
-		Control->barGraph.Readonly=Readonly;
-		Control->barGraph.Min=Min;
-		Control->barGraph.Max=Max;
-		Control->barGraph.value=value;
+		control->barGraph.size=size;
+		control->barGraph.readonly=Readonly;
+		control->barGraph.min=Min;
+		control->barGraph.max=Max;
+		control->barGraph.value=value;
 
 		return true;
 	}
@@ -91,19 +91,19 @@ bool UI_UpdateBarGraphPosition(UI_t *UI, uint32_t ID, vec2 position)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
+	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
 	{
-		Control->position=position;
+		control->position=position;
 
-		UI_Control_t *textControl=UI_FindControlByID(UI, Control->barGraph.titleTextID);
+		UI_Control_t *textControl=UI_FindControlByID(UI, control->barGraph.titleTextID);
 
 		const float textLength=Font_StringBaseWidth(textControl->text.titleText);
-		const float textSize=fminf(Control->barGraph.size.x/textLength*0.8f, Control->barGraph.size.y*0.8f);
-		vec2 textPosition=Vec2(Control->position.x-(textLength*textSize)*0.5f+Control->barGraph.size.x*0.5f, Control->position.y+(Control->barGraph.size.y*0.5f));
-		UI_UpdateTextPosition(UI, Control->barGraph.titleTextID, textPosition);
-		UI_UpdateTextSize(UI, Control->barGraph.titleTextID, textSize);
+		const float textSize=fminf(control->barGraph.size.x/textLength*0.8f, control->barGraph.size.y*0.8f);
+		vec2 textPosition=Vec2(control->position.x-(textLength*textSize)*0.5f+control->barGraph.size.x*0.5f, control->position.y+(control->barGraph.size.y*0.5f));
+		UI_UpdateTextPosition(UI, control->barGraph.titleTextID, textPosition);
+		UI_UpdateTextSize(UI, control->barGraph.titleTextID, textSize);
 
 		return true;
 	}
@@ -118,19 +118,19 @@ bool UI_UpdateBarGraphSize(UI_t *UI, uint32_t ID, vec2 size)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
+	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
 	{
-		Control->barGraph.size=size;
+		control->barGraph.size=size;
 
-		UI_Control_t *textControl=UI_FindControlByID(UI, Control->barGraph.titleTextID);
+		UI_Control_t *textControl=UI_FindControlByID(UI, control->barGraph.titleTextID);
 
 		const float textLength=Font_StringBaseWidth(textControl->text.titleText);
-		const float textSize=fminf(Control->barGraph.size.x/textLength*0.8f, Control->barGraph.size.y*0.8f);
-		vec2 textPosition=Vec2(Control->position.x-(textLength*textSize)*0.5f+Control->barGraph.size.x*0.5f, Control->position.y+(Control->barGraph.size.y*0.5f));
-		UI_UpdateTextPosition(UI, Control->barGraph.titleTextID, textPosition);
-		UI_UpdateTextSize(UI, Control->barGraph.titleTextID, textSize);
+		const float textSize=fminf(control->barGraph.size.x/textLength*0.8f, control->barGraph.size.y*0.8f);
+		vec2 textPosition=Vec2(control->position.x-(textLength*textSize)*0.5f+control->barGraph.size.x*0.5f, control->position.y+(control->barGraph.size.y*0.5f));
+		UI_UpdateTextPosition(UI, control->barGraph.titleTextID, textPosition);
+		UI_UpdateTextSize(UI, control->barGraph.titleTextID, textSize);
 
 		return true;
 	}
@@ -145,11 +145,11 @@ bool UI_UpdateBarGraphColor(UI_t *UI, uint32_t ID, vec3 color)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
+	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
 	{
-		Control->color=color;
+		control->color=color;
 		return true;
 	}
 
@@ -163,12 +163,12 @@ bool UI_UpdateBarGraphVisibility(UI_t *UI, uint32_t ID, bool hidden)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
+	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
 	{
-		Control->hidden=hidden;
-		UI_UpdateTextVisibility(UI, Control->barGraph.titleTextID, hidden);
+		control->hidden=hidden;
+		UI_UpdateTextVisibility(UI, control->barGraph.titleTextID, hidden);
 
 		return true;
 	}
@@ -183,11 +183,11 @@ bool UI_UpdateBarGraphTitleText(UI_t *UI, uint32_t ID, const char *titleText)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
+	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
 	{
-		UI_UpdateTextTitleText(UI, Control->barGraph.titleTextID, titleText);
+		UI_UpdateTextTitleText(UI, control->barGraph.titleTextID, titleText);
 		return true;
 	}
 
@@ -201,11 +201,11 @@ bool UI_UpdateBarGraphReadonly(UI_t *UI, uint32_t ID, bool Readonly)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
+	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
 	{
-		Control->barGraph.Readonly=Readonly;
+		control->barGraph.readonly=Readonly;
 		return true;
 	}
 
@@ -219,11 +219,11 @@ bool UI_UpdateBarGraphMin(UI_t *UI, uint32_t ID, float Min)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
+	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
 	{
-		Control->barGraph.Min=Min;
+		control->barGraph.min=Min;
 		return true;
 	}
 
@@ -237,11 +237,11 @@ bool UI_UpdateBarGraphMax(UI_t *UI, uint32_t ID, float Max)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
+	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
 	{
-		Control->barGraph.Max=Max;
+		control->barGraph.max=Max;
 		return true;
 	}
 
@@ -255,11 +255,11 @@ bool UI_UpdateBarGraphValue(UI_t *UI, uint32_t ID, float value)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
+	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
 	{
-		Control->barGraph.value=value;
+		control->barGraph.value=value;
 		return true;
 	}
 
@@ -273,10 +273,10 @@ float UI_GetBarGraphMin(UI_t *UI, uint32_t ID)
 		return NAN;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
-		return Control->barGraph.Min;
+	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
+		return control->barGraph.min;
 
 	// Not found
 	return NAN;
@@ -288,10 +288,10 @@ float UI_GetBarGraphMax(UI_t *UI, uint32_t ID)
 		return NAN;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
-		return Control->barGraph.Max;
+	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
+		return control->barGraph.max;
 
 	// Not found
 	return NAN;
@@ -303,10 +303,10 @@ float UI_GetBarGraphValue(UI_t *UI, uint32_t ID)
 		return NAN;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
-		return Control->barGraph.value;
+	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
+		return control->barGraph.value;
 
 	// Not found
 	return NAN;
@@ -318,10 +318,10 @@ float *UI_GetBarGraphValuePointer(UI_t *UI, uint32_t ID)
 		return NULL;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BARGRAPH)
-		return &Control->barGraph.value;
+	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
+		return &control->barGraph.value;
 
 	// Not found
 	return NULL;

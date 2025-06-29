@@ -15,7 +15,7 @@ uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color, bool hi
 	if(ID==UINT32_MAX||ID>=UI_HASHTABLE_MAX)
 		return UINT32_MAX;
 
-	UI_Control_t Control=
+	UI_Control_t control=
 	{
 		.type=UI_CONTROL_CURSOR,
 		.ID=ID,
@@ -26,7 +26,7 @@ uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color, bool hi
 		.cursor.radius=radius,
 	};
 
-	if(!List_Add(&UI->controls, &Control))
+	if(!List_Add(&UI->controls, &control))
 		return UINT32_MAX;
 
 	UI->controlsHashtable[ID]=List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
@@ -43,15 +43,15 @@ bool UI_UpdateCursor(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 co
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CURSOR)
+	if(control!=NULL&&control->type==UI_CONTROL_CURSOR)
 	{
-		Control->position=position;
-		Control->color=color;
-		Control->hidden=hidden;
+		control->position=position;
+		control->color=color;
+		control->hidden=hidden;
 
-		Control->cursor.radius=radius;
+		control->cursor.radius=radius;
 
 		return true;
 	}
@@ -66,11 +66,11 @@ bool UI_UpdateCursorPosition(UI_t *UI, uint32_t ID, vec2 position)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CURSOR)
+	if(control!=NULL&&control->type==UI_CONTROL_CURSOR)
 	{
-		Control->position=position;
+		control->position=position;
 		return true;
 	}
 
@@ -84,11 +84,11 @@ bool UI_UpdateCursorRadius(UI_t *UI, uint32_t ID, float radius)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CURSOR)
+	if(control!=NULL&&control->type==UI_CONTROL_CURSOR)
 	{
-		Control->cursor.radius=radius;
+		control->cursor.radius=radius;
 		return true;
 	}
 
@@ -102,11 +102,11 @@ bool UI_UpdateCursorColor(UI_t *UI, uint32_t ID, vec3 color)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CURSOR)
+	if(control!=NULL&&control->type==UI_CONTROL_CURSOR)
 	{
-		Control->color=color;
+		control->color=color;
 		return true;
 	}
 
@@ -120,11 +120,11 @@ bool UI_UpdateCursorVisibility(UI_t *UI, uint32_t ID, bool hidden)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CURSOR)
+	if(control!=NULL&&control->type==UI_CONTROL_CURSOR)
 	{
-		Control->hidden=hidden;
+		control->hidden=hidden;
 		return true;
 	}
 
