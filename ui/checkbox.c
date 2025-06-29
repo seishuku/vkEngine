@@ -15,7 +15,7 @@ uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, bool 
 	if(ID==UINT32_MAX||ID>=UI_HASHTABLE_MAX)
 		return UINT32_MAX;
 
-	UI_Control_t Control=
+	UI_Control_t control=
 	{
 		.type=UI_CONTROL_CHECKBOX,
 		.ID=ID,
@@ -27,7 +27,7 @@ uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, bool 
 		.checkBox.value=value
 	};
 
-	if(!List_Add(&UI->controls, &Control))
+	if(!List_Add(&UI->controls, &control))
 		return UINT32_MAX;
 
 	UI->controlsHashtable[ID]=List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
@@ -56,21 +56,21 @@ bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CHECKBOX)
+	if(control!=NULL&&control->type==UI_CONTROL_CHECKBOX)
 	{
-		Control->position=position;
-		Control->color=color;
-		Control->hidden=hidden;
+		control->position=position;
+		control->color=color;
+		control->hidden=hidden;
 
-		UI_UpdateText(UI, Control->checkBox.titleTextID,
-			Vec2(position.x+radius, position.y-(radius/2.0f)), radius,
+		UI_UpdateText(UI, control->checkBox.titleTextID,
+			Vec2(position.x+radius, position.y), radius,
 			Vec3(1.0f, 1.0f, 1.0f),
 			hidden,
 			titleText);
-		Control->checkBox.radius=radius;
-		Control->checkBox.value=value;
+		control->checkBox.radius=radius;
+		control->checkBox.value=value;
 
 		return true;
 	}
@@ -85,13 +85,13 @@ bool UI_UpdateCheckBoxPosition(UI_t *UI, uint32_t ID, vec2 position)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CHECKBOX)
+	if(control!=NULL&&control->type==UI_CONTROL_CHECKBOX)
 	{
-		Control->position=position;
-		UI_UpdateTextPosition(UI, Control->checkBox.titleTextID,
-			Vec2(Control->position.x+Control->checkBox.radius, Control->position.y-(Control->checkBox.radius/2.0f)));
+		control->position=position;
+		UI_UpdateTextPosition(UI, control->checkBox.titleTextID,
+			Vec2(control->position.x+control->checkBox.radius, control->position.y));
 		return true;
 	}
 
@@ -105,14 +105,14 @@ bool UI_UpdateCheckBoxRadius(UI_t *UI, uint32_t ID, float radius)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CHECKBOX)
+	if(control!=NULL&&control->type==UI_CONTROL_CHECKBOX)
 	{
-		Control->checkBox.radius=radius;
-		UI_UpdateTextPosition(UI, Control->checkBox.titleTextID,
-			Vec2(Control->position.x+Control->checkBox.radius, Control->position.y-(Control->checkBox.radius/2.0f)));
-		UI_UpdateTextSize(UI, Control->checkBox.titleTextID, Control->checkBox.radius);
+		control->checkBox.radius=radius;
+		UI_UpdateTextPosition(UI, control->checkBox.titleTextID,
+			Vec2(control->position.x+control->checkBox.radius, control->position.y));
+		UI_UpdateTextSize(UI, control->checkBox.titleTextID, control->checkBox.radius);
 		return true;
 	}
 
@@ -126,11 +126,11 @@ bool UI_UpdateCheckBoxColor(UI_t *UI, uint32_t ID, vec3 color)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CHECKBOX)
+	if(control!=NULL&&control->type==UI_CONTROL_CHECKBOX)
 	{
-		Control->color=color;
+		control->color=color;
 		return true;
 	}
 
@@ -144,12 +144,12 @@ bool UI_UpdateCheckBoxVisibility(UI_t *UI, uint32_t ID, bool hidden)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CHECKBOX)
+	if(control!=NULL&&control->type==UI_CONTROL_CHECKBOX)
 	{
-		Control->hidden=hidden;
-		UI_UpdateTextVisibility(UI, Control->checkBox.titleTextID, hidden);
+		control->hidden=hidden;
+		UI_UpdateTextVisibility(UI, control->checkBox.titleTextID, hidden);
 
 		return true;
 	}
@@ -164,11 +164,11 @@ bool UI_UpdateCheckBoxTitleText(UI_t *UI, uint32_t ID, const char *titleText)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CHECKBOX)
+	if(control!=NULL&&control->type==UI_CONTROL_CHECKBOX)
 	{
-		UI_UpdateTextTitleText(UI, Control->checkBox.titleTextID, titleText);
+		UI_UpdateTextTitleText(UI, control->checkBox.titleTextID, titleText);
 		return true;
 	}
 
@@ -182,11 +182,11 @@ bool UI_UpdateCheckBoxValue(UI_t *UI, uint32_t ID, bool value)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_CHECKBOX)
+	if(control!=NULL&&control->type==UI_CONTROL_CHECKBOX)
 	{
-		Control->checkBox.value=value;
+		control->checkBox.value=value;
 		return true;
 	}
 
@@ -202,13 +202,11 @@ bool UI_GetCheckBoxValue(UI_t *UI, uint32_t ID)
 		return false;
 
 	// Search list
-	for(uint32_t i=0;i<List_GetCount(&UI->controls);i++)
-	{
-		UI_Control_t *Control=(UI_Control_t *)List_GetPointer(&UI->controls, i);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-		// Check for matching ID and type
-		if(Control->ID==ID&&Control->type==UI_CONTROL_CHECKBOX)
-			return Control->checkBox.value;
+	if(control!=NULL&&control->type==UI_CONTROL_CHECKBOX)
+	{
+		return control->checkBox.value;
 	}
 
 	// Not found

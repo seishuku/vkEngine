@@ -18,7 +18,7 @@ uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidde
 	if(ID==UINT32_MAX||ID>=UI_HASHTABLE_MAX)
 		return UINT32_MAX;
 
-	UI_Control_t Control=
+	UI_Control_t control=
 	{
 		.type=UI_CONTROL_SPRITE,
 		.ID=ID,
@@ -31,7 +31,7 @@ uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidde
 		.sprite.rotation=rotation
 	};
 
-	if(!List_Add(&UI->controls, &Control))
+	if(!List_Add(&UI->controls, &control))
 		return UINT32_MAX;
 
 	UI->controlsHashtable[ID]=List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
@@ -48,17 +48,17 @@ bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
+	if(control!=NULL&&control->type==UI_CONTROL_SPRITE)
 	{
-		Control->position=position;
-		Control->color=color;
-		Control->hidden=hidden;
+		control->position=position;
+		control->color=color;
+		control->hidden=hidden;
 
-		Control->sprite.image=image,
-		Control->sprite.rotation=rotation;
-		Control->sprite.size=size;
+		control->sprite.image=image,
+		control->sprite.rotation=rotation;
+		control->sprite.size=size;
 
 		return true;
 	}
@@ -73,11 +73,11 @@ bool UI_UpdateSpritePosition(UI_t *UI, uint32_t ID, vec2 position)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
+	if(control!=NULL&&control->type==UI_CONTROL_SPRITE)
 	{
-		Control->position=position;
+		control->position=position;
 		return true;
 	}
 
@@ -91,11 +91,11 @@ bool UI_UpdateSpriteSize(UI_t *UI, uint32_t ID, vec2 size)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
+	if(control!=NULL&&control->type==UI_CONTROL_SPRITE)
 	{
-		Control->sprite.size=size;
+		control->sprite.size=size;
 		return true;
 	}
 
@@ -109,11 +109,11 @@ bool UI_UpdateSpriteColor(UI_t *UI, uint32_t ID, vec3 color)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
+	if(control!=NULL&&control->type==UI_CONTROL_SPRITE)
 	{
-		Control->color=color;
+		control->color=color;
 		return true;
 	}
 
@@ -127,11 +127,11 @@ bool UI_UpdateSpriteVisibility(UI_t *UI, uint32_t ID, bool hidden)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
+	if(control!=NULL&&control->type==UI_CONTROL_SPRITE)
 	{
-		Control->hidden=hidden;
+		control->hidden=hidden;
 		return true;
 	}
 
@@ -145,11 +145,11 @@ bool UI_UpdateSpriteImage(UI_t *UI, uint32_t ID, VkuImage_t *image)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
+	if(control!=NULL&&control->type==UI_CONTROL_SPRITE)
 	{
-		Control->sprite.image=image;
+		control->sprite.image=image;
 		return true;
 	}
 
@@ -163,11 +163,11 @@ bool UI_UpdateSpriteRotation(UI_t *UI, uint32_t ID, float rotation)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_SPRITE)
+	if(control!=NULL&&control->type==UI_CONTROL_SPRITE)
 	{
-		Control->sprite.rotation=rotation;
+		control->sprite.rotation=rotation;
 		return true;
 	}
 

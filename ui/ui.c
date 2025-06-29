@@ -154,6 +154,9 @@ void UI_Destroy(UI_t *UI)
 
 		if(control->type==UI_CONTROL_WINDOW)
 			List_Destroy(&control->window.children);
+
+		if(control->type==UI_CONTROL_TEXT)
+			Zone_Free(zone, control->text.titleText);
 	}
 
 	List_Destroy(&UI->controls);
@@ -229,13 +232,13 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 			// Only return the ID of this control
 			case UI_CONTROL_BARGRAPH:
 			{
-				if(!control->barGraph.Readonly)
+				if(!control->barGraph.readonly)
 				{
 					// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
 					if(position.x>=control->position.x&&position.x<=control->position.x+control->barGraph.size.x&&
 						position.y>=control->position.y&&position.y<=control->position.y+control->barGraph.size.y)
 					{
-						control->barGraph.value=((position.x-control->position.x)/control->barGraph.size.x)*(control->barGraph.Max-control->barGraph.Min)+control->barGraph.Min;
+						control->barGraph.value=((position.x-control->position.x)/control->barGraph.size.x)*(control->barGraph.max-control->barGraph.min)+control->barGraph.min;
 						return control->ID;
 					}
 				}
@@ -290,13 +293,13 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 						// Only return the ID of this control
 						case UI_CONTROL_BARGRAPH:
 						{
-							if(!child->barGraph.Readonly)
+							if(!child->barGraph.readonly)
 							{
 								// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
 								if(position.x>=childPos.x&&position.x<=childPos.x+child->barGraph.size.x&&
 									position.y>=childPos.y&&position.y<=childPos.y+child->barGraph.size.y)
 								{
-									child->barGraph.value=((position.x-childPos.x)/child->barGraph.size.x)*(child->barGraph.Max-child->barGraph.Min)+child->barGraph.Min;
+									child->barGraph.value=((position.x-childPos.x)/child->barGraph.size.x)*(child->barGraph.max-child->barGraph.min)+child->barGraph.min;
 									return child->ID;
 								}
 							}
@@ -372,12 +375,12 @@ bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 hitPos)
 			break;
 
 		case UI_CONTROL_BARGRAPH:
-			if(!control->barGraph.Readonly)
+			if(!control->barGraph.readonly)
 			{
 				// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
 				if(position.x>=control->position.x&&position.x<=control->position.x+control->barGraph.size.x&&
 					position.y>=control->position.y&&position.y<=control->position.y+control->barGraph.size.y)
-					control->barGraph.value=((position.x-control->position.x)/control->barGraph.size.x)*(control->barGraph.Max-control->barGraph.Min)+control->barGraph.Min;
+					control->barGraph.value=((position.x-control->position.x)/control->barGraph.size.x)*(control->barGraph.max-control->barGraph.min)+control->barGraph.min;
 			}
 			break;
 
@@ -453,7 +456,7 @@ static bool UI_AddControlInstance(UI_Instance_t **instance, uint32_t *instanceCo
 		{
 			const float speed=10.0f;
 			control->barGraph.curValue+=(control->barGraph.value-control->barGraph.curValue)*(1-exp(-speed*dt));
-			float normalize_value=(control->barGraph.curValue-control->barGraph.Min)/(control->barGraph.Max-control->barGraph.Min);
+			float normalize_value=(control->barGraph.curValue-control->barGraph.min)/(control->barGraph.max-control->barGraph.min);
 
 			(*instance)->positionSize.x=offset.x+(control->position.x+control->barGraph.size.x*0.5f);
 			(*instance)->positionSize.y=offset.y+(control->position.y+control->barGraph.size.y*0.5f);
@@ -515,6 +518,9 @@ static bool UI_AddControlInstance(UI_Instance_t **instance, uint32_t *instanceCo
 
 		case UI_CONTROL_TEXT:
 		{
+			if(control->text.titleText==NULL)
+				return false;
+
 			const float sx=offset.x+control->position.x;
 			float x=sx;
 			float y=offset.y+control->position.y;

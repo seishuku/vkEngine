@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include "../system/system.h"
 #include "../math/math.h"
 #include "../utils/list.h"
 #include "../font/font.h"
@@ -9,12 +10,15 @@
 
 uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, bool hidden, const char *titleText)
 {
+	if(UI==NULL||titleText==NULL)
+		return false;
+
 	uint32_t ID=UI->baseID++;
 
 	if(ID==UINT32_MAX||ID>=UI_HASHTABLE_MAX)
 		return UINT32_MAX;
 
-	UI_Control_t Control=
+	UI_Control_t control=
 	{
 		.type=UI_CONTROL_TEXT,
 		.ID=ID,
@@ -25,12 +29,18 @@ uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, bool hidden
 		.text.size=size,
 	};
 
-	strncpy(Control.text.titleText, titleText, UI_CONTROL_TITLETEXT_MAX);
+	control.text.titleTextLength=strlen(titleText)+1;
+	control.text.titleText=(char *)Zone_Malloc(zone, control.text.titleTextLength);
 
-	if(!List_Add(&UI->controls, &Control))
+	if(control.text.titleText==NULL)
+		return false;
+
+	memcpy(control.text.titleText, titleText, control.text.titleTextLength);
+
+	if(!List_Add(&UI->controls, &control))
 		return UINT32_MAX;
 
-	UI->controlsHashtable[ID]=List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
+	UI->controlsHashtable[ID]=(UI_Control_t *)List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
 
 	return ID;
 }
@@ -41,16 +51,25 @@ bool UI_UpdateText(UI_t *UI, uint32_t ID, vec2 position, float size, vec3 color,
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
+	if(control!=NULL&&control->type==UI_CONTROL_TEXT)
 	{
-		Control->position=position;
-		Control->color=color;
-		Control->hidden=hidden;
+		control->position=position;
+		control->color=color;
+		control->hidden=hidden;
 
-		strncpy(Control->text.titleText, titleText, UI_CONTROL_TITLETEXT_MAX);
-		Control->text.size=size;
+		Zone_Free(zone, control->text.titleText);
+
+		control->text.titleTextLength=strlen(titleText)+1;
+		control->text.titleText=(char *)Zone_Malloc(zone, control->text.titleTextLength);
+
+		if(control->text.titleText==NULL)
+			return false;
+
+		memcpy(control->text.titleText, titleText, control->text.titleTextLength);
+
+		control->text.size=size;
 
 		return true;
 	}
@@ -65,11 +84,11 @@ bool UI_UpdateTextPosition(UI_t *UI, uint32_t ID, vec2 position)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
+	if(control!=NULL&&control->type==UI_CONTROL_TEXT)
 	{
-		Control->position=position;
+		control->position=position;
 		return true;
 	}
 
@@ -83,11 +102,11 @@ bool UI_UpdateTextSize(UI_t *UI, uint32_t ID, float size)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
+	if(control!=NULL&&control->type==UI_CONTROL_TEXT)
 	{
-		Control->text.size=size;
+		control->text.size=size;
 		return true;
 	}
 
@@ -101,11 +120,11 @@ bool UI_UpdateTextColor(UI_t *UI, uint32_t ID, vec3 color)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
+	if(control!=NULL&&control->type==UI_CONTROL_TEXT)
 	{
-		Control->color=color;
+		control->color=color;
 		return true;
 	}
 
@@ -119,11 +138,11 @@ bool UI_UpdateTextVisibility(UI_t *UI, uint32_t ID, bool hidden)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
+	if(control!=NULL&&control->type==UI_CONTROL_TEXT)
 	{
-		Control->hidden=hidden;
+		control->hidden=hidden;
 		return true;
 	}
 
@@ -137,11 +156,20 @@ bool UI_UpdateTextTitleText(UI_t *UI, uint32_t ID, const char *titleText)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
+	if(control!=NULL&&control->type==UI_CONTROL_TEXT)
 	{
-		strncpy(Control->text.titleText, titleText, UI_CONTROL_TITLETEXT_MAX);
+		Zone_Free(zone, control->text.titleText);
+
+		control->text.titleTextLength=strlen(titleText)+1;
+		control->text.titleText=(char *)Zone_Malloc(zone, control->text.titleTextLength);
+
+		if(control->text.titleText==NULL)
+			return false;
+
+		memcpy(control->text.titleText, titleText, control->text.titleTextLength);
+
 		return true;
 	}
 
@@ -155,14 +183,30 @@ bool UI_UpdateTextTitleTextf(UI_t *UI, uint32_t ID, const char *titleText, ...)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_TEXT)
+	if(control!=NULL&&control->type==UI_CONTROL_TEXT)
 	{
-		va_list	ap;
-		va_start(ap, titleText);
-		vsnprintf(Control->text.titleText, UI_CONTROL_TITLETEXT_MAX-1, titleText, ap);
-		va_end(ap);
+		Zone_Free(zone, control->text.titleText);
+
+		va_list args;
+		va_start(args, titleText);
+
+		va_list argsCopy;
+		va_copy(argsCopy, args);
+		control->text.titleTextLength=vsnprintf(NULL, 0, titleText, argsCopy);
+		va_end(argsCopy);
+
+		control->text.titleText=(char *)Zone_Malloc(zone, control->text.titleTextLength+1);
+
+		if(control->text.titleText==NULL)
+		{
+			va_end(args);
+			return false;
+		}
+
+		vsnprintf(control->text.titleText, control->text.titleTextLength+1, titleText, args);
+		va_end(args);
 
 		return true;
 	}

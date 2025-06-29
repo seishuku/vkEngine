@@ -15,7 +15,7 @@ uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidde
 	if(ID==UINT32_MAX||ID>=UI_HASHTABLE_MAX)
 		return UINT32_MAX;
 
-	UI_Control_t Control=
+	UI_Control_t control=
 	{
 		.type=UI_CONTROL_BUTTON,
 		.ID=ID,
@@ -27,7 +27,7 @@ uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidde
 		.button.callback=callback
 	};
 
-	if(!List_Add(&UI->controls, &Control))
+	if(!List_Add(&UI->controls, &control))
 		return UINT32_MAX;
 
 	UI->controlsHashtable[ID]=List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
@@ -45,7 +45,7 @@ uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidde
 
 	// Print the text centered
 	vec2 textPosition=Vec2(position.x-(textLength*textSize)*0.5f+size.x*0.5f, position.y+(size.y*0.5f));
-	UI->controlsHashtable[ID]->barGraph.titleTextID=UI_AddText(UI, textPosition, textSize, Vec3b(1.0f), hidden, titleText);
+	UI->controlsHashtable[ID]->button.titleTextID=UI_AddText(UI, textPosition, textSize, Vec3b(1.0f), hidden, titleText);
 
 	// Left justified
 	//	control->position.x,
@@ -67,20 +67,20 @@ bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BUTTON)
+	if(control!=NULL&&control->type==UI_CONTROL_BUTTON)
 	{
-		Control->position=position;
-		Control->color=color;
-		Control->hidden=hidden;
-		Control->button.size=size;
-		Control->button.callback=callback;
+		control->position=position;
+		control->color=color;
+		control->hidden=hidden;
+		control->button.size=size;
+		control->button.callback=callback;
 
 		float textLength=Font_StringBaseWidth(titleText);
-		float textSize=fminf(Control->button.size.x/textLength*0.8f, Control->button.size.y*0.8f);
-		vec2 textPosition=Vec2(Control->position.x-(textLength*textSize)*0.5f+Control->button.size.x*0.5f, Control->position.y+(Control->button.size.y*0.5f));
-		UI_UpdateText(UI, Control->button.titleTextID, textPosition, textSize, Vec3b(1.0f), hidden, titleText);
+		float textSize=fminf(control->button.size.x/textLength*0.8f, control->button.size.y*0.8f);
+		vec2 textPosition=Vec2(control->position.x-(textLength*textSize)*0.5f+control->button.size.x*0.5f, control->position.y+(control->button.size.y*0.5f));
+		UI_UpdateText(UI, control->button.titleTextID, textPosition, textSize, Vec3b(1.0f), hidden, titleText);
 
 		return true;
 	}
@@ -95,19 +95,19 @@ bool UI_UpdateButtonPosition(UI_t *UI, uint32_t ID, vec2 position)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BUTTON)
+	if(control!=NULL&&control->type==UI_CONTROL_BUTTON)
 	{
-		Control->position=position;
+		control->position=position;
 
-		UI_Control_t *textControl=UI_FindControlByID(UI, Control->button.titleTextID);
+		UI_Control_t *textControl=UI_FindControlByID(UI, control->button.titleTextID);
 
 		const float textLength=Font_StringBaseWidth(textControl->text.titleText);
-		const float textSize=fminf(Control->button.size.x/textLength*0.8f, Control->button.size.y*0.8f);
-		vec2 textPosition=Vec2(Control->position.x-(textLength*textSize)*0.5f+Control->button.size.x*0.5f, Control->position.y+(Control->button.size.y*0.5f));
-		UI_UpdateTextPosition(UI, Control->button.titleTextID, textPosition);
-		UI_UpdateTextSize(UI, Control->button.titleTextID, textSize);
+		const float textSize=fminf(control->button.size.x/textLength*0.8f, control->button.size.y*0.8f);
+		vec2 textPosition=Vec2(control->position.x-(textLength*textSize)*0.5f+control->button.size.x*0.5f, control->position.y+(control->button.size.y*0.5f));
+		UI_UpdateTextPosition(UI, control->button.titleTextID, textPosition);
+		UI_UpdateTextSize(UI, control->button.titleTextID, textSize);
 
 		return true;
 	}
@@ -122,19 +122,19 @@ bool UI_UpdateButtonSize(UI_t *UI, uint32_t ID, vec2 size)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BUTTON)
+	if(control!=NULL&&control->type==UI_CONTROL_BUTTON)
 	{
-		Control->button.size=size;
+		control->button.size=size;
 
-		UI_Control_t *textControl=UI_FindControlByID(UI, Control->button.titleTextID);
+		UI_Control_t *textControl=UI_FindControlByID(UI, control->button.titleTextID);
 
 		const float textLength=Font_StringBaseWidth(textControl->text.titleText);
-		const float textSize=fminf(Control->button.size.x/textLength*0.8f, Control->button.size.y*0.8f);
-		vec2 textPosition=Vec2(Control->position.x-(textLength*textSize)*0.5f+Control->button.size.x*0.5f, Control->position.y+(Control->button.size.y*0.5f));
-		UI_UpdateTextPosition(UI, Control->button.titleTextID, textPosition);
-		UI_UpdateTextSize(UI, Control->button.titleTextID, textSize);
+		const float textSize=fminf(control->button.size.x/textLength*0.8f, control->button.size.y*0.8f);
+		vec2 textPosition=Vec2(control->position.x-(textLength*textSize)*0.5f+control->button.size.x*0.5f, control->position.y+(control->button.size.y*0.5f));
+		UI_UpdateTextPosition(UI, control->button.titleTextID, textPosition);
+		UI_UpdateTextSize(UI, control->button.titleTextID, textSize);
 
 		return true;
 	}
@@ -149,11 +149,11 @@ bool UI_UpdateButtonColor(UI_t *UI, uint32_t ID, vec3 color)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BUTTON)
+	if(control!=NULL&&control->type==UI_CONTROL_BUTTON)
 	{
-		Control->color=color;
+		control->color=color;
 		return true;
 	}
 
@@ -167,12 +167,12 @@ bool UI_UpdateButtonVisibility(UI_t *UI, uint32_t ID, bool hidden)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BUTTON)
+	if(control!=NULL&&control->type==UI_CONTROL_BUTTON)
 	{
-		Control->hidden=hidden;
-		UI_UpdateTextVisibility(UI, Control->button.titleTextID, hidden);
+		control->hidden=hidden;
+		UI_UpdateTextVisibility(UI, control->button.titleTextID, hidden);
 
 		return true;
 	}
@@ -187,11 +187,11 @@ bool UI_UpdateButtonTitleText(UI_t *UI, uint32_t ID, const char *titleText)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BUTTON)
+	if(control!=NULL&&control->type==UI_CONTROL_BUTTON)
 	{
-		UI_UpdateTextTitleText(UI, Control->button.titleTextID, titleText);
+		UI_UpdateTextTitleText(UI, control->button.titleTextID, titleText);
 		return true;
 	}
 
@@ -205,11 +205,11 @@ bool UI_UpdateButtonCallback(UI_t *UI, uint32_t ID, UIControlCallback callback)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_BUTTON)
+	if(control!=NULL&&control->type==UI_CONTROL_BUTTON)
 	{
-		Control->button.callback=callback;
+		control->button.callback=callback;
 		return true;
 	}
 
