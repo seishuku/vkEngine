@@ -32,7 +32,7 @@ uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hid
 	if(!List_Add(&UI->controls, &control))
 		return UINT32_MAX;
 
-	UI->controlsHashtable[ID]=List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
+	UI->controlsHashtable[ID]=(UI_Control_t *)List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
 
 	// TODO:
 	// This is bit annoying...
@@ -53,7 +53,7 @@ uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hid
 	return ID;
 }
 
-bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, bool Readonly, float Min, float Max, float value)
+bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, bool readonly, float Min, float Max, float value)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -73,7 +73,7 @@ bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 col
 		UI_UpdateText(UI, control->barGraph.titleTextID, textPosition, textSize, Vec3b(1.0f), hidden, titleText);
 
 		control->barGraph.size=size;
-		control->barGraph.readonly=Readonly;
+		control->barGraph.readonly=readonly;
 		control->barGraph.min=Min;
 		control->barGraph.max=Max;
 		control->barGraph.value=value;
@@ -195,7 +195,7 @@ bool UI_UpdateBarGraphTitleText(UI_t *UI, uint32_t ID, const char *titleText)
 	return false;
 }
 
-bool UI_UpdateBarGraphReadonly(UI_t *UI, uint32_t ID, bool Readonly)
+bool UI_UpdateBarGraphReadonly(UI_t *UI, uint32_t ID, bool readonly)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -205,7 +205,7 @@ bool UI_UpdateBarGraphReadonly(UI_t *UI, uint32_t ID, bool Readonly)
 
 	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
 	{
-		control->barGraph.readonly=Readonly;
+		control->barGraph.readonly=readonly;
 		return true;
 	}
 
@@ -213,7 +213,7 @@ bool UI_UpdateBarGraphReadonly(UI_t *UI, uint32_t ID, bool Readonly)
 	return false;
 }
 
-bool UI_UpdateBarGraphMin(UI_t *UI, uint32_t ID, float Min)
+bool UI_UpdateBarGraphMin(UI_t *UI, uint32_t ID, float min)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -223,7 +223,7 @@ bool UI_UpdateBarGraphMin(UI_t *UI, uint32_t ID, float Min)
 
 	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
 	{
-		control->barGraph.min=Min;
+		control->barGraph.min=min;
 		return true;
 	}
 
@@ -231,7 +231,7 @@ bool UI_UpdateBarGraphMin(UI_t *UI, uint32_t ID, float Min)
 	return false;
 }
 
-bool UI_UpdateBarGraphMax(UI_t *UI, uint32_t ID, float Max)
+bool UI_UpdateBarGraphMax(UI_t *UI, uint32_t ID, float max)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -241,7 +241,7 @@ bool UI_UpdateBarGraphMax(UI_t *UI, uint32_t ID, float Max)
 
 	if(control!=NULL&&control->type==UI_CONTROL_BARGRAPH)
 	{
-		control->barGraph.max=Max;
+		control->barGraph.max=max;
 		return true;
 	}
 

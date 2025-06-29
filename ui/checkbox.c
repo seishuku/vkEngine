@@ -30,7 +30,7 @@ uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, bool 
 	if(!List_Add(&UI->controls, &control))
 		return UINT32_MAX;
 
-	UI->controlsHashtable[ID]=List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
+	UI->controlsHashtable[ID]=(UI_Control_t *)List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
 
 	// TODO:
 	// This is bit annoying...
