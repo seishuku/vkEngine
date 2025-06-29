@@ -50,6 +50,7 @@ set(PROJECT_SOURCES
 	ui/button.c
 	ui/checkbox.c
 	ui/cursor.c
+	ui/edittext.c
 	ui/sprite.c
 	ui/text.c
 	ui/ui.c

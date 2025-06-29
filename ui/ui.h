@@ -19,13 +19,14 @@ typedef void (*UIControlCallback)(void *arg);
 
 typedef enum
 {
-	UI_CONTROL_BUTTON=0,
+	UI_CONTROL_BARGRAPH=0,
+	UI_CONTROL_BUTTON,
 	UI_CONTROL_CHECKBOX,
-	UI_CONTROL_BARGRAPH,
-	UI_CONTROL_SPRITE,
 	UI_CONTROL_CURSOR,
-	UI_CONTROL_WINDOW,
+	UI_CONTROL_EDITTEXT,
+	UI_CONTROL_SPRITE,
 	UI_CONTROL_TEXT,
+	UI_CONTROL_WINDOW,
 	UI_NUM_CONTROLTYPE
 } UI_ControlType;
 
@@ -72,6 +73,14 @@ typedef struct
 		{
 			float radius;
 		} cursor;
+
+		// Edit text type
+		struct
+		{
+			uint32_t titleTextID;
+			vec2 size;
+			bool readonly;
+		} editText;
 
 		// Sprite type
 		struct
@@ -130,28 +139,6 @@ void UI_Destroy(UI_t *UI);
 
 UI_Control_t *UI_FindControlByID(UI_t *UI, uint32_t ID);
 
-// Buttons
-uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, UIControlCallback callback);
-bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, UIControlCallback callback);
-bool UI_UpdateButtonPosition(UI_t *UI, uint32_t ID, vec2 position);
-bool UI_UpdateButtonSize(UI_t *UI, uint32_t ID, vec2 size);
-bool UI_UpdateButtonColor(UI_t *UI, uint32_t ID, vec3 color);
-bool UI_UpdateButtonVisibility(UI_t *UI, uint32_t ID, bool hidden);
-bool UI_UpdateButtonTitleText(UI_t *UI, uint32_t ID, const char *titleText);
-bool UI_UpdateButtonCallback(UI_t *UI, uint32_t ID, UIControlCallback callback);
-
-// Check boxes
-uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, bool hidden, const char *titleText, bool value);
-bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, bool hidden, const char *titleText, bool value);
-bool UI_UpdateCheckBoxPosition(UI_t *UI, uint32_t ID, vec2 position);
-bool UI_UpdateCheckBoxRadius(UI_t *UI, uint32_t ID, float radius);
-bool UI_UpdateCheckBoxColor(UI_t *UI, uint32_t ID, vec3 color);
-bool UI_UpdateCheckBoxVisibility(UI_t *UI, uint32_t ID, bool hidden);
-bool UI_UpdateCheckBoxTitleText(UI_t *UI, uint32_t ID, const char *titleText);
-bool UI_UpdateCheckBoxValue(UI_t *UI, uint32_t ID, bool value);
-bool UI_GetCheckBoxValue(UI_t *UI, uint32_t ID);
-
-// Bar graphs
 uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, bool Readonly, float Min, float Max, float value);
 bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, bool Readonly, float Min, float Max, float value);
 bool UI_UpdateBarGraphPosition(UI_t *UI, uint32_t ID, vec2 position);
@@ -168,6 +155,41 @@ float UI_GetBarGraphMax(UI_t *UI, uint32_t ID);
 float UI_GetBarGraphValue(UI_t *UI, uint32_t ID);
 float *UI_GetBarGraphValuePointer(UI_t *UI, uint32_t ID);
 
+uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, UIControlCallback callback);
+bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, UIControlCallback callback);
+bool UI_UpdateButtonPosition(UI_t *UI, uint32_t ID, vec2 position);
+bool UI_UpdateButtonSize(UI_t *UI, uint32_t ID, vec2 size);
+bool UI_UpdateButtonColor(UI_t *UI, uint32_t ID, vec3 color);
+bool UI_UpdateButtonVisibility(UI_t *UI, uint32_t ID, bool hidden);
+bool UI_UpdateButtonTitleText(UI_t *UI, uint32_t ID, const char *titleText);
+bool UI_UpdateButtonCallback(UI_t *UI, uint32_t ID, UIControlCallback callback);
+
+uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, bool hidden, const char *titleText, bool value);
+bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, bool hidden, const char *titleText, bool value);
+bool UI_UpdateCheckBoxPosition(UI_t *UI, uint32_t ID, vec2 position);
+bool UI_UpdateCheckBoxRadius(UI_t *UI, uint32_t ID, float radius);
+bool UI_UpdateCheckBoxColor(UI_t *UI, uint32_t ID, vec3 color);
+bool UI_UpdateCheckBoxVisibility(UI_t *UI, uint32_t ID, bool hidden);
+bool UI_UpdateCheckBoxTitleText(UI_t *UI, uint32_t ID, const char *titleText);
+bool UI_UpdateCheckBoxValue(UI_t *UI, uint32_t ID, bool value);
+bool UI_GetCheckBoxValue(UI_t *UI, uint32_t ID);
+
+uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color, bool hidden);
+bool UI_UpdateCursor(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, bool hidden);
+bool UI_UpdateCursorPosition(UI_t *UI, uint32_t ID, vec2 position);
+bool UI_UpdateCursorRadius(UI_t *UI, uint32_t ID, float radius);
+bool UI_UpdateCursorColor(UI_t *UI, uint32_t ID, vec3 color);
+bool UI_UpdateCursorVisibility(UI_t *UI, uint32_t ID, bool hidden);
+
+uint32_t UI_AddEditText(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, bool readonly);
+bool UI_UpdateEditText(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, bool readonly);
+bool UI_UpdateEditTextPosition(UI_t *UI, uint32_t ID, vec2 position);
+bool UI_UpdateEditTextSize(UI_t *UI, uint32_t ID, vec2 size);
+bool UI_UpdateEditTextColor(UI_t *UI, uint32_t ID, vec3 color);
+bool UI_UpdateEditTextVisibility(UI_t *UI, uint32_t ID, bool hidden);
+bool UI_UpdateEditTextTitleText(UI_t *UI, uint32_t ID, const char *titleText);
+bool UI_UpdateEditTextReadonly(UI_t *UI, uint32_t ID, bool readonly);
+
 uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, VkuImage_t *image, float rotation);
 bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, VkuImage_t *image, float rotation);
 bool UI_UpdateSpritePosition(UI_t *UI, uint32_t ID, vec2 position);
@@ -177,12 +199,14 @@ bool UI_UpdateSpriteImage(UI_t *UI, uint32_t ID, VkuImage_t *image);
 bool UI_UpdateSpriteRotation(UI_t *UI, uint32_t ID, float rotation);
 bool UI_UpdateSpriteVisibility(UI_t *UI, uint32_t ID, bool hidden);
 
-uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color, bool hidden);
-bool UI_UpdateCursor(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, bool hidden);
-bool UI_UpdateCursorPosition(UI_t *UI, uint32_t ID, vec2 position);
-bool UI_UpdateCursorRadius(UI_t *UI, uint32_t ID, float radius);
-bool UI_UpdateCursorColor(UI_t *UI, uint32_t ID, vec3 color);
-bool UI_UpdateCursorVisibility(UI_t *UI, uint32_t ID, bool hidden);
+uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, bool hidden, const char *titleText);
+bool UI_UpdateText(UI_t *UI, uint32_t ID, vec2 position, float size, vec3 color, bool hidden, const char *titleText);
+bool UI_UpdateTextPosition(UI_t *UI, uint32_t ID, vec2 position);
+bool UI_UpdateTextSize(UI_t *UI, uint32_t ID, float size);
+bool UI_UpdateTextColor(UI_t *UI, uint32_t ID, vec3 color);
+bool UI_UpdateTextVisibility(UI_t *UI, uint32_t ID, bool hidden);
+bool UI_UpdateTextTitleText(UI_t *UI, uint32_t ID, const char *titleText);
+bool UI_UpdateTextTitleTextf(UI_t *UI, uint32_t ID, const char *titleText, ...);
 
 uint32_t UI_AddWindow(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText);
 bool UI_UpdateWindow(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText);
@@ -192,15 +216,6 @@ bool UI_UpdateWindowColor(UI_t *UI, uint32_t ID, vec3 color);
 bool UI_UpdateWindowVisibility(UI_t *UI, uint32_t ID, bool hidden);
 bool UI_UpdateWindowTitleText(UI_t *UI, uint32_t ID, const char *titleText);
 bool UI_WindowAddControl(UI_t *UI, uint32_t ID, uint32_t childID);
-
-uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, bool hidden, const char *titleText);
-bool UI_UpdateText(UI_t *UI, uint32_t ID, vec2 position, float size, vec3 color, bool hidden, const char *titleText);
-bool UI_UpdateTextPosition(UI_t *UI, uint32_t ID, vec2 position);
-bool UI_UpdateTextSize(UI_t *UI, uint32_t ID, float size);
-bool UI_UpdateTextColor(UI_t *UI, uint32_t ID, vec3 color);
-bool UI_UpdateTextVisibility(UI_t *UI, uint32_t ID, bool hidden);
-bool UI_UpdateTextTitleText(UI_t *UI, uint32_t ID, const char *titleText);
-bool UI_UpdateTextTitleTextf(UI_t *UI, uint32_t ID, const char *titleText, ...);
 
 uint32_t UI_TestHit(UI_t *UI, vec2 position);
 bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 position);

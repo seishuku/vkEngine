@@ -408,6 +408,30 @@ static bool UI_AddControlInstance(UI_Instance_t **instance, uint32_t *instanceCo
 {
 	switch(control->type)
 	{
+		case UI_CONTROL_BARGRAPH:
+		{
+			const float speed=10.0f;
+			control->barGraph.curValue+=(control->barGraph.value-control->barGraph.curValue)*(1-exp(-speed*dt));
+			float normalize_value=(control->barGraph.curValue-control->barGraph.min)/(control->barGraph.max-control->barGraph.min);
+
+			(*instance)->positionSize.x=offset.x+(control->position.x+control->barGraph.size.x*0.5f);
+			(*instance)->positionSize.y=offset.y+(control->position.y+control->barGraph.size.y*0.5f);
+			(*instance)->positionSize.z=control->barGraph.size.x;
+			(*instance)->positionSize.w=control->barGraph.size.y;
+
+			(*instance)->colorValue.x=control->color.x;
+			(*instance)->colorValue.y=control->color.y;
+			(*instance)->colorValue.z=control->color.z;
+			(*instance)->colorValue.w=normalize_value;
+
+			(*instance)->type=UI_CONTROL_BARGRAPH;
+
+			(*instance)++;
+			(*instanceCount)++;
+
+			return true;
+		}
+
 		case UI_CONTROL_BUTTON:
 		{
 			(*instance)->positionSize.x=offset.x+(control->position.x+control->button.size.x*0.5f);
@@ -452,30 +476,6 @@ static bool UI_AddControlInstance(UI_Instance_t **instance, uint32_t *instanceCo
 			return true;
 		}
 
-		case UI_CONTROL_BARGRAPH:
-		{
-			const float speed=10.0f;
-			control->barGraph.curValue+=(control->barGraph.value-control->barGraph.curValue)*(1-exp(-speed*dt));
-			float normalize_value=(control->barGraph.curValue-control->barGraph.min)/(control->barGraph.max-control->barGraph.min);
-
-			(*instance)->positionSize.x=offset.x+(control->position.x+control->barGraph.size.x*0.5f);
-			(*instance)->positionSize.y=offset.y+(control->position.y+control->barGraph.size.y*0.5f);
-			(*instance)->positionSize.z=control->barGraph.size.x;
-			(*instance)->positionSize.w=control->barGraph.size.y;
-
-			(*instance)->colorValue.x=control->color.x;
-			(*instance)->colorValue.y=control->color.y;
-			(*instance)->colorValue.z=control->color.z;
-			(*instance)->colorValue.w=normalize_value;
-
-			(*instance)->type=UI_CONTROL_BARGRAPH;
-
-			(*instance)++;
-			(*instanceCount)++;
-
-			return true;
-		}
-
 		case UI_CONTROL_CURSOR:
 		{
 			(*instance)->positionSize.x=offset.x+(control->position.x+control->cursor.radius);
@@ -489,6 +489,26 @@ static bool UI_AddControlInstance(UI_Instance_t **instance, uint32_t *instanceCo
 			(*instance)->colorValue.w=0.0f;
 
 			(*instance)->type=UI_CONTROL_CURSOR;
+
+			(*instance)++;
+			(*instanceCount)++;
+
+			return true;
+		}
+
+		case UI_CONTROL_EDITTEXT:
+		{
+			(*instance)->positionSize.x=offset.x+(control->position.x+control->editText.size.x*0.5f);
+			(*instance)->positionSize.y=offset.y+(control->position.y+control->editText.size.y*0.5f);
+			(*instance)->positionSize.z=control->editText.size.x;
+			(*instance)->positionSize.w=control->editText.size.y;
+
+			(*instance)->colorValue.x=control->color.x;
+			(*instance)->colorValue.y=control->color.y;
+			(*instance)->colorValue.z=control->color.z;
+			(*instance)->colorValue.w=0.0f;
+
+			(*instance)->type=UI_CONTROL_EDITTEXT;
 
 			(*instance)++;
 			(*instanceCount)++;

@@ -14,13 +14,14 @@ layout (push_constant) uniform ubo {
 	vec2 Viewport;	// Window width/height
 };
 
-const uint UI_CONTROL_BUTTON	=0;
-const uint UI_CONTROL_CHECKBOX	=1;
-const uint UI_CONTROL_BARGRAPH	=2;
-const uint UI_CONTROL_SPRITE	=3;
-const uint UI_CONTROL_CURSOR	=4;
-const uint UI_CONTROL_WINDOW	=5;
+const uint UI_CONTROL_BARGRAPH	=0;
+const uint UI_CONTROL_BUTTON	=1;
+const uint UI_CONTROL_CHECKBOX	=2;
+const uint UI_CONTROL_CURSOR	=3;
+const uint UI_CONTROL_EDITTEXT	=4;
+const uint UI_CONTROL_SPRITE	=5;
 const uint UI_CONTROL_TEXT		=6;
+const uint UI_CONTROL_WINDOW	=7;
 
 float sdfDistance(float dist)
 {
@@ -572,6 +573,27 @@ void main()
 
 			// Add them together and output
 			Output=vec4(outer+(Color.xyz*centerAlpha), outerAlpha+centerAlpha);
+			return;
+		}
+
+		case UI_CONTROL_EDITTEXT:
+		{
+			// Get the distance of full filled face
+			float distFace=roundedRect(uv-offset, aspect-(offset*2), cornerRadius);
+
+			// Render a ring from that full face
+			float distRing=abs(distFace)-(offset.x*0.75);
+			float ring=sdfDistance(distRing);
+
+			// Render a full face shadow section and clip it by the full face
+			float distShadow=max(-distFace, roundedRect(uv+offset, aspect-(offset*1.5), cornerRadius+(offset.x*0.5)));
+			float shadow=sdfDistance(distShadow);
+
+			// Layer the ring and shadow and join both to make the alpha mask
+			vec3 outer=mix(vec3(0.0)*shadow, vec3(1.0)*ring, ring);
+			float outerAlpha=sdfDistance(min(distRing, distShadow));
+
+			Output=vec4(outer, outerAlpha);
 			return;
 		}
 

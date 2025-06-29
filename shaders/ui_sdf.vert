@@ -17,13 +17,14 @@ layout (location=1) out flat vec4 Color;			// Control color
 layout (location=2) out flat uint Type;				// Control type
 layout (location=3) out flat vec2 Size;				// Control size
 
-const uint UI_CONTROL_BUTTON	=0;
-const uint UI_CONTROL_CHECKBOX	=1;
-const uint UI_CONTROL_BARGRAPH	=2;
-const uint UI_CONTROL_SPRITE	=3;
-const uint UI_CONTROL_CURSOR	=4;
-const uint UI_CONTROL_WINDOW	=5;
+const uint UI_CONTROL_BARGRAPH	=0;
+const uint UI_CONTROL_BUTTON	=1;
+const uint UI_CONTROL_CHECKBOX	=2;
+const uint UI_CONTROL_CURSOR	=3;
+const uint UI_CONTROL_EDITTEXT	=4;
+const uint UI_CONTROL_SPRITE	=5;
 const uint UI_CONTROL_TEXT		=6;
+const uint UI_CONTROL_WINDOW	=7;
 
 vec2 rotate(vec2 v, float a)
 {
