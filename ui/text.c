@@ -37,10 +37,8 @@ uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, bool hidden
 
 	memcpy(control.text.titleText, titleText, control.text.titleTextLength);
 
-	if(!List_Add(&UI->controls, &control))
+	if(!UI_AddControl(UI, &control))
 		return UINT32_MAX;
-
-	UI->controlsHashtable[ID]=(UI_Control_t *)List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
 
 	return ID;
 }

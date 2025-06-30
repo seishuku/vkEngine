@@ -13,7 +13,7 @@ uint32_t UI_AddWindow(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidde
 	if(ID==UINT32_MAX||ID>=UI_HASHTABLE_MAX)
 		return UINT32_MAX;
 
-	UI_Control_t Control=
+	UI_Control_t control=
 	{
 		.type=UI_CONTROL_WINDOW,
 		.ID=ID,
@@ -25,13 +25,11 @@ uint32_t UI_AddWindow(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidde
 		.window.hitOffset=Vec2b(0.0f),
 	};
 
-	if(!List_Init(&Control.window.children, sizeof(uint32_t), 0, NULL))
+	if(!List_Init(&control.window.children, sizeof(uint32_t), 0, NULL))
 		return UINT32_MAX;
 
-	if(!List_Add(&UI->controls, &Control))
+	if(!UI_AddControl(UI, &control))
 		return UINT32_MAX;
-
-	UI->controlsHashtable[ID]=(UI_Control_t *)List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
 
 	// TODO:
 	// This is bit annoying...
@@ -48,17 +46,17 @@ bool UI_UpdateWindow(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_WINDOW)
+	if(control!=NULL&&control->type==UI_CONTROL_WINDOW)
 	{
-		Control->position=position;
-		Control->color=color;
-		Control->hidden=hidden;
+		control->position=position;
+		control->color=color;
+		control->hidden=hidden;
 
-		UI_UpdateTextTitleText(UI, Control->window.titleTextID, titleText);
-		UI_UpdateTextVisibility(UI, Control->window.titleTextID, hidden);
-		Control->window.size=size;
+		UI_UpdateTextTitleText(UI, control->window.titleTextID, titleText);
+		UI_UpdateTextVisibility(UI, control->window.titleTextID, hidden);
+		control->window.size=size;
 
 		return true;
 	}
@@ -73,12 +71,12 @@ bool UI_UpdateWindowPosition(UI_t *UI, uint32_t ID, vec2 position)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_WINDOW)
+	if(control!=NULL&&control->type==UI_CONTROL_WINDOW)
 	{
-		UI_UpdateTextPosition(UI, Control->window.titleTextID, Vec2_Add(position, 0.0f, 16.0f-(UI_CONTROL_WINDOW_BORDER*0.5f)));
-		Control->position=position;
+		UI_UpdateTextPosition(UI, control->window.titleTextID, Vec2_Add(position, 0.0f, 16.0f-(UI_CONTROL_WINDOW_BORDER*0.5f)));
+		control->position=position;
 		return true;
 	}
 
@@ -92,11 +90,11 @@ bool UI_UpdateWindowSize(UI_t *UI, uint32_t ID, vec2 size)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_WINDOW)
+	if(control!=NULL&&control->type==UI_CONTROL_WINDOW)
 	{
-		Control->window.size=size;
+		control->window.size=size;
 		return true;
 	}
 
@@ -110,11 +108,11 @@ bool UI_UpdateWindowColor(UI_t *UI, uint32_t ID, vec3 color)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_WINDOW)
+	if(control!=NULL&&control->type==UI_CONTROL_WINDOW)
 	{
-		Control->color=color;
+		control->color=color;
 		return true;
 	}
 
@@ -128,12 +126,12 @@ bool UI_UpdateWindowVisibility(UI_t *UI, uint32_t ID, bool hidden)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_WINDOW)
+	if(control!=NULL&&control->type==UI_CONTROL_WINDOW)
 	{
-		Control->hidden=hidden;
-		UI_UpdateTextVisibility(UI, Control->window.titleTextID, hidden);
+		control->hidden=hidden;
+		UI_UpdateTextVisibility(UI, control->window.titleTextID, hidden);
 
 		return true;
 	}
@@ -148,11 +146,11 @@ bool UI_UpdateWindowTitleText(UI_t *UI, uint32_t ID, const char *titleText)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_WINDOW)
+	if(control!=NULL&&control->type==UI_CONTROL_WINDOW)
 	{
-		UI_UpdateTextTitleText(UI, Control->window.titleTextID, titleText);
+		UI_UpdateTextTitleText(UI, control->window.titleTextID, titleText);
 		return true;
 	}
 
@@ -166,9 +164,9 @@ bool UI_WindowAddControl(UI_t *UI, uint32_t ID, uint32_t childID)
 		return false;
 
 	// Search list
-	UI_Control_t *Control=UI_FindControlByID(UI, ID);
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(Control!=NULL&&Control->type==UI_CONTROL_WINDOW)
+	if(control!=NULL&&control->type==UI_CONTROL_WINDOW)
 	{
 		UI_Control_t *childControl=UI_FindControlByID(UI, childID);
 
@@ -179,11 +177,11 @@ bool UI_WindowAddControl(UI_t *UI, uint32_t ID, uint32_t childID)
 			if(childControl->type==UI_CONTROL_BUTTON||childControl->type==UI_CONTROL_BARGRAPH||childControl->type==UI_CONTROL_CHECKBOX)
 				UI->controlsHashtable[childControl->button.titleTextID]->childParentID=childID;
 
-			if(List_Add(&Control->window.children, &childID))
+			if(List_Add(&control->window.children, &childID))
 			{
 				if(childControl->type==UI_CONTROL_BUTTON||childControl->type==UI_CONTROL_BARGRAPH||childControl->type==UI_CONTROL_CHECKBOX)
 				{
-					if(List_Add(&Control->window.children, &childControl->button.titleTextID))
+					if(List_Add(&control->window.children, &childControl->button.titleTextID))
 						return true;
 				}
 				else

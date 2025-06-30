@@ -147,7 +147,7 @@ bool UI_Init(UI_t *UI, vec2 position, vec2 size)
 
 void UI_Destroy(UI_t *UI)
 {
-	// Find any window controls and delete children list
+	// Find any window controls and delete children list, and handle other misc control deletes
 	for(uint32_t i=0;i<List_GetCount(&UI->controls);i++)
 	{
 		UI_Control_t *control=(UI_Control_t *)List_GetPointer(&UI->controls, i);
@@ -157,6 +157,9 @@ void UI_Destroy(UI_t *UI)
 
 		if(control->type==UI_CONTROL_TEXT)
 			Zone_Free(zone, control->text.titleText);
+
+		if(control->type==UI_CONTROL_EDITTEXT)
+			Zone_Free(zone, control->editText.buffer);
 	}
 
 	List_Destroy(&UI->controls);
@@ -168,6 +171,25 @@ void UI_Destroy(UI_t *UI)
 	vkuDestroyImageBuffer(&vkContext, &UI->blankImage);
 
 	DestroyPipeline(&vkContext, &UI->pipeline);
+}
+
+bool UI_AddControl(UI_t *UI, UI_Control_t *control)
+{
+	// Add control to controls list
+	if(!List_Add(&UI->controls, control))
+		return false;
+
+	// Refresh hashmap pointers (controls list may reallocate and change pointers)
+	for(uint32_t i=0;i<List_GetCount(&UI->controls);i++)
+	{
+		UI_Control_t *ptr=(UI_Control_t *)List_GetPointer(&UI->controls, i);
+		UI->controlsHashtable[ptr->ID]=ptr;
+	}
+
+	// Add control pointer to controls hashmap
+	UI->controlsHashtable[control->ID]=(UI_Control_t *)List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
+
+	return true;
 }
 
 UI_Control_t *UI_FindControlByID(UI_t *UI, uint32_t ID)

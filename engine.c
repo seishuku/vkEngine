@@ -1659,7 +1659,7 @@ bool Init(void)
 
 	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), true, &textures[TEXTURE_FIGHTER1], 0.0f);
 
-	UI_AddEditText(&UI, Vec2(100, 100), Vec2(200, 50), Vec3b(1.0f), false, "test", false);
+	UI_AddEditText(&UI, Vec2(100, 100), Vec2(200, 50), Vec3b(1.0f), false, false, 100, "test");
 
 	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3b(1.0f), false);
 

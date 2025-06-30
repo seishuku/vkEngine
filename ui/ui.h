@@ -13,8 +13,6 @@ typedef void (*UIControlCallback)(void *arg);
 #define UI_CONTROL_WINDOW_TITLEBAR_HEIGHT 16.0f
 #define UI_CONTROL_WINDOW_BORDER 10.0f
 
-#define UI_CONTROL_TITLETEXT_MAX 128
-
 #define UI_HASHTABLE_MAX 8192
 
 typedef enum
@@ -80,6 +78,9 @@ typedef struct
 			uint32_t titleTextID;
 			vec2 size;
 			bool readonly;
+
+			char *buffer;
+			uint32_t maxLength, cursorPos;
 		} editText;
 
 		// Sprite type
@@ -137,6 +138,7 @@ typedef struct
 bool UI_Init(UI_t *UI, vec2 position, vec2 size);
 void UI_Destroy(UI_t *UI);
 
+bool UI_AddControl(UI_t *UI, UI_Control_t *control);
 UI_Control_t *UI_FindControlByID(UI_t *UI, uint32_t ID);
 
 uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, bool Readonly, float Min, float Max, float value);
@@ -181,8 +183,8 @@ bool UI_UpdateCursorRadius(UI_t *UI, uint32_t ID, float radius);
 bool UI_UpdateCursorColor(UI_t *UI, uint32_t ID, vec3 color);
 bool UI_UpdateCursorVisibility(UI_t *UI, uint32_t ID, bool hidden);
 
-uint32_t UI_AddEditText(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, bool readonly);
-bool UI_UpdateEditText(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, bool readonly);
+uint32_t UI_AddEditText(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, bool readonly, uint32_t maxLength, const char *initialText);
+bool UI_UpdateEditText(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, bool readonly, uint32_t maxLength, const char *initialText);
 bool UI_UpdateEditTextPosition(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_UpdateEditTextSize(UI_t *UI, uint32_t ID, vec2 size);
 bool UI_UpdateEditTextColor(UI_t *UI, uint32_t ID, vec3 color);

@@ -27,10 +27,8 @@ uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidde
 		.button.callback=callback
 	};
 
-	if(!List_Add(&UI->controls, &control))
+	if(!UI_AddControl(UI, &control))
 		return UINT32_MAX;
-
-	UI->controlsHashtable[ID]=List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
 
 	// TODO:
 	// This is bit annoying...

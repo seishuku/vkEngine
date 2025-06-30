@@ -26,10 +26,8 @@ uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color, bool hi
 		.cursor.radius=radius,
 	};
 
-	if(!List_Add(&UI->controls, &control))
+	if(!UI_AddControl(UI, &control))
 		return UINT32_MAX;
-
-	UI->controlsHashtable[ID]=(UI_Control_t *)List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
 
 	return ID;
 }

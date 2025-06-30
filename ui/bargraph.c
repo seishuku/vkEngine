@@ -29,10 +29,8 @@ uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hid
 		.barGraph.curValue=value,
 	};
 
-	if(!List_Add(&UI->controls, &control))
+	if(!UI_AddControl(UI, &control))
 		return UINT32_MAX;
-
-	UI->controlsHashtable[ID]=(UI_Control_t *)List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
 
 	// TODO:
 	// This is bit annoying...
