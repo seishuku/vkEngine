@@ -80,7 +80,7 @@ typedef struct
 			bool readonly;
 
 			char *buffer;
-			uint32_t maxLength, cursorPos;
+			uint32_t maxLength, cursorPos, textOffset;
 		} editText;
 
 		// Sprite type
@@ -191,6 +191,10 @@ bool UI_UpdateEditTextColor(UI_t *UI, uint32_t ID, vec3 color);
 bool UI_UpdateEditTextVisibility(UI_t *UI, uint32_t ID, bool hidden);
 bool UI_UpdateEditTextTitleText(UI_t *UI, uint32_t ID, const char *titleText);
 bool UI_UpdateEditTextReadonly(UI_t *UI, uint32_t ID, bool readonly);
+bool UI_EditTextInsertChar(UI_t *UI, uint32_t ID, char c);
+bool UI_EditTextMoveCursor(UI_t *UI, uint32_t ID, int32_t offset);
+bool UI_EditTextBackspace(UI_t *UI, uint32_t ID);
+bool UI_EditTextDelete(UI_t *UI, uint32_t ID);
 
 uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, VkuImage_t *image, float rotation);
 bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, VkuImage_t *image, float rotation);

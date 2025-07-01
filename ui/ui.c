@@ -248,7 +248,6 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 				break;
 			}
 
-			// Only return the ID of this control
 			case UI_CONTROL_BARGRAPH:
 			{
 				if(!control->barGraph.readonly)
@@ -258,6 +257,20 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 						position.y>=control->position.y&&position.y<=control->position.y+control->barGraph.size.y)
 					{
 						control->barGraph.value=((position.x-control->position.x)/control->barGraph.size.x)*(control->barGraph.max-control->barGraph.min)+control->barGraph.min;
+						return control->ID;
+					}
+				}
+				break;
+			}
+
+			case UI_CONTROL_EDITTEXT:
+			{
+				if(!control->editText.readonly)
+				{
+					// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
+					if(position.x>=control->position.x&&position.x<=control->position.x+control->editText.size.x&&
+					   position.y>=control->position.y&&position.y<=control->position.y+control->editText.size.y)
+					{
 						return control->ID;
 					}
 				}

@@ -163,6 +163,36 @@ bool Event_Trigger(EventID ID, void *arg)
 				return true;
 			}
 
+			UI_Control_t *control=UI_FindControlByID(&UI, activeID);
+
+			if(activeID!=UINT32_MAX&&control->type==UI_CONTROL_EDITTEXT)
+			{
+				switch(key)
+				{
+					case KB_LEFT:
+						UI_EditTextMoveCursor(&UI, activeID, -1);
+						break;
+
+					case KB_RIGHT:
+						UI_EditTextMoveCursor(&UI, activeID, 1);
+						break;
+
+					case KB_BACKSPACE:
+						UI_EditTextBackspace(&UI, activeID);
+						break;
+
+					case KB_DEL:
+						UI_EditTextDelete(&UI, activeID);
+						break;
+
+					default:
+						UI_EditTextInsertChar(&UI, activeID, tolower(key));
+						break;
+				}
+
+				return true;
+			}
+
 			switch(key)
 			{
 				// Toggle console

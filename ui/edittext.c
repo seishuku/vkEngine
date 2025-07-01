@@ -26,6 +26,7 @@ uint32_t UI_AddEditText(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hid
 		.editText.readonly=readonly,
 		.editText.maxLength=maxLength,
 		.editText.cursorPos=0,
+		.editText.textOffset=0,
 	};
 
 	control.editText.buffer=(char *)Zone_Malloc(zone, maxLength+1);
@@ -33,11 +34,19 @@ uint32_t UI_AddEditText(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hid
 	if(!control.editText.buffer)
 		return UINT32_MAX;
 
+	memset(control.editText.buffer, 0, maxLength+1);
+
+	if(initialText)
+	{
+		strncpy(control.editText.buffer, initialText, maxLength);
+		control.editText.cursorPos=(uint32_t)strlen(control.editText.buffer);
+	}
+
 	if(!UI_AddControl(UI, &control))
 		return UINT32_MAX;
 
 	// Get base length of title text
-	const float textLength=Font_StringBaseWidth(initialText);
+	const float textLength=Font_StringBaseWidth(control.editText.buffer);
 
 	// Scale text size based on the base control size and length of text, but no bigger than 80% of button height
 	const float textSize=fminf(size.x/textLength*0.8f, size.y*0.8f);
@@ -45,7 +54,7 @@ uint32_t UI_AddEditText(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hid
 	// Print the text left justified
 	vec2 textPosition=Vec2(position.x+8.0f, position.y+(size.y*0.5f));
 
-	UI->controlsHashtable[ID]->editText.titleTextID=UI_AddText(UI, textPosition, textSize, Vec3b(1.0f), hidden, initialText);
+	UI->controlsHashtable[ID]->editText.titleTextID=UI_AddText(UI, textPosition, textSize, Vec3b(1.0f), hidden, control.editText.buffer);
 
 	return ID;
 }
@@ -206,4 +215,121 @@ bool UI_UpdateEditTextReadonly(UI_t *UI, uint32_t ID, bool readonly)
 
 	// Not found
 	return false;
+}
+
+static void UI_UpdateEditTextRender(UI_t *UI, UI_Control_t *control)
+{
+	float textSize=UI_FindControlByID(UI, control->editText.titleTextID)->text.size;
+	uint32_t len=(uint32_t)strlen(control->editText.buffer);
+	float width=0.0f;
+
+	for(uint32_t i=control->editText.textOffset;i<len+control->editText.cursorPos;i++)
+		width+=Font_CharacterBaseWidth(control->editText.buffer[i])*textSize;
+
+	uint32_t visibleCount=(uint32_t)width;
+
+	while(width>(control->editText.size.x-16))
+	{
+		width-=Font_CharacterBaseWidth(control->editText.buffer[control->editText.textOffset])*textSize;
+		control->editText.textOffset++;
+	}
+
+	UI_UpdateTextTitleTextf(UI, control->editText.titleTextID,
+		"%.*s", visibleCount, &control->editText.buffer[control->editText.textOffset]);
+}
+
+bool UI_EditTextInsertChar(UI_t *UI, uint32_t ID, char c)
+{
+	if(UI==NULL||ID==UINT32_MAX)
+		return false;
+
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
+
+	if(!control||control->type!=UI_CONTROL_EDITTEXT||control->editText.readonly)
+		return false;
+
+	uint32_t len=(uint32_t)strlen(control->editText.buffer);
+
+	if(len>=control->editText.maxLength)
+		return false;
+
+	if(control->editText.cursorPos>len)
+		control->editText.cursorPos=len;
+
+	memmove(&control->editText.buffer[control->editText.cursorPos+1], &control->editText.buffer[control->editText.cursorPos], len-control->editText.cursorPos+1);
+
+	control->editText.buffer[control->editText.cursorPos]=c;
+	control->editText.cursorPos++;
+
+	UI_UpdateEditTextRender(UI, control);
+
+	return true;
+}
+
+bool UI_EditTextMoveCursor(UI_t *UI, uint32_t ID, int32_t offset)
+{
+	if(UI==NULL||ID==UINT32_MAX)
+		return false;
+
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
+
+	if(!control||control->type!=UI_CONTROL_EDITTEXT||control->editText.readonly)
+		return false;
+
+	int32_t newPos=(int32_t)control->editText.cursorPos+offset;
+
+	if(newPos<0)
+		newPos=0;
+
+	uint32_t len=(uint32_t)strlen(control->editText.buffer);
+
+	if((uint32_t)newPos>len)
+		newPos=len;
+
+	control->editText.cursorPos=(uint32_t)newPos;
+
+	UI_UpdateEditTextRender(UI, control);
+
+	return true;
+}
+
+bool UI_EditTextBackspace(UI_t *UI, uint32_t ID)
+{
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
+	if(!control||control->type!=UI_CONTROL_EDITTEXT||control->editText.readonly)
+		return false;
+
+	if(control->editText.cursorPos==0)
+		return false;
+
+	memmove(
+		&control->editText.buffer[control->editText.cursorPos-1],
+		&control->editText.buffer[control->editText.cursorPos],
+		strlen(&control->editText.buffer[control->editText.cursorPos])+1
+	);
+
+	control->editText.cursorPos--;
+
+	UI_UpdateEditTextRender(UI, control);
+	return true;
+}
+
+bool UI_EditTextDelete(UI_t *UI, uint32_t ID)
+{
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
+	if(!control||control->type!=UI_CONTROL_EDITTEXT||control->editText.readonly)
+		return false;
+
+	uint32_t len=(uint32_t)strlen(control->editText.buffer);
+	if(control->editText.cursorPos>=len)
+		return false;
+
+	memmove(
+		&control->editText.buffer[control->editText.cursorPos],
+		&control->editText.buffer[control->editText.cursorPos+1],
+		len-control->editText.cursorPos
+	);
+
+	UI_UpdateEditTextRender(UI, control);
+	return true;
 }
