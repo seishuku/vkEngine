@@ -179,15 +179,12 @@ bool UI_AddControl(UI_t *UI, UI_Control_t *control)
 	if(!List_Add(&UI->controls, control))
 		return false;
 
-	// Refresh hashmap pointers (controls list may reallocate and change pointers)
+	// Refresh hashmap pointers, controls list may reallocate and change pointers, so just refresh everything any time a control is added.
 	for(uint32_t i=0;i<List_GetCount(&UI->controls);i++)
 	{
 		UI_Control_t *ptr=(UI_Control_t *)List_GetPointer(&UI->controls, i);
 		UI->controlsHashtable[ptr->ID]=ptr;
 	}
-
-	// Add control pointer to controls hashmap
-	UI->controlsHashtable[control->ID]=(UI_Control_t *)List_GetPointer(&UI->controls, List_GetCount(&UI->controls)-1);
 
 	return true;
 }
