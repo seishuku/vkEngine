@@ -219,23 +219,77 @@ bool UI_UpdateEditTextReadonly(UI_t *UI, uint32_t ID, bool readonly)
 
 static void UI_UpdateEditTextRender(UI_t *UI, UI_Control_t *control)
 {
-	float textSize=UI_FindControlByID(UI, control->editText.titleTextID)->text.size;
-	uint32_t len=(uint32_t)strlen(control->editText.buffer);
-	float width=0.0f;
+	const float textSize=UI_FindControlByID(UI, control->editText.titleTextID)->text.size;
+	const uint32_t len=(uint32_t)strlen(control->editText.buffer);
+	const float maxWidth=control->editText.size.x-16.0f;
 
-	for(uint32_t i=control->editText.textOffset;i<len+control->editText.cursorPos;i++)
-		width+=Font_CharacterBaseWidth(control->editText.buffer[i])*textSize;
-
-	uint32_t visibleCount=(uint32_t)width;
-
-	while(width>(control->editText.size.x-16))
+	while(1)
 	{
-		width-=Font_CharacterBaseWidth(control->editText.buffer[control->editText.textOffset])*textSize;
-		control->editText.textOffset++;
+		float cursor=0.0f;
+
+		if(control->editText.cursorPos>=control->editText.textOffset)
+		{
+			for(uint32_t i=control->editText.textOffset;i<control->editText.cursorPos&&i<len;i++)
+				cursor+=Font_CharacterBaseWidth(control->editText.buffer[i])*textSize;
+		}
+		else
+			cursor=-1.0f;
+
+		if(cursor>maxWidth)
+		{
+			if(control->editText.textOffset<len)
+				control->editText.textOffset++;
+			else
+				break;
+		}
+		else if(cursor<0.0f)
+		{
+			if(control->editText.textOffset>0)
+				control->editText.textOffset--;
+			else
+				break;
+		}
+		else
+			break;
 	}
 
-	UI_UpdateTextTitleTextf(UI, control->editText.titleTextID,
-		"%.*s", visibleCount, &control->editText.buffer[control->editText.textOffset]);
+	char tempBuf[512];
+	uint32_t visIdx=0;
+	float width=0.0f;
+	uint32_t offset=control->editText.textOffset;
+
+	while(offset<len&&visIdx<sizeof(tempBuf)-2)
+	{
+		if(offset==control->editText.cursorPos)
+		{
+			tempBuf[visIdx++]='|';
+
+			width+=Font_CharacterBaseWidth('|')*textSize;
+
+			if(width>maxWidth)
+				break;
+		}
+
+		const char c=control->editText.buffer[offset];
+		const float charWidth=Font_CharacterBaseWidth(c)*textSize;
+
+		if(width+charWidth>maxWidth)
+			break;
+
+		tempBuf[visIdx++]=c;
+		width+=charWidth;
+		offset++;
+	}
+
+	if(control->editText.cursorPos==len&&visIdx<sizeof(tempBuf)-1)
+	{
+		if(width+Font_CharacterBaseWidth('|')*textSize<=maxWidth)
+			tempBuf[visIdx++]='|';
+	}
+
+	tempBuf[visIdx]='\0';
+
+	UI_UpdateTextTitleTextf(UI, control->editText.titleTextID, "%s", tempBuf);
 }
 
 bool UI_EditTextInsertChar(UI_t *UI, uint32_t ID, char c)
