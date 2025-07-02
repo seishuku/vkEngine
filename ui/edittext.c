@@ -74,7 +74,7 @@ bool UI_UpdateEditText(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 col
 		control->hidden=hidden;
 		control->editText.maxLength=maxLength;
 
-		const float textLength=Font_StringBaseWidth(initialText);
+		const float textLength=Font_StringBaseWidth(control->editText.buffer);
 		const float textSize=fminf(size.x/textLength*0.8f, size.y*0.8f);
 		vec2 textPosition=Vec2(position.x+8.0f, position.y+(size.y*0.5f));
 		UI_UpdateText(UI, control->editText.titleTextID, textPosition, textSize, Vec3b(1.0f), hidden, initialText);
@@ -101,11 +101,9 @@ bool UI_UpdateEditTextPosition(UI_t *UI, uint32_t ID, vec2 position)
 	{
 		control->position=position;
 
-		UI_Control_t *textControl=UI_FindControlByID(UI, control->editText.titleTextID);
-
-		const float textLength=Font_StringBaseWidth(textControl->text.titleText);
+		const float textLength=Font_StringBaseWidth(control->editText.buffer);
 		const float textSize=fminf(control->editText.size.x/textLength*0.8f, control->editText.size.y*0.8f);
-		vec2 textPosition=Vec2(control->position.x+8.0f, control->position.y+(control->editText.size.y*0.5f));
+		vec2 textPosition=Vec2(position.x+8.0f, position.y+(control->editText.size.y*0.5f));
 		UI_UpdateTextPosition(UI, control->editText.titleTextID, textPosition);
 		UI_UpdateTextSize(UI, control->editText.titleTextID, textSize);
 
@@ -128,9 +126,7 @@ bool UI_UpdateEditTextSize(UI_t *UI, uint32_t ID, vec2 size)
 	{
 		control->editText.size=size;
 
-		UI_Control_t *textControl=UI_FindControlByID(UI, control->editText.titleTextID);
-
-		const float textLength=Font_StringBaseWidth(textControl->text.titleText);
+		const float textLength=Font_StringBaseWidth(control->editText.buffer);
 		const float textSize=fminf(control->editText.size.x/textLength*0.8f, control->editText.size.y*0.8f);
 		vec2 textPosition=Vec2(control->position.x+8.0f, control->position.y+(control->editText.size.y*0.5f));
 		UI_UpdateTextPosition(UI, control->editText.titleTextID, textPosition);

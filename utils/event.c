@@ -186,7 +186,8 @@ bool Event_Trigger(EventID ID, void *arg)
 						break;
 
 					default:
-						UI_EditTextInsertChar(&UI, activeID, tolower(key));
+						if(key>=32&&key<=126)
+							UI_EditTextInsertChar(&UI, activeID, tolower(key));
 						break;
 				}
 

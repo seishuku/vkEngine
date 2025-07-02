@@ -174,18 +174,53 @@ bool UI_WindowAddControl(UI_t *UI, uint32_t ID, uint32_t childID)
 		{
 			childControl->childParentID=ID;
 
-			if(childControl->type==UI_CONTROL_BUTTON||childControl->type==UI_CONTROL_BARGRAPH||childControl->type==UI_CONTROL_CHECKBOX)
-				UI->controlsHashtable[childControl->button.titleTextID]->childParentID=childID;
+			switch(childControl->type)
+			{
+				case UI_CONTROL_BARGRAPH:
+					UI->controlsHashtable[childControl->barGraph.titleTextID]->childParentID=childID;
+					break;
+
+				case UI_CONTROL_BUTTON:
+					UI->controlsHashtable[childControl->button.titleTextID]->childParentID=childID;
+					break;
+
+				case UI_CONTROL_CHECKBOX:
+					UI->controlsHashtable[childControl->checkBox.titleTextID]->childParentID=childID;
+					break;
+
+				case UI_CONTROL_EDITTEXT:
+					UI->controlsHashtable[childControl->editText.titleTextID]->childParentID=childID;
+					break;
+
+				default:
+					break;
+			}
 
 			if(List_Add(&control->window.children, &childID))
 			{
-				if(childControl->type==UI_CONTROL_BUTTON||childControl->type==UI_CONTROL_BARGRAPH||childControl->type==UI_CONTROL_CHECKBOX)
+				switch(childControl->type)
 				{
-					if(List_Add(&control->window.children, &childControl->button.titleTextID))
-						return true;
+					case UI_CONTROL_BARGRAPH:
+						List_Add(&control->window.children, &childControl->barGraph.titleTextID);
+						break;
+
+					case UI_CONTROL_BUTTON:
+						List_Add(&control->window.children, &childControl->button.titleTextID);
+						break;
+
+					case UI_CONTROL_CHECKBOX:
+						List_Add(&control->window.children, &childControl->checkBox.titleTextID);
+						break;
+
+					case UI_CONTROL_EDITTEXT:
+						List_Add(&control->window.children, &childControl->editText.titleTextID);
+						break;
+
+					default:
+						break;
 				}
-				else
-					return true;
+
+				return true;
 			}
 		}
 		else

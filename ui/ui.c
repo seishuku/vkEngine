@@ -338,6 +338,20 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 							break;
 						}
 
+						case UI_CONTROL_EDITTEXT:
+						{
+							if(!child->editText.readonly)
+							{
+								// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
+								if(position.x>=childPos.x&&position.x<=childPos.x+child->editText.size.x&&
+								   position.y>=childPos.y&&position.y<=childPos.y+child->editText.size.y)
+								{
+									return child->ID;
+								}
+							}
+							break;
+						}
+
 						default:
 							break;
 					}

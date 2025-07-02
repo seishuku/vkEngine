@@ -140,6 +140,8 @@ uint32_t colorShiftID=UINT32_MAX;
 uint32_t consoleBackground=UINT32_MAX;
 uint32_t currentTrack=UINT32_MAX;
 uint32_t windowID=UINT32_MAX;
+uint32_t editWindowID=UINT32_MAX;
+uint32_t editControl=UINT32_MAX;
 //////
 
 Console_t console;
@@ -1659,7 +1661,9 @@ bool Init(void)
 
 	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), true, &textures[TEXTURE_FIGHTER1], 0.0f);
 
-	UI_AddEditText(&UI, Vec2(100, 100), Vec2(200, 50), Vec3b(1.0f), false, false, 100, "test");
+	editWindowID=UI_AddWindow(&UI, Vec2(100, 100), Vec2(200, 50), Vec3(0.5, 0.1, 0.1), false, "Edit control test");
+	editControl=UI_AddEditText(&UI, Vec2(0, -50), Vec2(200, 50), Vec3b(1.0f), false, false, 100, "test");
+	UI_WindowAddControl(&UI, editWindowID, editControl);
 
 	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3b(1.0f), false);
 
