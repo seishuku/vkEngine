@@ -1073,7 +1073,7 @@ static vec3 lastLeftPosition={ 0.0f, 0.0f, 0.0f };
 // Render call from system main event loop
 void Render(void)
 {
-	static uint32_t index=0, imageIndex=0;
+	static uint32_t index=0, imageIndex[2]={ 0, 0 };
 
 	Thread_AddJob(&threadPhysics, Thread_Physics, (void *)&index);
 	//Thread_Physics((void *)&index);
@@ -1083,7 +1083,7 @@ void Render(void)
 	// Handle VR frame start
 	if(config.isVR)
 	{
-		if(!VR_StartFrame(&xrContext))
+		if(!VR_StartFrame(&xrContext, imageIndex))
 		{
 			// Wait for physics to finish, then dump the frame and start over
 			ThreadBarrier_Wait(&physicsThreadBarrier);
@@ -1157,7 +1157,7 @@ void Render(void)
 	else
 	// Handle non-VR frame start
 	{
-		VkResult Result=vkAcquireNextImageKHR(vkContext.device, swapchain.swapchain, UINT64_MAX, perFrame[index].completeSemaphore, VK_NULL_HANDLE, &imageIndex);
+		VkResult Result=vkAcquireNextImageKHR(vkContext.device, swapchain.swapchain, UINT64_MAX, perFrame[index].completeSemaphore, VK_NULL_HANDLE, &imageIndex[0]);
 
 		if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
 		{
@@ -1213,12 +1213,12 @@ void Render(void)
 		EyeRender(index, 1, headPose);
 
 	// Final drawing compositing
-	CompositeDraw(imageIndex, index, 0);
+	CompositeDraw(imageIndex[0], index, 0);
 	//////
 
 	// Other eye compositing
 	if(config.isVR)
-		CompositeDraw(imageIndex, index, 1);
+		CompositeDraw(imageIndex[1], index, 1);
 
 	// Reset the font text collection for the next frame
 	Font_Reset(&font);
@@ -1236,7 +1236,7 @@ void Render(void)
 		.waitSemaphoreCount=1,
 		.pWaitSemaphores=&perFrame[index].completeSemaphore,
 		.signalSemaphoreCount=1,
-		.pSignalSemaphores=&swapchain.waitSemaphore[imageIndex],
+		.pSignalSemaphores=&swapchain.waitSemaphore[imageIndex[0]],
 		.commandBufferCount=1,
 		.pCommandBuffers=&perFrame[index].commandBuffer,
 	};
@@ -1255,7 +1255,6 @@ void Render(void)
 	if(config.isVR)
 	{
 		VR_EndFrame(&xrContext);
-		index=(index+1)%FRAMES_IN_FLIGHT;
 	}
 	else
 	// Handle non-VR frame end
@@ -1265,21 +1264,21 @@ void Render(void)
 		{
 			.sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 			.waitSemaphoreCount=1,
-			.pWaitSemaphores=&swapchain.waitSemaphore[imageIndex],
+			.pWaitSemaphores=&swapchain.waitSemaphore[imageIndex[0]],
 			.swapchainCount=1,
 			.pSwapchains=&swapchain.swapchain,
-			.pImageIndices=&imageIndex,
+			.pImageIndices=&imageIndex[0],
 		});
 
 		if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
 			DBGPRINTF(DEBUG_WARNING, "vkQueuePresent out of date or suboptimal...\n");
-
-		index=(index+1)%FRAMES_IN_FLIGHT;
 	}
 
 	UpdateLineGraph(&frameTimes, fTimeStep, fTimeStep);
 	UpdateLineGraph(&audioTimes, audioTime, fTimeStep);
 	UpdateLineGraph(&physicsTimes, physicsTime, fTimeStep);
+
+	index=(index+1)%FRAMES_IN_FLIGHT;
 }
 
 void Console_CmdQuit(Console_t *console, const char *param)
@@ -1597,8 +1596,8 @@ bool Init(void)
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)config.renderWidth, (float)config.renderHeight));
 
 #ifdef ANDROID
-	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-50.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), "Random", (UIControlCallback)GenerateWorld);
-	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-100.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), "Fire", (UIControlCallback)Fire);
+	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-50.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), false, "Random", (UIControlCallback)GenerateWorld);
+	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-100.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), false, "Fire", (UIControlCallback)Fire);
 #endif
 
 	windowID=UI_AddWindow(&UI, Vec2(UI.size.x-450, UI.size.y-50), Vec2(400, 128), Vec3(0.1, 0.1, 0.1), false, "Controls");

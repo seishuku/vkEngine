@@ -62,7 +62,7 @@ typedef struct
 	XrSpace leftHandSpace, rightHandSpace;
 } XruContext_t;
 
-bool VR_StartFrame(XruContext_t *xrContext);
+bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex);
 bool VR_EndFrame(XruContext_t *xrContext);
 matrix VR_GetEyeProjection(XruContext_t *xrContext, uint32_t eye);
 matrix VR_GetHeadPose(XruContext_t *xrContext);

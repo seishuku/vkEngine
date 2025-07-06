@@ -133,6 +133,9 @@ static void HRIRInterpolate(vec3 xyz)
 	// Query spatial hash for nearby triangles
 	SpatialHash_TestObjects(&HRIRHash, position, &position, HRIR_FindBestTriangle);
 
+	if(triangleIndex>sphere.numIndex)
+		return;
+
 	// Calculate the barycentric coordinates and use them to interpolate the HRIR samples.
 	const HRIR_Vertex_t *v0=&sphere.vertices[triangleIndex+0];
 	const HRIR_Vertex_t *v1=&sphere.vertices[triangleIndex+1];

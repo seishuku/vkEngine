@@ -509,6 +509,7 @@ int main(int argc, char **argv)
 		config.windowWidth=config.renderWidth;
 		config.windowHeight=config.renderHeight;
 		MoveWindow(vkContext.hWnd, 0, 0, config.windowWidth/2, config.windowHeight/2, TRUE);
+		config.isVR=true;
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Initializing Vulkan resources...\n");

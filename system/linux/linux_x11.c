@@ -33,8 +33,6 @@ extern XruContext_t xrContext;
 extern VkInstance vkInstance;
 extern VkuContext_t vkContext;
 
-extern VkuMemZone_t vkZone;
-
 extern VkuSwapchain_t swapchain;
 
 float fps=0.0f, fTimeStep=0.0f, fTime=0.0f;
@@ -387,6 +385,7 @@ int main(int argc, char **argv)
 		config.windowWidth=config.renderWidth;
 		config.windowHeight=config.renderHeight;
 		XMoveResizeWindow(vkContext.display, vkContext.window, 0, 0, config.windowWidth/2, config.windowHeight/2);
+		config.isVR=true;
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Initializing Vulkan resources...\n");

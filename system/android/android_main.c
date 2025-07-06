@@ -19,7 +19,6 @@ MemZone_t *zone;
 
 bool isDone=false;
 
-bool isVR=false;
 extern XruContext_t xrContext;
 
 extern VkInstance vkInstance;
@@ -244,12 +243,13 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			if(!VR_Init(&xrContext, vkInstance, &vkContext))
 			{
 				DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
-				isVR=false;
+				config.isVR=false;
 			}
 			else
 			{
 				config.renderWidth=xrContext.swapchainExtent.width;
 				config.renderHeight=xrContext.swapchainExtent.height;
+				config.isVR=true;
 			}
 
 			DBGPRINTF(DEBUG_INFO, "Init...\n");

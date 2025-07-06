@@ -91,7 +91,7 @@ static void xruPollEvents(XruContext_t *xrContext)
 	}
 }
 
-bool VR_StartFrame(XruContext_t *xrContext)
+bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex)
 {
 	xruPollEvents(xrContext);
 
@@ -112,8 +112,6 @@ bool VR_StartFrame(XruContext_t *xrContext)
 	
 	if(xrContext->frameState.shouldRender&&(xrContext->sessionState==XR_SESSION_STATE_VISIBLE||xrContext->sessionState==XR_SESSION_STATE_FOCUSED))
 	{
-		uint32_t imageIndex[2];
-
 		if(!xruCheck(xrContext->instance, xrAcquireSwapchainImage(xrContext->swapchain[0].swapchain, &(XrSwapchainImageAcquireInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO }, &imageIndex[0])))
 		{
 			DBGPRINTF(DEBUG_ERROR, "VR: Failed to acquire swapchain image 0.\n");
