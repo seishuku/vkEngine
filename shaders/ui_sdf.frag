@@ -29,6 +29,11 @@ float sdfDistance(float dist)
 	return smoothstep(-w, w, -dist);
 }
 
+float sdfDistanceW(float dist, float w)
+{
+	return smoothstep(-w, w, -dist);
+}
+
 mat2 rotate(float a)
 {
 	float s=sin(a*0.017453292223), c=cos(a*0.017453292223);
@@ -611,113 +616,115 @@ void main()
 
 		case UI_CONTROL_TEXT:
 		{
-			float dist=1.0;
+			vec3 dist=vec3(1.0);
 
 			switch(uint(Size.x))
 			{
-				case 33:	dist=exclamation(UV.xy); break;
-				case 34:	dist=quote(UV.xy); break;
-				case 35:	dist=pound(UV.xy); break;
-				case 36:	dist=dollersign(UV.xy); break;
-				case 37:	dist=percent(UV.xy); break;
-				case 38:	dist=ampersand(UV.xy); break;
-				case 39:	dist=apostrophe(UV.xy); break;
-				case 40:	dist=leftparenthesis(UV.xy); break;
-				case 41:	dist=rightparenthesis(UV.xy); break;
-				case 42:	dist=asterisk(UV.xy); break;
-				case 43:	dist=plus(UV.xy); break;
-				case 44:	dist=comma(UV.xy); break;
-				case 45:	dist=minus(UV.xy); break;
-				case 46:	dist=period(UV.xy); break;
-				case 47:	dist=forwardslash(UV.xy); break;
+				case 33:	dist.x=exclamation(UV.xy-vec2(onePixel.x, 0.0));		dist.y=exclamation(UV.xy);		dist.z=exclamation(UV.xy+vec2(onePixel.x, 0.0));		break;
+				case 34:	dist.x=quote(UV.xy-vec2(onePixel.x, 0.0));				dist.y=quote(UV.xy);			dist.z=quote(UV.xy+vec2(onePixel.x, 0.0));				break;
+				case 35:	dist.x=pound(UV.xy-vec2(onePixel.x, 0.0));				dist.y=pound(UV.xy);			dist.z=pound(UV.xy+vec2(onePixel.x, 0.0));				break;
+				case 36:	dist.x=dollersign(UV.xy-vec2(onePixel.x, 0.0));			dist.y=dollersign(UV.xy);		dist.z=dollersign(UV.xy+vec2(onePixel.x, 0.0));			break;
+				case 37:	dist.x=percent(UV.xy-vec2(onePixel.x, 0.0));			dist.y=percent(UV.xy);			dist.z=percent(UV.xy+vec2(onePixel.x, 0.0));			break;
+				case 38:	dist.x=ampersand(UV.xy-vec2(onePixel.x, 0.0));			dist.y=ampersand(UV.xy);		dist.z=ampersand(UV.xy+vec2(onePixel.x, 0.0));			break;
+				case 39:	dist.x=apostrophe(UV.xy-vec2(onePixel.x, 0.0));			dist.y=apostrophe(UV.xy);		dist.z=apostrophe(UV.xy+vec2(onePixel.x, 0.0));			break;
+				case 40:	dist.x=leftparenthesis(UV.xy-vec2(onePixel.x, 0.0));	dist.y=leftparenthesis(UV.xy);	dist.z=leftparenthesis(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 41:	dist.x=rightparenthesis(UV.xy-vec2(onePixel.x, 0.0));	dist.y=rightparenthesis(UV.xy);	dist.z=rightparenthesis(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 42:	dist.x=asterisk(UV.xy-vec2(onePixel.x, 0.0));			dist.y=asterisk(UV.xy);			dist.z=asterisk(UV.xy+vec2(onePixel.x, 0.0));			break;
+				case 43:	dist.x=plus(UV.xy-vec2(onePixel.x, 0.0));				dist.y=plus(UV.xy);				dist.z=plus(UV.xy+vec2(onePixel.x, 0.0));				break;
+				case 44:	dist.x=comma(UV.xy-vec2(onePixel.x, 0.0));				dist.y=comma(UV.xy);			dist.z=comma(UV.xy+vec2(onePixel.x, 0.0));				break;
+				case 45:	dist.x=minus(UV.xy-vec2(onePixel.x, 0.0));				dist.y=minus(UV.xy);			dist.z=minus(UV.xy+vec2(onePixel.x, 0.0));				break;
+				case 46:	dist.x=period(UV.xy-vec2(onePixel.x, 0.0));				dist.y=period(UV.xy);			dist.z=period(UV.xy+vec2(onePixel.x, 0.0));				break;
+				case 47:	dist.x=forwardslash(UV.xy-vec2(onePixel.x, 0.0));		dist.y=forwardslash(UV.xy);		dist.z=forwardslash(UV.xy+vec2(onePixel.x, 0.0));		break;
 
-				case 48:    dist=_00(UV.xy); break;
-				case 49:    dist=_11(UV.xy); break;
-				case 50:    dist=_22(UV.xy); break;
-				case 51:    dist=_33(UV.xy); break;
-				case 52:    dist=_44(UV.xy); break;
-				case 53:    dist=_55(UV.xy); break;
-				case 54:    dist=_66(UV.xy); break;
-				case 55:    dist=_77(UV.xy); break;
-				case 56:    dist=_88(UV.xy); break;
-				case 57:    dist=_99(UV.xy); break;
+				case 48:    dist.x=_00(UV.xy-vec2(onePixel.x, 0.0));	dist.y=_00(UV.xy);	dist.z=_00(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 49:    dist.x=_11(UV.xy-vec2(onePixel.x, 0.0));	dist.y=_11(UV.xy);	dist.z=_11(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 50:    dist.x=_22(UV.xy-vec2(onePixel.x, 0.0));	dist.y=_22(UV.xy);	dist.z=_22(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 51:    dist.x=_33(UV.xy-vec2(onePixel.x, 0.0));	dist.y=_33(UV.xy);	dist.z=_33(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 52:    dist.x=_44(UV.xy-vec2(onePixel.x, 0.0));	dist.y=_44(UV.xy);	dist.z=_44(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 53:    dist.x=_55(UV.xy-vec2(onePixel.x, 0.0));	dist.y=_55(UV.xy);	dist.z=_55(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 54:    dist.x=_66(UV.xy-vec2(onePixel.x, 0.0));	dist.y=_66(UV.xy);	dist.z=_66(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 55:    dist.x=_77(UV.xy-vec2(onePixel.x, 0.0));	dist.y=_77(UV.xy);	dist.z=_77(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 56:    dist.x=_88(UV.xy-vec2(onePixel.x, 0.0));	dist.y=_88(UV.xy);	dist.z=_88(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 57:    dist.x=_99(UV.xy-vec2(onePixel.x, 0.0));	dist.y=_99(UV.xy);	dist.z=_99(UV.xy+vec2(onePixel.x, 0.0));	break;
 
-				case 58:	dist=colon(UV.xy); break;
-				case 59:	dist=semicolon(UV.xy); break;
-				case 60:	dist=less(UV.xy); break;
-				case 61:	dist=_equal(UV.xy); break;
-				case 62:	dist=greater(UV.xy); break;
-				case 63:	dist=question(UV.xy); break;
-				case 64:	dist=at(UV.xy); break;
+				case 58:	dist.x=colon(UV.xy-vec2(onePixel.x, 0.0));		dist.y=colon(UV.xy);		dist.z=colon(UV.xy+vec2(onePixel.x, 0.0));		break;
+				case 59:	dist.x=semicolon(UV.xy-vec2(onePixel.x, 0.0));	dist.y=semicolon(UV.xy);	dist.z=semicolon(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 60:	dist.x=less(UV.xy-vec2(onePixel.x, 0.0));		dist.y=less(UV.xy);			dist.z=less(UV.xy+vec2(onePixel.x, 0.0));		break;
+				case 61:	dist.x=_equal(UV.xy-vec2(onePixel.x, 0.0));		dist.y=_equal(UV.xy);		dist.z=_equal(UV.xy+vec2(onePixel.x, 0.0));		break;
+				case 62:	dist.x=greater(UV.xy-vec2(onePixel.x, 0.0));	dist.y=greater(UV.xy);		dist.z=greater(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 63:	dist.x=question(UV.xy-vec2(onePixel.x, 0.0));	dist.y=question(UV.xy);		dist.z=question(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 64:	dist.x=at(UV.xy-vec2(onePixel.x, 0.0));			dist.y=at(UV.xy);			dist.z=at(UV.xy+vec2(onePixel.x, 0.0));			break;
 
-				case 65:    dist=AA(UV.xy); break;
-				case 66:    dist=BB(UV.xy); break;
-				case 67:    dist=CC(UV.xy); break;
-				case 68:    dist=DD(UV.xy); break;
-				case 69:    dist=EE(UV.xy); break;
-				case 70:    dist=FF(UV.xy); break;
-				case 71:    dist=GG(UV.xy); break;
-				case 72:    dist=HH(UV.xy); break;
-				case 73:    dist=II(UV.xy); break;
-				case 74:    dist=JJ(UV.xy); break;
-				case 75:    dist=KK(UV.xy); break;
-				case 76:    dist=LL(UV.xy); break;
-				case 77:    dist=MM(UV.xy); break;
-				case 78:    dist=NN(UV.xy); break;
-				case 79:    dist=OO(UV.xy); break;
-				case 80:    dist=PP(UV.xy); break;
-				case 81:    dist=QQ(UV.xy); break;
-				case 82:    dist=RR(UV.xy); break;
-				case 83:    dist=SS(UV.xy); break;
-				case 84:    dist=TT(UV.xy); break;
-				case 85:    dist=UU(UV.xy); break;
-				case 86:    dist=VV(UV.xy); break;
-				case 87:    dist=WW(UV.xy); break;
-				case 88:    dist=XX(UV.xy); break;
-				case 89:    dist=YY(UV.xy); break;
-				case 90:    dist=ZZ(UV.xy); break;
+				case 65: 	dist.x=AA(UV.xy-vec2(onePixel.x, 0.0));	dist.y=AA(UV.xy);	dist.z=AA(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 66: 	dist.x=BB(UV.xy-vec2(onePixel.x, 0.0));	dist.y=BB(UV.xy);	dist.z=BB(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 67: 	dist.x=CC(UV.xy-vec2(onePixel.x, 0.0));	dist.y=CC(UV.xy);	dist.z=CC(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 68: 	dist.x=DD(UV.xy-vec2(onePixel.x, 0.0));	dist.y=DD(UV.xy);	dist.z=DD(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 69: 	dist.x=EE(UV.xy-vec2(onePixel.x, 0.0));	dist.y=EE(UV.xy);	dist.z=EE(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 70: 	dist.x=FF(UV.xy-vec2(onePixel.x, 0.0));	dist.y=FF(UV.xy);	dist.z=FF(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 71: 	dist.x=GG(UV.xy-vec2(onePixel.x, 0.0));	dist.y=GG(UV.xy);	dist.z=GG(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 72: 	dist.x=HH(UV.xy-vec2(onePixel.x, 0.0));	dist.y=HH(UV.xy);	dist.z=HH(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 73: 	dist.x=II(UV.xy-vec2(onePixel.x, 0.0));	dist.y=II(UV.xy);	dist.z=II(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 74: 	dist.x=JJ(UV.xy-vec2(onePixel.x, 0.0));	dist.y=JJ(UV.xy);	dist.z=JJ(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 75: 	dist.x=KK(UV.xy-vec2(onePixel.x, 0.0));	dist.y=KK(UV.xy);	dist.z=KK(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 76: 	dist.x=LL(UV.xy-vec2(onePixel.x, 0.0));	dist.y=LL(UV.xy);	dist.z=LL(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 77: 	dist.x=MM(UV.xy-vec2(onePixel.x, 0.0));	dist.y=MM(UV.xy);	dist.z=MM(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 78: 	dist.x=NN(UV.xy-vec2(onePixel.x, 0.0));	dist.y=NN(UV.xy);	dist.z=NN(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 79: 	dist.x=OO(UV.xy-vec2(onePixel.x, 0.0));	dist.y=OO(UV.xy);	dist.z=OO(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 80: 	dist.x=PP(UV.xy-vec2(onePixel.x, 0.0));	dist.y=PP(UV.xy);	dist.z=PP(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 81: 	dist.x=QQ(UV.xy-vec2(onePixel.x, 0.0));	dist.y=QQ(UV.xy);	dist.z=QQ(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 82: 	dist.x=RR(UV.xy-vec2(onePixel.x, 0.0));	dist.y=RR(UV.xy);	dist.z=RR(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 83: 	dist.x=SS(UV.xy-vec2(onePixel.x, 0.0));	dist.y=SS(UV.xy);	dist.z=SS(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 84: 	dist.x=TT(UV.xy-vec2(onePixel.x, 0.0));	dist.y=TT(UV.xy);	dist.z=TT(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 85: 	dist.x=UU(UV.xy-vec2(onePixel.x, 0.0));	dist.y=UU(UV.xy);	dist.z=UU(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 86: 	dist.x=VV(UV.xy-vec2(onePixel.x, 0.0));	dist.y=VV(UV.xy);	dist.z=VV(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 87: 	dist.x=WW(UV.xy-vec2(onePixel.x, 0.0));	dist.y=WW(UV.xy);	dist.z=WW(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 88: 	dist.x=XX(UV.xy-vec2(onePixel.x, 0.0));	dist.y=XX(UV.xy);	dist.z=XX(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 89: 	dist.x=YY(UV.xy-vec2(onePixel.x, 0.0));	dist.y=YY(UV.xy);	dist.z=YY(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 90: 	dist.x=ZZ(UV.xy-vec2(onePixel.x, 0.0));	dist.y=ZZ(UV.xy);	dist.z=ZZ(UV.xy+vec2(onePixel.x, 0.0));	break;
 
-				case 91:	dist=leftsquare(UV.xy); break;
-				case 92:	dist=backslash(UV.xy); break;
-				case 93:	dist=rightsquare(UV.xy); break;
-				case 94:	dist=circumflex(UV.xy); break;
-				case 95:	dist=underline(UV.xy); break;
-				case 96:	dist=grave(UV.xy); break;
+				case 91:	dist.x=leftsquare(UV.xy-vec2(onePixel.x, 0.0));		dist.y=leftsquare(UV.xy);	dist.z=leftsquare(UV.xy+vec2(onePixel.x, 0.0));		break;
+				case 92:	dist.x=backslash(UV.xy-vec2(onePixel.x, 0.0));		dist.y=backslash(UV.xy);	dist.z=backslash(UV.xy+vec2(onePixel.x, 0.0));		break;
+				case 93:	dist.x=rightsquare(UV.xy-vec2(onePixel.x, 0.0));	dist.y=rightsquare(UV.xy);	dist.z=rightsquare(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 94:	dist.x=circumflex(UV.xy-vec2(onePixel.x, 0.0));		dist.y=circumflex(UV.xy);	dist.z=circumflex(UV.xy+vec2(onePixel.x, 0.0));		break;
+				case 95:	dist.x=underline(UV.xy-vec2(onePixel.x, 0.0));		dist.y=underline(UV.xy);	dist.z=underline(UV.xy+vec2(onePixel.x, 0.0));		break;
+				case 96:	dist.x=grave(UV.xy-vec2(onePixel.x, 0.0));			dist.y=grave(UV.xy);		dist.z=grave(UV.xy+vec2(onePixel.x, 0.0));			break;
 
-				case 97:    dist=aa(UV.xy); break;
-				case 98:    dist=bb(UV.xy); break;
-				case 99:    dist=cc(UV.xy); break;
-				case 100:   dist=dd(UV.xy); break;
-				case 101:   dist=ee(UV.xy); break;
-				case 102:   dist=ff(UV.xy); break;
-				case 103:   dist=gg(UV.xy); break;
-				case 104:   dist=hh(UV.xy); break;
-				case 105:   dist=ii(UV.xy); break;
-				case 106:   dist=jj(UV.xy); break;
-				case 107:   dist=kk(UV.xy); break;
-				case 108:   dist=ll(UV.xy); break;
-				case 109:   dist=mm(UV.xy); break;
-				case 110:   dist=nn(UV.xy); break;
-				case 111:   dist=oo(UV.xy); break;
-				case 112:   dist=pp(UV.xy); break;
-				case 113:   dist=qq(UV.xy); break;
-				case 114:   dist=rr(UV.xy); break;
-				case 115:   dist=ss(UV.xy); break;
-				case 116:   dist=tt(UV.xy); break;
-				case 117:   dist=uu(UV.xy); break;
-				case 118:   dist=vv(UV.xy); break;
-				case 119:   dist=ww(UV.xy); break;
-				case 120:   dist=xx(UV.xy); break;
-				case 121:   dist=yy(UV.xy); break;
-				case 122:   dist=zz(UV.xy); break;
+				case 97: 	dist.x=aa(UV.xy-vec2(onePixel.x, 0.0));	dist.y=aa(UV.xy);	dist.z=aa(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 98: 	dist.x=bb(UV.xy-vec2(onePixel.x, 0.0));	dist.y=bb(UV.xy);	dist.z=bb(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 99: 	dist.x=cc(UV.xy-vec2(onePixel.x, 0.0));	dist.y=cc(UV.xy);	dist.z=cc(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 100:	dist.x=dd(UV.xy-vec2(onePixel.x, 0.0));	dist.y=dd(UV.xy);	dist.z=dd(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 101:	dist.x=ee(UV.xy-vec2(onePixel.x, 0.0));	dist.y=ee(UV.xy);	dist.z=ee(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 102:	dist.x=ff(UV.xy-vec2(onePixel.x, 0.0));	dist.y=ff(UV.xy);	dist.z=ff(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 103:	dist.x=gg(UV.xy-vec2(onePixel.x, 0.0));	dist.y=gg(UV.xy);	dist.z=gg(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 104:	dist.x=hh(UV.xy-vec2(onePixel.x, 0.0));	dist.y=hh(UV.xy);	dist.z=hh(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 105:	dist.x=ii(UV.xy-vec2(onePixel.x, 0.0));	dist.y=ii(UV.xy);	dist.z=ii(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 106:	dist.x=jj(UV.xy-vec2(onePixel.x, 0.0));	dist.y=jj(UV.xy);	dist.z=jj(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 107:	dist.x=kk(UV.xy-vec2(onePixel.x, 0.0));	dist.y=kk(UV.xy);	dist.z=kk(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 108:	dist.x=ll(UV.xy-vec2(onePixel.x, 0.0));	dist.y=ll(UV.xy);	dist.z=ll(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 109:	dist.x=mm(UV.xy-vec2(onePixel.x, 0.0));	dist.y=mm(UV.xy);	dist.z=mm(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 110:	dist.x=nn(UV.xy-vec2(onePixel.x, 0.0));	dist.y=nn(UV.xy);	dist.z=nn(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 111:	dist.x=oo(UV.xy-vec2(onePixel.x, 0.0));	dist.y=oo(UV.xy);	dist.z=oo(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 112:	dist.x=pp(UV.xy-vec2(onePixel.x, 0.0));	dist.y=pp(UV.xy);	dist.z=pp(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 113:	dist.x=qq(UV.xy-vec2(onePixel.x, 0.0));	dist.y=qq(UV.xy);	dist.z=qq(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 114:	dist.x=rr(UV.xy-vec2(onePixel.x, 0.0));	dist.y=rr(UV.xy);	dist.z=rr(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 115:	dist.x=ss(UV.xy-vec2(onePixel.x, 0.0));	dist.y=ss(UV.xy);	dist.z=ss(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 116:	dist.x=tt(UV.xy-vec2(onePixel.x, 0.0));	dist.y=tt(UV.xy);	dist.z=tt(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 117:	dist.x=uu(UV.xy-vec2(onePixel.x, 0.0));	dist.y=uu(UV.xy);	dist.z=uu(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 118:	dist.x=vv(UV.xy-vec2(onePixel.x, 0.0));	dist.y=vv(UV.xy);	dist.z=vv(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 119:	dist.x=ww(UV.xy-vec2(onePixel.x, 0.0));	dist.y=ww(UV.xy);	dist.z=ww(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 120:	dist.x=xx(UV.xy-vec2(onePixel.x, 0.0));	dist.y=xx(UV.xy);	dist.z=xx(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 121:	dist.x=yy(UV.xy-vec2(onePixel.x, 0.0));	dist.y=yy(UV.xy);	dist.z=yy(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 122:	dist.x=zz(UV.xy-vec2(onePixel.x, 0.0));	dist.y=zz(UV.xy);	dist.z=zz(UV.xy+vec2(onePixel.x, 0.0));	break;
 
-				case 123:	dist=leftcurly(UV.xy); break;
-				case 124:	dist=pipe(UV.xy); break;
-				case 125:	dist=rightcurly(UV.xy); break;
-				case 126:	dist=tilde(UV.xy); break;
+				case 123:	dist.x=leftcurly(UV.xy-vec2(onePixel.x, 0.0)); 	dist.y=leftcurly(UV.xy);	dist.z=leftcurly(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 124:	dist.x=pipe(UV.xy-vec2(onePixel.x, 0.0));		dist.y=pipe(UV.xy);			dist.z=pipe(UV.xy+vec2(onePixel.x, 0.0));		break;
+				case 125:	dist.x=rightcurly(UV.xy-vec2(onePixel.x, 0.0));	dist.y=rightcurly(UV.xy);	dist.z=rightcurly(UV.xy+vec2(onePixel.x, 0.0));	break;
+				case 126:	dist.x=tilde(UV.xy-vec2(onePixel.x, 0.0));		dist.y=tilde(UV.xy);		dist.z=tilde(UV.xy+vec2(onePixel.x, 0.0));		break;
 			};
 
-			Output=vec4(Color.xyz, sdfDistance(dist-0.065));
+			vec3 subPix=vec3(sdfDistanceW(dist.x-0.065, onePixel.x), sdfDistanceW(dist.y-0.065, onePixel.x), sdfDistanceW(dist.z-0.065, onePixel.x));
+			subPix=pow(subPix, vec3(1.0/2.2));
+			Output=vec4(Color.xyz*subPix, (subPix.x+subPix.y+subPix.z)/3.0);
 			return;
 		}
 
