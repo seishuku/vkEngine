@@ -5,6 +5,7 @@
 #include "../vulkan/vulkan.h"
 #include "../perframe.h"
 #include "../math/math.h"
+#include "../utils/id.h"
 #include "../utils/list.h"
 #include "../utils/pipeline.h"
 #include "../font/font.h"
@@ -127,7 +128,8 @@ bool UI_Init(UI_t *UI, vec2 position, vec2 size)
 	if(UI==NULL)
 		return false;
 
-	UI->baseID=0;
+	//UI->baseID=0;
+	ID_Init(UI->baseID);
 
 	// Set screen width/height
 	UI->position=position;

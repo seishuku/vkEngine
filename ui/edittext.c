@@ -3,13 +3,14 @@
 #include <stdio.h>
 #include "../system/system.h"
 #include "../math/math.h"
+#include "../utils/id.h"
 #include "../utils/list.h"
 #include "../font/font.h"
 #include "ui.h"
 
 uint32_t UI_AddEditText(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden,  bool readonly, uint32_t maxLength, const char *initialText)
 {
-	uint32_t ID=UI->baseID++;
+	uint32_t ID=ID_Generate(UI->baseID);
 
 	if(ID==UINT32_MAX||ID>=UI_HASHTABLE_MAX)
 		return UINT32_MAX;

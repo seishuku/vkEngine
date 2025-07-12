@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "../math/math.h"
+#include "../utils/id.h"
 #include "../utils/pipeline.h"
 #include "../utils/list.h"
 
@@ -126,7 +127,8 @@ typedef struct
 	void *instanceBufferPtr;
 
 	// Base ID for generating IDs
-	uint32_t baseID;
+	//uint32_t baseID;
+	ID_t baseID;
 
 	// List of controls in UI
 	List_t controls;

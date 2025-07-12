@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
+#include "../utils/id.h"
 #include "../utils/list.h"
 #include "../font/font.h"
 #include "ui.h"
@@ -13,7 +14,7 @@ extern VkuContext_t vkContext;
 // Returns an ID, or UINT32_MAX on failure.
 uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, VkuImage_t *image, float rotation)
 {
-	uint32_t ID=UI->baseID++;
+	uint32_t ID=ID_Generate(UI->baseID);
 
 	if(ID==UINT32_MAX||ID>=UI_HASHTABLE_MAX)
 		return UINT32_MAX;

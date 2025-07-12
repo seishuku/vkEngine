@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include "../math/math.h"
+#include "../utils/id.h"
 #include "../utils/list.h"
 #include "../font/font.h"
 #include "ui.h"
@@ -10,7 +11,7 @@
 // Returns an ID, or UINT32_MAX on failure.
 uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color, bool hidden)
 {
-	uint32_t ID=UI->baseID++;
+	uint32_t ID=ID_Generate(UI->baseID);
 
 	if(ID==UINT32_MAX||ID>=UI_HASHTABLE_MAX)
 		return UINT32_MAX;

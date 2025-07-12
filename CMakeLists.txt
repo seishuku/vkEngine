@@ -58,6 +58,7 @@ set(PROJECT_SOURCES
 	utils/base64.c
 	utils/config.c
 	utils/event.c
+	utils/id.c
 	utils/list.c
 	utils/pipeline.c
 	utils/spatialhash.c
