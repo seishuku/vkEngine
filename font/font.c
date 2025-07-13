@@ -283,7 +283,7 @@ void Font_Print(Font_t *font, float size, float x, float y, const char *string, 
 
 		// Emit position, atlas offset, and color for this character
 		*font->instance++=Vec4(x-((Font_CharacterBaseWidth(*ptr)*0.5f)*size), y, (float)(*ptr), size);	// Instance position, character to render, size
-		*font->instance++=Vec4(r, g, b, 1.0f);															// Instance color
+		*font->instance++=Vec4(r, g, b, 0.0f);															// Instance color
 	}
 	// ---
 }

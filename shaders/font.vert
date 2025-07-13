@@ -10,7 +10,7 @@ layout (push_constant) uniform ubo {
 	mat4 mvp;
 };
 
-layout (location=0) out vec3 UV;			// Output texture coords
+layout (location=0) out vec4 UV;			// Output texture coords
 layout (location=1) out vec4 Color;			// Output color
 
 void main()
@@ -21,8 +21,8 @@ void main()
 	gl_Position=mvp*vec4(((Vert+InstancePos.xy)/(Viewport*0.5)-1.0)*vec2(1.0, 1.0), 0.0, 1.0);
 
 	// Offset texture coords to position in texture atlas
-	UV=vec3(vVert.zw, InstancePos.z);
+	UV=vec4(vVert.zw, InstancePos.z, InstancePos.w);
 
 	// Pass color
-	Color=vec4(InstanceColor.xyz, 1.0);
+	Color=InstanceColor;
 }
