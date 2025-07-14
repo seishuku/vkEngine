@@ -9,7 +9,7 @@
 
 // Add a cursor to the UI.
 // Returns an ID, or UINT32_MAX on failure.
-uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color, bool hidden)
+uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color, UI_ControlVisibility visibility)
 {
 	uint32_t ID=ID_Generate(UI->baseID);
 
@@ -23,7 +23,7 @@ uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color, bool hi
 		.position=position,
 		.color=color,
 		.childParentID=UINT32_MAX,
-		.hidden=hidden,
+		.visibility=visibility,
 		.cursor.radius=radius,
 	};
 
@@ -36,7 +36,7 @@ uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color, bool hi
 // Update UI cursor parameters.
 // Returns true on success, false on failure.
 // Also individual parameter update functions.
-bool UI_UpdateCursor(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, bool hidden)
+bool UI_UpdateCursor(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, UI_ControlVisibility visibility)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -48,7 +48,7 @@ bool UI_UpdateCursor(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 co
 	{
 		control->position=position;
 		control->color=color;
-		control->hidden=hidden;
+		control->visibility=visibility;
 
 		control->cursor.radius=radius;
 
@@ -113,7 +113,7 @@ bool UI_UpdateCursorColor(UI_t *UI, uint32_t ID, vec3 color)
 	return false;
 }
 
-bool UI_UpdateCursorVisibility(UI_t *UI, uint32_t ID, bool hidden)
+bool UI_UpdateCursorVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -123,7 +123,7 @@ bool UI_UpdateCursorVisibility(UI_t *UI, uint32_t ID, bool hidden)
 
 	if(control!=NULL&&control->type==UI_CONTROL_CURSOR)
 	{
-		control->hidden=hidden;
+		control->visibility=visibility;
 		return true;
 	}
 

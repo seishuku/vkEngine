@@ -4,7 +4,8 @@
 layout (location=0) in vec2 UV;
 layout (location=1) in flat vec4 Color;
 layout (location=2) in flat uint Type;
-layout (location=3) in flat vec2 Size;
+layout (location=3) in flat uint Flag;
+layout (location=4) in flat vec2 Size;
 
 layout (binding=0) uniform sampler2D Texture;
 
@@ -573,7 +574,9 @@ void main()
 			// (or in the case of a checkbox, it's either completely filled or not at the cost of extra math)
 			float centerAlpha=0.0;
 
-			if(Color.w>(uv.x/aspect.x)*0.5+0.5)
+			float direction=Flag==1?(uv.y/aspect.y):(uv.x/aspect.x);
+
+			if(Color.w>direction*0.5+0.5)
 				centerAlpha=sdfDistance(roundedRect(uv-offset, aspect-(offset*3), cornerRadius-offset.x));;
 
 			// Add them together and output
@@ -723,7 +726,6 @@ void main()
 			};
 
 			vec3 subPix=vec3(sdfDistanceW(dist.x-0.065, onePixel.x), sdfDistanceW(dist.y-0.065, onePixel.x), sdfDistanceW(dist.z-0.065, onePixel.x));
-			subPix=pow(subPix, vec3(1.0/2.2));
 			Output=vec4(Color.xyz*subPix, (subPix.x+subPix.y+subPix.z)/3.0);
 			return;
 		}

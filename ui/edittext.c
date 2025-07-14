@@ -8,7 +8,7 @@
 #include "../font/font.h"
 #include "ui.h"
 
-uint32_t UI_AddEditText(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden,  bool readonly, uint32_t maxLength, const char *initialText)
+uint32_t UI_AddEditText(UI_t *UI, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, UI_ControlMutability mutability, uint32_t maxLength, const char *initialText)
 {
 	uint32_t ID=ID_Generate(UI->baseID);
 
@@ -22,9 +22,9 @@ uint32_t UI_AddEditText(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hid
 		.position=position,
 		.color=color,
 		.childParentID=UINT32_MAX,
-		.hidden=hidden,
+		.visibility=visibility,
 		.editText.size=size,
-		.editText.readonly=readonly,
+		.editText.mutability=mutability,
 		.editText.maxLength=maxLength,
 		.editText.cursorPos=0,
 		.editText.textOffset=0,
@@ -55,12 +55,12 @@ uint32_t UI_AddEditText(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hid
 	// Print the text left justified
 	vec2 textPosition=Vec2(position.x+8.0f, position.y+(size.y*0.5f));
 
-	UI->controlsHashtable[ID]->editText.titleTextID=UI_AddText(UI, textPosition, textSize, Vec3b(1.0f), hidden, control.editText.buffer);
+	UI->controlsHashtable[ID]->editText.titleTextID=UI_AddText(UI, textPosition, textSize, Vec3b(1.0f), visibility, control.editText.buffer);
 
 	return ID;
 }
 
-bool UI_UpdateEditText(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, bool readonly, uint32_t maxLength, const char *initialText)
+bool UI_UpdateEditText(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, UI_ControlMutability mutability, uint32_t maxLength, const char *initialText)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -72,16 +72,16 @@ bool UI_UpdateEditText(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 col
 	{
 		control->position=position;
 		control->color=color;
-		control->hidden=hidden;
+		control->visibility=visibility;
 		control->editText.maxLength=maxLength;
 
 		const float textLength=Font_StringBaseWidth(control->editText.buffer);
 		const float textSize=fminf(size.x/textLength*0.8f, size.y*0.8f);
 		vec2 textPosition=Vec2(position.x+8.0f, position.y+(size.y*0.5f));
-		UI_UpdateText(UI, control->editText.titleTextID, textPosition, textSize, Vec3b(1.0f), hidden, initialText);
+		UI_UpdateText(UI, control->editText.titleTextID, textPosition, textSize, Vec3b(1.0f), visibility, initialText);
 
 		control->editText.size=size;
-		control->editText.readonly=readonly;
+		control->editText.mutability=mutability;
 
 		return true;
 	}
@@ -158,7 +158,7 @@ bool UI_UpdateEditTextColor(UI_t *UI, uint32_t ID, vec3 color)
 	return false;
 }
 
-bool UI_UpdateEditTextVisibility(UI_t *UI, uint32_t ID, bool hidden)
+bool UI_UpdateEditTextVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -168,8 +168,8 @@ bool UI_UpdateEditTextVisibility(UI_t *UI, uint32_t ID, bool hidden)
 
 	if(control!=NULL&&control->type==UI_CONTROL_EDITTEXT)
 	{
-		control->hidden=hidden;
-		UI_UpdateTextVisibility(UI, control->editText.titleTextID, hidden);
+		control->visibility=visibility;
+		UI_UpdateTextVisibility(UI, control->editText.titleTextID, visibility);
 
 		return true;
 	}
@@ -196,7 +196,7 @@ bool UI_UpdateEditTextTitleText(UI_t *UI, uint32_t ID, const char *titleText)
 	return false;
 }
 
-bool UI_UpdateEditTextReadonly(UI_t *UI, uint32_t ID, bool readonly)
+bool UI_UpdateEditTextMutability(UI_t *UI, uint32_t ID, UI_ControlMutability mutability)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -206,7 +206,7 @@ bool UI_UpdateEditTextReadonly(UI_t *UI, uint32_t ID, bool readonly)
 
 	if(control!=NULL&&control->type==UI_CONTROL_EDITTEXT)
 	{
-		control->editText.readonly=readonly;
+		control->editText.mutability=mutability;
 		return true;
 	}
 
@@ -296,7 +296,7 @@ bool UI_EditTextInsertChar(UI_t *UI, uint32_t ID, char c)
 
 	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(!control||control->type!=UI_CONTROL_EDITTEXT||control->editText.readonly)
+	if(!control||control->type!=UI_CONTROL_EDITTEXT||control->editText.mutability)
 		return false;
 
 	uint32_t len=(uint32_t)strlen(control->editText.buffer);
@@ -324,7 +324,7 @@ bool UI_EditTextMoveCursor(UI_t *UI, uint32_t ID, int32_t offset)
 
 	UI_Control_t *control=UI_FindControlByID(UI, ID);
 
-	if(!control||control->type!=UI_CONTROL_EDITTEXT||control->editText.readonly)
+	if(!control||control->type!=UI_CONTROL_EDITTEXT||control->editText.mutability)
 		return false;
 
 	int32_t newPos=(int32_t)control->editText.cursorPos+offset;
@@ -347,7 +347,7 @@ bool UI_EditTextMoveCursor(UI_t *UI, uint32_t ID, int32_t offset)
 bool UI_EditTextBackspace(UI_t *UI, uint32_t ID)
 {
 	UI_Control_t *control=UI_FindControlByID(UI, ID);
-	if(!control||control->type!=UI_CONTROL_EDITTEXT||control->editText.readonly)
+	if(!control||control->type!=UI_CONTROL_EDITTEXT||control->editText.mutability)
 		return false;
 
 	if(control->editText.cursorPos==0)
@@ -368,7 +368,7 @@ bool UI_EditTextBackspace(UI_t *UI, uint32_t ID)
 bool UI_EditTextDelete(UI_t *UI, uint32_t ID)
 {
 	UI_Control_t *control=UI_FindControlByID(UI, ID);
-	if(!control||control->type!=UI_CONTROL_EDITTEXT||control->editText.readonly)
+	if(!control||control->type!=UI_CONTROL_EDITTEXT||control->editText.mutability)
 		return false;
 
 	uint32_t len=(uint32_t)strlen(control->editText.buffer);

@@ -585,6 +585,5 @@ void main()
 	};
 
 	vec3 subPix=vec3(sdfDistanceW(dist.x-0.065, onePixel.x), sdfDistanceW(dist.y-0.065, onePixel.x), sdfDistanceW(dist.z-0.065, onePixel.x));
-	subPix=pow(subPix, vec3(1.0/2.2));
 	Output=vec4(Color.xyz*subPix, (subPix.x+subPix.y+subPix.z)/3.0);
 }

@@ -15,7 +15,8 @@ layout (push_constant) uniform ubo {
 layout (location=0) out vec2 UV;					// Output coords
 layout (location=1) out flat vec4 Color;			// Control color
 layout (location=2) out flat uint Type;				// Control type
-layout (location=3) out flat vec2 Size;				// Control size
+layout (location=3) out flat uint Flag;				// Control flag
+layout (location=4) out flat vec2 Size;				// Control size
 
 const uint UI_CONTROL_BARGRAPH	=0;
 const uint UI_CONTROL_BUTTON	=1;
@@ -57,6 +58,9 @@ void main()
 
 	// Pass type
 	Type=InstanceType.x;
+
+	// Pass flag
+	Flag=InstanceType.y;
 
 	// Pass size
 	Size=InstancePos.zw;

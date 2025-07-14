@@ -12,7 +12,7 @@ extern VkuContext_t vkContext;
 
 // Add a sprite to the UI.
 // Returns an ID, or UINT32_MAX on failure.
-uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, VkuImage_t *image, float rotation)
+uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, VkuImage_t *image, float rotation)
 {
 	uint32_t ID=ID_Generate(UI->baseID);
 
@@ -26,7 +26,7 @@ uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidde
 		.position=position,
 		.color=color,
 		.childParentID=UINT32_MAX,
-		.hidden=hidden,
+		.visibility=visibility,
 		.sprite.image=image,
 		.sprite.size=size,
 		.sprite.rotation=rotation
@@ -41,7 +41,7 @@ uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidde
 // Update UI sprite parameters.
 // Returns true on success, false on failure.
 // Also individual parameter update function as well.
-bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, VkuImage_t *image, float rotation)
+bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, VkuImage_t *image, float rotation)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -53,7 +53,7 @@ bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color
 	{
 		control->position=position;
 		control->color=color;
-		control->hidden=hidden;
+		control->visibility=visibility;
 
 		control->sprite.image=image,
 		control->sprite.rotation=rotation;
@@ -120,7 +120,7 @@ bool UI_UpdateSpriteColor(UI_t *UI, uint32_t ID, vec3 color)
 	return false;
 }
 
-bool UI_UpdateSpriteVisibility(UI_t *UI, uint32_t ID, bool hidden)
+bool UI_UpdateSpriteVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -130,7 +130,7 @@ bool UI_UpdateSpriteVisibility(UI_t *UI, uint32_t ID, bool hidden)
 
 	if(control!=NULL&&control->type==UI_CONTROL_SPRITE)
 	{
-		control->hidden=hidden;
+		control->visibility=visibility;
 		return true;
 	}
 

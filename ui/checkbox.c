@@ -9,7 +9,7 @@
 
 // Add a checkbox to the UI.
 // Returns an ID, or UINT32_MAX on failure.
-uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, bool hidden, const char *titleText, bool value)
+uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, UI_ControlVisibility visibility, const char *titleText, bool value)
 {
 	uint32_t ID=ID_Generate(UI->baseID);
 
@@ -23,7 +23,7 @@ uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, bool 
 		.position=position,
 		.color=color,
 		.childParentID=UINT32_MAX,
-		.hidden=hidden,
+		.visibility=visibility,
 		.checkBox.radius=radius,
 		.checkBox.value=value
 	};
@@ -40,7 +40,7 @@ uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, bool 
 	UI->controlsHashtable[ID]->checkBox.titleTextID=UI_AddText(UI,
 		Vec2(position.x+radius, position.y), radius,
 		Vec3(1.0f, 1.0f, 1.0f),
-		hidden,
+		visibility,
 		titleText);
 
 	return ID;
@@ -49,7 +49,7 @@ uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, bool 
 // Update UI checkbox parameters.
 // Returns true on success, false on failure.
 // Also individual parameter update functions.
-bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, bool hidden, const char *titleText, bool value)
+bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, UI_ControlVisibility visibility, const char *titleText, bool value)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -61,12 +61,12 @@ bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 
 	{
 		control->position=position;
 		control->color=color;
-		control->hidden=hidden;
+		control->visibility=visibility;
 
 		UI_UpdateText(UI, control->checkBox.titleTextID,
 			Vec2(position.x+radius, position.y), radius,
 			Vec3(1.0f, 1.0f, 1.0f),
-			hidden,
+			visibility,
 			titleText);
 		control->checkBox.radius=radius;
 		control->checkBox.value=value;
@@ -137,7 +137,7 @@ bool UI_UpdateCheckBoxColor(UI_t *UI, uint32_t ID, vec3 color)
 	return false;
 }
 
-bool UI_UpdateCheckBoxVisibility(UI_t *UI, uint32_t ID, bool hidden)
+bool UI_UpdateCheckBoxVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -147,8 +147,8 @@ bool UI_UpdateCheckBoxVisibility(UI_t *UI, uint32_t ID, bool hidden)
 
 	if(control!=NULL&&control->type==UI_CONTROL_CHECKBOX)
 	{
-		control->hidden=hidden;
-		UI_UpdateTextVisibility(UI, control->checkBox.titleTextID, hidden);
+		control->visibility=visibility;
+		UI_UpdateTextVisibility(UI, control->checkBox.titleTextID, visibility);
 
 		return true;
 	}

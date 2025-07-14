@@ -28,7 +28,8 @@ typedef struct
 {
 	vec4 positionSize;
 	vec4 colorValue;
-	uint32_t type, pad[3];
+	uint32_t type, flag;
+	uint32_t pad[2];
 } UI_Instance_t;
 
 static bool UI_VulkanVertex(UI_t *UI)
@@ -221,7 +222,7 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 		UI_Control_t *control=List_GetPointer(&UI->controls, i);
 
 		// Only test non-child and visible controls here
-		if(control->childParentID!=UINT32_MAX||control->hidden)
+		if(control->childParentID!=UINT32_MAX||control->visibility)
 			continue;
 
 		switch(control->type)
@@ -252,14 +253,26 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 
 			case UI_CONTROL_BARGRAPH:
 			{
-				if(!control->barGraph.readonly)
+				if(!control->barGraph.mutability)
 				{
-					// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
-					if(position.x>=control->position.x&&position.x<=control->position.x+control->barGraph.size.x&&
-						position.y>=control->position.y&&position.y<=control->position.y+control->barGraph.size.y)
+					// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max based on it's direction
+					if(control->barGraph.direction)
 					{
-						control->barGraph.value=((position.x-control->position.x)/control->barGraph.size.x)*(control->barGraph.max-control->barGraph.min)+control->barGraph.min;
-						return control->ID;
+						if(position.x>=control->position.x&&position.x<=control->position.x+control->barGraph.size.x&&
+						   position.y>=control->position.y&&position.y<=control->position.y+control->barGraph.size.y)
+						{
+							control->barGraph.value=((position.y-control->position.y)/control->barGraph.size.y)*(control->barGraph.max-control->barGraph.min)+control->barGraph.min;
+							return control->ID;
+						}
+					}
+					else
+					{
+						if(position.x>=control->position.x&&position.x<=control->position.x+control->barGraph.size.x&&
+						   position.y>=control->position.y&&position.y<=control->position.y+control->barGraph.size.y)
+						{
+							control->barGraph.value=((position.x-control->position.x)/control->barGraph.size.x)*(control->barGraph.max-control->barGraph.min)+control->barGraph.min;
+							return control->ID;
+						}
 					}
 				}
 				break;
@@ -267,7 +280,7 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 
 			case UI_CONTROL_EDITTEXT:
 			{
-				if(!control->editText.readonly)
+				if(!control->editText.mutability)
 				{
 					// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
 					if(position.x>=control->position.x&&position.x<=control->position.x+control->editText.size.x&&
@@ -293,7 +306,7 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 					uint32_t *childID=List_GetPointer(&control->window.children, j);
 					UI_Control_t *child=UI_FindControlByID(UI, *childID);
 
-					if(child->hidden)
+					if(child->visibility)
 						continue;
 
 					vec2 childPos=Vec2_Addv(control->position, child->position);
@@ -327,14 +340,26 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 						// Only return the ID of this control
 						case UI_CONTROL_BARGRAPH:
 						{
-							if(!child->barGraph.readonly)
+							if(!child->barGraph.mutability)
 							{
-								// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
-								if(position.x>=childPos.x&&position.x<=childPos.x+child->barGraph.size.x&&
-									position.y>=childPos.y&&position.y<=childPos.y+child->barGraph.size.y)
+								// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max based on it's direction
+								if(child->barGraph.direction)
 								{
-									child->barGraph.value=((position.x-childPos.x)/child->barGraph.size.x)*(child->barGraph.max-child->barGraph.min)+child->barGraph.min;
-									return child->ID;
+									if(position.x>=childPos.x&&position.x<=childPos.x+child->barGraph.size.x&&
+									   position.y>=childPos.y&&position.y<=childPos.y+child->barGraph.size.y)
+									{
+										child->barGraph.value=((position.y-childPos.y)/child->barGraph.size.y)*(child->barGraph.max-child->barGraph.min)+child->barGraph.min;
+										return child->ID;
+									}
+								}
+								else
+								{
+									if(position.x>=childPos.x&&position.x<=childPos.x+child->barGraph.size.x&&
+									   position.y>=childPos.y&&position.y<=childPos.y+child->barGraph.size.y)
+									{
+										child->barGraph.value=((position.x-childPos.x)/child->barGraph.size.x)*(child->barGraph.max-child->barGraph.min)+child->barGraph.min;
+										return child->ID;
+									}
 								}
 							}
 							break;
@@ -342,7 +367,7 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 
 						case UI_CONTROL_EDITTEXT:
 						{
-							if(!child->editText.readonly)
+							if(!child->editText.mutability)
 							{
 								// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
 								if(position.x>=childPos.x&&position.x<=childPos.x+child->editText.size.x&&
@@ -423,12 +448,21 @@ bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 hitPos)
 			break;
 
 		case UI_CONTROL_BARGRAPH:
-			if(!control->barGraph.readonly)
+			if(!control->barGraph.mutability)
 			{
-				// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max
-				if(position.x>=control->position.x&&position.x<=control->position.x+control->barGraph.size.x&&
-					position.y>=control->position.y&&position.y<=control->position.y+control->barGraph.size.y)
-					control->barGraph.value=((position.x-control->position.x)/control->barGraph.size.x)*(control->barGraph.max-control->barGraph.min)+control->barGraph.min;
+				// If hit inside control area, map hit position to point on bargraph and set the value scaled to the set min and max based on it's direction
+				if(control->barGraph.direction)
+				{
+					if(position.x>=control->position.x&&position.x<=control->position.x+control->barGraph.size.x&&
+					   position.y>=control->position.y&&position.y<=control->position.y+control->barGraph.size.y)
+						control->barGraph.value=((position.y-control->position.y)/control->barGraph.size.y)*(control->barGraph.max-control->barGraph.min)+control->barGraph.min;
+				}
+				else
+				{
+					if(position.x>=control->position.x&&position.x<=control->position.x+control->barGraph.size.x&&
+					   position.y>=control->position.y&&position.y<=control->position.y+control->barGraph.size.y)
+						control->barGraph.value=((position.x-control->position.x)/control->barGraph.size.x)*(control->barGraph.max-control->barGraph.min)+control->barGraph.min;
+				}
 			}
 			break;
 
@@ -473,6 +507,7 @@ static bool UI_AddControlInstance(UI_Instance_t **instance, uint32_t *instanceCo
 			(*instance)->colorValue.w=normalize_value;
 
 			(*instance)->type=UI_CONTROL_BARGRAPH;
+			(*instance)->flag=control->barGraph.direction;
 
 			(*instance)++;
 			(*instanceCount)++;
@@ -676,7 +711,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 		UI_Control_t *control=List_GetPointer(&UI->controls, i);
 
 		// Only add controls that are non-child and visible controls
-		if(control->childParentID!=UINT32_MAX||control->hidden)
+		if(control->childParentID!=UINT32_MAX||control->visibility)
 			continue;
 
 		UI_AddControlInstance(&instance, &instanceCount, control, Vec2b(0.0f), dt);
@@ -690,7 +725,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 				UI_Control_t *child=UI_FindControlByID(UI, *childID);
 
 				// Add child control instances with offset of parent control, but only if visible
-				if(!child->hidden)
+				if(!child->visibility)
 					UI_AddControlInstance(&instance, &instanceCount, child, control->position, dt);
 			}
 		}
@@ -735,7 +770,7 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 	{
 		UI_Control_t *control=List_GetPointer(&UI->controls, i);
 
-		if(control->type==UI_CONTROL_SPRITE&&!control->hidden)
+		if(control->type==UI_CONTROL_SPRITE&&!control->visibility)
 		{
 			// TODO: This may be a problem on integrated or mobile platforms, flush needed?
 			instance->positionSize.x=control->position.x;

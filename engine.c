@@ -1596,56 +1596,58 @@ bool Init(void)
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)config.renderWidth, (float)config.renderHeight));
 
 #ifdef ANDROID
-	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-50.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), false, "Random", (UIControlCallback)GenerateWorld);
-	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-100.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), false, "Fire", (UIControlCallback)Fire);
+	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-50.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), UI_CONTORL_NONHIDDEN, "Random", (UIControlCallback)GenerateWorld);
+	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-100.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), UI_CONTORL_NONHIDDEN, "Fire", (UIControlCallback)Fire);
 #endif
 
-	windowID=UI_AddWindow(&UI, Vec2(UI.size.x-450, UI.size.y-50), Vec2(400, 128), Vec3(0.1, 0.1, 0.1), false, "Controls");
+	windowID=UI_AddWindow(&UI, Vec2(UI.size.x-450, UI.size.y-50), Vec2(400, 128), Vec3(0.1, 0.1, 0.1), UI_CONTROL_VISIBLE, "Controls");
 
 	uint32_t playButton=UI_AddButton(&UI,
 				 Vec2(0, -50),							// Position
 				 Vec2(100, 50),							// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
-				 false,									// Not hidden
+				 UI_CONTROL_VISIBLE,					// Not hidden
 				 "Play",								// Title text
 				 StartStreamCallback);					// Callback
 	uint32_t pauseButton=UI_AddButton(&UI,
 				 Vec2(100, -50),						// Position
 				 Vec2(100, 50),							// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
-				 false,									// Not hidden
+				 UI_CONTROL_VISIBLE,					// Not hidden
 				 "Pause",								// Title text
 				 StopStreamCallback);					// Callback
 	uint32_t prevButton=UI_AddButton(&UI,
 				 Vec2(200, -50),						// Position
 				 Vec2(100, 50),							// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
-				 false,									// Not hidden
+				 UI_CONTROL_VISIBLE,					// Not hidden
 				 "Prev",								// Title text
 				 PrevTrackCallback);					// Callback
 	uint32_t nextButton=UI_AddButton(&UI,
 				 Vec2(300, -50),						// Position
 				 Vec2(100, 50),							// Size
 				 Vec3(0.25f, 0.25f, 0.25f),				// Color
-				 false,									// Not hidden
+				 UI_CONTROL_VISIBLE,					// Not hidden
 				 "Next",								// Title text
 				 NextTrackCallback);					// Callback
-	currentTrack=UI_AddText(&UI, Vec2(0, -58), 16.0f, Vec3b(1.0f), false, "NULL");
+	currentTrack=UI_AddText(&UI, Vec2(0, -58), 16.0f, Vec3b(1.0f), UI_CONTROL_VISIBLE, "NULL");
 	volumeID=UI_AddBarGraph(&UI,
 				Vec2(0, -96),							// Position
 				Vec2(400, 30),							// Size
 				Vec3(0.1f, 1.0f, 0.1f),					// Color
-				 false,									// Not hidden
+				UI_CONTROL_VISIBLE,						// Not hidden
 				"Volume",								// Title text
-				false,									// Read-only
+				UI_CONTROL_MODIFIABLE,					// Control is modifiable
+				UI_CONTROL_HORIZONTAL,					// Bar is horizontal
 				0.0f, 1.0f, 0.125f);					// min/max/initial value
 	colorShiftID=UI_AddBarGraph(&UI,
 				Vec2(0, -128),							// Position
 				Vec2(400, 30),							// Size
 				Vec3(0.1f, 0.1f, 1.0f),					// Color
-				 false,									// Not hidden
+				UI_CONTROL_VISIBLE,						// Not hidden
 				"Cloud Color Shift",					// Title text
-				false,									// Read-only
+				UI_CONTROL_MODIFIABLE,					// Control is modifiable
+				UI_CONTROL_HORIZONTAL,					// Bar is horizontal
 				0.0f, 1.0f, 0.45f);						// min/max/initial value
 
 	UI_WindowAddControl(&UI, windowID, playButton);
@@ -1656,15 +1658,15 @@ bool Init(void)
 	UI_WindowAddControl(&UI, windowID, volumeID);
 	UI_WindowAddControl(&UI, windowID, colorShiftID);
 
-	UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, UI.size.y/2.0f), Vec2(50.0f, 50.0f), Vec3b(1.0f), false, &textures[TEXTURE_CROSSHAIR], 0.0f);
+	UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, UI.size.y/2.0f), Vec2(50.0f, 50.0f), Vec3b(1.0f), UI_CONTROL_VISIBLE, &textures[TEXTURE_CROSSHAIR], 0.0f);
 
-	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), true, &textures[TEXTURE_FIGHTER1], 0.0f);
+	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), UI_CONTROL_HIDDEN, &textures[TEXTURE_FIGHTER1], 0.0f);
 
-	editWindowID=UI_AddWindow(&UI, Vec2(100, 100), Vec2(200, 50), Vec3(0.5, 0.1, 0.1), false, "Edit control test");
-	editControl=UI_AddEditText(&UI, Vec2(0, -50), Vec2(200, 50), Vec3b(1.0f), false, false, 100, "test");
+	editWindowID=UI_AddWindow(&UI, Vec2(100, 300), Vec2(200, 50), Vec3(0.5, 0.1, 0.1), UI_CONTROL_VISIBLE, "Edit control test");
+	editControl=UI_AddEditText(&UI, Vec2(0, -50), Vec2(200, 50), Vec3b(1.0f), UI_CONTROL_VISIBLE, UI_CONTROL_MODIFIABLE, 150, "");
 	UI_WindowAddControl(&UI, editWindowID, editControl);
 
-	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3b(1.0f), false);
+	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3b(1.0f), UI_CONTROL_VISIBLE);
 
 	// Other per-frame data
 	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)

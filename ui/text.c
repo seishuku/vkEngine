@@ -9,7 +9,7 @@
 #include "../font/font.h"
 #include "ui.h"
 
-uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, bool hidden, const char *titleText)
+uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, UI_ControlVisibility visibility, const char *titleText)
 {
 	if(UI==NULL||titleText==NULL)
 		return false;
@@ -26,7 +26,7 @@ uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, bool hidden
 		.position=position,
 		.color=color,
 		.childParentID=UINT32_MAX,
-		.hidden=hidden,
+		.visibility=visibility,
 		.text.size=size,
 	};
 
@@ -44,7 +44,7 @@ uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, bool hidden
 	return ID;
 }
 
-bool UI_UpdateText(UI_t *UI, uint32_t ID, vec2 position, float size, vec3 color, bool hidden, const char *titleText)
+bool UI_UpdateText(UI_t *UI, uint32_t ID, vec2 position, float size, vec3 color, UI_ControlVisibility visibility, const char *titleText)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -56,7 +56,7 @@ bool UI_UpdateText(UI_t *UI, uint32_t ID, vec2 position, float size, vec3 color,
 	{
 		control->position=position;
 		control->color=color;
-		control->hidden=hidden;
+		control->visibility=visibility;
 
 		Zone_Free(zone, control->text.titleText);
 
@@ -131,7 +131,7 @@ bool UI_UpdateTextColor(UI_t *UI, uint32_t ID, vec3 color)
 	return false;
 }
 
-bool UI_UpdateTextVisibility(UI_t *UI, uint32_t ID, bool hidden)
+bool UI_UpdateTextVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -141,7 +141,7 @@ bool UI_UpdateTextVisibility(UI_t *UI, uint32_t ID, bool hidden)
 
 	if(control!=NULL&&control->type==UI_CONTROL_TEXT)
 	{
-		control->hidden=hidden;
+		control->visibility=visibility;
 		return true;
 	}
 

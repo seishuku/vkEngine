@@ -18,6 +18,24 @@ typedef void (*UIControlCallback)(void *arg);
 
 typedef enum
 {
+	UI_CONTROL_VISIBLE=0,
+	UI_CONTROL_HIDDEN=1,
+} UI_ControlVisibility;
+
+typedef enum
+{
+	UI_CONTROL_MODIFIABLE=0,
+	UI_CONTROL_READONLY=1,
+} UI_ControlMutability;
+
+typedef enum
+{
+	UI_CONTROL_HORIZONTAL=0,
+	UI_CONTROL_VERTICAL=1,
+} UI_BarGraphDirection;
+
+typedef enum
+{
 	UI_CONTROL_BARGRAPH=0,
 	UI_CONTROL_BUTTON,
 	UI_CONTROL_CHECKBOX,
@@ -37,7 +55,7 @@ typedef struct
 	vec2 position;
 	vec3 color;
 	uint32_t childParentID;
-	bool hidden;
+	UI_ControlVisibility visibility;
 
 	// Specific to type
 	union
@@ -47,7 +65,8 @@ typedef struct
 		{
 			uint32_t titleTextID;
 			vec2 size;
-			bool readonly;
+			UI_ControlMutability mutability;
+			UI_BarGraphDirection direction;
 			float min, max, value, curValue;
 		} barGraph;
 
@@ -78,7 +97,7 @@ typedef struct
 		{
 			uint32_t titleTextID;
 			vec2 size;
-			bool readonly;
+			UI_ControlMutability mutability;
 
 			char *buffer;
 			uint32_t maxLength, cursorPos, textOffset;
@@ -143,85 +162,86 @@ void UI_Destroy(UI_t *UI);
 bool UI_AddControl(UI_t *UI, UI_Control_t *control);
 UI_Control_t *UI_FindControlByID(UI_t *UI, uint32_t ID);
 
-uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, bool Readonly, float Min, float Max, float value);
-bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, bool Readonly, float Min, float Max, float value);
+uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, const char *titleText, UI_ControlMutability mutability, UI_BarGraphDirection direction, float min, float max, float value);
+bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, const char *titleText, UI_ControlMutability mutability, UI_BarGraphDirection direction, float Min, float Max, float value);
 bool UI_UpdateBarGraphPosition(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_UpdateBarGraphSize(UI_t *UI, uint32_t ID, vec2 size);
 bool UI_UpdateBarGraphColor(UI_t *UI, uint32_t ID, vec3 color);
-bool UI_UpdateBarGraphVisibility(UI_t *UI, uint32_t ID, bool hidden);
+bool UI_UpdateBarGraphVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility);
 bool UI_UpdateBarGraphTitleText(UI_t *UI, uint32_t ID, const char *titleText);
-bool UI_UpdateBarGraphReadonly(UI_t *UI, uint32_t ID, bool Readonly);
-bool UI_UpdateBarGraphMin(UI_t *UI, uint32_t ID, float Min);
-bool UI_UpdateBarGraphMax(UI_t *UI, uint32_t ID, float Max);
+bool UI_UpdateBarGraphMutability(UI_t *UI, uint32_t ID, UI_ControlMutability mutability);
+bool UI_UpdateBarGraphDirection(UI_t *UI, uint32_t ID, UI_BarGraphDirection direction);
+bool UI_UpdateBarGraphMin(UI_t *UI, uint32_t ID, float min);
+bool UI_UpdateBarGraphMax(UI_t *UI, uint32_t ID, float max);
 bool UI_UpdateBarGraphValue(UI_t *UI, uint32_t ID, float value);
 float UI_GetBarGraphMin(UI_t *UI, uint32_t ID);
 float UI_GetBarGraphMax(UI_t *UI, uint32_t ID);
 float UI_GetBarGraphValue(UI_t *UI, uint32_t ID);
 float *UI_GetBarGraphValuePointer(UI_t *UI, uint32_t ID);
 
-uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, UIControlCallback callback);
-bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText, UIControlCallback callback);
+uint32_t UI_AddButton(UI_t *UI, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, const char *titleText, UIControlCallback callback);
+bool UI_UpdateButton(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, const char *titleText, UIControlCallback callback);
 bool UI_UpdateButtonPosition(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_UpdateButtonSize(UI_t *UI, uint32_t ID, vec2 size);
 bool UI_UpdateButtonColor(UI_t *UI, uint32_t ID, vec3 color);
-bool UI_UpdateButtonVisibility(UI_t *UI, uint32_t ID, bool hidden);
+bool UI_UpdateButtonVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility);
 bool UI_UpdateButtonTitleText(UI_t *UI, uint32_t ID, const char *titleText);
 bool UI_UpdateButtonCallback(UI_t *UI, uint32_t ID, UIControlCallback callback);
 
-uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, bool hidden, const char *titleText, bool value);
-bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, bool hidden, const char *titleText, bool value);
+uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, UI_ControlVisibility visibility, const char *titleText, bool value);
+bool UI_UpdateCheckBox(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, UI_ControlVisibility visibility, const char *titleText, bool value);
 bool UI_UpdateCheckBoxPosition(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_UpdateCheckBoxRadius(UI_t *UI, uint32_t ID, float radius);
 bool UI_UpdateCheckBoxColor(UI_t *UI, uint32_t ID, vec3 color);
-bool UI_UpdateCheckBoxVisibility(UI_t *UI, uint32_t ID, bool hidden);
+bool UI_UpdateCheckBoxVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility);
 bool UI_UpdateCheckBoxTitleText(UI_t *UI, uint32_t ID, const char *titleText);
 bool UI_UpdateCheckBoxValue(UI_t *UI, uint32_t ID, bool value);
 bool UI_GetCheckBoxValue(UI_t *UI, uint32_t ID);
 
-uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color, bool hidden);
-bool UI_UpdateCursor(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, bool hidden);
+uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color, UI_ControlVisibility visibility);
+bool UI_UpdateCursor(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, UI_ControlVisibility visibility);
 bool UI_UpdateCursorPosition(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_UpdateCursorRadius(UI_t *UI, uint32_t ID, float radius);
 bool UI_UpdateCursorColor(UI_t *UI, uint32_t ID, vec3 color);
-bool UI_UpdateCursorVisibility(UI_t *UI, uint32_t ID, bool hidden);
+bool UI_UpdateCursorVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility);
 
-uint32_t UI_AddEditText(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, bool readonly, uint32_t maxLength, const char *initialText);
-bool UI_UpdateEditText(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, bool readonly, uint32_t maxLength, const char *initialText);
+uint32_t UI_AddEditText(UI_t *UI, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, UI_ControlMutability mutability, uint32_t maxLength, const char *initialText);
+bool UI_UpdateEditText(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, UI_ControlMutability mutability, uint32_t maxLength, const char *initialText);
 bool UI_UpdateEditTextPosition(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_UpdateEditTextSize(UI_t *UI, uint32_t ID, vec2 size);
 bool UI_UpdateEditTextColor(UI_t *UI, uint32_t ID, vec3 color);
-bool UI_UpdateEditTextVisibility(UI_t *UI, uint32_t ID, bool hidden);
+bool UI_UpdateEditTextVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility);
 bool UI_UpdateEditTextTitleText(UI_t *UI, uint32_t ID, const char *titleText);
-bool UI_UpdateEditTextReadonly(UI_t *UI, uint32_t ID, bool readonly);
+bool UI_UpdateEditTextMutability(UI_t *UI, uint32_t ID, UI_ControlMutability mutability);
 bool UI_EditTextInsertChar(UI_t *UI, uint32_t ID, char c);
 bool UI_EditTextMoveCursor(UI_t *UI, uint32_t ID, int32_t offset);
 bool UI_EditTextBackspace(UI_t *UI, uint32_t ID);
 bool UI_EditTextDelete(UI_t *UI, uint32_t ID);
 
-uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, VkuImage_t *image, float rotation);
-bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, VkuImage_t *image, float rotation);
+uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, VkuImage_t *image, float rotation);
+bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, VkuImage_t *image, float rotation);
 bool UI_UpdateSpritePosition(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_UpdateSpriteSize(UI_t *UI, uint32_t ID, vec2 size);
 bool UI_UpdateSpriteColor(UI_t *UI, uint32_t ID, vec3 color);
 bool UI_UpdateSpriteImage(UI_t *UI, uint32_t ID, VkuImage_t *image);
 bool UI_UpdateSpriteRotation(UI_t *UI, uint32_t ID, float rotation);
-bool UI_UpdateSpriteVisibility(UI_t *UI, uint32_t ID, bool hidden);
+bool UI_UpdateSpriteVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility);
 
-uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, bool hidden, const char *titleText);
-bool UI_UpdateText(UI_t *UI, uint32_t ID, vec2 position, float size, vec3 color, bool hidden, const char *titleText);
+uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, UI_ControlVisibility visibility, const char *titleText);
+bool UI_UpdateText(UI_t *UI, uint32_t ID, vec2 position, float size, vec3 color, UI_ControlVisibility visibility, const char *titleText);
 bool UI_UpdateTextPosition(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_UpdateTextSize(UI_t *UI, uint32_t ID, float size);
 bool UI_UpdateTextColor(UI_t *UI, uint32_t ID, vec3 color);
-bool UI_UpdateTextVisibility(UI_t *UI, uint32_t ID, bool hidden);
+bool UI_UpdateTextVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility);
 bool UI_UpdateTextTitleText(UI_t *UI, uint32_t ID, const char *titleText);
 bool UI_UpdateTextTitleTextf(UI_t *UI, uint32_t ID, const char *titleText, ...);
 
-uint32_t UI_AddWindow(UI_t *UI, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText);
-bool UI_UpdateWindow(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, bool hidden, const char *titleText);
+uint32_t UI_AddWindow(UI_t *UI, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, const char *titleText);
+bool UI_UpdateWindow(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, const char *titleText);
 bool UI_UpdateWindowPosition(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_UpdateWindowSize(UI_t *UI, uint32_t ID, vec2 size);
 bool UI_UpdateWindowColor(UI_t *UI, uint32_t ID, vec3 color);
-bool UI_UpdateWindowVisibility(UI_t *UI, uint32_t ID, bool hidden);
+bool UI_UpdateWindowVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility);
 bool UI_UpdateWindowTitleText(UI_t *UI, uint32_t ID, const char *titleText);
 bool UI_WindowAddControl(UI_t *UI, uint32_t ID, uint32_t childID);
 
