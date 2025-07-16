@@ -14,13 +14,7 @@
 
 // external Vulkan data and font
 extern VkuContext_t vkContext;
-extern VkuSwapchain_t swapchain;
-extern VkRenderPass compositeRenderPass;
 
-extern Font_t font;
-
-extern VkuSwapchain_t swapchain;
-extern XruContext_t xrContext;
 extern matrix modelView, projection[2], headPose;
 // ---
 
@@ -115,7 +109,7 @@ static bool UI_VulkanVertex(UI_t *UI)
 
 static bool UI_VulkanPipeline(UI_t *UI)
 {
-	if(!CreatePipeline(&vkContext, &UI->pipeline, compositeRenderPass, "pipelines/ui_sdf.pipeline"))
+	if(!CreatePipeline(&vkContext, &UI->pipeline, UI->renderPass, "pipelines/ui_sdf.pipeline"))
 		return false;
 
 	UI_VulkanVertex(UI);
@@ -124,13 +118,15 @@ static bool UI_VulkanPipeline(UI_t *UI)
 }
 
 // Initialize UI system.
-bool UI_Init(UI_t *UI, vec2 position, vec2 size)
+bool UI_Init(UI_t *UI, vec2 position, vec2 size, VkRenderPass renderPass)
 {
 	if(UI==NULL)
 		return false;
 
 	//UI->baseID=0;
 	ID_Init(UI->baseID);
+
+	UI->renderPass=renderPass;
 
 	// Set screen width/height
 	UI->position=position;
@@ -695,7 +691,7 @@ static bool UI_AddControlInstance(UI_Instance_t **instance, uint32_t *instanceCo
 	}	
 }
 
-bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
+bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, float dt)
 {
 	if(UI==NULL)
 		return false;
@@ -740,12 +736,12 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 		0, VK_WHOLE_SIZE
 	});
 
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipeline.pipeline);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipeline.pipeline);
 
 	// Bind vertex data buffer
-	vkCmdBindVertexBuffers(perFrame[index].commandBuffer, 0, 1, &UI->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &UI->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 	// Bind object instance buffer
-	vkCmdBindVertexBuffers(perFrame[index].commandBuffer, 1, 1, &UI->instanceBuffer.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &UI->instanceBuffer.buffer, &(VkDeviceSize) { 0 });
 
 	struct
 	{
@@ -760,15 +756,16 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 		z=-1.5f;
 
 	UIPC.viewport=UI->size;
-	UIPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale(UIPC.viewport.x/UIPC.viewport.y, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[eye]);
+	// TODO: This breaks VR
+	UIPC.mvp=MatrixScale(1.0f, -1.0f, 1.0f);//MatrixMult(MatrixMult(MatrixMult(MatrixScale(UIPC.viewport.x/UIPC.viewport.y, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[0]);
 
-	vkCmdPushConstants(perFrame[index].commandBuffer, UI->pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(UIPC), &UIPC);
+	vkCmdPushConstants(commandBuffer, UI->pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(UIPC), &UIPC);
 
 	// Draw sprites, they need descriptor set changes and aren't easy to draw instanced...
 	uint32_t spriteCount=instanceCount;
 	for(uint32_t i=0;i<controlCount;i++)
 	{
-		UI_Control_t *control=List_GetPointer(&UI->controls, i);
+		UI_Control_t *control=(UI_Control_t *)List_GetPointer(&UI->controls, i);
 
 		if(control->type==UI_CONTROL_SPRITE&&!control->visibility)
 		{
@@ -787,20 +784,20 @@ bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt)
 			instance++;
 
 			vkuDescriptorSet_UpdateBindingImageInfo(&UI->pipeline.descriptorSet, 0, control->sprite.image->sampler, control->sprite.image->imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			vkuAllocateUpdateDescriptorSet(&UI->pipeline.descriptorSet, perFrame[index].descriptorPool);
-			vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipelineLayout, 0, 1, &UI->pipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+			vkuAllocateUpdateDescriptorSet(&UI->pipeline.descriptorSet, descriptorPool);
+			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipelineLayout, 0, 1, &UI->pipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 			// Use the last unused instanced data slot for drawing
-			vkCmdDraw(perFrame[index].commandBuffer, 4, 1, 0, spriteCount++);
+			vkCmdDraw(commandBuffer, 4, 1, 0, spriteCount++);
 		}
 	}
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&UI->pipeline.descriptorSet, 0, UI->blankImage.sampler, UI->blankImage.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuAllocateUpdateDescriptorSet(&UI->pipeline.descriptorSet, perFrame[index].descriptorPool);
-	vkCmdBindDescriptorSets(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipelineLayout, 0, 1, &UI->pipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+	vkuAllocateUpdateDescriptorSet(&UI->pipeline.descriptorSet, descriptorPool);
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipelineLayout, 0, 1, &UI->pipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 	// Draw instanced UI elements
-	vkCmdDraw(perFrame[index].commandBuffer, 4, instanceCount, 0, 0);
+	vkCmdDraw(commandBuffer, 4, instanceCount, 0, 0);
 
 	return true;
 }

@@ -145,6 +145,8 @@ typedef struct
 	VkuBuffer_t instanceBuffer;
 	void *instanceBufferPtr;
 
+	VkRenderPass renderPass;
+
 	// Base ID for generating IDs
 	//uint32_t baseID;
 	ID_t baseID;
@@ -156,7 +158,7 @@ typedef struct
 	UI_Control_t *controlsHashtable[UI_HASHTABLE_MAX];
 } UI_t;
 
-bool UI_Init(UI_t *UI, vec2 position, vec2 size);
+bool UI_Init(UI_t *UI, vec2 position, vec2 size, VkRenderPass renderPass);
 void UI_Destroy(UI_t *UI);
 
 bool UI_AddControl(UI_t *UI, UI_Control_t *control);
@@ -247,6 +249,6 @@ bool UI_WindowAddControl(UI_t *UI, uint32_t ID, uint32_t childID);
 
 uint32_t UI_TestHit(UI_t *UI, vec2 position);
 bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 position);
-bool UI_Draw(UI_t *UI, uint32_t index, uint32_t eye, float dt);
+bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, float dt);
 
 #endif

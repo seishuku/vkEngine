@@ -4,8 +4,8 @@
 #include "../vulkan/vulkan.h"
 
 extern VkuImage_t colorResolve[2];
-extern VkuImage_t colorBlur[2];
-extern VkuImage_t colorTemp[2];
+
+extern VkRenderPass compositeRenderPass;
 
 bool CreateCompositePipeline(void);
 void CreateCompositeFramebuffers(uint32_t eye);

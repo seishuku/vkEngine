@@ -38,8 +38,6 @@ typedef struct
 	matrix *cubeInstancePtr;
 	//////
 
-	VkFramebuffer compositeFramebuffer[2];
-
 	// Descriptor pool
 	VkDescriptorPool descriptorPool;
 

@@ -289,7 +289,7 @@ void Font_Print(Font_t *font, float size, float x, float y, const char *string, 
 }
 
 // Submits text draw data to GPU and resets for next frame
-void Font_Draw(Font_t *font, uint32_t index, uint32_t eye)
+void Font_Draw(Font_t *font, VkCommandBuffer commandBuffer)
 {
 	struct
 	{
@@ -308,20 +308,22 @@ void Font_Draw(Font_t *font, uint32_t index, uint32_t eye)
 	else
 		fontPC.extent=(VkExtent2D){ config.renderWidth, config.renderHeight };
 
-	fontPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale((float)fontPC.extent.width/(float)fontPC.extent.height, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[eye]);
+	//fontPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale((float)fontPC.extent.width/(float)fontPC.extent.height, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[0]);
+	// TODO: This breaks VR
+	fontPC.mvp=MatrixScale(1.0f, -1.0f, 1.0f);
 
 	// Bind the font rendering pipeline (sets states and shaders)
-	vkCmdBindPipeline(perFrame[index].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, font->pipeline.pipeline.pipeline);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, font->pipeline.pipeline.pipeline);
 
-	vkCmdPushConstants(perFrame[index].commandBuffer, font->pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(fontPC), &fontPC);
+	vkCmdPushConstants(commandBuffer, font->pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(fontPC), &fontPC);
 
 	// Bind vertex data buffer
-	vkCmdBindVertexBuffers(perFrame[index].commandBuffer, 0, 1, &font->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &font->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 	// Bind object instance buffer
-	vkCmdBindVertexBuffers(perFrame[index].commandBuffer, 1, 1, &font->instanceBuffer.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &font->instanceBuffer.buffer, &(VkDeviceSize) { 0 });
 
 	// Draw the number of characters
-	vkCmdDraw(perFrame[index].commandBuffer, 4, font->numChar, 0, 0);
+	vkCmdDraw(commandBuffer, 4, font->numChar, 0, 0);
 }
 
 void Font_Reset(Font_t *font)

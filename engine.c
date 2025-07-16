@@ -37,6 +37,7 @@
 #include "vr/vr.h"
 #include "vulkan/vulkan.h"
 #include "enemy.h"
+#include "loadingscreen.h"
 #include "models.h"
 #include "perframe.h"
 #include "textures.h"
@@ -1333,10 +1334,15 @@ void Console_CmdExplode(Console_t *console, const char *param)
 	ParticleSystem_ResetEmitter(&particleSystem, em);
 }
 
+LoadingScreen_t loadingScreen;
 
 // Initialization call from system main
 bool Init(void)
 {
+	vkuMemAllocator_Init(&vkContext);
+
+	LoadingScreenInit(&loadingScreen, 53);
+
 	//const uint32_t seed=time(NULL);
 	const uint32_t seed=69420;
 	RandomSeed(seed);
@@ -1350,8 +1356,6 @@ bool Init(void)
 	ConsoleRegisterCommand(&console, "connect", Console_CmdConnect);
 	ConsoleRegisterCommand(&console, "disconnect", Console_CmdDisconnect);
 	ConsoleRegisterCommand(&console, "explode", Console_CmdExplode);
-
-	vkuMemAllocator_Init(&vkContext);
 
 	CameraInit(&camera, Vec3(0.0f, 0.0f, -100.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 
@@ -1369,60 +1373,61 @@ bool Init(void)
 		return false;
 	}
 
+	loadingScreen.currentCount++;
 	if(!Audio_LoadStatic("assets/pew1.wav", &sounds[SOUND_PEW1]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/pew1.wav\n");
 		return false;
 	}
-
+	loadingScreen.currentCount++;
 	if(!Audio_LoadStatic("assets/pew1.wav", &sounds[SOUND_PEW2]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/pew2.wav\n");
 		return false;
 	}
-
+	loadingScreen.currentCount++;
 	if(!Audio_LoadStatic("assets/pew1.wav", &sounds[SOUND_PEW3]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/pew3.wav\n");
 		return false;
 	}
-
+	loadingScreen.currentCount++;
 	if(!Audio_LoadStatic("assets/stone1.wav", &sounds[SOUND_STONE1]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/stone1.wav\n");
 		return false;
 	}
-
+	loadingScreen.currentCount++;
 	if(!Audio_LoadStatic("assets/stone2.wav", &sounds[SOUND_STONE2]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/stone2.wav\n");
 		return false;
 	}
-
+	loadingScreen.currentCount++;
 	if(!Audio_LoadStatic("assets/stone3.wav", &sounds[SOUND_STONE3]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/stone3.wav\n");
 		return false;
 	}
-
+	loadingScreen.currentCount++;
 	if(!Audio_LoadStatic("assets/crash.wav", &sounds[SOUND_CRASH]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/crash.wav\n");
 		return false;
 	}
-
+	loadingScreen.currentCount++;
 	if(!Audio_LoadStatic("assets/explode1.qoa", &sounds[SOUND_EXPLODE1]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode1.wav\n");
 		return false;
 	}
-
+	loadingScreen.currentCount++;
 	if(!Audio_LoadStatic("assets/explode2.qoa", &sounds[SOUND_EXPLODE2]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode2.wav\n");
 		return false;
 	}
-
+	loadingScreen.currentCount++;
 	if(!Audio_LoadStatic("assets/explode3.qoa", &sounds[SOUND_EXPLODE3]))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode3.wav\n");
@@ -1433,6 +1438,7 @@ bool Init(void)
 	Music_Init();
 
 	// Load models
+	loadingScreen.currentCount++;
 	if(LoadBModel(&models[MODEL_ASTEROID1], "assets/asteroid1.bmodel"))
 		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID1]);
 	else
@@ -1440,7 +1446,7 @@ bool Init(void)
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid1.bmodel\n");
 		return false;
 	}
-
+	loadingScreen.currentCount++;
 	if(LoadBModel(&models[MODEL_ASTEROID2], "assets/asteroid2.bmodel"))
 		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID2]);
 	else
@@ -1448,7 +1454,7 @@ bool Init(void)
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid2.bmodel\n");
 		return false;
 	}
-
+	loadingScreen.currentCount++;
 	if(LoadBModel(&models[MODEL_ASTEROID3], "assets/asteroid3.bmodel"))
 		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID3]);
 	else
@@ -1456,7 +1462,7 @@ bool Init(void)
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid3.bmodel\n");
 		return false;
 	}
-
+	loadingScreen.currentCount++;
 	if(LoadBModel(&models[MODEL_ASTEROID4], "assets/asteroid4.bmodel"))
 		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID4]);
 	else
@@ -1464,7 +1470,7 @@ bool Init(void)
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid4.bmodel\n");
 		return false;
 	}
-
+	loadingScreen.currentCount++;
 	if(LoadBModel(&fighter, "assets/fighter1.bmodel"))
 		BuildMemoryBuffersBModel(&vkContext, &fighter);
 	else
@@ -1472,7 +1478,7 @@ bool Init(void)
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/fighter1.bmodel\n");
 		return false;
 	}
-
+	loadingScreen.currentCount++;
 	if(LoadBModel(&cube, "assets/cube.bmodel"))
 		BuildMemoryBuffersBModel(&vkContext, &cube);
 	else
@@ -1482,56 +1488,91 @@ bool Init(void)
 	}
 
 	// Load textures
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID1], "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID1_NORMAL], "assets/asteroid1_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID2], "assets/asteroid2.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID2_NORMAL], "assets/asteroid2_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID3], "assets/asteroid3.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID3_NORMAL], "assets/asteroid3_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID4], "assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID4_NORMAL], "assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_CROSSHAIR], "assets/crosshair.qoi", IMAGE_NONE);
 
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER1], "assets/crono782.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER1_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER2], "assets/cubik.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER2_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER3], "assets/freelancer.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER3_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER4], "assets/idolknight.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER4_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER5], "assets/krulspeld1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER5_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER6], "assets/psionic.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER6_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER7], "assets/thor.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER7_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER8], "assets/wilko.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER8_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_CUBE], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
+	loadingScreen.currentCount++;
 	Image_Upload(&vkContext, &textures[TEXTURE_CUBE_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
 
+	loadingScreen.currentCount++;
 	GenNebulaVolume(&textures[TEXTURE_VOLUME]);
 
 	// Create primary pipeline
+	loadingScreen.currentCount++;
 	CreateLightingPipeline();
 
 	// Create skybox pipeline
+	loadingScreen.currentCount++;
 	CreateSkyboxPipeline();
 	GenerateWorld();
 
+	loadingScreen.currentCount++;
 	CreateSpherePipeline();
+	loadingScreen.currentCount++;
 	CreateLinePipeline();
 
 	// Create volumetric rendering pipeline
+	loadingScreen.currentCount++;
 	CreateVolumePipeline();
 
 	// Create shadow map pipeline
+	loadingScreen.currentCount++;
 	CreateShadowPipeline();
 	CreateShadowMap();
 
 	// Create compositing pipeline
+	loadingScreen.currentCount++;
 	CreateCompositePipeline();
 
 	// Create primary frame buffers, depth image
@@ -1545,6 +1586,7 @@ bool Init(void)
 		CreateCompositeFramebuffers(1);
 	}
 
+	loadingScreen.currentCount++;
 	CreateLineGraphPipeline();
 	CreateLineGraph(&frameTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, config.renderHeight-32.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
 	CreateLineGraph(&audioTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, config.renderHeight-48.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
@@ -1593,7 +1635,7 @@ bool Init(void)
 
 	Font_Init(&font);
 
-	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)config.renderWidth, (float)config.renderHeight));
+	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)config.renderWidth, (float)config.renderHeight), compositeRenderPass);
 
 #ifdef ANDROID
 	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-50.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), UI_CONTORL_NONHIDDEN, "Random", (UIControlCallback)GenerateWorld);
@@ -1750,6 +1792,8 @@ bool Init(void)
 	ThreadBarrier_Init(&physicsThreadBarrier, 2);
 
 	//ClientNetwork_Init();
+
+	DestroyLoadingScreen(&loadingScreen);
 
 	if(!Zone_VerifyHeap(zone))
 		exit(-1);
@@ -2018,8 +2062,6 @@ void Destroy(void)
 	// swapchain, framebuffer, and depth buffer destruction
 	vkuDestroyImageBuffer(&vkContext, &colorImage[0]);
 	vkuDestroyImageBuffer(&vkContext, &colorResolve[0]);
-	vkuDestroyImageBuffer(&vkContext, &colorBlur[0]);
-	vkuDestroyImageBuffer(&vkContext, &colorTemp[0]);
 	vkuDestroyImageBuffer(&vkContext, &depthImage[0]);
 
 	vkDestroyFramebuffer(vkContext.device, framebuffer[0], VK_NULL_HANDLE);
@@ -2028,8 +2070,6 @@ void Destroy(void)
 	{
 		vkuDestroyImageBuffer(&vkContext, &colorImage[1]);
 		vkuDestroyImageBuffer(&vkContext, &colorResolve[1]);
-		vkuDestroyImageBuffer(&vkContext, &colorBlur[1]);
-		vkuDestroyImageBuffer(&vkContext, &colorTemp[1]);
 		vkuDestroyImageBuffer(&vkContext, &depthImage[1]);
 
 		vkDestroyFramebuffer(vkContext.device, framebuffer[1], VK_NULL_HANDLE);

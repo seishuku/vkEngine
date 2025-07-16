@@ -33,6 +33,8 @@ extern LineGraph_t frameTimes, audioTimes, physicsTimes;
 Pipeline_t compositePipeline;
 VkRenderPass compositeRenderPass;
 
+VkFramebuffer compositeFramebuffer[VKU_MAX_FRAME_COUNT][2];
+
 Pipeline_t thresholdPipeline;
 VkRenderPass thresholdRenderPass;
 VkFramebuffer thresholdFramebuffer[2];
@@ -204,7 +206,7 @@ void CreateCompositeFramebuffers(uint32_t eye)
 				.width=config.renderWidth,
 				.height=config.renderHeight,
 				.layers=1,
-			}, 0, &perFrame[i].compositeFramebuffer[0]);
+			}, 0, &compositeFramebuffer[i][0]);
 		}
 	}
 	else
@@ -221,7 +223,7 @@ void CreateCompositeFramebuffers(uint32_t eye)
 				.width=config.renderWidth,
 				.height=config.renderHeight,
 				.layers=1,
-			}, 0, &perFrame[i].compositeFramebuffer[0]);
+			}, 0, &compositeFramebuffer[i][0]);
 
 			vkCreateFramebuffer(vkContext.device, &(VkFramebufferCreateInfo)
 			{
@@ -232,7 +234,7 @@ void CreateCompositeFramebuffers(uint32_t eye)
 				.width=config.renderWidth,
 				.height=config.renderHeight,
 				.layers=1,
-			}, 0, &perFrame[i].compositeFramebuffer[1]);
+			}, 0, &compositeFramebuffer[i][1]);
 		}
 	}
 }
@@ -338,10 +340,10 @@ void DestroyCompositeFramebuffers(void)
 	// Compositing
 	for(uint32_t i=0;i<swapchain.numImages;i++)
 	{
-		vkDestroyFramebuffer(vkContext.device, perFrame[i].compositeFramebuffer[0], VK_NULL_HANDLE);
+		vkDestroyFramebuffer(vkContext.device, compositeFramebuffer[i][0], VK_NULL_HANDLE);
 
 		if(config.isVR)
-			vkDestroyFramebuffer(vkContext.device, perFrame[i].compositeFramebuffer[1], VK_NULL_HANDLE);
+			vkDestroyFramebuffer(vkContext.device, compositeFramebuffer[i][1], VK_NULL_HANDLE);
 	}
 	//////
 }
@@ -455,7 +457,7 @@ void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass=compositeRenderPass,
-		.framebuffer=perFrame[imageIndex].compositeFramebuffer[eye],
+		.framebuffer=compositeFramebuffer[imageIndex][eye],
 		.clearValueCount=1,
 		.pClearValues=(VkClearValue[]){ {{{ 0.0f, 0.0f, 0.0f, 1.0f }}} },
 		.renderArea={ { 0, 0 }, { config.renderWidth, config.renderHeight } },
@@ -491,14 +493,14 @@ void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye)
 	vkCmdDraw(perFrame[frameIndex].commandBuffer, 3, 1, 0, 0);
 
 	// Draw UI controls
-	UI_Draw(&UI, frameIndex, eye, fTimeStep);
+	UI_Draw(&UI, perFrame[frameIndex].commandBuffer, perFrame[frameIndex].descriptorPool, fTimeStep);
 
 	UI_Control_t *control=UI_FindControlByID(&UI, editControl);
 
 	// Draw text in the compositing renderpass
 	Font_Print(&font, 16.0f, 0.0f, (float)config.renderHeight-16.0f, "FPS: %0.1f\n\x1B[33mFrame time: %0.3fms\nAudio time: %0.3fms\nPhysics time: %0.3fms\nEdit control text buffer: %s", fps, fTimeStep*1000.0f, audioTime*1000.0f, physicsTime*1000.0f, control->editText.buffer);
 
-	Font_Draw(&font, frameIndex, eye);
+	Font_Draw(&font, perFrame[frameIndex].commandBuffer);
 
 	DrawLineGraph(perFrame[frameIndex].commandBuffer, 0, 0, &frameTimes);
 	DrawLineGraph(perFrame[frameIndex].commandBuffer, 0, 0, &audioTimes);

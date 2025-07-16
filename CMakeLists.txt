@@ -77,6 +77,7 @@ set(PROJECT_SOURCES
 	vulkan/vulkan_swapchain.c
 	enemy.c
 	engine.c
+	loadingscreen.c
 )
 
 # change this for how many asteroids you want

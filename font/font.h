@@ -25,7 +25,7 @@ bool Font_Init(Font_t *font);
 const float Font_CharacterBaseWidth(const char ch);
 float Font_StringBaseWidth(const char *string);
 void Font_Print(Font_t *font, float size, float x, float y, const char *string, ...);
-void Font_Draw(Font_t *font, uint32_t index, uint32_t eye);
+void Font_Draw(Font_t *font, VkCommandBuffer commandBuffer);
 void Font_Reset(Font_t *font);
 void Font_Destroy(Font_t *font);
 
