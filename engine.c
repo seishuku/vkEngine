@@ -8,7 +8,6 @@
 #include "audio/audio.h"
 #include "audio/music.h"
 #include "audio/sfx.h"
-#include "audio/sounds.h"
 #include "camera/camera.h"
 #include "console/console.h"
 #include "font/font.h"
@@ -40,6 +39,7 @@
 #include "loadingscreen.h"
 #include "models.h"
 #include "perframe.h"
+#include "sounds.h"
 #include "textures.h"
 
 extern bool isDone;
@@ -89,10 +89,52 @@ RigidBody_t cubeBody[NUM_CUBE];
 BModel_t cube;
 
 // Texture images
-VkuImage_t textures[NUM_TEXTURES];
+Textures_t textures[NUM_TEXTURES]=
+{
+	{ "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR },
+	{ "assets/asteroid1_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
+	{ "assets/asteroid2.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR },
+	{ "assets/asteroid2_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
+	{ "assets/asteroid3.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR },
+	{ "assets/asteroid3_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
+	{ "assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR },
+	{ "assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
+	{ NULL }, // Generated volume cloud texture
+	{ "assets/crosshair.qoi", IMAGE_NONE },
+	{ "assets/crono782.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR },
+	{ "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
+	{ "assets/cubik.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR },
+	{ "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
+	{ "assets/freelancer.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR },
+	{ "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
+	{ "assets/idolknight.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR },
+	{ "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
+	{ "assets/krulspeld1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR },
+	{ "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
+	{ "assets/psionic.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR },
+	{ "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
+	{ "assets/thor.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR },
+	{ "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
+	{ "assets/wilko.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR },
+	{ "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
+	{ "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR },
+	{ "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
+};
 
 // Sound sample data
-Sample_t sounds[NUM_SOUNDS];
+Sounds_t sounds[NUM_SOUNDS]=
+{
+	{ "assets/pew1.wav" },
+	{ "assets/pew1.wav" },
+	{ "assets/pew1.wav" },
+	{ "assets/stone1.wav" },
+	{ "assets/stone2.wav" },
+	{ "assets/stone3.wav" },
+	{ "assets/crash.wav" },
+	{ "assets/explode1.qoa" },
+	{ "assets/explode2.qoa" },
+	{ "assets/explode3.qoa" },
+};
 
 // Vulkan swapchain helper struct
 VkuSwapchain_t swapchain;
@@ -415,8 +457,8 @@ static void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 
 	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[index].fighterInstance.buffer, &(VkDeviceSize) { 0 });
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 0, textures[TEXTURE_FIGHTER1+fighterTexture].sampler, textures[TEXTURE_FIGHTER1+fighterTexture].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 1, textures[TEXTURE_FIGHTER1_NORMAL+fighterTexture].sampler, textures[TEXTURE_FIGHTER1_NORMAL+fighterTexture].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 0, textures[TEXTURE_FIGHTER1+fighterTexture].image.sampler, textures[TEXTURE_FIGHTER1+fighterTexture].image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 1, textures[TEXTURE_FIGHTER1_NORMAL+fighterTexture].image.sampler, textures[TEXTURE_FIGHTER1_NORMAL+fighterTexture].image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 2, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 3, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
 	vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 4, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
@@ -767,18 +809,18 @@ void TestCollision(void *a, void *b)
 		// If both objects are asteroids
 		if(objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_FIELD)
 		{
-			Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)], false, 1.0f, objB->rigidBody->position);
+			Audio_PlaySample(&sounds[RandRange(SOUND_STONE1, SOUND_STONE3)].sample, false, 1.0f, objB->rigidBody->position);
 		}
 		// If one is an asteroid and one is a player
 		else if((objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)||
 				(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_FIELD))
 		{
-			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, objB->rigidBody->position);
+			Audio_PlaySample(&sounds[SOUND_CRASH].sample, false, 1.0f, objB->rigidBody->position);
 		}
 		// If both objects are players
 		else if(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)
 		{
-			Audio_PlaySample(&sounds[SOUND_CRASH], false, 1.0f, objB->rigidBody->position);
+			Audio_PlaySample(&sounds[SOUND_CRASH].sample, false, 1.0f, objB->rigidBody->position);
 		}
 		// If it was a projectile colliding with anything
 		else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE||objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
@@ -827,7 +869,7 @@ void TestCollision(void *a, void *b)
 				}
 			}
 
-			Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, whichProjectile->rigidBody->position);
+			Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)].sample, false, 1.0f, whichProjectile->rigidBody->position);
 
 			ParticleSystem_AddEmitter(&particleSystem,
 									  whichProjectile->rigidBody->position,	// Position
@@ -961,7 +1003,7 @@ void Thread_Physics(void *arg)
 
 					if(PhysicsCollisionResponse(&particleBody, physicsObjects[i].rigidBody)>1.0f)
 					{
-						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, particleBody.position);
+						Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)].sample, false, 1.0f, particleBody.position);
 
 						ParticleSystem_AddEmitter
 						(
@@ -1373,207 +1415,134 @@ bool Init(void)
 		return false;
 	}
 
-	loadingScreen.currentCount++;
-	if(!Audio_LoadStatic("assets/pew1.wav", &sounds[SOUND_PEW1]))
+	for(uint32_t i=0;i<NUM_SOUNDS;i++)
 	{
-		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/pew1.wav\n");
-		return false;
-	}
-	loadingScreen.currentCount++;
-	if(!Audio_LoadStatic("assets/pew1.wav", &sounds[SOUND_PEW2]))
-	{
-		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/pew2.wav\n");
-		return false;
-	}
-	loadingScreen.currentCount++;
-	if(!Audio_LoadStatic("assets/pew1.wav", &sounds[SOUND_PEW3]))
-	{
-		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/pew3.wav\n");
-		return false;
-	}
-	loadingScreen.currentCount++;
-	if(!Audio_LoadStatic("assets/stone1.wav", &sounds[SOUND_STONE1]))
-	{
-		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/stone1.wav\n");
-		return false;
-	}
-	loadingScreen.currentCount++;
-	if(!Audio_LoadStatic("assets/stone2.wav", &sounds[SOUND_STONE2]))
-	{
-		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/stone2.wav\n");
-		return false;
-	}
-	loadingScreen.currentCount++;
-	if(!Audio_LoadStatic("assets/stone3.wav", &sounds[SOUND_STONE3]))
-	{
-		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/stone3.wav\n");
-		return false;
-	}
-	loadingScreen.currentCount++;
-	if(!Audio_LoadStatic("assets/crash.wav", &sounds[SOUND_CRASH]))
-	{
-		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/crash.wav\n");
-		return false;
-	}
-	loadingScreen.currentCount++;
-	if(!Audio_LoadStatic("assets/explode1.qoa", &sounds[SOUND_EXPLODE1]))
-	{
-		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode1.wav\n");
-		return false;
-	}
-	loadingScreen.currentCount++;
-	if(!Audio_LoadStatic("assets/explode2.qoa", &sounds[SOUND_EXPLODE2]))
-	{
-		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode2.wav\n");
-		return false;
-	}
-	loadingScreen.currentCount++;
-	if(!Audio_LoadStatic("assets/explode3.qoa", &sounds[SOUND_EXPLODE3]))
-	{
-		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/explode3.wav\n");
-		return false;
+		if(sounds[i].filename!=NULL)
+		{
+			if(!Audio_LoadStatic(sounds[i].filename, &sounds[i].sample))
+			{
+				DBGPRINTF(DEBUG_ERROR, "Init: Failed to load %s\n", sounds[i].filename);
+				return false;
+			}
+			else
+				loadingScreen.currentCount++;
+		}
 	}
 
 	SFX_Init();
 	Music_Init();
 
 	// Load models
-	loadingScreen.currentCount++;
-	if(LoadBModel(&models[MODEL_ASTEROID1], "assets/asteroid1.bmodel"))
-		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID1]);
-	else
+	if(!LoadBModel(&models[MODEL_ASTEROID1], "assets/asteroid1.bmodel"))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid1.bmodel\n");
 		return false;
 	}
-	loadingScreen.currentCount++;
-	if(LoadBModel(&models[MODEL_ASTEROID2], "assets/asteroid2.bmodel"))
-		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID2]);
 	else
+	{
+		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID1]);
+		loadingScreen.currentCount++;
+	}
+
+	if(!LoadBModel(&models[MODEL_ASTEROID2], "assets/asteroid2.bmodel"))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid2.bmodel\n");
 		return false;
 	}
-	loadingScreen.currentCount++;
-	if(LoadBModel(&models[MODEL_ASTEROID3], "assets/asteroid3.bmodel"))
-		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID3]);
 	else
+	{
+		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID2]);
+		loadingScreen.currentCount++;
+	}
+
+	if(!LoadBModel(&models[MODEL_ASTEROID3], "assets/asteroid3.bmodel"))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid3.bmodel\n");
 		return false;
 	}
-	loadingScreen.currentCount++;
-	if(LoadBModel(&models[MODEL_ASTEROID4], "assets/asteroid4.bmodel"))
-		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID4]);
 	else
+	{
+		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID3]);
+		loadingScreen.currentCount++;
+	}
+
+	if(!LoadBModel(&models[MODEL_ASTEROID4], "assets/asteroid4.bmodel"))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/asteroid4.bmodel\n");
 		return false;
 	}
-	loadingScreen.currentCount++;
-	if(LoadBModel(&fighter, "assets/fighter1.bmodel"))
-		BuildMemoryBuffersBModel(&vkContext, &fighter);
 	else
+	{
+		BuildMemoryBuffersBModel(&vkContext, &models[MODEL_ASTEROID4]);
+		loadingScreen.currentCount++;
+	}
+	if(!LoadBModel(&fighter, "assets/fighter1.bmodel"))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/fighter1.bmodel\n");
 		return false;
 	}
-	loadingScreen.currentCount++;
-	if(LoadBModel(&cube, "assets/cube.bmodel"))
-		BuildMemoryBuffersBModel(&vkContext, &cube);
 	else
+	{
+		BuildMemoryBuffersBModel(&vkContext, &fighter);
+		loadingScreen.currentCount++;
+	}
+
+	if(!LoadBModel(&cube, "assets/cube.bmodel"))
 	{
 		DBGPRINTF(DEBUG_ERROR, "Init: Failed to load assets/cube.bmodel\n");
 		return false;
 	}
+	else
+	{
+		BuildMemoryBuffersBModel(&vkContext, &cube);
+		loadingScreen.currentCount++;
+	}
 
 	// Load textures
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID1], "assets/asteroid1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID1_NORMAL], "assets/asteroid1_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID2], "assets/asteroid2.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID2_NORMAL], "assets/asteroid2_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID3], "assets/asteroid3.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID3_NORMAL], "assets/asteroid3_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID4], "assets/asteroid4.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_ASTEROID4_NORMAL], "assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_CROSSHAIR], "assets/crosshair.qoi", IMAGE_NONE);
+	for(uint32_t i=0;i<NUM_TEXTURES;i++)
+	{
+		if(textures[i].filename!=NULL)
+		{
+			if(!Image_Upload(&vkContext, &textures[i].image, textures[i].filename, textures[i].flags))
+			{
+				DBGPRINTF(DEBUG_ERROR, "Init: Failed to load %s\n", textures[i].filename);
+				return false;
+			}
+			else
+				loadingScreen.currentCount++;
+		}
+	}
 
+	GenNebulaVolume(&textures[TEXTURE_VOLUME].image);
 	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER1], "assets/crono782.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER1_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER2], "assets/cubik.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER2_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER3], "assets/freelancer.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER3_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER4], "assets/idolknight.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER4_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER5], "assets/krulspeld1.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER5_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER6], "assets/psionic.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER6_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER7], "assets/thor.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER7_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER8], "assets/wilko.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_FIGHTER8_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_CUBE], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR);
-	loadingScreen.currentCount++;
-	Image_Upload(&vkContext, &textures[TEXTURE_CUBE_NORMAL], "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE);
-
-	loadingScreen.currentCount++;
-	GenNebulaVolume(&textures[TEXTURE_VOLUME]);
 
 	// Create primary pipeline
-	loadingScreen.currentCount++;
 	CreateLightingPipeline();
+	loadingScreen.currentCount++;
 
 	// Create skybox pipeline
-	loadingScreen.currentCount++;
 	CreateSkyboxPipeline();
+	loadingScreen.currentCount++;
+
 	GenerateWorld();
 
-	loadingScreen.currentCount++;
 	CreateSpherePipeline();
 	loadingScreen.currentCount++;
 	CreateLinePipeline();
+	loadingScreen.currentCount++;
 
 	// Create volumetric rendering pipeline
-	loadingScreen.currentCount++;
 	CreateVolumePipeline();
+	loadingScreen.currentCount++;
 
 	// Create shadow map pipeline
-	loadingScreen.currentCount++;
 	CreateShadowPipeline();
 	CreateShadowMap();
+	loadingScreen.currentCount++;
 
 	// Create compositing pipeline
-	loadingScreen.currentCount++;
 	CreateCompositePipeline();
+	loadingScreen.currentCount++;
 
 	// Create primary frame buffers, depth image
 	CreateFramebuffers(0);
@@ -1638,8 +1607,8 @@ bool Init(void)
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)config.renderWidth, (float)config.renderHeight), compositeRenderPass);
 
 #ifdef ANDROID
-	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-50.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), UI_CONTORL_NONHIDDEN, "Random", (UIControlCallback)GenerateWorld);
-	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-100.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), UI_CONTORL_NONHIDDEN, "Fire", (UIControlCallback)Fire);
+	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-50.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), UI_CONTROL_VISIBLE, "Random", (UIControlCallback)GenerateWorld);
+	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-100.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), UI_CONTROL_VISIBLE, "Fire", (UIControlCallback)Fire);
 #endif
 
 	windowID=UI_AddWindow(&UI, Vec2(UI.size.x-450, UI.size.y-50), Vec2(400, 128), Vec3(0.1, 0.1, 0.1), UI_CONTROL_VISIBLE, "Controls");
@@ -1700,9 +1669,9 @@ bool Init(void)
 	UI_WindowAddControl(&UI, windowID, volumeID);
 	UI_WindowAddControl(&UI, windowID, colorShiftID);
 
-	UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, UI.size.y/2.0f), Vec2(50.0f, 50.0f), Vec3b(1.0f), UI_CONTROL_VISIBLE, &textures[TEXTURE_CROSSHAIR], 0.0f);
+	UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, UI.size.y/2.0f), Vec2(50.0f, 50.0f), Vec3b(1.0f), UI_CONTROL_VISIBLE, &textures[TEXTURE_CROSSHAIR].image, 0.0f);
 
-	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), UI_CONTROL_HIDDEN, &textures[TEXTURE_FIGHTER1], 0.0f);
+	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), UI_CONTROL_HIDDEN, &textures[TEXTURE_FIGHTER1].image, 0.0f);
 
 	editWindowID=UI_AddWindow(&UI, Vec2(100, 300), Vec2(200, 50), Vec3(0.5, 0.1, 0.1), UI_CONTROL_VISIBLE, "Edit control test");
 	editControl=UI_AddEditText(&UI, Vec2(0, -50), Vec2(200, 50), Vec3b(1.0f), UI_CONTROL_VISIBLE, UI_CONTROL_MODIFIABLE, 150, "");
@@ -1925,16 +1894,8 @@ void Destroy(void)
 	SFX_Destroy();
 	Music_Destroy();
 
-	Zone_Free(zone, sounds[SOUND_PEW1].data);
-	Zone_Free(zone, sounds[SOUND_PEW2].data);
-	Zone_Free(zone, sounds[SOUND_PEW3].data);
-	Zone_Free(zone, sounds[SOUND_STONE1].data);
-	Zone_Free(zone, sounds[SOUND_STONE2].data);
-	Zone_Free(zone, sounds[SOUND_STONE3].data);
-	Zone_Free(zone, sounds[SOUND_CRASH].data);
-	Zone_Free(zone, sounds[SOUND_EXPLODE1].data);
-	Zone_Free(zone, sounds[SOUND_EXPLODE2].data);
-	Zone_Free(zone, sounds[SOUND_EXPLODE3].data);
+	for(uint32_t i=0;i<NUM_SOUNDS;i++)
+		Zone_Free(zone, sounds[i].sample.data);
 
 	if(config.isVR)
 		VR_Destroy(&xrContext);
@@ -2020,7 +1981,7 @@ void Destroy(void)
 
 	// Textures destruction
 	for(uint32_t i=0;i<NUM_TEXTURES;i++)
-		vkuDestroyImageBuffer(&vkContext, &textures[i]);
+		vkuDestroyImageBuffer(&vkContext, &textures[i].image);
 	//////////
 
 	// 3D Model destruction

@@ -10,10 +10,10 @@
 #include "../physics/physics.h"
 #include "../physics/particle.h"
 #include "../audio/audio.h"
-#include "../audio/sounds.h"
 #include "../ui/ui.h"
 #include "../font/font.h"
 #include "../console/console.h"
+#include "../sounds.h"
 #include "event.h"
 
 void GenerateWorld(void);
@@ -96,7 +96,7 @@ void FireParticleEmitter(vec3 position, vec3 direction)
 	}
 
 	// Finally, play the audio SFX
-	Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)], false, 1.0f, position);
+	Audio_PlaySample(&sounds[RandRange(SOUND_PEW1, SOUND_PEW3)].sample, false, 1.0f, position);
 }
 
 static uint32_t activeID=UINT32_MAX;

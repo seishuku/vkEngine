@@ -7,7 +7,7 @@
 #include "physics/physicslist.h"
 #include "camera/camera.h"
 #include "audio/audio.h"
-#include "audio/sounds.h"
+#include "sounds.h"
 #include "enemy.h"
 
 extern RigidBody_t asteroids[NUM_ASTEROIDS];
@@ -145,7 +145,7 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 {
 	if(enemy->health<0.0f&&enemy->state!=DEAD)
 	{
-		Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)], false, 1.0f, enemy->camera->body.position);
+		Audio_PlaySample(&sounds[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)].sample, false, 1.0f, enemy->camera->body.position);
 
 		ParticleSystem_AddEmitter(&particleSystem,
 								  enemy->camera->body.position,	// Position

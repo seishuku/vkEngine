@@ -196,7 +196,7 @@ bool LoadingScreenInit(LoadingScreen_t *loadingScreen, uint32_t numItems)
 		}
 	}, 0, &loadingScreen->renderPass);
 
-	if(!Image_Upload(&vkContext, &loadingScreen->logo, "assets/notademo.qoi", IMAGE_BILINEAR))
+	if(!Image_Upload(&vkContext, &loadingScreen->logo, "assets/splash.qoi", IMAGE_BILINEAR))
 		return false;
 
 	if(!UI_Init(&loadingScreen->UI, Vec2(0, 0), Vec2(config.renderWidth, config.renderHeight), loadingScreen->renderPass))
@@ -245,6 +245,8 @@ void DestroyLoadingScreen(LoadingScreen_t *loadingScreen)
 
 	UI_Destroy(&loadingScreen->UI);
 	
+	vkuDestroyImageBuffer(&vkContext, &loadingScreen->logo);
+
 	for(uint32_t i=0;i<swapchain.numImages;i++)
 		vkDestroyFramebuffer(vkContext.device, loadingScreen->framebuffer[i], VK_NULL_HANDLE);
 

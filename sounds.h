@@ -1,11 +1,11 @@
 #ifndef __SOUNDS_H__
 #define __SOUNDS_H__
 
-#include "audio.h"
+#include "audio/audio.h"
 
-enum
+typedef enum
 {
-	SOUND_PEW1,
+	SOUND_PEW1=0,
 	SOUND_PEW2,
 	SOUND_PEW3,
 	SOUND_STONE1,
@@ -16,8 +16,14 @@ enum
 	SOUND_EXPLODE2,
 	SOUND_EXPLODE3,
 	NUM_SOUNDS
-};
+} SoundIDs;
 
-extern Sample_t sounds[NUM_SOUNDS];
+typedef struct
+{
+	const char *filename;
+	Sample_t sample;
+} Sounds_t;
+
+extern Sounds_t sounds[NUM_SOUNDS];
 
 #endif
