@@ -25,14 +25,12 @@ typedef struct
 	uint32_t numItems;
 	uint32_t currentCount;
 	uint32_t loadingGraphID;
-	bool isDone;
 
 	UI_t UI;
-
-	ThreadWorker_t workerThread;
 } LoadingScreen_t;
 
 bool LoadingScreenInit(LoadingScreen_t *loadingScreen, uint32_t numItems);
+void LoadingScreenAdvance(LoadingScreen_t *loadingScreen);
 void DestroyLoadingScreen(LoadingScreen_t *loadingScreen);
 
 #endif

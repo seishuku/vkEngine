@@ -1,0 +1,75 @@
+#ifndef __ASSETMANAGER_H__
+#define __ASSETMANAGER_H__
+
+#include "vulkan/vulkan.h"
+#include "model/bmodel.h"
+#include "audio/audio.h"
+
+typedef enum
+{
+	TEXTURE_ASTEROID1=0, TEXTURE_ASTEROID1_NORMAL,
+	TEXTURE_ASTEROID2,   TEXTURE_ASTEROID2_NORMAL,
+	TEXTURE_ASTEROID3,   TEXTURE_ASTEROID3_NORMAL,
+	TEXTURE_ASTEROID4,   TEXTURE_ASTEROID4_NORMAL,
+	TEXTURE_VOLUME,
+	TEXTURE_CROSSHAIR,
+	TEXTURE_FIGHTER1,    TEXTURE_FIGHTER1_NORMAL,
+	TEXTURE_FIGHTER2,    TEXTURE_FIGHTER2_NORMAL,
+	TEXTURE_FIGHTER3,    TEXTURE_FIGHTER3_NORMAL,
+	TEXTURE_FIGHTER4,    TEXTURE_FIGHTER4_NORMAL,
+	TEXTURE_FIGHTER5,    TEXTURE_FIGHTER5_NORMAL,
+	TEXTURE_FIGHTER6,    TEXTURE_FIGHTER6_NORMAL,
+	TEXTURE_FIGHTER7,    TEXTURE_FIGHTER7_NORMAL,
+	TEXTURE_FIGHTER8,    TEXTURE_FIGHTER8_NORMAL,
+	TEXTURE_CUBE,        TEXTURE_CUBE_NORMAL,
+
+	MODEL_ASTEROID1,
+	MODEL_ASTEROID2,
+	MODEL_ASTEROID3,
+	MODEL_ASTEROID4,
+	MODEL_FIGHTER,
+	MODEL_CUBE,
+
+	SOUND_PEW1,
+	SOUND_PEW2,
+	SOUND_PEW3,
+	SOUND_STONE1,
+	SOUND_STONE2,
+	SOUND_STONE3,
+	SOUND_CRASH,
+	SOUND_EXPLODE1,
+	SOUND_EXPLODE2,
+	SOUND_EXPLODE3,
+
+	NUM_ASSETS
+} AssetIDs;
+
+typedef enum
+{
+	ASSET_TEXTURE=0,
+	ASSET_MODEL,
+	ASSET_SOUND,
+	NUM_ASSETTYPE
+} AssetType;
+
+typedef struct
+{
+	uint32_t index;
+	AssetType type;
+	const char *filename;
+	uint32_t flags;
+	union
+	{
+		VkuImage_t image;
+		BModel_t model;
+		Sample_t sound;
+	};
+} AssetManager_t;
+
+extern AssetManager_t assets[];
+extern uint32_t assetIndices[];
+
+bool AssetManagerLoad(AssetManager_t *assets, uint32_t numAssets);
+void AssetManagerDestroy(AssetManager_t *assets, uint32_t numAssets);
+
+#endif

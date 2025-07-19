@@ -75,6 +75,7 @@ set(PROJECT_SOURCES
 	vulkan/vulkan_pipeline.c
 	vulkan/vulkan_renderpass.c
 	vulkan/vulkan_swapchain.c
+	assetmanager.c
 	enemy.c
 	engine.c
 	loadingscreen.c

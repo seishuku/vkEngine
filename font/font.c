@@ -300,12 +300,12 @@ void Font_Draw(Font_t *font, VkCommandBuffer commandBuffer)
 
 	float z=-1.0f;
 
-	if(config.isVR)
-	{
-		z=-1.5f;
-		fontPC.extent=(VkExtent2D){ xrContext.swapchainExtent.width, xrContext.swapchainExtent.height };
-	}
-	else
+	//if(config.isVR)
+	//{
+	//	z=-1.5f;
+	//	fontPC.extent=(VkExtent2D){ xrContext.swapchainExtent.width, xrContext.swapchainExtent.height };
+	//}
+	//else
 		fontPC.extent=(VkExtent2D){ config.renderWidth, config.renderHeight };
 
 	//fontPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale((float)fontPC.extent.width/(float)fontPC.extent.height, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[0]);

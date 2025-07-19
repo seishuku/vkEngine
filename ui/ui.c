@@ -750,10 +750,10 @@ bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 		matrix mvp;
 	} UIPC;
 
-	float z=-1.0f;
+	//float z=-1.0f;
 
-	if(config.isVR)
-		z=-1.5f;
+	//if(config.isVR)
+		//z=-1.5f;
 
 	UIPC.viewport=UI->size;
 	// TODO: This breaks VR

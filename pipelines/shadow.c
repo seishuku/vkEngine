@@ -7,7 +7,7 @@
 #include "../camera/camera.h"
 #include "../model/bmodel.h"
 #include "../utils/pipeline.h"
-#include "../models.h"
+#include "../assetmanager.h"
 #include "../perframe.h"
 #include "skybox.h"
 #include "shadow.h"
@@ -122,60 +122,6 @@ bool CreateShadowPipeline(void)
 		}
 	}, 0, &shadowRenderPass);
 
-#if 0
-	vkCreatePipelineLayout(vkContext.device, &(VkPipelineLayoutCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount=0,
-		.pushConstantRangeCount=1,
-		.pPushConstantRanges=&(VkPushConstantRange)
-		{
-			.offset=0,
-			.size=sizeof(matrix),
-			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT,
-		},
-	}, 0, &shadowPipelineLayout);
-
-	vkuInitPipeline(&shadowPipeline, vkContext.device, vkContext.pipelineCache);
-
-	vkuPipeline_SetPipelineLayout(&shadowPipeline, shadowPipelineLayout);
-	vkuPipeline_SetRenderPass(&shadowPipeline, shadowRenderPass);
-
-	// Add in vertex shader
-	if(!vkuPipeline_AddStage(&shadowPipeline, "shaders/shadow.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
-		return false;
-
-	// Set states that are different than defaults
-	shadowPipeline.colorWriteMask=0;
-
-	shadowPipeline.cullMode=VK_CULL_MODE_BACK_BIT;
-	shadowPipeline.depthTest=VK_TRUE;
-
-	shadowPipeline.depthBias=VK_TRUE;
-	shadowPipeline.depthBiasConstantFactor=1.25f;
-	shadowPipeline.depthBiasSlopeFactor=1.75f;
-
-	// Add vertex binding and attrib parameters
-	vkuPipeline_AddVertexBinding(&shadowPipeline, 0, sizeof(float)*20, VK_VERTEX_INPUT_RATE_VERTEX);
-	vkuPipeline_AddVertexAttribute(&shadowPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-
-	vkuPipeline_AddVertexBinding(&shadowPipeline, 1, sizeof(matrix), VK_VERTEX_INPUT_RATE_INSTANCE);
-	vkuPipeline_AddVertexAttribute(&shadowPipeline, 1, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*0);
-	vkuPipeline_AddVertexAttribute(&shadowPipeline, 2, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*1);
-	vkuPipeline_AddVertexAttribute(&shadowPipeline, 3, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*2);
-	vkuPipeline_AddVertexAttribute(&shadowPipeline, 4, 1, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(vec4)*3);
-
-	//VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo=
-	//{
-	//	.sType=VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-	//	.depthAttachmentFormat=shadowDepthFormat,
-	//};
-
-	// Assemble the pipeline
-	if(!vkuAssemblePipeline(&shadowPipeline, VK_NULL_HANDLE/*&pipelineRenderingCreateInfo*/))
-		return false;
-#endif
-
 	if(!CreatePipeline(&vkContext, &shadowPipeline, shadowRenderPass, "pipelines/shadow.pipeline"))
 		return false;
 
@@ -223,36 +169,43 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[frameIndex].asteroidInstance.buffer, &(VkDeviceSize) { 0 });
 
 	// Draw the models
-	for(uint32_t j=0;j<NUM_MODELS;j++)
+	for(uint32_t i=0;i<4;i++)
 	{
-		// Bind model data buffers and draw the triangles
-		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &models[j].vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+		uint32_t modelOffset=MODEL_ASTEROID1+i;
 
-		for(uint32_t k=0;k<models[j].numMesh;k++)
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &assets[assetIndices[modelOffset]].model.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+
+		for(uint32_t j=0;j<assets[assetIndices[modelOffset]].model.numMesh;j++)
 		{
-			vkCmdBindIndexBuffer(commandBuffer, models[j].mesh[k].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(commandBuffer, models[j].mesh[k].numFace*3, NUM_ASTEROIDS/NUM_MODELS, 0, 0, (NUM_ASTEROIDS/NUM_MODELS)*j);
+			vkCmdBindIndexBuffer(commandBuffer, assets[assetIndices[modelOffset]].model.mesh[j].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(commandBuffer, assets[assetIndices[modelOffset]].model.mesh[j].numFace*3, NUM_ASTEROIDS/4, 0, 0, (NUM_ASTEROIDS/4)*i);
 		}
 	}
+	//////
 
+	// Fighters
 	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[frameIndex].fighterInstance.buffer, &(VkDeviceSize) { 0 });
 
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &fighter.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &assets[assetIndices[MODEL_FIGHTER]].model.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 
-	for(uint32_t j=0;j<fighter.numMesh;j++)
+	for(uint32_t i=0;i<assets[assetIndices[MODEL_FIGHTER]].model.numMesh;i++)
 	{
-		vkCmdBindIndexBuffer(commandBuffer, fighter.mesh[j].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-		vkCmdDrawIndexed(commandBuffer, fighter.mesh[j].numFace*3, 2, 0, 0, 0);
+		vkCmdBindIndexBuffer(commandBuffer, assets[assetIndices[MODEL_FIGHTER]].model.mesh[i].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(commandBuffer, assets[assetIndices[MODEL_FIGHTER]].model.mesh[i].numFace*3, 2, 0, 0, 0);
 	}
+	//////
 
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &cube.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+	// Cubes
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &assets[assetIndices[MODEL_CUBE]].model.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[frameIndex].cubeInstance.buffer, &(VkDeviceSize) { 0 });
 
-	for(uint32_t j=0;j<cube.numMesh;j++)
+	for(uint32_t i=0;i<assets[assetIndices[MODEL_CUBE]].model.numMesh;i++)
 	{
-		vkCmdBindIndexBuffer(commandBuffer, cube.mesh[j].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-		vkCmdDrawIndexed(commandBuffer, cube.mesh[j].numFace*3, 2, 0, 0, 0);
+		vkCmdBindIndexBuffer(commandBuffer, assets[assetIndices[MODEL_CUBE]].model.mesh[i].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(commandBuffer, assets[assetIndices[MODEL_CUBE]].model.mesh[i].numFace*3, NUM_CUBE, 0, 0, 0);
 	}
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &assets[assetIndices[MODEL_CUBE]].model.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+	///////
 
 	vkCmdEndRenderPass(commandBuffer);
 }

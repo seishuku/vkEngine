@@ -8,146 +8,76 @@
 extern VkuContext_t vkContext;
 extern VkuSwapchain_t swapchain;
 
-static void threadConstructor(void *arg)
+void LoadingScreenAdvance(LoadingScreen_t *loadingScreen)
 {
-	LoadingScreen_t *loadingScreen=(LoadingScreen_t *)arg;
+	uint32_t imageIndex=0;
 
-	// Per-frame descriptor pool for main thread
-	vkCreateDescriptorPool(vkContext.device, &(VkDescriptorPoolCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-		.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
-		.poolSizeCount=4,
-		.pPoolSizes=(VkDescriptorPoolSize[])
-		{
-			{
-				.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-				.descriptorCount=1024, // Max number of this descriptor type that can be in each descriptor set?
-			},
-			{
-				.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-				.descriptorCount=1024,
-			},
-			{
-				.type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-				.descriptorCount=1024,
-			},
-			{
-				.type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.descriptorCount=1024,
-			},
-		},
-	}, VK_NULL_HANDLE, &loadingScreen->descriptorPool);
+	UI_UpdateBarGraphValue(&loadingScreen->UI, loadingScreen->loadingGraphID, (float)(loadingScreen->currentCount++)/(loadingScreen->numItems-1));
 
-	// Create per-frame command pools
-	vkCreateCommandPool(vkContext.device, &(VkCommandPoolCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-		.flags=0,
-		.queueFamilyIndex=vkContext.graphicsQueueIndex,
-	}, VK_NULL_HANDLE, &loadingScreen->commandPool);
+	vkWaitForFences(vkContext.device, 1, &loadingScreen->frameFence, VK_TRUE, UINT64_MAX);
 
-	// Allocate the command buffers we will be rendering into
-	vkAllocateCommandBuffers(vkContext.device, &(VkCommandBufferAllocateInfo)
+	VkResult Result=vkAcquireNextImageKHR(vkContext.device, swapchain.swapchain, UINT64_MAX, loadingScreen->completeSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+	if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
+		DBGPRINTF(DEBUG_WARNING, "Swapchain out of date or suboptimal...\n");
+
+	vkResetFences(vkContext.device, 1, &loadingScreen->frameFence);
+	vkResetCommandPool(vkContext.device, loadingScreen->commandPool, 0);
+	vkResetDescriptorPool(vkContext.device, loadingScreen->descriptorPool, 0);
+
+	vkBeginCommandBuffer(loadingScreen->commandBuffer, &(VkCommandBufferBeginInfo)
 	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=loadingScreen->commandPool,
-		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+	});
+
+	vkCmdBeginRenderPass(loadingScreen->commandBuffer, &(VkRenderPassBeginInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+		.renderPass=loadingScreen->renderPass,
+		.framebuffer=loadingScreen->framebuffer[imageIndex],
+		.renderArea={ { 0, 0 }, { config.renderWidth, config.renderHeight } },
+		.clearValueCount=1,
+		.pClearValues=(VkClearValue[]){ {{{ 0.0f, 0.0f, 0.0f, 1.0f }}} },
+	}, VK_SUBPASS_CONTENTS_INLINE);
+
+	vkCmdSetViewport(loadingScreen->commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)config.renderWidth, (float)config.renderHeight, 0.0f, 1.0f });
+	vkCmdSetScissor(loadingScreen->commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth, config.renderHeight } });
+
+	UI_Draw(&loadingScreen->UI, loadingScreen->commandBuffer, loadingScreen->descriptorPool, 999.0f);
+
+	vkCmdEndRenderPass(loadingScreen->commandBuffer);
+
+	vkEndCommandBuffer(loadingScreen->commandBuffer);
+
+	vkQueueSubmit(vkContext.graphicsQueue, 1, &(VkSubmitInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.pWaitDstStageMask=&(VkPipelineStageFlags) { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT },
+		.waitSemaphoreCount=1,
+		.pWaitSemaphores=&loadingScreen->completeSemaphore,
+		.signalSemaphoreCount=1,
+		.pSignalSemaphores=&swapchain.waitSemaphore[imageIndex],
 		.commandBufferCount=1,
-	}, &loadingScreen->commandBuffer);
-}
+		.pCommandBuffers=&loadingScreen->commandBuffer,
+	}, loadingScreen->frameFence);
 
-static void threadDestructor(void *arg)
-{
-	LoadingScreen_t *loadingScreen=(LoadingScreen_t *)arg;
-	vkDeviceWaitIdle(vkContext.device);
-
-	vkDestroyDescriptorPool(vkContext.device, loadingScreen->descriptorPool, VK_NULL_HANDLE);
-	vkDestroyCommandPool(vkContext.device, loadingScreen->commandPool, VK_NULL_HANDLE);
-}
-
-void LoadingScreenRender(void *arg)
-{
-	LoadingScreen_t *loadingScreen=(LoadingScreen_t *)arg;
-	double startTime=0.0, timeStep=0.0;
-
-	while(!loadingScreen->isDone)
+	Result=vkQueuePresentKHR(vkContext.graphicsQueue, &(VkPresentInfoKHR)
 	{
-		uint32_t imageIndex=0;
+		.sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+		.waitSemaphoreCount=1,
+		.pWaitSemaphores=&swapchain.waitSemaphore[imageIndex],
+		.swapchainCount=1,
+		.pSwapchains=&swapchain.swapchain,
+		.pImageIndices=&imageIndex,
+	});
 
-		startTime=GetClock();
-
-		//loadingScreen->currentCount++;
-		UI_UpdateBarGraphValue(&loadingScreen->UI, loadingScreen->loadingGraphID, (float)loadingScreen->currentCount/(loadingScreen->numItems-1));
-
-		vkWaitForFences(vkContext.device, 1, &loadingScreen->frameFence, VK_TRUE, UINT64_MAX);
-
-		VkResult Result=vkAcquireNextImageKHR(vkContext.device, swapchain.swapchain, UINT64_MAX, loadingScreen->completeSemaphore, VK_NULL_HANDLE, &imageIndex);
-
-		if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
-			DBGPRINTF(DEBUG_WARNING, "Swapchain out of date or suboptimal...\n");
-
-		vkResetFences(vkContext.device, 1, &loadingScreen->frameFence);
-		vkResetCommandPool(vkContext.device, loadingScreen->commandPool, 0);
-		vkResetDescriptorPool(vkContext.device, loadingScreen->descriptorPool, 0);
-
-		vkBeginCommandBuffer(loadingScreen->commandBuffer, &(VkCommandBufferBeginInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-			.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
-		});
-
-		vkCmdBeginRenderPass(loadingScreen->commandBuffer, &(VkRenderPassBeginInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-			.renderPass=loadingScreen->renderPass,
-			.framebuffer=loadingScreen->framebuffer[imageIndex],
-			.renderArea={ { 0, 0 }, { config.renderWidth, config.renderHeight } },
-			.clearValueCount=1,
-			.pClearValues=(VkClearValue[]){ {{{ 0.0f, 0.0f, 0.0f, 1.0f }}} },
-		}, VK_SUBPASS_CONTENTS_INLINE);
-
-		vkCmdSetViewport(loadingScreen->commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)config.renderWidth, (float)config.renderHeight, 0.0f, 1.0f });
-		vkCmdSetScissor(loadingScreen->commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth, config.renderHeight } });
-
-		UI_Draw(&loadingScreen->UI, loadingScreen->commandBuffer, loadingScreen->descriptorPool, (float)timeStep);
-
-		vkCmdEndRenderPass(loadingScreen->commandBuffer);
-
-		vkEndCommandBuffer(loadingScreen->commandBuffer);
-
-		vkQueueSubmit(vkContext.graphicsQueue, 1, &(VkSubmitInfo)
-		{
-			.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
-			.pWaitDstStageMask=&(VkPipelineStageFlags) { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT },
-			.waitSemaphoreCount=1,
-			.pWaitSemaphores=&loadingScreen->completeSemaphore,
-			.signalSemaphoreCount=1,
-			.pSignalSemaphores=&swapchain.waitSemaphore[imageIndex],
-			.commandBufferCount=1,
-			.pCommandBuffers=&loadingScreen->commandBuffer,
-		}, loadingScreen->frameFence);
-
-		Result=vkQueuePresentKHR(vkContext.graphicsQueue, &(VkPresentInfoKHR)
-		{
-			.sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-			.waitSemaphoreCount=1,
-			.pWaitSemaphores=&swapchain.waitSemaphore[imageIndex],
-			.swapchainCount=1,
-			.pSwapchains=&swapchain.swapchain,
-			.pImageIndices=&imageIndex,
-		});
-
-		if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
-			DBGPRINTF(DEBUG_WARNING, "vkQueuePresent out of date or suboptimal...\n");
-
-		timeStep=GetClock()-startTime;
-	}
+	if(Result==VK_ERROR_OUT_OF_DATE_KHR||Result==VK_SUBOPTIMAL_KHR)
+		DBGPRINTF(DEBUG_WARNING, "vkQueuePresent out of date or suboptimal...\n");
 }
 
 bool LoadingScreenInit(LoadingScreen_t *loadingScreen, uint32_t numItems)
 {
-	loadingScreen->isDone=false;
 	loadingScreen->numItems=numItems;
 	loadingScreen->currentCount=0;
 
@@ -219,6 +149,50 @@ bool LoadingScreenInit(LoadingScreen_t *loadingScreen, uint32_t numItems)
 		}, 0, &loadingScreen->framebuffer[i]);
 	}
 
+	// Per-frame descriptor pool for main thread
+	vkCreateDescriptorPool(vkContext.device, &(VkDescriptorPoolCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+		.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
+		.poolSizeCount=4,
+		.pPoolSizes=(VkDescriptorPoolSize[])
+		{
+			{
+				.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				.descriptorCount=1024, // Max number of this descriptor type that can be in each descriptor set?
+			},
+			{
+				.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+				.descriptorCount=1024,
+			},
+			{
+				.type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				.descriptorCount=1024,
+			},
+			{
+				.type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.descriptorCount=1024,
+			},
+		},
+	}, VK_NULL_HANDLE, &loadingScreen->descriptorPool);
+
+	// Create per-frame command pools
+	vkCreateCommandPool(vkContext.device, &(VkCommandPoolCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+		.flags=0,
+		.queueFamilyIndex=vkContext.graphicsQueueIndex,
+	}, VK_NULL_HANDLE, &loadingScreen->commandPool);
+
+	// Allocate the command buffers we will be rendering into
+	vkAllocateCommandBuffers(vkContext.device, &(VkCommandBufferAllocateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool=loadingScreen->commandPool,
+		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount=1,
+	}, &loadingScreen->commandBuffer);
+
 	// Create needed fence and semaphore for rendering
 	// Wait fence for command queue, to signal when we can submit commands again
 	vkCreateFence(vkContext.device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=VK_FENCE_CREATE_SIGNALED_BIT }, VK_NULL_HANDLE, &loadingScreen->frameFence);
@@ -226,20 +200,17 @@ bool LoadingScreenInit(LoadingScreen_t *loadingScreen, uint32_t numItems)
 	// Semaphore for image presentation, to signal when we can present again
 	vkCreateSemaphore(vkContext.device, &(VkSemaphoreCreateInfo) {.sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext=VK_NULL_HANDLE }, VK_NULL_HANDLE, &loadingScreen->completeSemaphore);
 
-	Thread_Init(&loadingScreen->workerThread);
-	Thread_AddConstructor(&loadingScreen->workerThread, threadConstructor, (void *)loadingScreen);
-	Thread_AddDestructor(&loadingScreen->workerThread, threadDestructor, (void *)loadingScreen);
-	Thread_Start(&loadingScreen->workerThread);
-
-	Thread_AddJob(&loadingScreen->workerThread, (ThreadFunction_t)LoadingScreenRender, (void *)loadingScreen);
+	LoadingScreenAdvance(loadingScreen);
 
 	return true;
 }
 
 void DestroyLoadingScreen(LoadingScreen_t *loadingScreen)
 {
-	loadingScreen->isDone=true;
-	Thread_Destroy(&loadingScreen->workerThread);
+	vkDeviceWaitIdle(vkContext.device);
+
+	vkDestroyDescriptorPool(vkContext.device, loadingScreen->descriptorPool, VK_NULL_HANDLE);
+	vkDestroyCommandPool(vkContext.device, loadingScreen->commandPool, VK_NULL_HANDLE);
 
 	vkDestroyRenderPass(vkContext.device, loadingScreen->renderPass, VK_NULL_HANDLE);
 
