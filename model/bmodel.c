@@ -69,7 +69,8 @@ static void CalculateTangent(BModel_t *model)
 				uv1.x=model->UV[2*i3+0]-model->UV[2*i1+0];
 				uv1.y=model->UV[2*i3+1]-model->UV[2*i1+1];
 
-				r=1.0f/(uv0.x*uv1.y-uv1.x*uv0.y);
+				r=(uv0.x*uv1.y-uv1.x*uv0.y);
+				r=(fabsf(r)<1e-8f)?0.0f:1.0f/r;
 
 				s.x=(uv1.y*v0.x-uv0.y*v1.x)*r;
 				s.y=(uv1.y*v0.y-uv0.y*v1.y)*r;
@@ -360,8 +361,7 @@ bool LoadBModel(BModel_t *model, const char *filename)
 		}
 	}
 
-	if(!model->tangent&&!model->binormal&&!model->normal&&model->UV)
-		CalculateTangent(model);
+	CalculateTangent(model);
 
 	CalculateBounds(model);
 

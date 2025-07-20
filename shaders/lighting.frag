@@ -64,8 +64,9 @@ float ShadowPCF(vec4 Coords)
 
 void main()
 {
-	vec4 Base=texture(TexBase, UV);
-	vec3 n=normalize(iMatrix*vec4(Tangent*(2*texture(TexNormal, UV)-1).xyz, 0.0)).xyz;
+	vec4 BaseTex=texture(TexBase, UV);
+	vec3 NormalTex=texture(TexNormal, UV).xyz*2.0-1.0;
+	vec3 n=normalize(mat3(iMatrix)*Tangent*NormalTex);
 
-	Output=vec4(Base.xyz*lightColor.xyz*max(0.01, dot(n, lightDirection.xyz)*ShadowPCF(Shadow)), 1.0);
+	Output=vec4(BaseTex.xyz*lightColor.xyz*max(0.01, dot(n, lightDirection.xyz)*ShadowPCF(Shadow)), 1.0);
 }
