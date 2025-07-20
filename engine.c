@@ -403,8 +403,8 @@ static void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 
 	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[index].fighterInstance.buffer, &(VkDeviceSize) { 0 });
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 0, assets[assetIndices[TEXTURE_FIGHTER1+fighterTexture]].image.sampler, assets[assetIndices[TEXTURE_FIGHTER1+fighterTexture]].image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 1, assets[assetIndices[TEXTURE_FIGHTER1_NORMAL+fighterTexture]].image.sampler, assets[assetIndices[TEXTURE_FIGHTER1_NORMAL+fighterTexture]].image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 0, assets[assetIndices[TEXTURE_FIGHTER1+(2*fighterTexture+0)]].image.sampler, assets[assetIndices[TEXTURE_FIGHTER1+(2*fighterTexture+0)]].image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 1, assets[assetIndices[TEXTURE_FIGHTER1_NORMAL+(2*fighterTexture+1)]].image.sampler, assets[assetIndices[TEXTURE_FIGHTER1_NORMAL+(2*fighterTexture+1)]].image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 2, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 3, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
 	vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 4, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
@@ -974,7 +974,7 @@ void Thread_Physics(void *arg)
 	{
 		for(uint32_t i=0;i<NUM_ENEMY;i++)
 		{
-			//UpdateEnemy(&enemyAI[i], camera);
+			UpdateEnemy(&enemyAI[i], camera);
 
 			const float scale=(1.0f/assets[assetIndices[MODEL_FIGHTER]].model.radius)*enemy[i].body.radius;
 			matrix local=MatrixScale(scale, scale, scale);
@@ -1041,7 +1041,7 @@ void Thread_Physics(void *arg)
 		CameraUpdate(&enemy[i], fTimeStep);
 
 	// View from enemy camera
-	//modelView=MatrixMult(CameraUpdate(&enemy[0], fTimeStep), MatrixTranslate(0.0f, -5.0f, -10.0f));
+	modelView=MatrixMult(CameraUpdate(&enemy[0], fTimeStep), MatrixTranslate(0.0f, -5.0f, -10.0f));
 	//////
 
 	physicsTime=(float)(GetClock()-startTime);
