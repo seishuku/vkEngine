@@ -10,6 +10,12 @@ typedef struct Camera_s
 {
 	RigidBody_t body;
 
+	bool thirdPerson;
+	float followDistance;
+	float heightOffset;
+	float trackSpeed;
+	vec3 targetPosition;
+
 	vec3 right;
 	vec3 up;
 	vec3 forward;

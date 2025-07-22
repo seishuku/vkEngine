@@ -199,9 +199,31 @@ void CameraCheckCollision(Camera_t *camera, float *vertex, uint32_t *face, int32
 	}
 }
 
+static matrix ThirdPersonMatrix(matrix baseView, Camera_t *targetCamera, float dt)
+{
+	// Desired position behind/above the target
+	const vec3 forwardOffset=Vec3_Muls(targetCamera->forward, -targetCamera->followDistance);
+	const vec3 upOffset=Vec3_Muls(targetCamera->up, targetCamera->heightOffset);
+
+	const vec3 desiredPos=Vec3_Addv(Vec3_Addv(targetCamera->body.position, forwardOffset), upOffset);
+
+	// Interpolation to desired position
+	const vec3 delta=Vec3_Subv(desiredPos, targetCamera->targetPosition);
+	targetCamera->targetPosition=Vec3_Addv(targetCamera->targetPosition, Vec3_Muls(delta, targetCamera->trackSpeed*dt));
+
+	// Look-at matrix from 3rd person to the target
+	return MatrixLookAt(targetCamera->targetPosition, targetCamera->body.position, targetCamera->up);
+}
+
 // Actual camera stuff
 void CameraInit(Camera_t *camera, const vec3 position, const vec3 up, const vec3 forward)
 {
+	camera->thirdPerson=false;
+	camera->targetPosition=position;
+	camera->followDistance=12.0f;
+	camera->heightOffset=2.0f;
+	camera->trackSpeed=20.0f;
+
 	camera->right=Vec3_Cross(up, forward);
 	camera->up=up;
 	camera->forward=forward;
@@ -310,7 +332,13 @@ matrix CameraUpdate(Camera_t *camera, float dt)
 	camera->up     =Vec3(orientation.y.x, orientation.y.y, orientation.y.z);
 	camera->forward=Vec3(orientation.z.x, orientation.z.y, orientation.z.z);
 
-	return MatrixLookAt(camera->body.position, Vec3_Addv(camera->body.position, camera->forward), camera->up);
+	if(camera->thirdPerson)
+		return ThirdPersonMatrix(MatrixLookAt(camera->body.position, Vec3_Addv(camera->body.position, camera->forward), camera->up), camera, dt);
+	else
+	{
+		camera->targetPosition=camera->body.position;
+		return MatrixLookAt(camera->body.position, Vec3_Addv(camera->body.position, camera->forward), camera->up);
+	}
 }
 
 // Camera path track stuff

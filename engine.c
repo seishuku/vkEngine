@@ -129,8 +129,7 @@ uint32_t colorShiftID=UINT32_MAX;
 uint32_t consoleBackground=UINT32_MAX;
 uint32_t currentTrack=UINT32_MAX;
 uint32_t windowID=UINT32_MAX;
-uint32_t editWindowID=UINT32_MAX;
-uint32_t editControl=UINT32_MAX;
+uint32_t thirdPersonID=UINT32_MAX;
 //////
 
 Console_t console;
@@ -427,7 +426,12 @@ static void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 			}
 		}
 		else
-			vkCmdDrawIndexed(commandBuffer, assets[assetIndices[MODEL_FIGHTER]].model.mesh[i].numFace*3, NUM_ENEMY, 0, 0, 0);
+		{
+			if(camera.thirdPerson)
+				vkCmdDrawIndexed(commandBuffer, assets[assetIndices[MODEL_FIGHTER]].model.mesh[i].numFace*3, NUM_ENEMY+1, 0, 0, 0);
+			else
+				vkCmdDrawIndexed(commandBuffer, assets[assetIndices[MODEL_FIGHTER]].model.mesh[i].numFace*3, NUM_ENEMY, 0, 0, 1);
+		}
 	}
 }
 
@@ -1035,7 +1039,7 @@ void Thread_Physics(void *arg)
 	}
 
 	// Update camera and modelview matrix
-	modelView=MatrixMult(CameraUpdate(&camera, fTimeStep), MatrixTranslate(0.0f, -5.0f, -10.0f));//CameraUpdate(&camera, fTimeStep);
+	modelView=CameraUpdate(&camera, fTimeStep);
 
 	for(uint32_t i=0;i<NUM_ENEMY;i++)
 		CameraUpdate(&enemy[i], fTimeStep);
@@ -1180,6 +1184,8 @@ void Render(void)
 	Audio_SetStreamVolume(0, UI_GetBarGraphValue(&UI, volumeID));
 
 	UI_UpdateTextTitleTextf(&UI, currentTrack, "Current track: %s", GetCurrentMusicTrack());
+
+	camera.thirdPerson=UI_GetCheckBoxValue(&UI, thirdPersonID);
 
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
@@ -1459,6 +1465,8 @@ bool Init(void)
 
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)config.renderWidth, (float)config.renderHeight), compositeRenderPass);
 
+	thirdPersonID=UI_AddCheckBox(&UI, Vec2(50, 50), 15, Vec3(1, 1, 1), UI_CONTROL_VISIBLE, "Third person camera", false);
+
 #ifdef ANDROID
 	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-50.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), UI_CONTROL_VISIBLE, "Random", (UIControlCallback)GenerateWorld);
 	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-100.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), UI_CONTROL_VISIBLE, "Fire", (UIControlCallback)Fire);
@@ -1525,10 +1533,6 @@ bool Init(void)
 	UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, UI.size.y/2.0f), Vec2(50.0f, 50.0f), Vec3b(1.0f), UI_CONTROL_VISIBLE, &assets[assetIndices[TEXTURE_CROSSHAIR]].image, 0.0f);
 
 	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), UI_CONTROL_HIDDEN, &assets[assetIndices[TEXTURE_FIGHTER1]].image, 0.0f);
-
-	editWindowID=UI_AddWindow(&UI, Vec2(100, 300), Vec2(200, 50), Vec3(0.5, 0.1, 0.1), UI_CONTROL_VISIBLE, "Edit control test");
-	editControl=UI_AddEditText(&UI, Vec2(0, -50), Vec2(200, 50), Vec3b(1.0f), UI_CONTROL_VISIBLE, UI_CONTROL_MODIFIABLE, 150, "");
-	UI_WindowAddControl(&UI, editWindowID, editControl);
 
 	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3b(1.0f), UI_CONTROL_VISIBLE);
 

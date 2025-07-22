@@ -26,7 +26,6 @@ extern VkuImage_t shadowDepth;
 
 extern UI_t UI;
 extern Font_t font;
-extern uint32_t editControl;
 
 extern LineGraph_t frameTimes, audioTimes, physicsTimes;
 
@@ -495,10 +494,8 @@ void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye)
 	// Draw UI controls
 	UI_Draw(&UI, perFrame[frameIndex].commandBuffer, perFrame[frameIndex].descriptorPool, fTimeStep);
 
-	UI_Control_t *control=UI_FindControlByID(&UI, editControl);
-
 	// Draw text in the compositing renderpass
-	Font_Print(&font, 16.0f, 0.0f, (float)config.renderHeight-16.0f, "FPS: %0.1f\n\x1B[33mFrame time: %0.3fms\nAudio time: %0.3fms\nPhysics time: %0.3fms\nEdit control text buffer: %s", fps, fTimeStep*1000.0f, audioTime*1000.0f, physicsTime*1000.0f, control->editText.buffer);
+	Font_Print(&font, 16.0f, 0.0f, (float)config.renderHeight-16.0f, "FPS: %0.1f\n\x1B[33mFrame time: %0.3fms\nAudio time: %0.3fms\nPhysics time: %0.3fms", fps, fTimeStep*1000.0f, audioTime*1000.0f, physicsTime*1000.0f);
 
 	Font_Draw(&font, perFrame[frameIndex].commandBuffer);
 
