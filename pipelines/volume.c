@@ -390,12 +390,15 @@ void DrawVolume(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkD
 		uint32_t uWidth;
 		uint32_t uHeight;
 		float fShift;
+		uint32_t uSamples;
+		uint32_t pad[3];
 	} PC;
 
 	PC.uFrame=uFrame++;
 	PC.uWidth=config.renderWidth;
 	PC.uHeight=config.renderHeight;
 	PC.fShift=UI_GetBarGraphValue(&UI, colorShiftID);
+	PC.uSamples=config.msaaSamples;
 
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, volumePipeline.pipeline.pipeline);
 

@@ -3,9 +3,9 @@
 layout(location=0) in vec3 Position;
 layout(location=1) flat in float Scale;
 
-layout(binding=0) uniform sampler3D Volume;
-layout(binding=1) uniform sampler2DMS Depth;
-layout(binding=2) uniform sampler2DShadow Shadow;
+layout(binding=0) uniform sampler3D volumeTex;
+layout(binding=1) uniform sampler2DMS depthTex;
+layout(binding=2) uniform sampler2DShadow shadowTex;
 
 layout(binding=3) uniform MainUBO
 {
@@ -42,18 +42,21 @@ layout(push_constant) uniform PC
 	uint uFrame;
 	uint uWidth, uHeight;
 	float fShift;
+	uint uSamples;
+	uint pad[3];
 };
 
 layout(location=0) out vec4 Output;
 
 vec4 depth2Eye()
 {
-	const float viewZ=max((
-		texelFetch(Depth, ivec2(gl_FragCoord.xy), 0).x+
-		texelFetch(Depth, ivec2(gl_FragCoord.xy), 1).x+
-		texelFetch(Depth, ivec2(gl_FragCoord.xy), 2).x+
-		texelFetch(Depth, ivec2(gl_FragCoord.xy), 3).x
-	)*0.25, 0.000009);
+	const float invSamples=1.0/float(uSamples);
+	float depth=0.0;
+
+	for(int i=0;i<uSamples;i++)
+		depth+=texelFetch(depthTex, ivec2(gl_FragCoord.xy), i).x*invSamples;
+
+	const float viewZ=max(depth, 0.000009);
 
 	const vec4 clipPosition=inverse(projection)*vec4(vec3((gl_FragCoord.xy/vec2(uWidth, uHeight))*2-1, viewZ), 1.0);
 	return clipPosition/clipPosition.w;
@@ -158,7 +161,7 @@ void main()
 		const vec3 pos=ro+rd*dist;
 
 		const float d=clamp(1.0-length(pos), 0.0, 1.0);
-		const float density=1.0-exp(-(texture(Volume, pos*0.5+0.5).r*d)*2.0);
+		const float density=1.0-exp(-(texture(volumeTex, pos*0.5+0.5).r*d)*2.0);
 
 		// colorize the cloud sample
 		vec4 val_color=vec4(hsv2rgb(vec3(density+fShift, 1.0, 1.0)), density);//vec4(TurboColormap((density+1.0)*1.2), density);

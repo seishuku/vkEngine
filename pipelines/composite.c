@@ -480,12 +480,13 @@ void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye)
 	{
 		uint32_t uFrame;
 		uint32_t uSize[2];
-		uint32_t pad;
+		uint32_t uSamples;
 	} PC;
 
 	PC.uFrame=uFrame++;
 	PC.uSize[0]=config.renderWidth;
 	PC.uSize[1]=config.renderHeight;
+	PC.uSamples=config.msaaSamples;
 
 	vkCmdPushConstants(perFrame[frameIndex].commandBuffer, compositePipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PC), &PC);
 

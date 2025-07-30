@@ -17,7 +17,6 @@ static const char *keywords[]=
 
 	// Subsection definitions
 	"windowSize", "msaaSamples", "deviceIndex",
-	"test1", "test2"
 };
 
 bool Config_ReadINI(Config_t *config, const char *filename)
@@ -28,6 +27,7 @@ bool Config_ReadINI(Config_t *config, const char *filename)
 	config->windowWidth=1920;
 	config->windowHeight=1080;
 	config->deviceIndex=0;
+	config->msaaSamples=2;
 
 	// System state
 	config->renderWidth=1920;
@@ -123,16 +123,26 @@ bool Config_ReadINI(Config_t *config, const char *filename)
 							if(!Tokenizer_ArgumentHelper(&tokenizer, "i", &msaaSamples))
 								return false;
 
-							switch(msaaSamples)
+							if(msaaSamples>=1&&msaaSamples<=64)
 							{
-								case 1:		config->MSAA=VK_SAMPLE_COUNT_1_BIT;		break;
-								case 2:		config->MSAA=VK_SAMPLE_COUNT_2_BIT;		break;
-								case 4:		config->MSAA=VK_SAMPLE_COUNT_4_BIT;		break;
-								case 8:		config->MSAA=VK_SAMPLE_COUNT_8_BIT;		break;
-								case 16:	config->MSAA=VK_SAMPLE_COUNT_16_BIT;	break;
-								case 32:	config->MSAA=VK_SAMPLE_COUNT_32_BIT;	break;
-								case 64:	config->MSAA=VK_SAMPLE_COUNT_64_BIT;	break;
-								default:	config->MSAA=VK_SAMPLE_COUNT_1_BIT;		break;
+								config->msaaSamples=msaaSamples;
+
+								switch(config->msaaSamples)
+								{
+									case 1:		config->MSAA=VK_SAMPLE_COUNT_1_BIT;		break;
+									case 2:		config->MSAA=VK_SAMPLE_COUNT_2_BIT;		break;
+									case 4:		config->MSAA=VK_SAMPLE_COUNT_4_BIT;		break;
+									case 8:		config->MSAA=VK_SAMPLE_COUNT_8_BIT;		break;
+									case 16:	config->MSAA=VK_SAMPLE_COUNT_16_BIT;	break;
+									case 32:	config->MSAA=VK_SAMPLE_COUNT_32_BIT;	break;
+									case 64:	config->MSAA=VK_SAMPLE_COUNT_64_BIT;	break;
+									default:	config->MSAA=VK_SAMPLE_COUNT_1_BIT;		break;
+								}
+							}
+							else
+							{
+								DBGPRINTF(DEBUG_ERROR, "Config MSAA out of range (%d).\n", msaaSamples);
+								return false;
 							}
 						}
 						else if(strcmp(token->string, "deviceIndex")==0)
@@ -142,11 +152,11 @@ bool Config_ReadINI(Config_t *config, const char *filename)
 							if(!Tokenizer_ArgumentHelper(&tokenizer, "i", &deviceIndex))
 								return false;
 
-							if(deviceIndex>=0&&deviceIndex<4)
+							if(deviceIndex>=0&&deviceIndex<=3)
 								config->deviceIndex=deviceIndex;
 							else
 							{
-								DBGPRINTF(DEBUG_ERROR, "Config device index out of range.\n");
+								DBGPRINTF(DEBUG_ERROR, "Config device index out of range (%d).\n", deviceIndex);
 								return false;
 							}
 						}

@@ -21,7 +21,7 @@ layout(push_constant) uniform PC
 {
 	uint uFrame;
 	uint uWidth, uHeight;
-	uint pad;
+	uint uSamples;
 };
 
 layout(location=0) out vec4 Output;
@@ -112,12 +112,13 @@ float volumetricLightScattering(const vec3 lightPos, const vec3 rayOrigin, const
 
 vec4 depth2World()
 {
-	const float viewZ=max((
-		texelFetch(depthTex, ivec2(UV*textureSize(depthTex)), 0).x+
-		texelFetch(depthTex, ivec2(UV*textureSize(depthTex)), 1).x+
-		texelFetch(depthTex, ivec2(UV*textureSize(depthTex)), 2).x+
-		texelFetch(depthTex, ivec2(UV*textureSize(depthTex)), 3).x
-	)*0.25, 0.00009);
+	const float invSamples=1.0f/float(uSamples);
+	float depth=0.0;
+
+	for(int i=0;i<uSamples;i++)
+		depth+=texelFetch(depthTex, ivec2(UV*textureSize(depthTex)), i).x*invSamples;
+
+	const float viewZ=max(depth, 0.00009);
 
 	const vec4 clipPosition=inverse(projection)*vec4(vec3(UV*2-1, viewZ), 1.0);
 	return inverse(HMD*modelview)*clipPosition/clipPosition.w;
