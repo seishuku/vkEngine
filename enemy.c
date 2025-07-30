@@ -10,11 +10,11 @@
 #include "assetmanager.h"
 #include "enemy.h"
 
-extern RigidBody_t asteroids[NUM_ASTEROIDS];
 extern float fTimeStep;
 extern ParticleSystem_t particleSystem;
 
 void FireParticleEmitter(vec3 position, vec3 direction);
+void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *particle);
 
 // angles here are in cosine space (-1.0 to 1.0)
 static const float MAX_SIGHT_DISTANCE=1000.0f;
@@ -139,8 +139,6 @@ bool IsAlignedForAttack(Enemy_t *enemy, const Camera_t player)
 	return Vec3_Dot(enemy->camera->forward, direction)>ATTACK_ANGLE_THRESHOLD;
 }
 
-void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *particle);
-
 void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 {
 	if(enemy->health<0.0f&&enemy->state!=DEAD)
@@ -163,7 +161,7 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 	{
 		case PURSUING:
 		{
-			const float distance=TrackPlayer(enemy, player);
+			TrackPlayer(enemy, player);
 
 			// Switch to attacking if within range and aligned
 			if(IsInAttackRange(enemy, player)&&IsAlignedForAttack(enemy, player))
@@ -178,7 +176,7 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 
 		case SEARCHING:
 		{
-			const float distance=TrackPlayer(enemy, enemy->lastKnownPlayer);
+			TrackPlayer(enemy, enemy->lastKnownPlayer);
 
 			if(HasLineOfSight(enemy, player))
 				enemy->state=PURSUING;

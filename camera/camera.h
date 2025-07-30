@@ -15,7 +15,6 @@ typedef struct Camera_s
 	float heightOffset;
 	float trackSpeed;
 	vec3 targetPosition;
-	vec3 targetUp;
 
 	vec3 right;
 	vec3 up;

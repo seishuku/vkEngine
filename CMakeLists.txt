@@ -82,7 +82,7 @@ set(PROJECT_SOURCES
 )
 
 # change this for how many asteroids you want
-add_definitions(-DNUM_ASTEROIDS=5000)
+add_definitions(-DNUM_ASTEROIDS=2000)
 add_definitions(-DNUM_CUBE=30)
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")

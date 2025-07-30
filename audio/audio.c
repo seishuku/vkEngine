@@ -480,7 +480,6 @@ int Audio_Init(void)
 
 	DSP_AddEffect(DSP_Reverb);
 	DSP_AddEffect(DSP_LowPass);
-	DSP_AddEffect(DSP_Overdrive);
 
 #ifdef ANDROID
 	AudioAndroid_Init();

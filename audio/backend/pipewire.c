@@ -38,8 +38,6 @@ static volatile bool streamReady=false;
 
 static void on_state_changed(void *data, enum pw_stream_state old, enum pw_stream_state state, const char *error)
 {
-    DBGPRINTF(DEBUG_INFO, "Stream state changed: %s to %s\n", pw_stream_state_as_string(old), pw_stream_state_as_string(state));
-
     if(state==PW_STREAM_STATE_PAUSED||state==PW_STREAM_STATE_STREAMING)
 	{
 		streamReady=true;

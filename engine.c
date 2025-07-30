@@ -130,7 +130,10 @@ uint32_t consoleBackground=UINT32_MAX;
 uint32_t currentTrack=UINT32_MAX;
 uint32_t windowID=UINT32_MAX;
 uint32_t thirdPersonID=UINT32_MAX;
+uint32_t playerHealthID=UINT32_MAX;
 //////
+
+float playerHealth=100.0f;
 
 Console_t console;
 
@@ -146,7 +149,7 @@ bool pausePhysics=false;
 extern vec2 lStick, rStick;
 extern bool buttons[4];
 
-#define NUM_ENEMY 1
+#define NUM_ENEMY 8
 Camera_t enemy[NUM_ENEMY];
 Enemy_t enemyAI[NUM_ENEMY];
 
@@ -248,8 +251,8 @@ void GenerateWorld(void)
 	}
 
 	// Set up rigid body reps for asteroids
-	const float asteroidFieldMinRadius=50.0f;
-	const float asteroidFieldMaxRadius=fminf((float)NUM_ASTEROIDS/2, 2000.0f);
+	const float asteroidFieldMinRadius=100.0f;
+	const float asteroidFieldMaxRadius=2000.0f;
 	const float asteroidMinRadius=0.05f;
 	const float asteroidMaxRadius=40.0f;
 
@@ -359,6 +362,8 @@ void GenerateWorld(void)
 	}
 
 	ResetPhysicsCubes();
+
+	playerHealth=100.0f;
 }
 //////
 
@@ -754,7 +759,9 @@ void TestCollision(void *a, void *b)
 {
 	PhysicsObject_t *objA=(PhysicsObject_t *)a, *objB=(PhysicsObject_t *)b;
 
-	if(PhysicsCollisionResponse(objA->rigidBody, objB->rigidBody)>1.0f)
+	const float impactSpeed=PhysicsCollisionResponse(objA->rigidBody, objB->rigidBody);
+
+	if(impactSpeed>1.0f)
 	{
 		// If both objects are asteroids
 		if(objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_FIELD)
@@ -797,7 +804,12 @@ void TestCollision(void *a, void *b)
 				{
 					if(&enemyAI[i].camera->body==otherObject->rigidBody)
 					{
-						enemyAI[i].health-=10.0f;
+						enemyAI[i].health-=impactSpeed*0.5f;
+						break;
+					}
+					else if(&camera.body==otherObject->rigidBody)
+					{
+						playerHealth-=impactSpeed*0.5f;
 						break;
 					}
 				}
@@ -978,7 +990,7 @@ void Thread_Physics(void *arg)
 	{
 		for(uint32_t i=0;i<NUM_ENEMY;i++)
 		{
-			//UpdateEnemy(&enemyAI[i], camera);
+			UpdateEnemy(&enemyAI[i], camera);
 
 			const float scale=(1.0f/assets[assetIndices[MODEL_FIGHTER]].model.radius)*enemy[i].body.radius;
 			matrix local=MatrixScale(scale, scale, scale);
@@ -1039,13 +1051,15 @@ void Thread_Physics(void *arg)
 	}
 
 	// Update camera and modelview matrix
-	modelView=CameraUpdate(&camera, fTimeStep);
+	if(playerHealth>0.0f)
+		modelView=CameraUpdate(&camera, fTimeStep);
 
 	for(uint32_t i=0;i<NUM_ENEMY;i++)
 		CameraUpdate(&enemy[i], fTimeStep);
 
 	// View from enemy camera
-	//modelView=MatrixMult(CameraUpdate(&enemy[0], fTimeStep), MatrixTranslate(0.0f, -5.0f, -10.0f));
+	//enemy[0].thirdPerson=true;
+	//modelView=CameraUpdate(&enemy[0], fTimeStep);
 	//////
 
 	physicsTime=(float)(GetClock()-startTime);
@@ -1186,6 +1200,7 @@ void Render(void)
 	UI_UpdateTextTitleTextf(&UI, currentTrack, "Current track: %s", GetCurrentMusicTrack());
 
 	camera.thirdPerson=UI_GetCheckBoxValue(&UI, thirdPersonID);
+	UI_UpdateBarGraphValue(&UI, playerHealthID, playerHealth);
 
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
@@ -1532,6 +1547,16 @@ bool Init(void)
 
 	UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, UI.size.y/2.0f), Vec2(50.0f, 50.0f), Vec3b(1.0f), UI_CONTROL_VISIBLE, &assets[assetIndices[TEXTURE_CROSSHAIR]].image, 0.0f);
 
+	playerHealthID=UI_AddBarGraph(&UI,
+								Vec2(5, 5),							// Position
+								Vec2(400, 30),							// Size
+								Vec3(1.0f, 0.1f, 0.1f),					// Color
+								UI_CONTROL_VISIBLE,						// Not hidden
+								"Player Health",						// Title text
+								UI_CONTROL_READONLY,					// Control is modifiable
+								UI_CONTROL_HORIZONTAL,					// Bar is horizontal
+								0.0f, 100.0f, 100.0f);					// min/max/initial value
+
 	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), UI_CONTROL_HIDDEN, &assets[assetIndices[TEXTURE_FIGHTER1]].image, 0.0f);
 
 	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3b(1.0f), UI_CONTROL_VISIBLE);
@@ -1616,8 +1641,6 @@ bool Init(void)
 	Thread_Start(&threadPhysics);
 
 	ThreadBarrier_Init(&physicsThreadBarrier, 2);
-
-	//ClientNetwork_Init();
 
 	DestroyLoadingScreen(&loadingScreen);
 
