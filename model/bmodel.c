@@ -26,6 +26,9 @@ static void CalculateTangent(BModel_t *model)
 		vec2 uv0, uv1;
 		float r;
 
+		if(model->tangent)
+			Zone_Free(zone, model->tangent);
+
 		model->tangent=(float *)Zone_Malloc(zone, sizeof(float)*3*model->numVertex);
 
 		if(model->tangent==NULL)
@@ -33,12 +36,18 @@ static void CalculateTangent(BModel_t *model)
 
 		memset(model->tangent, 0, sizeof(float)*3*model->numVertex);
 
+		if(model->binormal)
+			Zone_Free(zone, model->binormal);
+
 		model->binormal=(float *)Zone_Malloc(zone, sizeof(float)*3*model->numVertex);
 
 		if(model->binormal==NULL)
 			return;
 
 		memset(model->binormal, 0, sizeof(float)*3*model->numVertex);
+
+		if(model->normal)
+			Zone_Free(zone, model->normal);
 
 		model->normal=(float *)Zone_Malloc(zone, sizeof(float)*3*model->numVertex);
 
