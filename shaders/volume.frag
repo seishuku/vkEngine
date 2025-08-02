@@ -56,9 +56,7 @@ vec4 depth2Eye()
 	for(int i=0;i<uSamples;i++)
 		depth+=texelFetch(depthTex, ivec2(gl_FragCoord.xy), i).x*invSamples;
 
-	const float viewZ=max(depth, 0.000009);
-
-	const vec4 clipPosition=inverse(projection)*vec4(vec3((gl_FragCoord.xy/vec2(uWidth, uHeight))*2-1, viewZ), 1.0);
+	const vec4 clipPosition=inverse(projection)*vec4(vec3((gl_FragCoord.xy/vec2(uWidth, uHeight))*2-1, depth), 1.0);
 	return clipPosition/clipPosition.w;
 }
 
@@ -99,27 +97,6 @@ float randomFloat()
 	return float(wang_hash())/4294967296.0;
 }
 
-vec3 TurboColormap(in float x)
-{
-	const vec4 kRedVec4=vec4(0.13572138, 4.61539260, -42.66032258, 132.13108234);
-	const vec4 kGreenVec4=vec4(0.09140261, 2.19418839, 4.84296658, -14.18503333);
-	const vec4 kBlueVec4=vec4(0.10667330, 12.64194608, -60.58204836, 110.36276771);
-	const vec2 kRedVec2=vec2(-152.94239396, 59.28637943);
-	const vec2 kGreenVec2=vec2(4.27729857, 2.82956604);
-	const vec2 kBlueVec2=vec2(-89.90310912, 27.34824973);
-
-	x=clamp(x, 0.0, 1.0);
-
-	vec4 v4=vec4(1.0, x, x*x, x*x*x);
-	vec2 v2=v4.zw*v4.z;
-
-	return vec3(
-		dot(v4, kRedVec4)+dot(v2, kRedVec2),
-		dot(v4, kGreenVec4)+dot(v2, kGreenVec2),
-		dot(v4, kBlueVec4)+dot(v2, kBlueVec2)
-	);
-}
-
 vec3 hsv2rgb(vec3 c)
 {
     vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
@@ -127,11 +104,51 @@ vec3 hsv2rgb(vec3 c)
     return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
+float ShadowPCF(vec3 pos)
+{
+	const mat4 biasMat = mat4( 
+		0.5, 0.0, 0.0, 0.0,
+		0.0, 0.5, 0.0, 0.0,
+		0.0, 0.0, 1.0, 0.0,
+		0.5, 0.5, 0.0, 1.0 );
+	const vec4 projCoords=biasMat*lightMVP*vec4(pos, 1.0);
+	const vec2 delta=(lightDirection.w*300.0)*(1.0/vec2(textureSize(shadowTex, 0)));
+
+	float shadow=0.0;
+	int count=0;
+	const int range=2;
+	
+	for(int x=-range;x<range;x++)
+	{
+		for(int y=-range;y<range;y++)
+		{
+			shadow+=texture(shadowTex, (projCoords.xyz+vec3(delta*vec2(x, y), 0.0))/projCoords.w);
+			count++;
+		}
+	}
+
+	return shadow/count;
+}
+
+float MiePhase(float cosTheta, float g)
+{
+    float gSq=g*g;
+    return (1.0+gSq)/pow(1.0-2.0*g*cosTheta+gSq, 1.5)/(4.0*3.1415926);
+}
+
+float CloudPhase(float cosTheta) {
+    float forward=MiePhase(cosTheta, 0.8);
+    float backward=MiePhase(cosTheta, -0.8);
+    float isotropic=0.1;
+    
+    return mix(forward, backward, 0.1)+isotropic;
+}
+
 void main()
 {
 	const vec3 eye=inverse(modelview)[3].xyz;
-    const vec3 ro=-eye/Scale;
-    const vec3 rd=normalize(eye-Position);
+    const vec3 ro=eye/Scale;
+    const vec3 rd=normalize(Position-eye);
 
 	vec2 hit=intersectBox(ro, rd);
 
@@ -154,6 +171,10 @@ void main()
 	const vec3 dt_vec=1.0/(Scale.xxx*abs(rd));
 	const float stepSize=min(dt_vec.x, min(dt_vec.y, dt_vec.z))*8.0;
 
+	// Phase angle between light and view
+	const float cosTheta=dot(rd, lightDirection.xyz);
+	const float phase=CloudPhase(cosTheta);
+
 	Output=0.0.xxxx;
 
 	for(float dist=hit.x;dist<hit.y;dist+=stepSize)
@@ -164,19 +185,18 @@ void main()
 		const float density=1.0-exp(-(texture(volumeTex, pos*0.5+0.5).r*d)*2.0);
 
 		// colorize the cloud sample
-		vec4 val_color=vec4(hsv2rgb(vec3(density+fShift, 1.0, 1.0)), density);//vec4(TurboColormap((density+1.0)*1.2), density);
+		vec4 val_color=vec4(hsv2rgb(vec3(density+fShift, 1.0, 1.0)), density);
 
-		// apply some simple lighting
-		val_color.xyz*=lightColor.xyz*max(0.1, dot(pos, -lightDirection.xyz));
+		// Apply scattering term
+		val_color.rgb*=lightColor.rgb*phase*mix(1.0, ShadowPCF(pos*Scale), 0.3);
 
 		Output.rgb+=(1.0-Output.a)*val_color.rgb*val_color.a;
 		Output.a+=(1.0-Output.a)*val_color.a;
-
+            
 		if(Output.a>=0.8)
 			break;
 	}
 
 	// boost final color some for a more dramatic cloud
 	Output=clamp(Output*1.3, 0.0, 1.0);
-	//Output=normalize(worldPos)*0.5+0.5;
 }

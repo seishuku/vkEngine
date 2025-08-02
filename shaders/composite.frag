@@ -5,7 +5,7 @@ layout(location=0) in vec2 UV;
 layout(binding=0) uniform sampler2D original;
 layout(binding=1) uniform sampler2D blur;
 layout(binding=2) uniform sampler2DMS depthTex;
-layout(binding=3) uniform sampler2DShadow shadowDepth;
+layout(binding=3) uniform sampler2DShadow shadowTex;
 
 layout(binding=4) uniform MainUBO
 {
@@ -50,28 +50,30 @@ float randomFloat()
 	return float(wang_hash())/4294967296.0;
 }
 
-float ShadowPCF(vec4 Coords)
+float ShadowPCF(vec3 pos)
 {
-#if 1
-	vec2 delta=(lightDirection.w*300.0)*(1.0/vec2(textureSize(shadowDepth, 0)));
+	const mat4 biasMat = mat4( 
+		0.5, 0.0, 0.0, 0.0,
+		0.0, 0.5, 0.0, 0.0,
+		0.0, 0.0, 1.0, 0.0,
+		0.5, 0.5, 0.0, 1.0 );
+	const vec4 projCoords=biasMat*lightMVP*vec4(-pos, 1.0);
+	const vec2 delta=(lightDirection.w*300.0)*(1.0/vec2(textureSize(shadowTex, 0)));
 
 	float shadow=0.0;
 	int count=0;
-	int range=2;
+	const int range=2;
 	
 	for(int x=-range;x<range;x++)
 	{
 		for(int y=-range;y<range;y++)
 		{
-			shadow+=texture(shadowDepth, (Coords.xyz+vec3(delta*vec2(x, y), 0.0))/Coords.w);
+			shadow+=texture(shadowTex, (projCoords.xyz+vec3(delta*vec2(x, y), 0.0))/projCoords.w);
 			count++;
 		}
 	}
 
 	return shadow/count;
-#else
-	return texture(shadowDepth, Coords.xyz/Coords.w);
-#endif
 }
 
 float MiePhase(float cosTheta, float g)
@@ -97,12 +99,12 @@ float volumetricLightScattering(const vec3 lightPos, const vec3 rayOrigin, const
 
 	float L=0.0;
 	float lDecay=1.0;
-	vec4 rayPos=vec4(rayOrigin+rayStep*randomFloat(), 1.0);
+	vec3 rayPos=rayOrigin+rayStep*randomFloat();
 
 	for(int i=0;i<numSteps;i++)
 	{
 		// TODO: sign/biasing cosTheta and raising it's power seems to be better, but are there better ways of handling this?
-		L+=(ShadowPCF(biasMat*lightMVP*rayPos)*pow(cosTheta, 4.0))*scattering*lDecay;
+		L+=(ShadowPCF(rayPos)*pow(cosTheta, 4.0))*scattering*lDecay;
 		lDecay*=decay;
 		rayPos.xyz+=rayStep;
 	}
@@ -134,5 +136,4 @@ void main(void)
 
 	vec3 lightVolume=volumetricLightScattering(lightDirection.xyz, ro, worldPos.xyz)*lightColor.xyz;
 	Output=1.0-exp(-(texture(original, UV)+texture(blur, UV))*1.0)+vec4(lightVolume, 0.0);
-//	Output=texture(original, UV);
 }
