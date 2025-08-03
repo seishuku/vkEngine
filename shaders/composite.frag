@@ -57,7 +57,7 @@ float ShadowPCF(vec3 pos)
 		0.0, 0.5, 0.0, 0.0,
 		0.0, 0.0, 1.0, 0.0,
 		0.5, 0.5, 0.0, 1.0 );
-	const vec4 projCoords=biasMat*lightMVP*vec4(-pos, 1.0);
+	const vec4 projCoords=biasMat*lightMVP*vec4(pos, 1.0);
 	const vec2 delta=(lightDirection.w*300.0)*(1.0/vec2(textureSize(shadowTex, 0)));
 
 	float shadow=0.0;
