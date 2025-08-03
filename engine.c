@@ -737,6 +737,8 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	////////
 //#endif
 
+	vkCmdPipelineBarrier(perFrame[index].commandBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1, &(VkMemoryBarrier) { .sType=VK_STRUCTURE_TYPE_MEMORY_BARRIER, .srcAccessMask=VK_ACCESS_SHADER_READ_BIT, .dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT }, 0, NULL, 0, NULL);
+
 	vkCmdEndRenderPass(perFrame[index].commandBuffer);
 
 	vkuTransitionLayout(perFrame[index].commandBuffer, colorImage[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
