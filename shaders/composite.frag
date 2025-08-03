@@ -62,7 +62,7 @@ float ShadowPCF(vec3 pos)
 
 	float shadow=0.0;
 	int count=0;
-	const int range=2;
+	const int range=1;
 	
 	for(int x=-range;x<range;x++)
 	{

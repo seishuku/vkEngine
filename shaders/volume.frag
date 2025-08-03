@@ -116,7 +116,7 @@ float ShadowPCF(vec3 pos)
 
 	float shadow=0.0;
 	int count=0;
-	const int range=2;
+	const int range=1;
 	
 	for(int x=-range;x<range;x++)
 	{
@@ -192,8 +192,12 @@ void main()
 
 		Output.rgb+=(1.0-Output.a)*val_color.rgb*val_color.a;
 		Output.a+=(1.0-Output.a)*val_color.a;
-            
-		if(Output.a>=0.8)
+
+		// Jump distance in low density areas where it doesn't matter
+		if(density<0.0001)
+			dist+=stepSize;
+
+		if(Output.a>=0.99)
 			break;
 	}
 
