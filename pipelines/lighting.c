@@ -96,7 +96,7 @@ bool CreateLightingPipeline(void)
 				},
 			},
 		},
-		.dependencyCount=5, // Increased to 2 for layout transition synchronization
+		.dependencyCount=6,
 		.pDependencies=(VkSubpassDependency[])
 		{
 			{
@@ -143,7 +143,16 @@ bool CreateLightingPipeline(void)
 				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT|VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 				.dstAccessMask=VK_ACCESS_MEMORY_READ_BIT,
 				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
-			}
+			},
+			{
+				.srcSubpass=1,
+				.dstSubpass=1,
+				.srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
+			} 
 		}
 	}, 0, &renderPass);
 
