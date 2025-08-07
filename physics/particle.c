@@ -255,7 +255,7 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 		}
 	}
 
-	system->systemBuffer=(vec4 *)Zone_Malloc(zone, sizeof(vec4)*2*system->maxParticles);
+	system->systemBuffer=(ParticleVertex_t *)Zone_Malloc(zone, sizeof(ParticleVertex_t)*system->maxParticles);
 
 	if(system->systemBuffer==NULL)
 	{
@@ -334,21 +334,81 @@ void ParticleSystem_Step(ParticleSystem_t *system, float dt)
 	mtx_unlock(&system->mutex);
 }
 
-int compareParticles(const void *a, const void *b)
+static void RadixSortParticles(ParticleVertex_t *particles, uint32_t count, const vec3 cameraPos)
 {
-	vec3 *particleA=(vec3 *)a;
-	vec3 *particleB=(vec3 *)b;
+	if(count<=1)
+		return;
 
-	float distA=Vec3_DistanceSq(*particleA, camera.body.position);
-	float distB=Vec3_DistanceSq(*particleB, camera.body.position);
+	// Single allocation for all temporary buffers
+	size_t totalSize=sizeof(uint32_t)*count*3+sizeof(ParticleVertex_t)*count;
 
-	if(distA>distB)
-		return -1;
+	void *tempBlock=Zone_Malloc(zone, totalSize);
 
-	if(distA<distB)
-		return 1;
+	uint32_t *keys=(uint32_t *)tempBlock;
+	uint32_t *indices=keys+count;
+	uint32_t *dst=indices+count;
 
-	return 0;
+	ParticleVertex_t *tempParticles=(ParticleVertex_t *)(dst+count);
+
+	for(uint32_t i=0;i<count;i++)
+	{
+		float distSq=Vec3_DistanceSq(Vec3(particles[i].posSize.x, particles[i].posSize.y, particles[i].posSize.z), cameraPos);
+
+		// "float flip"
+		memcpy(&keys[i], &distSq, sizeof(float));
+		uint32_t mask=-(int32_t)(keys[i]>>31)|0x80000000;
+
+		keys[i]^=mask;
+
+		indices[i]=i;
+	}
+
+	uint32_t histogram[256];
+	uint32_t *src=indices;
+
+	for(int shift=0;shift<32;shift+=8)
+	{
+		memset(histogram, 0, sizeof(histogram));
+
+		// Count byte frequencies
+		for(uint32_t i=0;i<count;i++)
+		{
+			uint32_t key=keys[src[i]];
+			uint32_t byte=(key>>shift)&0xFF;
+			histogram[byte]++;
+		}
+
+		// Convert to prefix sums
+		uint32_t sum=0;
+		for(int i=0;i<256;i++)
+		{
+			uint32_t temp=histogram[i];
+			histogram[i]=sum;
+			sum+=temp;
+		}
+
+		// Distribute elements
+		for(uint32_t i=0;i<count;i++)
+		{
+			uint32_t key=keys[src[i]];
+			uint32_t byte=(key>>shift)&0xFF;
+			dst[histogram[byte]++]=src[i];
+		}
+
+		// Swap buffers
+		uint32_t *tmp=src;
+		src=dst;
+		dst=tmp;
+	}
+
+	// Reorder in descending order (farthest to nearest)
+	for(uint32_t i=0;i<count;i++)
+		tempParticles[i]=particles[src[count-1-i]];
+
+	memcpy(particles, tempParticles, sizeof(ParticleVertex_t)*count);
+
+	// Free the single temporary block
+	Zone_Free(zone, tempBlock);
 }
 
 void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye)
@@ -359,31 +419,22 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 	mtx_lock(&system->mutex);
 
 	system->numParticles=0;
-	vec4 *array=(vec4 *)system->systemBuffer;
-
-	if(array==NULL)
-	{
-		mtx_unlock(&system->mutex);
-		return;
-	}
+	ParticleVertex_t *vertices=system->systemBuffer;
 
 	for(uint32_t i=0;i<system->maxParticles;i++)
 	{
-		// Only draw ones that are alive still
 		if(system->particles[i].life>0.0f)
 		{
 			vec3 color=Vec3_Lerp(system->particles[i].startColor, system->particles[i].endColor, system->particles[i].life);
-
-			*array++=Vec4_Vec3(system->particles[i].position, system->particles[i].particleSize);
-			*array++=Vec4_Vec3(color, clampf(system->particles[i].life, 0.0f, 1.0f));
-
+			vertices->posSize=Vec4_Vec3(system->particles[i].position, system->particles[i].particleSize);
+			vertices->colorLife=Vec4_Vec3(color, clampf(system->particles[i].life, 0.0f, 1.0f));
+			vertices++;
 			system->numParticles++;
 		}
 	}
 
-	// Sort and copy, because qsort on a GPU mapped buffer is bad :)
-	qsort(system->systemBuffer, system->numParticles, sizeof(vec4)*2, compareParticles);
-	memcpy(system->particleBuffer[index].memory->mappedPointer, system->systemBuffer, sizeof(vec4)*2*system->numParticles);
+	RadixSortParticles(system->systemBuffer, system->numParticles, camera.body.position);
+	memcpy(system->particleBuffer[index].memory->mappedPointer, system->systemBuffer, sizeof(ParticleVertex_t)*system->numParticles);
 
 	mtx_unlock(&system->mutex);
 
@@ -392,18 +443,18 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 		matrix modelview;
 		matrix projection;
 	} particlePC;
-
+	
 	particlePC.modelview=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
 	particlePC.projection=perFrame[index].mainUBO[eye]->projection;
-
+	
 	//vkuDescriptorSet_UpdateBindingImageInfo(&particleDescriptorSet, 0, &particleTexture);
 	//vkuAllocateUpdateDescriptorSet(&particleDescriptorSet, descriptorPool);
-
+	
 	//vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, particlePipelineLayout, 0, 1, &particleDescriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
-
+	
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, particlePipeline.pipeline.pipeline);
 	vkCmdPushConstants(commandBuffer, particlePipeline.pipelineLayout, VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(particlePC), &particlePC);
-
+	
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &system->particleBuffer[index].buffer, &(VkDeviceSize) { 0 });
 	vkCmdDraw(commandBuffer, system->numParticles, 1, 0, 0);
 }

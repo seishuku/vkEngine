@@ -38,6 +38,12 @@ typedef struct ParticleEmitter_s
 	ParticleInitCallback initCallback;
 } ParticleEmitter_t;
 
+typedef struct
+{
+	vec4 posSize;
+	vec4 colorLife;
+} ParticleVertex_t;
+
 typedef struct ParticleSystem_s
 {
 	uint32_t baseID;
@@ -52,7 +58,7 @@ typedef struct ParticleSystem_s
 	mtx_t mutex;
 
 	VkuBuffer_t particleBuffer[VKU_MAX_FRAME_COUNT];
-	vec4 *systemBuffer;
+	ParticleVertex_t *systemBuffer;
 } ParticleSystem_t;
 
 uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3 startColor, vec3 endColor, float particleSize, uint32_t numParticles, ParticleEmitterType_e type, ParticleInitCallback initCallback);
