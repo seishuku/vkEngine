@@ -84,7 +84,7 @@ void UpdateLineGraph(LineGraph_t *lineGraph, const float value, const float delt
 	}
 }
 
-void DrawLineGraph(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, LineGraph_t *lineGraph)
+void DrawLineGraph(VkCommandBuffer commandBuffer, LineGraph_t *lineGraph, matrix mvp)
 {
 	struct
 	{
@@ -94,17 +94,8 @@ void DrawLineGraph(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, 
 		vec4 color;
 	} linePC;
 
-	float z=-1.0f;
-
-	if(config.isVR)
-	{
-		z=-1.5f;
-		linePC.extent=(VkExtent2D){ xrContext.swapchainExtent.width, xrContext.swapchainExtent.height };
-	}
-	else
-		linePC.extent=(VkExtent2D){ config.renderWidth, config.renderHeight };
-
-	linePC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale((float)linePC.extent.width/(float)linePC.extent.height, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[eye]);
+	linePC.extent=(VkExtent2D){ config.renderWidth, config.renderHeight };
+	linePC.mvp=mvp;
 	linePC.color=lineGraph->color;
 
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, lineGraphPipeline.pipeline.pipeline);

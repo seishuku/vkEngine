@@ -110,7 +110,7 @@ bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex)
 		return false;
 	}
 	
-	if(xrContext->frameState.shouldRender&&(xrContext->sessionState==XR_SESSION_STATE_VISIBLE||xrContext->sessionState==XR_SESSION_STATE_FOCUSED))
+	if(xrContext->frameState.shouldRender)
 	{
 		if(!xruCheck(xrContext->instance, xrAcquireSwapchainImage(xrContext->swapchain[0].swapchain, &(XrSwapchainImageAcquireInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO }, &imageIndex[0])))
 		{
@@ -118,15 +118,15 @@ bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex)
 			return false;
 		}
 
-		if(!xruCheck(xrContext->instance, xrWaitSwapchainImage(xrContext->swapchain[0].swapchain, &(XrSwapchainImageWaitInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .timeout=INT64_MAX })))
-		{
-			DBGPRINTF(DEBUG_ERROR, "VR: Failed to wait for swapchain image 0.\n");
-			return false;
-		}
-
 		if(!xruCheck(xrContext->instance, xrAcquireSwapchainImage(xrContext->swapchain[1].swapchain, &(XrSwapchainImageAcquireInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO }, &imageIndex[1])))
 		{
 			DBGPRINTF(DEBUG_ERROR, "VR: Failed to acquire swapchain image 1.\n");
+			return false;
+		}
+
+		if(!xruCheck(xrContext->instance, xrWaitSwapchainImage(xrContext->swapchain[0].swapchain, &(XrSwapchainImageWaitInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .timeout=INT64_MAX })))
+		{
+			DBGPRINTF(DEBUG_ERROR, "VR: Failed to wait for swapchain image 0.\n");
 			return false;
 		}
 
@@ -181,8 +181,6 @@ bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex)
 		if(!xruCheck(xrContext->instance, xrSyncActions(xrContext->session, &syncInfo)))
 			DBGPRINTF(DEBUG_WARNING, "VR: Failed to sync actions.\n");
 	}
-	else
-		return false;
 
 	return true;
 }
@@ -192,20 +190,20 @@ bool VR_EndFrame(XruContext_t *xrContext)
 	if((!xrContext->sessionRunning)||(!xrContext->frameState.shouldRender))
 		return false;
 
-	if(xrContext->sessionState==XR_SESSION_STATE_VISIBLE||xrContext->sessionState==XR_SESSION_STATE_FOCUSED)
+	if(!xruCheck(xrContext->instance, xrReleaseSwapchainImage(xrContext->swapchain[0].swapchain, &(XrSwapchainImageReleaseInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next=XR_NULL_HANDLE })))
 	{
-		if(!xruCheck(xrContext->instance, xrReleaseSwapchainImage(xrContext->swapchain[0].swapchain, &(XrSwapchainImageReleaseInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next=XR_NULL_HANDLE })))
-		{
-			DBGPRINTF(DEBUG_ERROR, "VR: Failed to release swapchain image 0.\n");
-			return false;
-		}
+		DBGPRINTF(DEBUG_ERROR, "VR: Failed to release swapchain image 0.\n");
+		return false;
+	}
 
-		if(!xruCheck(xrContext->instance, xrReleaseSwapchainImage(xrContext->swapchain[1].swapchain, &(XrSwapchainImageReleaseInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next=XR_NULL_HANDLE })))
-		{
-			DBGPRINTF(DEBUG_ERROR, "VR: Failed to release swapchain image 1.\n");
-			return false;
-		}
+	if(!xruCheck(xrContext->instance, xrReleaseSwapchainImage(xrContext->swapchain[1].swapchain, &(XrSwapchainImageReleaseInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next=XR_NULL_HANDLE })))
+	{
+		DBGPRINTF(DEBUG_ERROR, "VR: Failed to release swapchain image 1.\n");
+		return false;
+	}
 
+	if(xrContext->frameState.shouldRender)
+	{
 		XrCompositionLayerProjection projectionLayer={
 			.type=XR_TYPE_COMPOSITION_LAYER_PROJECTION,
 			.next=NULL,
@@ -457,8 +455,8 @@ static bool VR_GetViewConfig(XruContext_t *xrContext, const XrViewConfigurationT
 
 	xrContext->viewType=viewType;
 
-	xrContext->swapchainExtent.width=xrContext->viewConfigViews[0].recommendedImageRectWidth;
-	xrContext->swapchainExtent.height=xrContext->viewConfigViews[0].recommendedImageRectHeight;
+	xrContext->swapchainExtent.width=(xrContext->viewConfigViews[0].recommendedImageRectWidth*2)/3;
+	xrContext->swapchainExtent.height=(xrContext->viewConfigViews[0].recommendedImageRectHeight*2)/3;
 
 	return true;
 }
@@ -477,10 +475,14 @@ static bool VR_InitSession(XruContext_t *xrContext, VkInstance instance, VkuCont
 		return false;
 	}
 
-	// Is this needed for sure?
-	// SteamVR null driver needed it, but Quest2 doesn't.
-	//VkPhysicalDevice physicalDevice=VK_NULL_HANDLE;
-	//xrGetVulkanGraphicsDeviceKHR(xrContext->instance, xrContext->systemID, instance, &physicalDevice);
+	VkPhysicalDevice physicalDevice=VK_NULL_HANDLE;
+	xrGetVulkanGraphicsDeviceKHR(xrContext->instance, xrContext->systemID, instance, &physicalDevice);
+
+	if(physicalDevice!=context->physicalDevice)
+	{
+		DBGPRINTF(DEBUG_ERROR, "VR: Physical device mismatch.\n");
+		return false;
+	}
 
 	XrGraphicsBindingVulkanKHR graphicsBindingVulkan=
 	{

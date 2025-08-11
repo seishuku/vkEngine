@@ -289,7 +289,7 @@ void Font_Print(Font_t *font, float size, float x, float y, const char *string, 
 }
 
 // Submits text draw data to GPU and resets for next frame
-void Font_Draw(Font_t *font, VkCommandBuffer commandBuffer)
+void Font_Draw(Font_t *font, VkCommandBuffer commandBuffer, matrix mvp)
 {
 	struct
 	{
@@ -306,11 +306,11 @@ void Font_Draw(Font_t *font, VkCommandBuffer commandBuffer)
 	//	fontPC.extent=(VkExtent2D){ xrContext.swapchainExtent.width, xrContext.swapchainExtent.height };
 	//}
 	//else
-		fontPC.extent=(VkExtent2D){ config.renderWidth, config.renderHeight };
+	fontPC.extent=(VkExtent2D){ config.renderWidth, config.renderHeight };
 
 	//fontPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale((float)fontPC.extent.width/(float)fontPC.extent.height, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[0]);
 	// TODO: This breaks VR
-	fontPC.mvp=MatrixScale(1.0f, -1.0f, 1.0f);
+	fontPC.mvp=mvp;//MatrixScale(1.0f, -1.0f, 1.0f);
 
 	// Bind the font rendering pipeline (sets states and shaders)
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, font->pipeline.pipeline.pipeline);

@@ -506,21 +506,26 @@ void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye)
 	PC.uSize[1]=config.renderHeight;
 	PC.uSamples=config.msaaSamples;
 
+	matrix mvp=MatrixScale(1.0f, -1.0f, 1.0f);
+
+	if(config.isVR)
+		mvp=MatrixMult(MatrixMult(MatrixScale(((float)config.renderWidth/config.renderHeight)*0.2f, 0.2f, 0.2f), MatrixTranslate(0.0f, 0.0f, -0.2f)), MatrixMult(perFrame[frameIndex].mainUBO[eye]->HMD, perFrame[frameIndex].mainUBO[eye]->projection));
+
 	vkCmdPushConstants(perFrame[frameIndex].commandBuffer, compositePipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PC), &PC);
 
 	vkCmdDraw(perFrame[frameIndex].commandBuffer, 3, 1, 0, 0);
 
 	// Draw UI controls
-	UI_Draw(&UI, perFrame[frameIndex].commandBuffer, perFrame[frameIndex].descriptorPool, fTimeStep);
+	UI_Draw(&UI, perFrame[frameIndex].commandBuffer, perFrame[frameIndex].descriptorPool, mvp, fTimeStep);
 
 	// Draw text in the compositing renderpass
 	Font_Print(&font, 16.0f, 0.0f, (float)config.renderHeight-16.0f, "FPS: %0.1f\n\x1B[33mFrame time: %0.3fms\nAudio time: %0.3fms\nPhysics time: %0.3fms", fps, fTimeStep*1000.0f, audioTime*1000.0f, physicsTime*1000.0f);
 
-	Font_Draw(&font, perFrame[frameIndex].commandBuffer);
+	Font_Draw(&font, perFrame[frameIndex].commandBuffer, mvp);
 
-	DrawLineGraph(perFrame[frameIndex].commandBuffer, 0, 0, &frameTimes);
-	DrawLineGraph(perFrame[frameIndex].commandBuffer, 0, 0, &audioTimes);
-	DrawLineGraph(perFrame[frameIndex].commandBuffer, 0, 0, &physicsTimes);
+	DrawLineGraph(perFrame[frameIndex].commandBuffer, &frameTimes, mvp);
+	DrawLineGraph(perFrame[frameIndex].commandBuffer, &audioTimes, mvp);
+	DrawLineGraph(perFrame[frameIndex].commandBuffer, &physicsTimes, mvp);
 
 	vkCmdEndRenderPass(perFrame[frameIndex].commandBuffer);
 }

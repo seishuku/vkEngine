@@ -691,7 +691,7 @@ static bool UI_AddControlInstance(UI_Instance_t **instance, uint32_t *instanceCo
 	}	
 }
 
-bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, float dt)
+bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, matrix mvp, float dt)
 {
 	if(UI==NULL)
 		return false;
@@ -750,14 +750,8 @@ bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 		matrix mvp;
 	} UIPC;
 
-	//float z=-1.0f;
-
-	//if(config.isVR)
-		//z=-1.5f;
-
 	UIPC.viewport=UI->size;
-	// TODO: This breaks VR
-	UIPC.mvp=MatrixScale(1.0f, -1.0f, 1.0f);//MatrixMult(MatrixMult(MatrixMult(MatrixScale(UIPC.viewport.x/UIPC.viewport.y, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[0]);
+	UIPC.mvp=mvp;//MatrixScale(1.0f, -1.0f, 1.0f);//MatrixMult(MatrixMult(MatrixMult(MatrixScale(UIPC.viewport.x/UIPC.viewport.y, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[0]);
 
 	vkCmdPushConstants(commandBuffer, UI->pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(UIPC), &UIPC);
 

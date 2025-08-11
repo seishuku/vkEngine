@@ -29,11 +29,11 @@ layout (location=2) out mat3 Tangent;
 layout (location=5) out mat4 iMatrix;
 layout (location=9) out vec4 Shadow;
 
-const mat4 biasMat = mat4( 
+const mat4 biasMat=mat4(
 	0.5, 0.0, 0.0, 0.0,
 	0.0, 0.5, 0.0, 0.0,
 	0.0, 0.0, 1.0, 0.0,
-	0.5, 0.5, 0.0, 1.0 );
+	0.5, 0.5, 0.0, 1.0);
 
 void main()
 {

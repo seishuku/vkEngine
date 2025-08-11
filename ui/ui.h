@@ -249,6 +249,6 @@ bool UI_WindowAddControl(UI_t *UI, uint32_t ID, uint32_t childID);
 
 uint32_t UI_TestHit(UI_t *UI, vec2 position);
 bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 position);
-bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, float dt);
+bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, matrix mvp, float dt);
 
 #endif
