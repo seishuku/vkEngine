@@ -44,7 +44,7 @@ void LoadingScreenAdvance(LoadingScreen_t *loadingScreen)
 	vkCmdSetViewport(loadingScreen->commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)config.renderWidth, (float)config.renderHeight, 0.0f, 1.0f });
 	vkCmdSetScissor(loadingScreen->commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth, config.renderHeight } });
 
-	UI_Draw(&loadingScreen->UI, loadingScreen->commandBuffer, loadingScreen->descriptorPool, 999.0f);
+	UI_Draw(&loadingScreen->UI, loadingScreen->commandBuffer, loadingScreen->descriptorPool, MatrixScale(1.0f, -1.0f, 1.0f), 999.0f);
 
 	vkCmdEndRenderPass(loadingScreen->commandBuffer);
 
