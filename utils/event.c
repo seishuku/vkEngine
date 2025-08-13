@@ -96,7 +96,7 @@ void FireParticleEmitter(vec3 position, vec3 direction)
 	}
 
 	// Finally, play the audio SFX
-	Audio_PlaySample(&assets[assetIndices[RandRange(SOUND_PEW1, SOUND_PEW3)]].sound, false, 1.0f, position);
+	Audio_PlaySample(&AssetManager_GetAsset(assets, RandRange(SOUND_PEW1, SOUND_PEW3))->sound, false, 1.0f, position);
 }
 
 static uint32_t activeID=UINT32_MAX;

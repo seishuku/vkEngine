@@ -65,6 +65,11 @@ AssetManager_t assets[]=
 
 uint32_t assetIndices[NUM_ASSETS]={ 0 };
 
+AssetManager_t *AssetManager_GetAsset(AssetManager_t *assets, uint32_t ID)
+{
+	return &assets[assetIndices[ID]];
+}
+
 bool AssetManagerLoad(AssetManager_t *assets, uint32_t numAssets)
 {
 	for(uint32_t i=0;i<numAssets;i++)

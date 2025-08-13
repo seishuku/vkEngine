@@ -407,8 +407,8 @@ static void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 
 	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[index].fighterInstance.buffer, &(VkDeviceSize) { 0 });
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 0, assets[assetIndices[TEXTURE_FIGHTER1+(2*fighterTexture+0)]].image.sampler, assets[assetIndices[TEXTURE_FIGHTER1+(2*fighterTexture+0)]].image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 1, assets[assetIndices[TEXTURE_FIGHTER1+(2*fighterTexture+1)]].image.sampler, assets[assetIndices[TEXTURE_FIGHTER1+(2*fighterTexture+1)]].image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 0, AssetManager_GetAsset(assets, TEXTURE_FIGHTER1+(2*fighterTexture+0))->image.sampler, AssetManager_GetAsset(assets, TEXTURE_FIGHTER1+(2*fighterTexture+0))->image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 1, AssetManager_GetAsset(assets, TEXTURE_FIGHTER1+(2*fighterTexture+1))->image.sampler, AssetManager_GetAsset(assets, TEXTURE_FIGHTER1+(2*fighterTexture+1))->image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 2, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 3, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
 	vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 4, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
@@ -416,26 +416,28 @@ static void DrawPlayer(VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 
 	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipelineLayout, 0, 1, &mainPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &assets[assetIndices[MODEL_FIGHTER]].model.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+	const BModel_t *fighterModel=&AssetManager_GetAsset(assets, MODEL_FIGHTER)->model;
 
-	for(uint32_t i=0;i<assets[assetIndices[MODEL_FIGHTER]].model.numMesh;i++)
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &fighterModel->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+
+	for(uint32_t i=0;i<fighterModel->numMesh;i++)
 	{
-		vkCmdBindIndexBuffer(commandBuffer, assets[assetIndices[MODEL_FIGHTER]].model.mesh[i].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdBindIndexBuffer(commandBuffer, fighterModel->mesh[i].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
 		if(clientSocket!=-1)
 		{
 			for(uint32_t j=0;j<connectedClients;j++)
 			{
 				if(j!=clientID)
-					vkCmdDrawIndexed(commandBuffer, assets[assetIndices[MODEL_FIGHTER]].model.mesh[i].numFace*3, 1, 0, 0, j);
+					vkCmdDrawIndexed(commandBuffer, fighterModel->mesh[i].numFace*3, 1, 0, 0, j);
 			}
 		}
 		else
 		{
 			if(camera.thirdPerson)
-				vkCmdDrawIndexed(commandBuffer, assets[assetIndices[MODEL_FIGHTER]].model.mesh[i].numFace*3, NUM_ENEMY+1, 0, 0, 0);
+				vkCmdDrawIndexed(commandBuffer, fighterModel->mesh[i].numFace*3, NUM_ENEMY+1, 0, 0, 0);
 			else
-				vkCmdDrawIndexed(commandBuffer, assets[assetIndices[MODEL_FIGHTER]].model.mesh[i].numFace*3, NUM_ENEMY, 0, 0, 1);
+				vkCmdDrawIndexed(commandBuffer, fighterModel->mesh[i].numFace*3, NUM_ENEMY, 0, 0, 1);
 		}
 	}
 }
@@ -768,18 +770,18 @@ void TestCollision(void *a, void *b)
 		// If both objects are asteroids
 		if(objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_FIELD)
 		{
-			Audio_PlaySample(&assets[assetIndices[RandRange(SOUND_STONE1, SOUND_STONE3)]].sound, false, 1.0f, objB->rigidBody->position);
+			Audio_PlaySample(&AssetManager_GetAsset(assets, RandRange(SOUND_STONE1, SOUND_STONE3))->sound, false, 1.0f, objB->rigidBody->position);
 		}
 		// If one is an asteroid and one is a player
 		else if((objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)||
 				(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_FIELD))
 		{
-			Audio_PlaySample(&assets[assetIndices[SOUND_CRASH]].sound, false, 1.0f, objB->rigidBody->position);
+			Audio_PlaySample(&AssetManager_GetAsset(assets, SOUND_CRASH)->sound, false, 1.0f, objB->rigidBody->position);
 		}
 		// If both objects are players
 		else if(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)
 		{
-			Audio_PlaySample(&assets[assetIndices[SOUND_CRASH]].sound, false, 1.0f, objB->rigidBody->position);
+			Audio_PlaySample(&AssetManager_GetAsset(assets, SOUND_CRASH)->sound, false, 1.0f, objB->rigidBody->position);
 		}
 		// If it was a projectile colliding with anything
 		else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE||objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
@@ -833,7 +835,7 @@ void TestCollision(void *a, void *b)
 				}
 			}
 
-			Audio_PlaySample(&assets[assetIndices[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)]].sound, false, 1.0f, whichProjectile->rigidBody->position);
+			Audio_PlaySample(&AssetManager_GetAsset(assets, RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3))->sound, false, 1.0f, whichProjectile->rigidBody->position);
 
 			ParticleSystem_AddEmitter(&particleSystem,
 									  whichProjectile->rigidBody->position,	// Position
@@ -967,7 +969,7 @@ void Thread_Physics(void *arg)
 
 					if(PhysicsCollisionResponse(&particleBody, physicsObjects[i].rigidBody)>1.0f)
 					{
-						Audio_PlaySample(&assets[assetIndices[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)]].sound, false, 1.0f, particleBody.position);
+						Audio_PlaySample(&AssetManager_GetAsset(assets, RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3))->sound, false, 1.0f, particleBody.position);
 
 						ParticleSystem_AddEmitter
 						(
@@ -994,10 +996,10 @@ void Thread_Physics(void *arg)
 		{
 			UpdateEnemy(&enemyAI[i], camera);
 
-			const float scale=(1.0f/assets[assetIndices[MODEL_FIGHTER]].model.radius)*enemy[i].body.radius;
+			const float scale=(1.0f/AssetManager_GetAsset(assets, MODEL_FIGHTER)->model.radius)*enemy[i].body.radius;
 			matrix local=MatrixScale(scale, scale, scale);
 			local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
-			local=MatrixMult(local, MatrixTranslatev(assets[assetIndices[MODEL_FIGHTER]].model.center));
+			local=MatrixMult(local, MatrixTranslatev(AssetManager_GetAsset(assets, MODEL_FIGHTER)->model.center));
 			local=MatrixMult(local, QuatToMatrix(enemy[i].body.orientation));
 			perFrame[index].fighterInstancePtr[1+i]=MatrixMult(local, MatrixTranslatev(enemy[i].body.position));
 		}
@@ -1025,20 +1027,20 @@ void Thread_Physics(void *arg)
 	{
 		for(uint32_t i=0;i<connectedClients;i++)
 		{
-			const float scale=(1.0f/assets[assetIndices[MODEL_FIGHTER]].model.radius)*netCameras[i].body.radius;
+			const float scale=(1.0f/AssetManager_GetAsset(assets, MODEL_FIGHTER)->model.radius)*netCameras[i].body.radius;
 			matrix local=MatrixScale(scale, scale, scale);
 			local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
-			local=MatrixMult(local, MatrixTranslatev(assets[assetIndices[MODEL_FIGHTER]].model.center));
+			local=MatrixMult(local, MatrixTranslatev(AssetManager_GetAsset(assets, MODEL_FIGHTER)->model.center));
 			local=MatrixMult(local, QuatToMatrix(netCameras[i].body.orientation));
 			perFrame[index].fighterInstancePtr[i]=MatrixMult(local, MatrixTranslatev(netCameras[i].body.position));
 		}
 	}
 	else
 	{
-		const float scale=(1.0f/assets[assetIndices[MODEL_FIGHTER]].model.radius)*camera.body.radius;
+		const float scale=(1.0f/AssetManager_GetAsset(assets, MODEL_FIGHTER)->model.radius)*camera.body.radius;
 		matrix local=MatrixScale(scale, scale, scale);
 		local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
-		local=MatrixMult(local, MatrixTranslatev(assets[assetIndices[MODEL_FIGHTER]].model.center));
+		local=MatrixMult(local, MatrixTranslatev(AssetManager_GetAsset(assets, MODEL_FIGHTER)->model.center));
 		local=MatrixMult(local, QuatToMatrix(camera.body.orientation));
 		perFrame[index].fighterInstancePtr[0]=MatrixMult(local, MatrixTranslatev(camera.body.position));
 	}
@@ -1047,7 +1049,7 @@ void Thread_Physics(void *arg)
 	{
 		matrix local=MatrixScalev(cubeBody[i].size);
 		local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
-		local=MatrixMult(local, MatrixTranslatev(assets[assetIndices[MODEL_CUBE]].model.center));
+		local=MatrixMult(local, MatrixTranslatev(AssetManager_GetAsset(assets, MODEL_CUBE)->model.center));
 		local=MatrixMult(local, QuatToMatrix(cubeBody[i].orientation));
 		perFrame[index].cubeInstancePtr[i]=MatrixMult(local, MatrixTranslatev(cubeBody[i].position));
 	}
@@ -1392,7 +1394,7 @@ bool Init(void)
 	if(!AssetManagerLoad(assets, NUM_ASSETS))
 		return false;
 
-	GenNebulaVolume(&assets[assetIndices[TEXTURE_VOLUME]].image);
+	GenNebulaVolume(&AssetManager_GetAsset(assets, TEXTURE_VOLUME)->image);
 	LoadingScreenAdvance(&loadingScreen);
 
 	// Create primary pipeline
@@ -1550,7 +1552,7 @@ bool Init(void)
 	UI_WindowAddControl(&UI, windowID, volumeID);
 	UI_WindowAddControl(&UI, windowID, colorShiftID);
 
-	UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, UI.size.y/2.0f), Vec2(50.0f, 50.0f), Vec3b(1.0f), UI_CONTROL_VISIBLE, &assets[assetIndices[TEXTURE_CROSSHAIR]].image, 0.0f);
+	UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, UI.size.y/2.0f), Vec2(50.0f, 50.0f), Vec3b(1.0f), UI_CONTROL_VISIBLE, &AssetManager_GetAsset(assets, TEXTURE_CROSSHAIR)->image, 0.0f);
 
 	playerHealthID=UI_AddBarGraph(&UI,
 								Vec2(5, 5),							// Position
@@ -1562,7 +1564,7 @@ bool Init(void)
 								UI_CONTROL_HORIZONTAL,					// Bar is horizontal
 								0.0f, 100.0f, 100.0f);					// min/max/initial value
 
-	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), UI_CONTROL_HIDDEN, &assets[assetIndices[TEXTURE_FIGHTER1]].image, 0.0f);
+	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), UI_CONTROL_HIDDEN, &AssetManager_GetAsset(assets, TEXTURE_FIGHTER1)->image, 0.0f);
 
 	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3b(1.0f), UI_CONTROL_VISIBLE);
 

@@ -171,40 +171,42 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 	// Draw the models
 	for(uint32_t i=0;i<4;i++)
 	{
-		uint32_t modelOffset=MODEL_ASTEROID1+i;
+		const BModel_t *model=&AssetManager_GetAsset(assets, MODEL_ASTEROID1+i)->model;
 
-		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &assets[assetIndices[modelOffset]].model.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &model->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 
-		for(uint32_t j=0;j<assets[assetIndices[modelOffset]].model.numMesh;j++)
+		for(uint32_t j=0;j<model->numMesh;j++)
 		{
-			vkCmdBindIndexBuffer(commandBuffer, assets[assetIndices[modelOffset]].model.mesh[j].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(commandBuffer, assets[assetIndices[modelOffset]].model.mesh[j].numFace*3, NUM_ASTEROIDS/4, 0, 0, (NUM_ASTEROIDS/4)*i);
+			vkCmdBindIndexBuffer(commandBuffer, model->mesh[j].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(commandBuffer, model->mesh[j].numFace*3, NUM_ASTEROIDS/4, 0, 0, (NUM_ASTEROIDS/4)*i);
 		}
 	}
 	//////
 
 	// Fighters
+	const BModel_t *fighterModel=&AssetManager_GetAsset(assets, MODEL_FIGHTER)->model;
+
 	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[frameIndex].fighterInstance.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &fighterModel->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &assets[assetIndices[MODEL_FIGHTER]].model.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
-
-	for(uint32_t i=0;i<assets[assetIndices[MODEL_FIGHTER]].model.numMesh;i++)
+	for(uint32_t i=0;i<fighterModel->numMesh;i++)
 	{
-		vkCmdBindIndexBuffer(commandBuffer, assets[assetIndices[MODEL_FIGHTER]].model.mesh[i].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-		vkCmdDrawIndexed(commandBuffer, assets[assetIndices[MODEL_FIGHTER]].model.mesh[i].numFace*3, 2, 0, 0, 0);
+		vkCmdBindIndexBuffer(commandBuffer, fighterModel->mesh[i].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(commandBuffer, fighterModel->mesh[i].numFace*3, 2, 0, 0, 0);
 	}
 	//////
 
 	// Cubes
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &assets[assetIndices[MODEL_CUBE]].model.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+	const BModel_t *cubeModel=&AssetManager_GetAsset(assets, MODEL_CUBE)->model;
+
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &cubeModel->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[frameIndex].cubeInstance.buffer, &(VkDeviceSize) { 0 });
 
-	for(uint32_t i=0;i<assets[assetIndices[MODEL_CUBE]].model.numMesh;i++)
+	for(uint32_t i=0;i<cubeModel->numMesh;i++)
 	{
-		vkCmdBindIndexBuffer(commandBuffer, assets[assetIndices[MODEL_CUBE]].model.mesh[i].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-		vkCmdDrawIndexed(commandBuffer, assets[assetIndices[MODEL_CUBE]].model.mesh[i].numFace*3, NUM_CUBE, 0, 0, 0);
+		vkCmdBindIndexBuffer(commandBuffer, cubeModel->mesh[i].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(commandBuffer, cubeModel->mesh[i].numFace*3, NUM_CUBE, 0, 0, 0);
 	}
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &assets[assetIndices[MODEL_CUBE]].model.vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 	///////
 
 	vkCmdEndRenderPass(commandBuffer);

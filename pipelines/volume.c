@@ -405,7 +405,7 @@ void DrawVolume(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkD
 
 	vkCmdPushConstants(commandBuffer, volumePipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PC), &PC);
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&volumePipeline.descriptorSet, 0, assets[assetIndices[TEXTURE_VOLUME]].image.sampler, assets[assetIndices[TEXTURE_VOLUME]].image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&volumePipeline.descriptorSet, 0, AssetManager_GetAsset(assets, TEXTURE_VOLUME)->image.sampler, AssetManager_GetAsset(assets, TEXTURE_VOLUME)->image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingImageInfo(&volumePipeline.descriptorSet, 1, depthImage[eye].sampler, depthImage[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingImageInfo(&volumePipeline.descriptorSet, 2, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingBufferInfo(&volumePipeline.descriptorSet, 3, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);

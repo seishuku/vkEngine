@@ -67,7 +67,8 @@ typedef struct
 } AssetManager_t;
 
 extern AssetManager_t assets[];
-extern uint32_t assetIndices[];
+
+AssetManager_t *AssetManager_GetAsset(AssetManager_t *assets, uint32_t ID);
 
 bool AssetManagerLoad(AssetManager_t *assets, uint32_t numAssets);
 void AssetManagerDestroy(AssetManager_t *assets, uint32_t numAssets);

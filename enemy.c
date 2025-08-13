@@ -143,7 +143,7 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 {
 	if(enemy->health<0.0f&&enemy->state!=DEAD)
 	{
-		Audio_PlaySample(&assets[assetIndices[RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3)]].sound, false, 1.0f, enemy->camera->body.position);
+		Audio_PlaySample(&AssetManager_GetAsset(assets, RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3))->sound, false, 1.0f, enemy->camera->body.position);
 
 		ParticleSystem_AddEmitter(&particleSystem,
 								  enemy->camera->body.position,	// Position
