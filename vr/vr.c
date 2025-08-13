@@ -255,9 +255,9 @@ matrix VR_GetEyeProjection(XruContext_t *xrContext, uint32_t Eye)
 }
 
 // Get current inverse head pose matrix
-matrix VR_GetHeadPose(XruContext_t *xrContext)
+matrix VR_GetHeadPose(XruContext_t *xrContext, uint32_t Eye)
 {
-	XrPosef Pose=xrContext->projViews[0].pose;
+	XrPosef Pose=xrContext->projViews[Eye].pose;
 
 	// Get a matrix from the orientation quaternion
 	matrix PoseMat=QuatToMatrix(Vec4(

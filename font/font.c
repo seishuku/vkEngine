@@ -298,19 +298,8 @@ void Font_Draw(Font_t *font, VkCommandBuffer commandBuffer, matrix mvp)
 		matrix mvp;
 	} fontPC;
 
-	float z=-1.0f;
-
-	//if(config.isVR)
-	//{
-	//	z=-1.5f;
-	//	fontPC.extent=(VkExtent2D){ xrContext.swapchainExtent.width, xrContext.swapchainExtent.height };
-	//}
-	//else
 	fontPC.extent=(VkExtent2D){ config.renderWidth, config.renderHeight };
-
-	//fontPC.mvp=MatrixMult(MatrixMult(MatrixMult(MatrixScale((float)fontPC.extent.width/(float)fontPC.extent.height, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[0]);
-	// TODO: This breaks VR
-	fontPC.mvp=mvp;//MatrixScale(1.0f, -1.0f, 1.0f);
+	fontPC.mvp=mvp;
 
 	// Bind the font rendering pipeline (sets states and shaders)
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, font->pipeline.pipeline.pipeline);

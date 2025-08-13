@@ -751,7 +751,7 @@ bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 	} UIPC;
 
 	UIPC.viewport=UI->size;
-	UIPC.mvp=mvp;//MatrixScale(1.0f, -1.0f, 1.0f);//MatrixMult(MatrixMult(MatrixMult(MatrixScale(UIPC.viewport.x/UIPC.viewport.y, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, z)), headPose), projection[0]);
+	UIPC.mvp=mvp;
 
 	vkCmdPushConstants(commandBuffer, UI->pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(UIPC), &UIPC);
 

@@ -54,7 +54,7 @@ PerFrame_t perFrame[FRAMES_IN_FLIGHT];
 
 // Camera data
 Camera_t camera;
-matrix modelView, projection[2], headPose;
+matrix modelView, projection[2], headPose[2];
 
 // extern timing data from system main
 extern float fps, fTimeStep, fTime, audioTime;
@@ -1094,6 +1094,8 @@ void Render(void)
 	{
 		if(!VR_StartFrame(&xrContext, imageIndex))
 		{
+			VR_EndFrame(&xrContext);
+
 			// Wait for physics to finish, then dump the frame and start over
 			ThreadBarrier_Wait(&physicsThreadBarrier);
 
@@ -1105,7 +1107,8 @@ void Render(void)
 		projection[0]=VR_GetEyeProjection(&xrContext, 0);
 		projection[1]=VR_GetEyeProjection(&xrContext, 1);
 
-		headPose=VR_GetHeadPose(&xrContext);
+		headPose[0]=VR_GetHeadPose(&xrContext, 0);
+		headPose[1]=VR_GetHeadPose(&xrContext, 1);
 
 		// TODO: Find a better place for VR input handling!
 		leftHand=VR_GetActionPose(&xrContext, xrContext.handPose, xrContext.leftHandSpace, 0);
@@ -1182,7 +1185,7 @@ void Render(void)
 		}
 
 		projection[0]=MatrixInfPerspective(90.0f, (float)config.renderWidth/config.renderHeight, 0.01f);
-		headPose=MatrixIdentity();
+		headPose[0]=MatrixIdentity();
 
 		// TODO: Find a better place for gamepad input handling!
 		const float speed=240.0f;
@@ -1219,10 +1222,10 @@ void Render(void)
 	// Update shadow depth map
 	ShadowUpdateMap(perFrame[index].commandBuffer, index);
 
-	EyeRender(index, 0, headPose);
+	EyeRender(index, 0, headPose[0]);
 
 	if(config.isVR)
-		EyeRender(index, 1, headPose);
+		EyeRender(index, 1, headPose[1]);
 
 	// Final drawing compositing
 	CompositeDraw(imageIndex[0], index, 0);

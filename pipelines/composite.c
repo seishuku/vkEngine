@@ -509,7 +509,7 @@ void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye)
 	matrix mvp=MatrixScale(1.0f, -1.0f, 1.0f);
 
 	if(config.isVR)
-		mvp=MatrixMult(MatrixMult(MatrixScale(((float)config.renderWidth/config.renderHeight)*0.2f, 0.2f, 0.2f), MatrixTranslate(0.0f, 0.0f, -0.2f)), MatrixMult(perFrame[frameIndex].mainUBO[eye]->HMD, perFrame[frameIndex].mainUBO[eye]->projection));
+		mvp=MatrixMult(MatrixMult(MatrixScale(((float)config.renderWidth/config.renderHeight)*1.0f, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, -1.0f)), MatrixMult(perFrame[frameIndex].mainUBO[eye]->HMD, perFrame[frameIndex].mainUBO[eye]->projection));
 
 	vkCmdPushConstants(perFrame[frameIndex].commandBuffer, compositePipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PC), &PC);
 
