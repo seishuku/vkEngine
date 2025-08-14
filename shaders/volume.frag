@@ -181,8 +181,7 @@ void main()
 	{
 		const vec3 pos=ro+rd*dist;
 
-		const float d=clamp(1.0-length(pos), 0.0, 1.0);
-		const float density=1.0-exp(-(texture(volumeTex, pos*0.5+0.5).r*d)*2.0);
+		const float density=1.0-exp(-(texture(volumeTex, pos*0.5+0.5).r)*2.0);
 
 		// colorize the cloud sample
 		vec4 val_color=vec4(hsv2rgb(vec3(density+fShift, 1.0, 1.0)), density);

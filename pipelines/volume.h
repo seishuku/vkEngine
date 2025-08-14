@@ -1,6 +1,7 @@
 #ifndef __NEBULA_H__
 #define __NEBULA_H__
 
+VkBool32 InitNebulaVolume(VkuImage_t *image);
 VkBool32 GenNebulaVolume(VkuImage_t *image);
 bool CreateVolumePipeline(void);
 void DestroyVolume(void);

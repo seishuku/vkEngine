@@ -120,6 +120,7 @@ float fbm(vec3 p)
 
 void main(void)
 {
-	vec3 p=vec3(gl_GlobalInvocationID.xyz)/imageSize(image);
-	imageStore(image, ivec3(gl_GlobalInvocationID.xyz), vec4(fbm((p+vSeed)*4.0), 0.0, 0.0, 0.0));
+	const vec3 p=(vec3(gl_GlobalInvocationID.xyz)/imageSize(image))*2.0-1.0;
+	const float d=clamp(1.0-length(p), 0.0, 1.0);
+	imageStore(image, ivec3(gl_GlobalInvocationID.xyz), vec4(fbm((p+vSeed)*4.0)*d, 0.0, 0.0, 0.0));
 }

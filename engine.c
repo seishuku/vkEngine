@@ -1089,6 +1089,8 @@ void Render(void)
 	Thread_AddJob(&threadPhysics, Thread_Physics, (void *)&index);
 	//Thread_Physics((void *)&index);
 
+	GenNebulaVolume(&AssetManager_GetAsset(assets, TEXTURE_VOLUME)->image);
+
 	vkWaitForFences(vkContext.device, 1, &perFrame[index].frameFence, VK_TRUE, UINT64_MAX);
 
 	// Handle VR frame start
@@ -1394,6 +1396,7 @@ bool Init(void)
 	if(!AssetManagerLoad(assets, NUM_ASSETS))
 		return false;
 
+	InitNebulaVolume(&AssetManager_GetAsset(assets, TEXTURE_VOLUME)->image);
 	GenNebulaVolume(&AssetManager_GetAsset(assets, TEXTURE_VOLUME)->image);
 	LoadingScreenAdvance(&loadingScreen);
 
