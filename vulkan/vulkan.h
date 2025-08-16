@@ -311,7 +311,8 @@ typedef struct
 uint32_t vkuMemoryTypeFromProperties(VkPhysicalDeviceMemoryProperties memory_properties, uint32_t typeBits, VkFlags requirements_mask);
 
 VkBool32 vkuCreateImageBuffer(VkuContext_t* Context, VkuImage_t* image, VkImageType imageType, VkFormat format, uint32_t mipLevels, uint32_t layers, uint32_t width, uint32_t height, uint32_t depth, VkSampleCountFlagBits samples, VkImageTiling tiling, VkBufferUsageFlags flags, VkFlags requirementsMask, VkImageCreateFlags createFlags);
-void vkuCreateTexture2D(VkuContext_t *context, VkuImage_t *image, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits samples);
+VkBool32 vkuCreateTexture2D(VkuContext_t *context, VkuImage_t *image, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits samples);
+VkBool32 vkuCreateTexture3D(VkuContext_t *context, VkuImage_t *image, uint32_t width, uint32_t height, uint32_t depth, VkFormat format, VkSampleCountFlagBits samples);
 void vkuDestroyImageBuffer(VkuContext_t *context, VkuImage_t *image);
 
 VkBool32 vkuCreateHostBuffer(VkuContext_t *context, VkuBuffer_t *buffer, uint32_t size, VkBufferUsageFlags flags);

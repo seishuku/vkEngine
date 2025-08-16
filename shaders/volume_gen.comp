@@ -1,6 +1,6 @@
 #version 450
 
-layout(binding=0, r8) uniform writeonly image3D image;
+layout(binding=0, r32f) uniform writeonly image3D image;
 
 layout(local_size_x=8, local_size_y=8, local_size_z=8) in;
 
@@ -122,5 +122,5 @@ void main(void)
 {
 	const vec3 p=(vec3(gl_GlobalInvocationID.xyz)/imageSize(image))*2.0-1.0;
 	const float d=clamp(1.0-length(p), 0.0, 1.0);
-	imageStore(image, ivec3(gl_GlobalInvocationID.xyz), vec4(fbm((p+vSeed)*4.0)*d, 0.0, 0.0, 0.0));
+	imageStore(image, ivec3(gl_GlobalInvocationID.xyz), vec4(clamp(fbm((p+vSeed)*4.0)*d, 0.0, 1.0)));
 }

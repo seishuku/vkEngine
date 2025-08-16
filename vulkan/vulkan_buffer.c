@@ -72,7 +72,7 @@ VkBool32 vkuCreateImageBuffer(VkuContext_t *context, VkuImage_t *image,
 	return VK_TRUE;
 }
 
-void vkuCreateTexture2D(VkuContext_t *context, VkuImage_t *image, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits samples)
+VkBool32 vkuCreateTexture2D(VkuContext_t *context, VkuImage_t *image, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits samples)
 {
 	// Set up some typical usage flags
 	VkBufferUsageFlags usageFlags=VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -90,20 +90,18 @@ void vkuCreateTexture2D(VkuContext_t *context, VkuImage_t *image, uint32_t width
 			aspectFlags|=VK_IMAGE_ASPECT_STENCIL_BIT;
 	}
 	else
-		usageFlags|=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		usageFlags|=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_STORAGE_BIT;
 
 	// Create the image buffer and memory
-	vkuCreateImageBuffer(context, image,
-						 VK_IMAGE_TYPE_2D, format, 1, 1, width, height, 1,
-						 samples, VK_IMAGE_TILING_OPTIMAL, usageFlags,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
+	if(!vkuCreateImageBuffer(context, image, VK_IMAGE_TYPE_2D, format, 1, 1, width, height, 1, samples, VK_IMAGE_TILING_OPTIMAL, usageFlags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
+		return VK_FALSE;
 
 	// Create image view for the image buffer
-	vkCreateImageView(context->device, &(VkImageViewCreateInfo)
+	if(vkCreateImageView(context->device, &(VkImageViewCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.pNext=NULL,
 		.image=image->image,
+		.viewType=VK_IMAGE_VIEW_TYPE_2D,
 		.format=format,
 		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
 		.subresourceRange.aspectMask=aspectFlags,
@@ -111,11 +109,10 @@ void vkuCreateTexture2D(VkuContext_t *context, VkuImage_t *image, uint32_t width
 		.subresourceRange.levelCount=1,
 		.subresourceRange.baseArrayLayer=0,
 		.subresourceRange.layerCount=1,
-		.viewType=VK_IMAGE_VIEW_TYPE_2D,
-		.flags=0,
-	}, NULL, &image->imageView);
+	}, NULL, &image->imageView)!=VK_SUCCESS)
+		return VK_FALSE;
 
-	vkCreateSampler(context->device, &(VkSamplerCreateInfo)
+	if(vkCreateSampler(context->device, &(VkSamplerCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 		.magFilter=VK_FILTER_LINEAR,
@@ -125,13 +122,70 @@ void vkuCreateTexture2D(VkuContext_t *context, VkuImage_t *image, uint32_t width
 		.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.mipLodBias=0.0f,
+		.maxAnisotropy=1.0f,
 		.compareOp=VK_COMPARE_OP_NEVER,
 		.minLod=0.0f,
 		.maxLod=VK_LOD_CLAMP_NONE,
-		.maxAnisotropy=1.0f,
-		.anisotropyEnable=VK_FALSE,
 		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-	}, VK_NULL_HANDLE, &image->sampler);
+	}, VK_NULL_HANDLE, &image->sampler)!=VK_SUCCESS)
+		return VK_FALSE;
+
+	return VK_TRUE;
+}
+
+VkBool32 vkuCreateTexture3D(VkuContext_t *context, VkuImage_t *image, uint32_t width, uint32_t height, uint32_t depth, VkFormat format, VkSampleCountFlagBits samples)
+{
+	// Set up some typical usage flags
+	VkBufferUsageFlags usageFlags=VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_STORAGE_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	VkImageAspectFlags aspectFlags=VK_IMAGE_ASPECT_COLOR_BIT;
+
+	if(format>=VK_FORMAT_D16_UNORM&&format<=VK_FORMAT_D32_SFLOAT_S8_UINT)
+	{
+		aspectFlags=VK_IMAGE_ASPECT_DEPTH_BIT;
+
+		if(format>=VK_FORMAT_S8_UINT)
+			aspectFlags|=VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+
+	// Create the image buffer and memory
+	if(!vkuCreateImageBuffer(context, image, VK_IMAGE_TYPE_3D, format, 1, 1, width, height, depth, samples, VK_IMAGE_TILING_OPTIMAL, usageFlags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
+		return VK_FALSE;
+
+	// Create image view for the image buffer
+	if(vkCreateImageView(context->device, &(VkImageViewCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+		.image=image->image,
+		.viewType=VK_IMAGE_VIEW_TYPE_3D,
+		.format=format,
+		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
+		.subresourceRange.aspectMask=aspectFlags,
+		.subresourceRange.baseMipLevel=0,
+		.subresourceRange.levelCount=1,
+		.subresourceRange.baseArrayLayer=0,
+		.subresourceRange.layerCount=1,
+	}, NULL, &image->imageView)!=VK_SUCCESS)
+		return VK_FALSE;
+
+	if(vkCreateSampler(context->device, &(VkSamplerCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+		.magFilter=VK_FILTER_LINEAR,
+		.minFilter=VK_FILTER_LINEAR,
+		.mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.addressModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.mipLodBias=0.0f,
+		.maxAnisotropy=1.0f,
+		.compareOp=VK_COMPARE_OP_NEVER,
+		.minLod=0.0f,
+		.maxLod=VK_LOD_CLAMP_NONE,
+		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+	}, VK_NULL_HANDLE, &image->sampler)!=VK_SUCCESS)
+		return VK_FALSE;
+
+	return VK_TRUE;
 }
 
 void vkuDestroyImageBuffer(VkuContext_t *context, VkuImage_t *image)

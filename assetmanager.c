@@ -23,7 +23,6 @@ AssetManager_t assets[]=
 	{ TEXTURE_ASTEROID3_NORMAL, ASSET_TEXTURE, "assets/asteroid3_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
 	{ TEXTURE_ASTEROID4,        ASSET_TEXTURE, "assets/asteroid4.qoi",   IMAGE_MIPMAP|IMAGE_BILINEAR },
 	{ TEXTURE_ASTEROID4_NORMAL, ASSET_TEXTURE, "assets/asteroid4_n.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
-	{ TEXTURE_VOLUME,           ASSET_TEXTURE, NULL }, // Generated volume cloud texture, not handled by asset manager
 	{ TEXTURE_CROSSHAIR,        ASSET_TEXTURE, "assets/crosshair.qoi",   IMAGE_NONE },
 	{ TEXTURE_FIGHTER1,         ASSET_TEXTURE, "assets/crono782.qoi",    IMAGE_MIPMAP|IMAGE_BILINEAR },
 	{ TEXTURE_FIGHTER1_NORMAL,  ASSET_TEXTURE, "assets/null_normal.qoi", IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },

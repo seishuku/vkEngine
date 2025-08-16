@@ -1,0 +1,303 @@
+#version 450
+layout(local_size_x=8, local_size_y=8, local_size_z=8) in;
+
+#define D_BASE 0
+#define D0 1
+#define U0 2
+#define V0 3
+#define W0 4
+#define D1 5
+#define U1 6
+#define V1 7
+#define W1 8
+
+layout(binding=D_BASE, r32f) uniform image3D d_base;
+layout(binding=D0, r32f) uniform image3D d0;
+layout(binding=U0, r32f) uniform image3D u0;
+layout(binding=V0, r32f) uniform image3D v0;
+layout(binding=W0, r32f) uniform image3D w0;
+layout(binding=D1, r32f) uniform image3D d1;
+layout(binding=U1, r32f) uniform image3D u1;
+layout(binding=V1, r32f) uniform image3D v1;
+layout(binding=W1, r32f) uniform image3D w1;
+
+layout(push_constant) uniform PC
+{
+    uvec3 uSize;
+    uint uKernel;
+    float fVisc, fDiff;
+    float fDt, pad;
+    vec4 positionRadius;
+    vec4 velocityDensity;
+};
+
+float safeLoad(ivec3 coord, uint texIndex)
+{
+    ivec3 clampedCoord=clamp(coord, ivec3(0), ivec3(uSize)-1);
+    
+    switch(texIndex)
+    {
+        case D_BASE: return imageLoad(d_base, clampedCoord).x;
+        case     D0: return imageLoad(d0,     clampedCoord).x;
+        case     U0: return imageLoad(u0,     clampedCoord).x;
+        case     V0: return imageLoad(v0,     clampedCoord).x;
+        case     W0: return imageLoad(w0,     clampedCoord).x;
+        case     D1: return imageLoad(d1,     clampedCoord).x;
+        case     U1: return imageLoad(u1,     clampedCoord).x;
+        case     V1: return imageLoad(v1,     clampedCoord).x;
+        case     W1: return imageLoad(w1,     clampedCoord).x;
+        default: return 0.0;
+    }
+}
+
+void safeStore(ivec3 coord, uint texIndex, float value)
+{
+    if(any(greaterThanEqual(coord, ivec3(uSize))))
+        return;
+    
+    switch(texIndex)
+    {
+        case D_BASE: imageStore(d_base, coord, vec4(value)); break;
+        case     D0: imageStore(d0,     coord, vec4(value)); break;
+        case     U0: imageStore(u0,     coord, vec4(value)); break;
+        case     V0: imageStore(v0,     coord, vec4(value)); break;
+        case     W0: imageStore(w0,     coord, vec4(value)); break;
+        case     D1: imageStore(d1,     coord, vec4(value)); break;
+        case     U1: imageStore(u1,     coord, vec4(value)); break;
+        case     V1: imageStore(v1,     coord, vec4(value)); break;
+        case     W1: imageStore(w1,     coord, vec4(value)); break;
+    }
+}
+
+float trilinearInterp(vec3 pos, uint texIndex)
+{
+    // Clamp to valid range
+    pos=clamp(pos, vec3(0.0), vec3(uSize)-1.0);
+    
+    ivec3 pos0=ivec3(floor(pos));
+    ivec3 pos1=min(pos0+1, ivec3(uSize)-1);
+    vec3 str1=pos-vec3(pos0);
+    vec3 str0=1.0-str1;
+    
+    return
+        str0.x*
+        (
+            str0.y*
+            (
+                str0.z*safeLoad(ivec3(pos0.x, pos0.y, pos0.z), texIndex)+
+                str1.z*safeLoad(ivec3(pos0.x, pos0.y, pos1.z), texIndex)
+            )+
+            str1.y*
+            (
+                str0.z*safeLoad(ivec3(pos0.x, pos1.y, pos0.z), texIndex)+
+                str1.z*safeLoad(ivec3(pos0.x, pos1.y, pos1.z), texIndex)
+            )
+        )+
+        str1.x*
+        (
+            str0.y*
+            (
+                str0.z*safeLoad(ivec3(pos1.x, pos0.y, pos0.z), texIndex)+
+                str1.z*safeLoad(ivec3(pos1.x, pos0.y, pos1.z), texIndex)
+            )+
+            str1.y*
+            (
+                str0.z*safeLoad(ivec3(pos1.x, pos1.y, pos0.z), texIndex)+
+                str1.z*safeLoad(ivec3(pos1.x, pos1.y, pos1.z), texIndex)
+            )
+        );
+}
+
+void main()
+{
+    const ivec3 coord=ivec3(gl_GlobalInvocationID.xyz);
+
+    if(any(greaterThanEqual(coord, ivec3(uSize))))
+        return;
+
+    switch(uKernel)
+    {
+        // Diffusion steps
+        case 0:
+        case 1:
+        case 2:
+        case 12:
+        {
+            if(any(lessThan(coord, ivec3(1)))||any(greaterThanEqual(coord, ivec3(uSize)-1)))
+                return;
+
+            uint srcTex, dstTex;
+            float diffCoeff;
+
+                 if(uKernel==0) { srcTex=U0; dstTex=U1; diffCoeff=fVisc; }
+            else if(uKernel==1) { srcTex=V0; dstTex=V1; diffCoeff=fVisc; }
+            else if(uKernel==2) { srcTex=W0; dstTex=W1; diffCoeff=fVisc; }
+            else                { srcTex=D0; dstTex=D1; diffCoeff=fDiff; }
+
+            float a=fDt*diffCoeff*(float(uSize.x-2)*float(uSize.x-2));
+            float c=1.0+6.0*a;
+            float cRecip=1.0/c;
+
+            float result=(safeLoad(coord, srcTex)+a*(
+                safeLoad(coord+ivec3(1, 0, 0), dstTex)+
+                safeLoad(coord+ivec3(0, 1, 0), dstTex)+
+                safeLoad(coord+ivec3(0, 0, 1), dstTex)+
+                safeLoad(coord-ivec3(1, 0, 0), dstTex)+
+                safeLoad(coord-ivec3(0, 1, 0), dstTex)+
+                safeLoad(coord-ivec3(0, 0, 1), dstTex)
+            ))*cRecip;
+
+            safeStore(coord, dstTex, result);
+            break;
+        }
+
+        // Projection steps
+        case 3:
+        case 9:
+        { 
+            if(any(lessThan(coord, ivec3(1)))||any(greaterThanEqual(coord, ivec3(uSize)-1)))
+                return;
+
+            uint uTex, vTex, wTex, divTex;
+
+            if(uKernel==3)
+            {
+                uTex=U1; vTex=V1; wTex=W1; divTex=V0;
+                safeStore(coord, U0, 0.0);
+            }
+            else
+            {
+                uTex=U0; vTex=V0; wTex=W0; divTex=V1;
+                safeStore(coord, U1, 0.0);
+            }
+
+            float divX=(safeLoad(coord+ivec3(1, 0, 0), uTex)-safeLoad(coord-ivec3(1, 0, 0), uTex))*0.5;
+            float divY=(safeLoad(coord+ivec3(0, 1, 0), vTex)-safeLoad(coord-ivec3(0, 1, 0), vTex))*0.5;
+            float divZ=(safeLoad(coord+ivec3(0, 0, 1), wTex)-safeLoad(coord-ivec3(0, 0, 1), wTex))*0.5;
+            safeStore(coord, divTex, -(divX+divY+divZ));
+            break;
+        }
+
+        case 4:
+        case 10:
+        {
+            if(any(lessThan(coord, ivec3(1)))||any(greaterThanEqual(coord, ivec3(uSize)-1)))
+                return;
+
+            uint divTex, pTex;
+
+            if(uKernel==4) { divTex=V0; pTex=U0; }
+            else           { divTex=V1; pTex=U1; }
+
+            const float cRecip=1.0/6.0;
+
+            float result=
+            (
+                safeLoad(coord, divTex)+
+                (
+                    safeLoad(coord+ivec3(1, 0, 0), pTex)+
+                    safeLoad(coord+ivec3(0, 1, 0), pTex)+
+                    safeLoad(coord+ivec3(0, 0, 1), pTex)+
+                    safeLoad(coord-ivec3(1, 0, 0), pTex)+
+                    safeLoad(coord-ivec3(0, 1, 0), pTex)+
+                    safeLoad(coord-ivec3(0, 0, 1), pTex)
+                )
+            )*cRecip;
+
+            safeStore(coord, pTex, result);
+            break;
+        }
+
+        case 5:
+        case 11:
+        {
+            if(any(lessThan(coord, ivec3(1)))||any(greaterThanEqual(coord, ivec3(uSize)-1)))
+                return;
+
+            uint uTex, vTex, wTex, pTex;
+
+            if(uKernel==5) { uTex=U1; vTex=V1; wTex=W1; pTex=U0; }
+            else           { uTex=U0; vTex=V0; wTex=W0; pTex=U1; }
+
+            float pGradX=(safeLoad(coord+ivec3(1, 0, 0), pTex)-safeLoad(coord-ivec3(1, 0, 0), pTex))*0.5;
+            float pGradY=(safeLoad(coord+ivec3(0, 1, 0), pTex)-safeLoad(coord-ivec3(0, 1, 0), pTex))*0.5;
+            float pGradZ=(safeLoad(coord+ivec3(0, 0, 1), pTex)-safeLoad(coord-ivec3(0, 0, 1), pTex))*0.5;
+
+            safeStore(coord, uTex, safeLoad(coord, uTex)-pGradX);
+            safeStore(coord, vTex, safeLoad(coord, vTex)-pGradY);
+            safeStore(coord, wTex, safeLoad(coord, wTex)-pGradZ);
+            break;
+        }
+
+        // Advection steps
+        case 6:
+        case 7:
+        case 8:
+        case 13:
+        {
+            uint srcTex, dstTex, uTex, vTex, wTex;
+
+                 if(uKernel==6) { srcTex=U1; dstTex=U0; }
+            else if(uKernel==7) { srcTex=V1; dstTex=V0; }
+            else if(uKernel==8) { srcTex=W1; dstTex=W0; }
+            else                { srcTex=D1; dstTex=D0; }
+
+            if(uKernel<=8) { uTex=U1; vTex=V1; wTex=W1; }
+            else           { uTex=U0; vTex=V0; wTex=W0; }
+
+            vec3 velocity=vec3(safeLoad(coord, uTex), safeLoad(coord, vTex), safeLoad(coord, wTex));
+            vec3 pos=vec3(coord)-fDt*velocity*float(uSize.x-2);
+
+            safeStore(coord, dstTex, trilinearInterp(pos, srcTex));
+            break;
+        }
+
+        // Set velocity/density
+        case 14:
+        {
+            float dist=length(vec3(coord)-positionRadius.xyz);
+            float mask=1.0-smoothstep(positionRadius.w, positionRadius.w*1.5, dist);
+
+            safeStore(coord, U0, mix(safeLoad(coord, U0), velocityDensity.x, mask));
+            safeStore(coord, V0, mix(safeLoad(coord, V0), velocityDensity.y, mask));
+            safeStore(coord, W0, mix(safeLoad(coord, W0), velocityDensity.z, mask));
+            safeStore(coord, D0, mix(safeLoad(coord, D0), velocityDensity.w, mask));
+            break;
+        }
+
+        // Restore density from image
+        case 15:
+        {
+            const float tau=1.0;
+            float decay=exp(-fDt/tau);
+            float base=safeLoad(coord, D_BASE);
+            float current=safeLoad(coord, D0);
+
+            safeStore(coord, D0, base+(current-base)*decay);
+            break;
+        }
+
+        // Spherical constraint
+        case 16:
+        {
+            // Sphere parameters
+            float radius  =0.5*float(uSize.x);
+            float softness=0.05*float(uSize.x);
+
+            float dist=length(vec3(coord)-vec3(uSize)*0.5);
+
+            // Smooth falloff factor [0,1]
+            float falloff=smoothstep(radius, radius-softness, dist);
+
+            // Apply it to density and velocity
+            safeStore(coord, D0, safeLoad(coord, D0)*falloff);
+            safeStore(coord, U0, safeLoad(coord, U0)*falloff);
+            safeStore(coord, V0, safeLoad(coord, V0)*falloff);
+            safeStore(coord, W0, safeLoad(coord, W0)*falloff);
+            break;
+        }
+
+        default:
+            break;
+    }
+}
