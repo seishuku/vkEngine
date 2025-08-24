@@ -726,18 +726,13 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 		threadData[1].perFrame[index].secCommandBuffer[eye]
 	});
 
-	// TODO:
-	//     Android has issues with depth readback and subsequent depth->eye/world transform, this also affects volumetrics in the compositing shader.
-//#ifndef ANDROID
 	vkCmdNextSubpass(perFrame[index].commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0, (float)config.renderWidth, (float)config.renderHeight, 0.0f, 1.0f });
+	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth, config.renderHeight } });
 
-	//matrix Modelview=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
-	//ParticleSystem_Draw(&particleSystem, perFrame[index].commandBuffer, perFrame[index].descriptorPool, Modelview, perFrame[index].mainUBO[eye]->projection);
-	
 	//////// Volume cloud
 	DrawVolume(perFrame[index].commandBuffer, index, eye, perFrame[index].descriptorPool);
 	////////
-//#endif
 
 	vkCmdPipelineBarrier(perFrame[index].commandBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1, &(VkMemoryBarrier) { .sType=VK_STRUCTURE_TYPE_MEMORY_BARRIER, .srcAccessMask=VK_ACCESS_SHADER_READ_BIT, .dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT }, 0, NULL, 0, NULL);
 
