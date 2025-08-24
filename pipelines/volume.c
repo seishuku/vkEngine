@@ -593,6 +593,7 @@ bool CreateVolumePipeline(void)
 
 void DestroyVolume(void)
 {
+	vkuDestroyImageBuffer(&vkContext, &density_base);
 	vkuDestroyImageBuffer(&vkContext, &density0);
 	vkuDestroyImageBuffer(&vkContext, &velocityX0);
 	vkuDestroyImageBuffer(&vkContext, &velocityY0);
@@ -606,7 +607,10 @@ void DestroyVolume(void)
 
 	vkDestroyCommandPool(vkContext.device, computeCommandPool, VK_NULL_HANDLE);
 	vkDestroyDescriptorPool(vkContext.device, computeDescriptorPool, VK_NULL_HANDLE);
+	
 	DestroyPipeline(&vkContext, &computePipeline);
+
+	DestroyPipeline(&vkContext, &fluidPipeline);
 
 	DestroyPipeline(&vkContext, &volumePipeline);
 }
