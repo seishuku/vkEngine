@@ -98,13 +98,13 @@ bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex)
 	if(!xrContext->sessionRunning)
 		return false;
 	
-	if(!xruCheck(xrContext->instance, xrWaitFrame(xrContext->session, XR_NULL_HANDLE, &xrContext->frameState)))
+	if(!xruCheck(xrContext->instance, xrWaitFrame(xrContext->session, &(XrFrameWaitInfo) { .type=XR_TYPE_FRAME_WAIT_INFO }, &xrContext->frameState)))
 	{
 		DBGPRINTF(DEBUG_ERROR, "VR: xrWaitFrame() was not successful.\n");
 		return false;
 	}
 
-	if(!xruCheck(xrContext->instance, xrBeginFrame(xrContext->session, XR_NULL_HANDLE)))
+	if(!xruCheck(xrContext->instance, xrBeginFrame(xrContext->session, &(XrFrameBeginInfo) { .type=XR_TYPE_FRAME_BEGIN_INFO })))
 	{
 		DBGPRINTF(DEBUG_ERROR, "VR: xrBeginFrame() was not successful.\n");
 		return false;
@@ -567,7 +567,7 @@ static bool VR_InitSwapchain(XruContext_t *xrContext, VkuContext_t *context)
 	};
 	bool FoundFormat=false;
 
-	for(uint32_t i=0;i<sizeof(PreferredFormats);i++)
+	for(uint32_t i=0;i<sizeof(PreferredFormats)/sizeof(PreferredFormats[0]);i++)
 	{
 		for(uint32_t j=0;j<swapchainFormatCount;j++)
 		{
