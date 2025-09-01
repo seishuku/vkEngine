@@ -44,9 +44,9 @@ void CreateShadowMap(void)
 		.magFilter=VK_FILTER_LINEAR,
 		.minFilter=VK_FILTER_LINEAR,
 		.mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR,
-		.addressModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+		.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+		.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
 		.mipLodBias=0.0f,
 		.compareOp=VK_COMPARE_OP_LESS_OR_EQUAL,
 		.compareEnable=VK_TRUE,
@@ -147,7 +147,7 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 	vkCmdSetViewport(commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)shadowSize, (float)shadowSize, 0.0f, 1.0f });
 	vkCmdSetScissor(commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { shadowSize, shadowSize } });
 
-	matrix projection=MatrixOrtho(-1200.0f, 1200.0f, -1200.0f, 1200.0f, 0.1f, 4000.0f);
+	matrix projection=MatrixOrtho(-2000.0f, 2000.0f, -2000.0f, 2000.0f, 0.01f, 4400.0f);
 
 	// Looking at the asteroid field from the sun's position "a number" away
 	// This should technically be an infinite distance away, but that's not possible, so "a number" is whatever best compromise.
@@ -156,10 +156,10 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 		perFrame[frameIndex].skyboxUBO[0]->uSunPosition.x,
 		perFrame[frameIndex].skyboxUBO[0]->uSunPosition.y,
 		perFrame[frameIndex].skyboxUBO[0]->uSunPosition.z
-	), 3000.0f);
+	), 2100.0f);
 
 	// Following the camera's position, so we don't have to composite multiple shadow maps or have super large maps.
-	matrix modelview=MatrixLookAt(Vec3_Addv(position, camera.body.position), camera.body.position, Vec3(0.0f, 1.0f, 0.0f));
+	matrix modelview=MatrixLookAt(position, Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f));
 
 	// Multiply matrices together, so we can just send one matrix as a push constant.
 

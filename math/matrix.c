@@ -23,10 +23,10 @@ matrix MatrixMult(const matrix a, const matrix b)
 	return (matrix)
 	{
 		{
-			a.x.x *b.x.x+a.x.y*b.y.x+a.x.z*b.z.x+a.x.w*b.w.x,
-			a.x.x *b.x.y+a.x.y*b.y.y+a.x.z*b.z.y+a.x.w*b.w.y,
-			a.x.x *b.x.z+a.x.y*b.y.z+a.x.z*b.z.z+a.x.w*b.w.z,
-			a.x.x *b.x.w+a.x.y*b.y.w+a.x.z*b.z.w+a.x.w*b.w.w
+			a.x.x*b.x.x+a.x.y*b.y.x+a.x.z*b.z.x+a.x.w*b.w.x,
+			a.x.x*b.x.y+a.x.y*b.y.y+a.x.z*b.z.y+a.x.w*b.w.y,
+			a.x.x*b.x.z+a.x.y*b.y.z+a.x.z*b.z.z+a.x.w*b.w.z,
+			a.x.x*b.x.w+a.x.y*b.y.w+a.x.z*b.z.w+a.x.w*b.w.w
 		},
 		{
 			a.y.x*b.x.x+a.y.y*b.y.x+a.y.z*b.z.x+a.y.w*b.w.x,

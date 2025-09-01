@@ -9,7 +9,7 @@ pipeline {
 
 	depthTest(true)
 	depthBias(true)
-	depthBiasConstantFactor(1.25)
+	depthBiasConstantFactor(0.001)
 	depthBiasSlopeFactor(1.75)
 
 	addVertexBinding(0, 80, perVertex)
