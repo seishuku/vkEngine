@@ -26,6 +26,7 @@
 #include "pipelines/shadow.h"
 #include "pipelines/skybox.h"
 #include "pipelines/sphere.h"
+#include "pipelines/triangle.h"
 #include "pipelines/volume.h"
 #include "system/system.h"
 #include "system/threads.h"
@@ -154,6 +155,39 @@ Camera_t enemy[NUM_ENEMY];
 Enemy_t enemyAI[NUM_ENEMY];
 
 LineGraph_t frameTimes, audioTimes, physicsTimes;
+
+#define MAX_POINTS 1000
+struct
+{
+	vec3 point;
+	uint32_t index;
+} points[MAX_POINTS];
+
+uint32_t numPoints=0;
+
+bool PushPoint(const vec3 point, const uint32_t index)
+{
+	if(numPoints>=MAX_POINTS)
+		return false;
+
+	points[numPoints].point=point;
+	points[numPoints].index=index;
+	numPoints++;
+
+	return true;
+}
+
+bool PopPoint(vec3 *point, uint32_t *index)
+{
+	if(numPoints==0)
+		return false;
+
+	numPoints--;
+	*point=points[numPoints].point;
+	*index=points[numPoints].index;
+
+	return true;
+}
 
 void RecreateSwapchain(void);
 bool CreateFramebuffers(uint32_t eye);
@@ -513,6 +547,23 @@ void Thread_Destructor(void *arg)
 
 Spring_t testSpring={ 0 };
 
+typedef struct
+{
+	vec3 vertex;
+	float left[MAX_HRIR_SAMPLES], right[MAX_HRIR_SAMPLES];
+} HRIR_Vertex_t;
+
+extern struct
+{
+	uint32_t magic;
+	uint32_t sampleRate;
+	uint32_t sampleLength;
+	uint32_t numVertex;
+	uint32_t numIndex;
+	uint32_t *indices;
+	HRIR_Vertex_t *vertices;
+} sphere;
+
 void Thread_Main(void *arg)
 {
 	ThreadData_t *data=(ThreadData_t *)arg;
@@ -640,6 +691,49 @@ void Thread_Main(void *arg)
 
 	// Draw player models
 	DrawPlayer(data->perFrame[data->index].secCommandBuffer[data->eye], data->perFrame[data->index].descriptorPool[data->eye], data->index, data->eye);
+
+	for(uint32_t i=0;i<numPoints;i++)
+	{
+		vec3 point=Vec3b(0.0f);
+		uint32_t index=0;
+
+		PopPoint(&point, &index);
+
+		struct
+		{
+			matrix mvp;
+			vec4 color;
+			vec4 verts[2];
+		} linePC;
+
+		linePC.mvp=perFrame[data->index].mainUBO[data->eye]->projection;
+		linePC.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
+		linePC.verts[0]=Vec4_Vec3(Vec3(0.0f, 0.0f, -1.0), 1.0f);
+		linePC.verts[1]=Vec4_Vec3(point, 1.0f);
+
+		DrawLinePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], sizeof(linePC), &linePC);
+
+		const HRIR_Vertex_t *v0=&sphere.vertices[sphere.indices[3*index+0]];
+		const HRIR_Vertex_t *v1=&sphere.vertices[sphere.indices[3*index+1]];
+		const HRIR_Vertex_t *v2=&sphere.vertices[sphere.indices[3*index+2]];
+
+		struct
+		{
+			matrix mvp;
+			vec4 color;
+			vec4 verts[3];
+		} trianglePC;
+
+		trianglePC.mvp=perFrame[data->index].mainUBO[data->eye]->projection;
+
+		trianglePC.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
+
+		trianglePC.verts[0]=Vec4_Vec3(v0->vertex, point.x);
+		trianglePC.verts[1]=Vec4_Vec3(v1->vertex, point.y);
+		trianglePC.verts[2]=Vec4_Vec3(v2->vertex, point.z);
+
+		DrawTrianglePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], sizeof(trianglePC), &trianglePC);
+	}
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
@@ -989,7 +1083,7 @@ void Thread_Physics(void *arg)
 	{
 		for(uint32_t i=0;i<NUM_ENEMY;i++)
 		{
-			UpdateEnemy(&enemyAI[i], camera);
+			//UpdateEnemy(&enemyAI[i], camera);
 
 			const float scale=(1.0f/AssetManager_GetAsset(assets, MODEL_FIGHTER)->model.radius)*enemy[i].body.radius;
 			matrix local=MatrixScale(scale, scale, scale);
@@ -1409,6 +1503,8 @@ bool Init(void)
 	CreateSpherePipeline();
 	LoadingScreenAdvance(&loadingScreen);
 	CreateLinePipeline();
+	LoadingScreenAdvance(&loadingScreen);
+	CreateTrianglePipeline();
 	LoadingScreenAdvance(&loadingScreen);
 
 	// Create volumetric rendering pipeline
@@ -1844,6 +1940,7 @@ void Destroy(void)
 	// Debug object pipeline destruction
 	DestroyLine();
 	DestroySphere();
+	DestroyTriangle();
 	//////////
 
 	// UI destruction
