@@ -1200,6 +1200,8 @@ void Render(void)
 	ConsoleDraw(&console);
 
 	Audio_SetStreamVolume(0, UI_GetBarGraphValue(&UI, volumeID));
+	Audio_SetListenerModelView(modelView);
+	Audio_SetListenerPosition(camera.body.position);
 
 	UI_UpdateTextTitleTextf(&UI, currentTrack, "Current track: %s", GetCurrentMusicTrack());
 

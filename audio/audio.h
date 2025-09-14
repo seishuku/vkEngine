@@ -113,6 +113,9 @@ typedef struct
 	float hpfCutoffSweep;
 } WaveParams_t;
 
+void Audio_SetListenerModelView(matrix modelView);
+void Audio_SetListenerPosition(vec3 position);
+
 void Audio_FillBuffer(void *buffer, uint32_t length);
 bool Audio_LoadStatic(const char *filename, Sample_t *sample);
 uint32_t Audio_PlaySample(Sample_t *sample, const bool looping, const float volume, vec3 position);

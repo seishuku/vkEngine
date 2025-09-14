@@ -16,17 +16,15 @@
 float audioTime=0.0;
 
 // HRIR sphere model and audio samples
+static const uint32_t HRIR_MAGIC='H'|'R'<<8|'I'<<16|'R'<<24;
+
 typedef struct
 {
-	vec3 vertex, normal;
+	vec3 vertex;
 	float left[MAX_HRIR_SAMPLES], right[MAX_HRIR_SAMPLES];
 } HRIR_Vertex_t;
 
-static const uint32_t HRIR_MAGIC='H'|'R'<<8|'I'<<16|'R'<<24;
-
-static SpatialHash_t HRIRHash;
-
-static struct
+struct
 {
 	uint32_t magic;
 	uint32_t sampleRate;
@@ -73,7 +71,25 @@ static struct
 	} stream[MAX_AUDIO_STREAMS];
 } streamBuffer;
 
-extern Camera_t camera;
+static matrix listenerModelView=
+{
+	{ 1.0f, 0.0f, 0.0f, 0.0f },
+	{ 0.0f, 1.0f, 0.0f, 0.0f },
+	{ 0.0f, 0.0f, 1.0f, 0.0f },
+	{ 0.0f, 0.0f, 0.0f, 1.0f }
+};
+
+static vec3 listenerPosition={ 0.0f, 0.0f, 0.0f };
+
+void Audio_SetListenerModelView(matrix modelView)
+{
+	listenerModelView=modelView;
+}
+
+void Audio_SetListenerPosition(vec3 position)
+{
+	listenerPosition=position;
+}
 
 static inline int32_t bitwiseClamp32(int32_t x, int32_t min, int32_t max)
 {
@@ -83,32 +99,61 @@ static inline int32_t bitwiseClamp32(int32_t x, int32_t min, int32_t max)
 
 static vec2 CalculateBarycentric(const vec3 p, const vec3 a, const vec3 b, const vec3 c)
 {
-	const vec3 v0=Vec3_Subv(b, a), v1=Vec3_Subv(c, a), v2=Vec3_Subv(p, a);
+	const vec3 ab=Vec3_Subv(b, a), ac=Vec3_Subv(c, a), ap=Vec3_Subv(p, a);
 
-	const float d00=Vec3_Dot(v0, v0);
-	const float d01=Vec3_Dot(v0, v1);
-	const float d11=Vec3_Dot(v1, v1);
-	const float d20=Vec3_Dot(v2, v0);
-	const float d21=Vec3_Dot(v2, v1);
+	const float d00=Vec3_Dot(ab, ab);
+	const float d01=Vec3_Dot(ab, ac);
+	const float d11=Vec3_Dot(ac, ac);
+	const float d20=Vec3_Dot(ap, ab);
+	const float d21=Vec3_Dot(ap, ac);
 	const float invDenom=1.0f/(d00*d11-d01*d01);
 
 	return Vec2((d11*d20-d01*d21)*invDenom, (d00*d21-d01*d20)*invDenom);
 }
 
-static float maxDistanceSq=-1.0f;
-static uint32_t triangleIndex=-1;
+bool PushPoint(const vec3 point, const uint32_t index);
 
-static void HRIR_FindBestTriangle(void *a, void *b)
+static vec3 ClosestPointOnTriangle(vec3 p, vec3 a, vec3 b, vec3 c)
 {
-	const vec3 *position=(vec3 *)a;
-	const uint32_t tri=*(uint32_t *)b;
-	const float d=Vec3_Dot(*position, sphere.vertices[3*tri].normal);
+	vec3 ab=Vec3_Subv(b, a), ac=Vec3_Subv(c, a), ap=Vec3_Subv(p, a);
 
-	if(d>maxDistanceSq)
-	{
-		maxDistanceSq=d;
-		triangleIndex=tri;
-	}
+	float d1=Vec3_Dot(ab, ap);
+	float d2=Vec3_Dot(ac, ap);
+
+	if(d1<=0.0f&&d2<=0.0f)
+		return a;
+
+	vec3 bp=Vec3_Subv(p, b);
+	float d3=Vec3_Dot(ab, bp);
+	float d4=Vec3_Dot(ac, bp);
+
+	if(d3>=0.0f&&d4<=d3)
+		return b;
+
+	float vc=d1*d4-d3*d2;
+
+	if(vc<=0.0f&&d1>=0.0f&&d3<=0.0f)
+		return Vec3_Addv(a, Vec3_Muls(ab, d1/(d1-d3)));
+
+	vec3 cp=Vec3_Subv(p, c);
+	float d5=Vec3_Dot(ab, cp);
+	float d6=Vec3_Dot(ac, cp);
+
+	if(d6>=0.0f&&d5<=d6)
+		return c;
+
+	float vb=d5*d2-d1*d6;
+
+	if(vb<=0.0f&&d2>=0.0f&&d6<=0.0f)
+		return Vec3_Addv(a, Vec3_Muls(ac, d2/(d2-d6)));
+
+	float va=d3*d6-d5*d4;
+
+	if(va<=0.0f&&(d4-d3)>=0.0f&&(d5-d6)>=0.0f)
+		return Vec3_Addv(b, Vec3_Muls(Vec3_Subv(c, b), (d4-d3)/((d4-d3)+(d5-d6))));
+
+	float denom=1.0f/(va+vb+vc);
+	return Vec3_Addv(a, Vec3_Addv(Vec3_Muls(ab, vb*denom), Vec3_Muls(ac, vc*denom)));
 }
 
 // HRIR sample interpolation, takes world-space position as input.
@@ -119,42 +164,65 @@ static void HRIRInterpolate(vec3 xyz)
 	const float invRadius=1.0f/500.0f;
 
 	// Calculate relative position of the sound source to the camera
-	const vec3 relPosition=Vec3_Subv(xyz, camera.body.position);
-	vec3 position=QuatRotate(QuatInverse(camera.body.orientation), relPosition);
+	const vec3 relPosition=Vec3_Subv(xyz, listenerPosition);
+	vec3 localPosition=Matrix3x3MultVec3(relPosition, listenerModelView);
 
 	// Calculate distance fall-off
 	float falloffDist=fmaxf(0.0f, 1.0f-Vec3_Length(Vec3_Muls(relPosition, invRadius)));
 
-	Vec3_Normalize(&position);
+	Vec3_Normalize(&localPosition);
 
-	maxDistanceSq=-1.0f;
-	triangleIndex=-1;
+	int triangleIndex=-1;
+	float distSq=FLT_MAX;
 
-	// Query spatial hash for nearby triangles
-	SpatialHash_TestObjects(&HRIRHash, position, &position, HRIR_FindBestTriangle);
+	for(uint32_t i=0;i<sphere.numIndex;i+=3)
+	{
+		vec3 a=sphere.vertices[sphere.indices[i+0]].vertex;
+		vec3 b=sphere.vertices[sphere.indices[i+1]].vertex;
+		vec3 c=sphere.vertices[sphere.indices[i+2]].vertex;
 
-	if(triangleIndex>sphere.numIndex)
+		vec3 cp=ClosestPointOnTriangle(localPosition, a, b, c);
+
+		float d=Vec3_DistanceSq(cp, localPosition);
+
+		if(d<distSq)
+		{
+			triangleIndex=i/3;
+			distSq=d;
+		}
+	}
+
+	if(triangleIndex<0||(3*triangleIndex)>=sphere.numIndex)
 		return;
 
+	PushPoint(localPosition, triangleIndex);
+
 	// Calculate the barycentric coordinates and use them to interpolate the HRIR samples.
-	const HRIR_Vertex_t *v0=&sphere.vertices[triangleIndex+0];
-	const HRIR_Vertex_t *v1=&sphere.vertices[triangleIndex+1];
-	const HRIR_Vertex_t *v2=&sphere.vertices[triangleIndex+2];
-	const vec2 g=Vec2_Clamp(CalculateBarycentric(position, v0->vertex, v1->vertex, v2->vertex), 0.0f, 1.0f);
-	const vec3 coords=Vec3(g.x, g.y, 1.0f-g.x-g.y);
+	const HRIR_Vertex_t *v0=&sphere.vertices[sphere.indices[3*triangleIndex+0]];
+	const HRIR_Vertex_t *v1=&sphere.vertices[sphere.indices[3*triangleIndex+1]];
+	const HRIR_Vertex_t *v2=&sphere.vertices[sphere.indices[3*triangleIndex+2]];
+	const vec2 g=CalculateBarycentric(localPosition, v0->vertex, v1->vertex, v2->vertex);
 
-	if(coords.x>=0.0f&&coords.y>=0.0f&&coords.z>=0.0f)
+	vec3 coords=Vec3(fmaxf(0.0f, g.x), fmaxf(0.0f, g.y), fmaxf(0.0f, 1.0f-g.x-g.y));
+	const float sum=coords.x+coords.y+coords.z;
+
+	if(sum>1e-6f)
 	{
-		for(uint32_t i=0;i<sphere.sampleLength;i++)
-		{
-			const vec3 left=Vec3(v0->left[i], v1->left[i], v2->left[i]);
-			const vec3 right=Vec3(v0->right[i], v1->right[i], v2->right[i]);
-			const float gain=4.0f;
-			const float final=falloffDist*gain*HRIRWindow[i]*INT16_MAX;
+		float invSum=1.0f/sum;
+		coords=Vec3_Muls(coords, invSum);
+	}
+	else
+		coords=Vec3(1.0f, 0.0f, 0.0f);
 
-			HRIRKernel[2*i+0]=(int16_t)(final*Vec3_Dot(left, coords));
-			HRIRKernel[2*i+1]=(int16_t)(final*Vec3_Dot(right, coords));
-		}
+	for(uint32_t i=0;i<sphere.sampleLength;i++)
+	{
+		const vec3 left=Vec3(v0->left[i], v1->left[i], v2->left[i]);
+		const vec3 right=Vec3(v0->right[i], v1->right[i], v2->right[i]);
+		const float gain=4.0f;
+		const float final=falloffDist*gain*HRIRWindow[i];
+
+		HRIRKernel[2*i+0]=(int16_t)clampf(final*Vec3_Dot(left, coords)*INT16_MAX, INT16_MIN, INT16_MAX);
+		HRIRKernel[2*i+1]=(int16_t)clampf(final*Vec3_Dot(right, coords)*INT16_MAX, INT16_MIN, INT16_MAX);
 	}
 }
 
@@ -399,58 +467,75 @@ static bool HRIR_Init(void)
 	if(!stream)
 		return false;
 
-	fread(&sphere, sizeof(uint32_t), 5, stream);
+	if(fread(&sphere, sizeof(uint32_t), 5, stream)!=5)
+	{
+		fclose(stream);
+		return false;
+	}
 
 	if(sphere.magic!=HRIR_MAGIC)
+	{
+		fclose(stream);
 		return false;
+	}
 
 	if(sphere.sampleLength>MAX_HRIR_SAMPLES)
+	{
+		fclose(stream);
 		return false;
+	}
 
 	sphere.indices=(uint32_t *)Zone_Malloc(zone, sizeof(uint32_t)*sphere.numIndex);
 
 	if(sphere.indices==NULL)
+	{
+		fclose(stream);
 		return false;
+	}
 
 	fread(sphere.indices, sizeof(uint32_t), sphere.numIndex, stream);
 
 	sphere.vertices=(HRIR_Vertex_t *)Zone_Malloc(zone, sizeof(HRIR_Vertex_t)*sphere.numVertex);
 
 	if(sphere.vertices==NULL)
+	{
+		Zone_Free(zone, sphere.indices);
+		fclose(stream);
 		return false;
+	}
 
 	memset(sphere.vertices, 0, sizeof(HRIR_Vertex_t)*sphere.numVertex);
 
 	for(uint32_t i=0;i<sphere.numVertex;i++)
 	{
-		fread(&sphere.vertices[i].vertex, sizeof(vec3), 1, stream);
+		if(fread(&sphere.vertices[i].vertex, sizeof(vec3), 1, stream)!=1)
+		{
+			Zone_Free(zone, sphere.vertices);
+			Zone_Free(zone, sphere.indices);
+			fclose(stream);
+			return false;
+		}
 
-		fread(sphere.vertices[i].left, sizeof(float), sphere.sampleLength, stream);
-		fread(sphere.vertices[i].right, sizeof(float), sphere.sampleLength, stream);
+		// TODO: I'm not sure which is correct, the math in the interpolation function seems correct, but resulting audio is channel swapped.
+		// TODO: Figure out if this is a problem in this program or in the HRIR sphere builder.
+		if(fread(sphere.vertices[i].right, sizeof(float), sphere.sampleLength, stream)!=sphere.sampleLength)
+		{
+			Zone_Free(zone, sphere.vertices);
+			Zone_Free(zone, sphere.indices);
+			fclose(stream);
+			return false;
+		}
+
+		if(fread(sphere.vertices[i].left, sizeof(float), sphere.sampleLength, stream)!=sphere.sampleLength)
+		{
+			Zone_Free(zone, sphere.vertices);
+			Zone_Free(zone, sphere.indices);
+			fclose(stream);
+			return false;
+		}
 	}
 
 	fclose(stream);
-
-	if(!SpatialHash_Create(&HRIRHash, 512, 2.0f))
-		return false;
-
-	SpatialHash_Clear(&HRIRHash);
-
-	// Pre-calculate the normal vector of the HRIR sphere triangles
-	for(uint32_t i=0;i<sphere.numIndex;i+=3)
-	{
-		HRIR_Vertex_t *v0=&sphere.vertices[sphere.indices[i+0]];
-		HRIR_Vertex_t *v1=&sphere.vertices[sphere.indices[i+1]];
-		HRIR_Vertex_t *v2=&sphere.vertices[sphere.indices[i+2]];
-		vec3 normal=Vec3_Cross(Vec3_Subv(v1->vertex, v0->vertex), Vec3_Subv(v2->vertex, v0->vertex));
-		Vec3_Normalize(&normal);
-
-		v0->normal=Vec3_Addv(v0->normal, normal);
-		v1->normal=Vec3_Addv(v1->normal, normal);
-		v2->normal=Vec3_Addv(v2->normal, normal);
-
-		SpatialHash_AddObject(&HRIRHash, Vec3_Muls(normal, 100.0f), &sphere.indices[i]);
-	}
 
 	for(uint32_t i=0;i<sphere.sampleLength;i++)
 		HRIRWindow[i]=0.5f*(0.5f-cosf(2.0f*PI*(float)i/(sphere.sampleLength-1)));
@@ -506,8 +591,6 @@ void Audio_Destroy(void)
 	// Clean up HRIR data
 	Zone_Free(zone, sphere.indices);
 	Zone_Free(zone, sphere.vertices);
-
-	SpatialHash_Destroy(&HRIRHash);
 }
 
 // Simple resample and conversion function to the audio engine's common format (44.1KHz/16bit).
@@ -627,7 +710,7 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 
 			if(buffer==NULL)
 			{
-				DBGPRINTF(DEBUG_ERROR, "Unable to allocate memory for file %s.\n", filename);
+				DBGPRINTF(DEBUG_ERROR, "Unable to load file %s.\n", filename);
 				return false;
 			}
 
@@ -654,7 +737,10 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 			int32_t size=ftell(stream);
 
 			if(size==-1)
+			{
+				fclose(stream);
 				return false;
+			}
 
 			fseek(stream, 0, SEEK_SET);
 
@@ -667,7 +753,13 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 				return false;
 			}
 
-			fread(data, 1, size, stream);
+			if(fread(data, 1, size, stream)!=size)
+			{
+				DBGPRINTF(DEBUG_ERROR, "Size read does not match for file %s.\n", filename);
+				Zone_Free(zone, data);
+				fclose(stream);
+				return false;
+			}
 
 			fclose(stream);
 
@@ -686,7 +778,6 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 			{
 				DBGPRINTF(DEBUG_ERROR, "QOA too many channels (%d) for file %s.\n", qoa.channels, filename);
 				Zone_Free(zone, buffer);
-				Zone_Free(zone, data);
 				return false;
 			}
 
@@ -712,6 +803,7 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 	if(resampledAndConverted==NULL)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Unable to resample/convert buffer for file %s.\n", filename);
+		Zone_Free(zone, buffer);
 		return false;
 	}
 
@@ -722,6 +814,5 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 	sample->length=outputSamples;
 	sample->channels=(uint8_t)channels;
 
-	// Done, return out
 	return true;
 }
