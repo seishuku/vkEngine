@@ -111,8 +111,6 @@ static vec2 CalculateBarycentric(const vec3 p, const vec3 a, const vec3 b, const
 	return Vec2((d11*d20-d01*d21)*invDenom, (d00*d21-d01*d20)*invDenom);
 }
 
-bool PushPoint(const vec3 point, const uint32_t index);
-
 static vec3 ClosestPointOnTriangle(vec3 p, vec3 a, vec3 b, vec3 c)
 {
 	vec3 ab=Vec3_Subv(b, a), ac=Vec3_Subv(c, a), ap=Vec3_Subv(p, a);
@@ -194,8 +192,6 @@ static void HRIRInterpolate(vec3 xyz)
 
 	if(triangleIndex<0||(3*triangleIndex)>=sphere.numIndex)
 		return;
-
-	PushPoint(localPosition, triangleIndex);
 
 	// Calculate the barycentric coordinates and use them to interpolate the HRIR samples.
 	const HRIR_Vertex_t *v0=&sphere.vertices[sphere.indices[3*triangleIndex+0]];
