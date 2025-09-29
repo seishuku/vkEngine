@@ -40,7 +40,7 @@ void SpatialHash_Destroy(SpatialHash_t *spatialHash)
 
 static inline uint32_t hashFunction(const int32_t hx, const int32_t hy, const int32_t hz, const uint32_t tableSize)
 {
-	return abs((hx*73856093)^(hy*19349663)^(hz*83492791))%tableSize;
+	return (uint32_t)((hx*73856093)^(hy*19349663)^(hz*83492791))%tableSize;
 }
 
 // Clear hash table
@@ -52,18 +52,18 @@ void SpatialHash_Clear(SpatialHash_t *spatialHash)
 // Add object to table
 bool SpatialHash_AddObject(SpatialHash_t *spatialHash, const vec3 value, void *object)
 {
-	const int32_t hx=(const int32_t)(value.x*spatialHash->invGridSize);
-	const int32_t hy=(const int32_t)(value.y*spatialHash->invGridSize);
-	const int32_t hz=(const int32_t)(value.z*spatialHash->invGridSize);
+	const int32_t hx=(const int32_t)floorf(value.x*spatialHash->invGridSize);
+	const int32_t hy=(const int32_t)floorf(value.y*spatialHash->invGridSize);
+	const int32_t hz=(const int32_t)floorf(value.z*spatialHash->invGridSize);
 	const uint32_t index=hashFunction(hx, hy, hz, spatialHash->hashTableSize);
 
-	if(index>spatialHash->hashTableSize)
+	if(index>=spatialHash->hashTableSize)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Invalid hash index.\n");
 		return false;
 	}
 
-	if(spatialHash->hashTable[index].numObjects<100)
+	if(spatialHash->hashTable[index].numObjects<MAX_SPATIALHASH_CELL_OBJECTS)
 	{
 		spatialHash->hashTable[index].objects[spatialHash->hashTable[index].numObjects++]=object;
 		return true;
@@ -99,7 +99,7 @@ void SpatialHash_TestObjects(SpatialHash_t *spatialHash, vec3 value, void *a, vo
 	{
 		const uint32_t hashIndex=hashFunction(hx+offsets[j][0], hy+offsets[j][1], hz+offsets[j][2], spatialHash->hashTableSize);
 
-		if(hashIndex>spatialHash->hashTableSize)
+		if(hashIndex>=spatialHash->hashTableSize)
 		{
 			DBGPRINTF(DEBUG_ERROR, "Invalid hash index.\n");
 			return;

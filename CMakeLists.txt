@@ -62,6 +62,7 @@ set(PROJECT_SOURCES
 	"utils/id.c"
 	"utils/list.c"
 	"utils/pipeline.c"
+	"utils/sap.c"
 	"utils/spatialhash.c"
 	"utils/spvparse.c"
 	"utils/tokenizer.c"

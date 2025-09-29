@@ -5,10 +5,14 @@
 #include <stdint.h>
 #include "../math/math.h"
 
+#ifndef MAX_SPATIALHASH_CELL_OBJECTS
+#define MAX_SPATIALHASH_CELL_OBJECTS 1000
+#endif
+
 typedef struct
 {
 	uint32_t numObjects;
-	void *objects[100];
+	void *objects[MAX_SPATIALHASH_CELL_OBJECTS];
 } Cell_t;
 
 typedef struct

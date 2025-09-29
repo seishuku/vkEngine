@@ -81,6 +81,8 @@ uint32_t fighterTexture=0;
 //#define NUM_CUBE 14
 RigidBody_t cubeBody[NUM_CUBE];
 
+SpatialHash_t collisionHash;
+
 LoadingScreen_t loadingScreen;
 
 // Vulkan swapchain helper struct
@@ -564,6 +566,34 @@ extern struct
 	HRIR_Vertex_t *vertices;
 } sphere;
 
+void DrawAABBCube(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, vec3 min, vec3 max, vec4 color)
+{
+	// 8 cube corners
+	vec3 corners[8]={
+		{min.x, min.y, min.z}, // 0
+		{max.x, min.y, min.z}, // 1
+		{max.x, max.y, min.z}, // 2
+		{min.x, max.y, min.z}, // 3
+		{min.x, min.y, max.z}, // 4
+		{max.x, min.y, max.z}, // 5
+		{max.x, max.y, max.z}, // 6
+		{min.x, max.y, max.z}, // 7
+	};
+	uint32_t edges[12][2]={
+		{0,1}, {1,2}, {2,3}, {3,0}, // bottom face
+		{4,5}, {5,6}, {6,7}, {7,4}, // top face
+		{0,4}, {1,5}, {2,6}, {3,7}  // vertical edges
+	};
+
+	// Draw all 12 edges
+	for(int i=0;i<12;i++)
+	{
+		vec3 start=corners[edges[i][0]];
+		vec3 end=corners[edges[i][1]];
+		DrawLine(commandBuffer, index, eye, start, end, color);
+	}
+}
+
 void Thread_Main(void *arg)
 {
 	ThreadData_t *data=(ThreadData_t *)arg;
@@ -692,6 +722,12 @@ void Thread_Main(void *arg)
 	// Draw player models
 	DrawPlayer(data->perFrame[data->index].secCommandBuffer[data->eye], data->perFrame[data->index].descriptorPool[data->eye], data->index, data->eye);
 
+#if 0
+	for(uint32_t i=0;i<numPhysicsObjects;i++)
+	{
+		DrawAABBCube(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, physicsObjects[i].min, physicsObjects[i].max, Vec4(1.0f, 1.0f, 0.0f, 1.0f));
+	}
+
 	for(uint32_t i=0;i<numPoints;i++)
 	{
 		vec3 point=Vec3b(0.0f);
@@ -734,6 +770,7 @@ void Thread_Main(void *arg)
 
 		DrawTrianglePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], sizeof(trianglePC), &trianglePC);
 	}
+#endif
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
@@ -854,8 +891,10 @@ void TestCollision(void *a, void *b)
 
 	const float impactSpeed=PhysicsCollisionResponse(objA->rigidBody, objB->rigidBody);
 
-	if(impactSpeed>1.0f)
+	if(impactSpeed>0.1f)
 	{
+		DBGPRINTF(DEBUG_ERROR, "Collision detected between %p and %p with impact speed of %f\n", objA, objB, impactSpeed);
+
 		// If both objects are asteroids
 		if(objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_FIELD)
 		{
@@ -939,7 +978,10 @@ void TestCollision(void *a, void *b)
 	}
 }
 
-SpatialHash_t spatialHash;
+// spatial hash 242FPS
+// sweep and prune 190FPS
+
+void SweepAndPrune3D();
 
 // Runs anything physics related
 void Thread_Physics(void *arg)
@@ -950,7 +992,7 @@ void Thread_Physics(void *arg)
 	SpringIntegrate(&testSpring, camera.body.position, fTimeStep);
 
 	// Set up physics objects to be processed
-	ResetPhysicsObjectList();
+	ClearPhysicsObjectList();
 
 	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
 		AddPhysicsObject(&asteroids[i], PHYSICSOBJECTTYPE_FIELD);
@@ -973,11 +1015,11 @@ void Thread_Physics(void *arg)
 	for(uint32_t i=0;i<NUM_CUBE;i++)
 		AddPhysicsObject(&cubeBody[i], PHYSICSOBJECTTYPE_FIELD);
 	//////
+		
+	//SpatialHash_Clear(&collisionHash);
 
-	SpatialHash_Clear(&spatialHash);
-
-	for(uint32_t i=0;i<numPhysicsObjects;i++)
-		SpatialHash_AddObject(&spatialHash, physicsObjects[i].rigidBody->position, &physicsObjects[i]);
+	//for(uint32_t i=0;i<numPhysicsObjects;i++)
+	//	SpatialHash_AddObject(&collisionHash, physicsObjects[i].rigidBody->position, &physicsObjects[i]);
 
 	if(!pausePhysics)
 	{
@@ -1018,12 +1060,14 @@ void Thread_Physics(void *arg)
 			}
 		}
 
+		SweepAndPrune3D();
+
 		// Run through the physics object list, run integration step and check for collisions against all other objects
 		for(uint32_t i=0;i<numPhysicsObjects;i++)
 		{
 			PhysicsIntegrate(physicsObjects[i].rigidBody, fTimeStep);
 
-			SpatialHash_TestObjects(&spatialHash, physicsObjects[i].rigidBody->position, &physicsObjects[i], TestCollision);
+			//SpatialHash_TestObjects(&collisionHash, physicsObjects[i].rigidBody->position, &physicsObjects[i], TestCollision);
 
 #if 1
 			// Fire "laser beam"
@@ -1178,7 +1222,7 @@ void Render(void)
 	Thread_AddJob(&threadPhysics, Thread_Physics, (void *)&index);
 	//Thread_Physics((void *)&index);
 
-	FluidStep();
+	//FluidStep();
 
 	vkWaitForFences(vkContext.device, 1, &perFrame[index].frameFence, VK_TRUE, UINT64_MAX);
 
@@ -1576,7 +1620,7 @@ bool Init(void)
 		};
 	}
 
-	SpatialHash_Create(&spatialHash, NUM_ASTEROIDS/2, 50.0f);
+	SpatialHash_Create(&collisionHash, NUM_ASTEROIDS/2, 50.0f);
 
 	Font_Init(&font);
 
@@ -1922,7 +1966,7 @@ void Destroy(void)
 	//////////
 
 	// Spatial hash for collision destruction
-	SpatialHash_Destroy(&spatialHash);
+	SpatialHash_Destroy(&collisionHash);
 	//////////
 
 	// Particle system destruction

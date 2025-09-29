@@ -1,6 +1,9 @@
 #ifndef __PHYSICSLIST_H__
 #define __PHYSICSLIST_H__
 
+#include "../math/math.h"
+#include "physics.h"
+
 typedef enum
 {
 	PHYSICSOBJECTTYPE_PLAYER,
@@ -10,6 +13,7 @@ typedef enum
 
 typedef struct
 {
+	vec3 min, max;
 	RigidBody_t *rigidBody;
 	PhysicsObjectType_e objectType;
 } PhysicsObject_t;
@@ -19,7 +23,7 @@ typedef struct
 extern uint32_t numPhysicsObjects;
 extern PhysicsObject_t physicsObjects[MAX_PHYSICSOBJECTS];
 
-void ResetPhysicsObjectList(void);
+void ClearPhysicsObjectList(void);
 void AddPhysicsObject(RigidBody_t *physicsObject, PhysicsObjectType_e objectType);
 
 #endif

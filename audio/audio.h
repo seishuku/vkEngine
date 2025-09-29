@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include "../math/math.h"
 
-#define AUDIO_SAMPLE_RATE 44100
+#define AUDIO_SAMPLE_RATE 48000
 #define MAX_AUDIO_SAMPLES 4096
 #define MAX_STREAM_SAMPLES (MAX_AUDIO_SAMPLES*2)
 #define MAX_HRIR_SAMPLES 1024
