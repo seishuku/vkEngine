@@ -55,6 +55,7 @@ set(PROJECT_SOURCES
 	"ui/sprite.c"
 	"ui/text.c"
 	"ui/ui.c"
+	"ui/virtualstick.c"
 	"ui/window.c"
 	"utils/base64.c"
 	"utils/config.c"

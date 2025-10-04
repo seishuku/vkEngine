@@ -84,7 +84,7 @@
             "displayName": "Android Debug",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
-            "toolchainFile": "$env{ANDROID_HOME}/ndk/27.2.12479018/build/cmake/android.toolchain.cmake",
+            "toolchainFile": "$env{ANDROID_HOME}/ndk/29.0.13846066/build/cmake/android.toolchain.cmake",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "ANDROID_PLATFORM": "android-28",
@@ -96,7 +96,7 @@
             "displayName": "Android Release",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
-            "toolchainFile": "$env{ANDROID_HOME}/ndk/27.2.12479018/build/cmake/android.toolchain.cmake",
+            "toolchainFile": "$env{ANDROID_HOME}/ndk/29.0.13846066/build/cmake/android.toolchain.cmake",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "ANDROID_PLATFORM": "android-28",

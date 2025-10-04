@@ -37,6 +37,7 @@ extern RigidBody_t asteroids[NUM_ASTEROIDS];
 
 extern UI_t UI;
 extern uint32_t cursorID;
+extern uint32_t thumbstickID;
 
 extern Console_t console;
 
@@ -266,6 +267,9 @@ bool Event_Trigger(EventID ID, void *arg)
 #ifndef ANDROID
 			if(mouseEvent->button&MOUSE_BUTTON_LEFT)
 				activeID=UI_TestHit(&UI, mousePosition);
+
+			if(activeID==thumbstickID)
+				UI_SetVirtualStickActive(&UI, thumbstickID, true);
 #else
 			mousePosition.x=(float)mouseEvent->dx;
 			mousePosition.y=(float)mouseEvent->dy;
@@ -284,6 +288,9 @@ bool Event_Trigger(EventID ID, void *arg)
 		case EVENT_MOUSEUP:
 		{
 #ifndef ANDROID
+			if(activeID==thumbstickID)
+				UI_SetVirtualStickActive(&UI, thumbstickID, false);
+
 			if(mouseEvent->button&MOUSE_BUTTON_LEFT)
 				activeID=UINT32_MAX;
 #else

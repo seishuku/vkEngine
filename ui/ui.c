@@ -23,7 +23,7 @@ typedef struct
 	vec4 positionSize;
 	vec4 colorValue;
 	uint32_t type, flag;
-	uint32_t pad[2];
+	vec2 extra;
 } UI_Instance_t;
 
 static bool UI_VulkanVertex(UI_t *UI)
@@ -294,6 +294,17 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 			case UI_CONTROL_CURSOR:
 				break;
 
+			case UI_CONTROL_VIRTUALSTICK:
+			{
+				if(Vec2_DistanceSq(control->position, position)<=control->virtualStick.radius*control->virtualStick.radius)
+				{
+					control->virtualStick.value=Vec2_Clamp(Vec2_Muls(Vec2_Subv(position, control->position), 1.0f/control->virtualStick.radius), -1.0f, 1.0f);
+					return control->ID;
+				}
+				break;
+			}
+
+
 			case UI_CONTROL_WINDOW:
 			{
 				// Hit test children
@@ -468,6 +479,13 @@ bool UI_ProcessControl(UI_t *UI, uint32_t ID, vec2 hitPos)
 		case UI_CONTROL_CURSOR:
 			break;
 
+		case UI_CONTROL_VIRTUALSTICK:
+		{
+			// Scale/clamp value to -1.0 to 1.0 value
+			control->virtualStick.value=Vec2_Clamp(Vec2_Muls(Vec2_Subv(position, control->position), 1.0f/control->virtualStick.radius), -1.0f, 1.0f);
+			break;
+		}
+
 		case UI_CONTROL_WINDOW:
 		{
 			control->position=Vec2_Subv(position, control->window.hitOffset);
@@ -588,6 +606,31 @@ static bool UI_AddControlInstance(UI_Instance_t **instance, uint32_t *instanceCo
 			(*instance)->colorValue.w=0.0f;
 
 			(*instance)->type=UI_CONTROL_EDITTEXT;
+
+			(*instance)++;
+			(*instanceCount)++;
+
+			return true;
+		}
+
+		case UI_CONTROL_VIRTUALSTICK:
+		{
+			if(!control->virtualStick.active)
+				control->virtualStick.value=Vec2_Muls(control->virtualStick.value, (1-exp(-200.0f*dt)));
+
+			(*instance)->positionSize.x=offset.x+control->position.x;
+			(*instance)->positionSize.y=offset.y+control->position.y;
+			(*instance)->positionSize.z=control->virtualStick.radius*2;
+			(*instance)->positionSize.w=control->virtualStick.radius*2;
+
+			(*instance)->colorValue.x=control->color.x;
+			(*instance)->colorValue.y=control->color.y;
+			(*instance)->colorValue.z=control->color.z;
+			(*instance)->colorValue.w=control->virtualStick.active?1.0f:0.0f;
+
+			(*instance)->type=UI_CONTROL_VIRTUALSTICK;
+
+			(*instance)->extra=Vec2_Clamp(control->virtualStick.value, -0.75f, 0.75f);
 
 			(*instance)++;
 			(*instanceCount)++;

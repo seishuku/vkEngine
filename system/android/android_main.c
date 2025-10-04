@@ -38,6 +38,53 @@ struct
 	struct android_app *app;
 } appState;
 
+typedef struct
+{
+    bool active;
+    int32_t pointerId;
+    vec2 start, delta;
+} VirtualStick_t;
+
+static VirtualStick_t leftStick={ 0 }, rightStick={ 0 };
+
+static void UpdateStick(VirtualStick_t *stick, bool active, int32_t pointerId, vec2 pos, bool start)
+{
+	if(start)
+	{
+		stick->active=true;
+		stick->pointerId=pointerId;
+		stick->start=pos;
+		stick->delta=Vec2b(0.0f);
+	}
+	else if(active&&stick->active&&stick->pointerId==pointerId)
+	{
+		stick->delta=Vec2_Subv(pos, stick->start);
+	}
+}
+
+static void ReleaseStick(VirtualStick_t *stick, int pointerId)
+{
+	if(stick->active&&stick->pointerId==pointerId)
+	{
+		stick->active=false;
+		stick->delta=Vec2b(0.0f);
+	}
+}
+
+static vec2 ApplyScaleDeadzone(int32_t x, int32_t y, int32_t maxX, int32_t maxY, float deadzoneThreshold)
+{
+	vec2 d={ ((float)x/maxX), 1.0f-((float)y/maxY) };
+
+	if(fabsf(d.x)<deadzoneThreshold)
+		d.x=0.0f;
+	if(fabsf(d.y)<deadzoneThreshold)
+		d.y=0.0f;
+
+	return d;
+}
+
+extern vec2 leftThumbstick, rightThumbstick;
+
 void Render(void);
 bool Init(void);
 void RecreateSwapchain(void);
@@ -61,35 +108,58 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 	{
 		case AINPUT_EVENT_TYPE_MOTION:
 		{
-			switch(AInputEvent_getSource(event))
+			int32_t action=AMotionEvent_getAction(event);
+			size_t pointerIndex=(action&AMOTION_EVENT_ACTION_POINTER_INDEX_MASK)>>AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
+			int32_t pointerId=AMotionEvent_getPointerId(event, pointerIndex);
+
+			float x=AMotionEvent_getX(event, pointerIndex);
+			float y=AMotionEvent_getY(event, pointerIndex);
+
+			MouseEvent.dx=x;
+			MouseEvent.dy=y;
+			MouseEvent.button=MOUSE_TOUCH;
+			Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
+			Event_Trigger(EVENT_MOUSEUP, &MouseEvent);
+
+			switch(action&AMOTION_EVENT_ACTION_MASK)
 			{
-				case AINPUT_SOURCE_TOUCHSCREEN:
-				case AINPUT_SOURCE_STYLUS:
-					switch(AKeyEvent_getAction(event)&AMOTION_EVENT_ACTION_MASK)
+				case AMOTION_EVENT_ACTION_DOWN:
+				case AMOTION_EVENT_ACTION_POINTER_DOWN:
+				{
+					vec2 pos=ApplyScaleDeadzone(x, y, config.windowWidth/4, config.windowHeight/4, 0.1);
+
+					if(x<(float)config.windowWidth/2.0f)
+						UpdateStick(&leftStick, true, pointerId, pos, true);
+					else
+						UpdateStick(&rightStick, true, pointerId, pos, true);
+					break;
+				}
+
+				case AMOTION_EVENT_ACTION_MOVE:
+				{
+					size_t count=AMotionEvent_getPointerCount(event);
+
+					for(size_t i=0;i<count;i++)
 					{
-						case AMOTION_EVENT_ACTION_DOWN:
-							MouseEvent.button|=MOUSE_TOUCH;
-							MouseEvent.dx=(int)(AMotionEvent_getX(event, 0)/scale);
-							MouseEvent.dy=config.windowHeight-(int)(AMotionEvent_getY(event, 0)/scale);
-							Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
-							break;
+						int32_t pid=AMotionEvent_getPointerId(event, i);
+						float px=AMotionEvent_getX(event, i);
+						float py=AMotionEvent_getY(event, i);
+						vec2 pos=ApplyScaleDeadzone(px, py, config.windowWidth/4, config.windowHeight/4, 0.1);
 
-						case AMOTION_EVENT_ACTION_UP:
-							MouseEvent.button&=~MOUSE_TOUCH;
-							MouseEvent.dx=(int)(AMotionEvent_getX(event, 0)/scale);
-							MouseEvent.dy=config.windowHeight-(int)(AMotionEvent_getY(event, 0)/scale);
-							Event_Trigger(EVENT_MOUSEUP, &MouseEvent);
-							break;
-
-						case AMOTION_EVENT_ACTION_MOVE:
-							MouseEvent.dx=(int)(AMotionEvent_getX(event, 0)/scale);
-							MouseEvent.dy=config.windowHeight-(int)(AMotionEvent_getY(event, 0)/scale);
-							Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
-							break;
+						UpdateStick(&leftStick, true, pid, pos, false);
+						UpdateStick(&rightStick, true, pid, pos, false);
 					}
 					break;
+				}
+
+				case AMOTION_EVENT_ACTION_UP:
+				case AMOTION_EVENT_ACTION_POINTER_UP:
+				case AMOTION_EVENT_ACTION_CANCEL:
+					ReleaseStick(&leftStick, pointerId);
+					ReleaseStick(&rightStick, pointerId);
+					break;
 			}
-	
+
 			break;
 		}
 
@@ -184,7 +254,7 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 		case APP_CMD_INIT_WINDOW:
 			config.windowWidth=ANativeWindow_getWidth(app->window)/scale;
 			config.windowHeight=ANativeWindow_getHeight(app->window)/scale;
-			ANativeWindow_setBuffersGeometry(app->window, config.windowWidth, config.windowHeight, 0);
+			ANativeWindow_setBuffersGeometry(app->window, config.windowWidth, config.windowHeight, AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM);
 
 			vkContext.window=app->window;
 
@@ -354,6 +424,10 @@ void android_main(struct android_app *app)
 			static float avgfps=0.0f;
 
 			double StartTime=GetClock();
+
+			leftThumbstick=leftStick.delta;
+			rightThumbstick=rightStick.delta;
+
 			Render();
 
 			fTimeStep=(float)(GetClock()-StartTime);

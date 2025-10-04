@@ -6,6 +6,7 @@ layout (location=1) in flat vec4 Color;
 layout (location=2) in flat uint Type;
 layout (location=3) in flat uint Flag;
 layout (location=4) in flat vec2 Size;
+layout (location=5) in flat vec2 Value;
 
 layout (binding=0) uniform sampler2D Texture;
 
@@ -15,14 +16,15 @@ layout (push_constant) uniform ubo {
 	vec2 Viewport;	// Window width/height
 };
 
-const uint UI_CONTROL_BARGRAPH	=0;
-const uint UI_CONTROL_BUTTON	=1;
-const uint UI_CONTROL_CHECKBOX	=2;
-const uint UI_CONTROL_CURSOR	=3;
-const uint UI_CONTROL_EDITTEXT	=4;
-const uint UI_CONTROL_SPRITE	=5;
-const uint UI_CONTROL_TEXT		=6;
-const uint UI_CONTROL_WINDOW	=7;
+const uint UI_CONTROL_BARGRAPH		=0;
+const uint UI_CONTROL_BUTTON		=1;
+const uint UI_CONTROL_CHECKBOX		=2;
+const uint UI_CONTROL_CURSOR		=3;
+const uint UI_CONTROL_EDITTEXT		=4;
+const uint UI_CONTROL_SPRITE		=5;
+const uint UI_CONTROL_TEXT			=6;
+const uint UI_CONTROL_VIRTUALSTICK	=7;
+const uint UI_CONTROL_WINDOW		=8;
 
 float sdfDistance(float dist)
 {
@@ -578,6 +580,35 @@ void main()
 
 			if(Color.w>direction*0.5+0.5)
 				centerAlpha=sdfDistance(roundedRect(uv-offset, aspect-(offset*3), cornerRadius-offset.x));;
+
+			// Add them together and output
+			Output=vec4(outer+(Color.xyz*centerAlpha), outerAlpha+centerAlpha);
+			return;
+		}
+
+		case UI_CONTROL_VIRTUALSTICK:
+		{
+			// Get the distance of full filled face
+			float distFace=roundedRect(uv-offset, aspect-(offset*2), cornerRadius);
+
+			// Render a ring from that full face
+			float distRing=abs(distFace)-(offset.x*0.75);
+			float ring=sdfDistance(distRing);
+
+			// Render a full face shadow section and clip it by the full face
+			float distShadow=max(-distFace, roundedRect(uv+offset, aspect-(offset*1.5), cornerRadius+(offset.x*0.5)));
+			float shadow=sdfDistance(distShadow);
+
+			// Layer the ring and shadow and join both to make the alpha mask
+			vec3 outer=mix(vec3(0.0)*shadow, vec3(1.0)*ring, ring);
+			float outerAlpha=sdfDistance(min(distRing, distShadow));
+
+			// Calculate a variable center section that fits just inside the primary section
+			// (or in the case of a checkbox, it's either completely filled or not at the cost of extra math)
+			float centerAlpha=sdfDistance(length(uv-Value)-0.25);
+
+			if(Color.w<0.5)
+				centerAlpha*=0.5;
 
 			// Add them together and output
 			Output=vec4(outer+(Color.xyz*centerAlpha), outerAlpha+centerAlpha);

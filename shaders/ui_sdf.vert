@@ -4,7 +4,8 @@ layout (location=0) in vec4 vVert;			// Incoming vertex position
 
 layout (location=1) in vec4 InstancePos;	// Instanced data position and size
 layout (location=2) in vec4 InstanceColor;	// Instanced data color and value
-layout (location=3) in uvec4 InstanceType;	// Instanced data type
+layout (location=3) in uvec2 InstanceType;	// Instanced data type and flag
+layout (location=4) in vec2 InstanceValue;	// Instanced data extra value data
 
 layout (push_constant) uniform ubo {
 	vec2 Viewport;	// Window width/height
@@ -17,15 +18,17 @@ layout (location=1) out flat vec4 Color;			// Control color
 layout (location=2) out flat uint Type;				// Control type
 layout (location=3) out flat uint Flag;				// Control flag
 layout (location=4) out flat vec2 Size;				// Control size
+layout (location=5) out flat vec2 Value;			// Control extra value
 
-const uint UI_CONTROL_BARGRAPH	=0;
-const uint UI_CONTROL_BUTTON	=1;
-const uint UI_CONTROL_CHECKBOX	=2;
-const uint UI_CONTROL_CURSOR	=3;
-const uint UI_CONTROL_EDITTEXT	=4;
-const uint UI_CONTROL_SPRITE	=5;
-const uint UI_CONTROL_TEXT		=6;
-const uint UI_CONTROL_WINDOW	=7;
+const uint UI_CONTROL_BARGRAPH		=0;
+const uint UI_CONTROL_BUTTON		=1;
+const uint UI_CONTROL_CHECKBOX		=2;
+const uint UI_CONTROL_CURSOR		=3;
+const uint UI_CONTROL_EDITTEXT		=4;
+const uint UI_CONTROL_SPRITE		=5;
+const uint UI_CONTROL_TEXT			=6;
+const uint UI_CONTROL_VIRTUALSTICK	=7;
+const uint UI_CONTROL_WINDOW		=8;
 
 vec2 rotate(vec2 v, float a)
 {
@@ -64,4 +67,7 @@ void main()
 
 	// Pass size
 	Size=InstancePos.zw;
+
+	// Pass extra value
+	Value=InstanceValue.xy;
 }

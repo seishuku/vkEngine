@@ -43,6 +43,7 @@ typedef enum
 	UI_CONTROL_EDITTEXT,
 	UI_CONTROL_SPRITE,
 	UI_CONTROL_TEXT,
+	UI_CONTROL_VIRTUALSTICK,
 	UI_CONTROL_WINDOW,
 	UI_NUM_CONTROLTYPE
 } UI_ControlType;
@@ -118,6 +119,15 @@ typedef struct
 			uint32_t titleTextLength;
 			float size;
 		} text;
+
+		// Virtual thumbsick type
+		struct
+		{
+			uint32_t titleTextID;
+			float radius;
+			bool active;
+			vec2 value;
+		} virtualStick;
 
 		// Window type
 		struct
@@ -237,6 +247,16 @@ bool UI_UpdateTextColor(UI_t *UI, uint32_t ID, vec3 color);
 bool UI_UpdateTextVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility);
 bool UI_UpdateTextTitleText(UI_t *UI, uint32_t ID, const char *titleText);
 bool UI_UpdateTextTitleTextf(UI_t *UI, uint32_t ID, const char *titleText, ...);
+
+uint32_t UI_AddVirtualStick(UI_t *UI, vec2 position, float radius, vec3 color, UI_ControlVisibility visibility, const char *titleText);
+bool UI_UpdateVirtualStick(UI_t *UI, uint32_t ID, vec2 position, float radius, vec3 color, UI_ControlVisibility visibility, const char *titleText);
+bool UI_UpdateVirtualStickPosition(UI_t *UI, uint32_t ID, vec2 position);
+bool UI_UpdateVirtualStickRadius(UI_t *UI, uint32_t ID, float radius);
+bool UI_UpdateVirtualStickColor(UI_t *UI, uint32_t ID, vec3 color);
+bool UI_UpdateVirtualStickVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility);
+bool UI_UpdateVirtualStickTitleText(UI_t *UI, uint32_t ID, const char *titleText);
+vec2 UI_GetVirtualStickValue(UI_t *UI, uint32_t ID);
+bool UI_SetVirtualStickActive(UI_t *UI, uint32_t ID, bool active);
 
 uint32_t UI_AddWindow(UI_t *UI, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, const char *titleText);
 bool UI_UpdateWindow(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, const char *titleText);

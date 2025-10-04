@@ -134,6 +134,8 @@ uint32_t currentTrack=UINT32_MAX;
 uint32_t windowID=UINT32_MAX;
 uint32_t thirdPersonID=UINT32_MAX;
 uint32_t playerHealthID=UINT32_MAX;
+
+uint32_t thumbstickID=UINT32_MAX;
 //////
 
 float playerHealth=100.0f;
@@ -148,9 +150,6 @@ vec2 leftThumbstick, rightThumbstick;
 bool isControlPressed=false;
 
 bool pausePhysics=false;
-
-extern vec2 lStick, rStick;
-extern bool buttons[4];
 
 #define NUM_ENEMY 8
 Camera_t enemy[NUM_ENEMY];
@@ -1346,6 +1345,9 @@ void Render(void)
 	camera.thirdPerson=UI_GetCheckBoxValue(&UI, thirdPersonID);
 	UI_UpdateBarGraphValue(&UI, playerHealthID, playerHealth);
 
+	vec2 temp=UI_GetVirtualStickValue(&UI, thumbstickID);
+	leftThumbstick=temp;
+
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
 	vkResetDescriptorPool(vkContext.device, perFrame[index].descriptorPool, 0);
@@ -1625,6 +1627,8 @@ bool Init(void)
 	Font_Init(&font);
 
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)config.renderWidth, (float)config.renderHeight), compositeRenderPass);
+
+	thumbstickID=UI_AddVirtualStick(&UI, Vec2(200, 200), 64, Vec3(1, 1, 1), UI_CONTROL_VISIBLE, "MOVE");
 
 	thirdPersonID=UI_AddCheckBox(&UI, Vec2(50, 50), 15, Vec3(1, 1, 1), UI_CONTROL_VISIBLE, "Third person camera", false);
 
