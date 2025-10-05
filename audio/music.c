@@ -233,6 +233,8 @@ void Music_Init(void)
 			return;
 		}
 	}
+	else
+		return;
 
 	Audio_SetStreamCallback(0, MusicStreamData);
 	Audio_StartStream(0);

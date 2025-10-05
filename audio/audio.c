@@ -567,12 +567,16 @@ int Audio_Init(void)
 	DSP_AddEffect(DSP_LowPass);
 
 #ifdef ANDROID
-	AudioAndroid_Init();
+	if(!AudioAndroid_Init())
 #elif WIN32
-	AudioWASAPI_Init();
+	if(!AudioWASAPI_Init())
 #elif LINUX
-	AudioPipeWire_Init();
+	if(!AudioPipeWire_Init())
 #endif
+	{
+		DBGPRINTF(DEBUG_ERROR, "Audio backend init failed.\n");
+		return false;
+	}
 
 	return true;
 }
