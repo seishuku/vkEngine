@@ -616,7 +616,12 @@ static bool UI_AddControlInstance(UI_Instance_t **instance, uint32_t *instanceCo
 		case UI_CONTROL_VIRTUALSTICK:
 		{
 			if(!control->virtualStick.active)
-				control->virtualStick.value=Vec2_Muls(control->virtualStick.value, (1-exp(-200.0f*dt)));
+			{
+				const float lambda=8.0f;
+				const float decay=expf(-lambda*dt);
+
+				control->virtualStick.value=Vec2_Muls(control->virtualStick.value, decay);
+			}
 
 			(*instance)->positionSize.x=offset.x+control->position.x;
 			(*instance)->positionSize.y=offset.y+control->position.y;
@@ -630,6 +635,7 @@ static bool UI_AddControlInstance(UI_Instance_t **instance, uint32_t *instanceCo
 
 			(*instance)->type=UI_CONTROL_VIRTUALSTICK;
 
+			// Clamp to +/- 0.75 only for visual appearence
 			(*instance)->extra=Vec2_Clamp(control->virtualStick.value, -0.75f, 0.75f);
 
 			(*instance)++;

@@ -135,7 +135,10 @@ uint32_t windowID=UINT32_MAX;
 uint32_t thirdPersonID=UINT32_MAX;
 uint32_t playerHealthID=UINT32_MAX;
 
-uint32_t thumbstickID=UINT32_MAX;
+#ifdef ANDROID
+uint32_t leftThumbstickID=UINT32_MAX;
+uint32_t rightThumbstickID=UINT32_MAX;
+#endif
 //////
 
 float playerHealth=100.0f;
@@ -1345,8 +1348,10 @@ void Render(void)
 	camera.thirdPerson=UI_GetCheckBoxValue(&UI, thirdPersonID);
 	UI_UpdateBarGraphValue(&UI, playerHealthID, playerHealth);
 
-	vec2 temp=UI_GetVirtualStickValue(&UI, thumbstickID);
-	leftThumbstick=temp;
+#ifdef ANDROID
+	leftThumbstick=UI_GetVirtualStickValue(&UI, leftThumbstickID);
+	rightThumbstick=UI_GetVirtualStickValue(&UI, rightThumbstickID);
+#endif
 
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
@@ -1628,11 +1633,12 @@ bool Init(void)
 
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)config.renderWidth, (float)config.renderHeight), compositeRenderPass);
 
-	thumbstickID=UI_AddVirtualStick(&UI, Vec2(200, 200), 64, Vec3(1, 1, 1), UI_CONTROL_VISIBLE, "MOVE");
-
 	thirdPersonID=UI_AddCheckBox(&UI, Vec2(50, 50), 15, Vec3(1, 1, 1), UI_CONTROL_VISIBLE, "Third person camera", false);
 
 #ifdef ANDROID
+	leftThumbstickID=UI_AddVirtualStick(&UI, Vec2(200, 200), 64, Vec3(1, 1, 1), UI_CONTROL_VISIBLE, "MOVE");
+	rightThumbstickID=UI_AddVirtualStick(&UI, Vec2(config.renderWidth-264, 200), 64, Vec3(1, 1, 1), UI_CONTROL_VISIBLE, "LOOK");
+
 	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-50.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), UI_CONTROL_VISIBLE, "Random", (UIControlCallback)GenerateWorld);
 	UI_AddButton(&UI, Vec2(0.0f, UI.size.y-100.0f), Vec2(100.0f, 50.0f), Vec3(0.25f, 0.25f, 0.25f), UI_CONTROL_VISIBLE, "Fire", (UIControlCallback)Fire);
 #endif

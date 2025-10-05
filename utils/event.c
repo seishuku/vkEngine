@@ -37,7 +37,8 @@ extern RigidBody_t asteroids[NUM_ASTEROIDS];
 
 extern UI_t UI;
 extern uint32_t cursorID;
-extern uint32_t thumbstickID;
+extern uint32_t leftThumbstickID;
+extern uint32_t rightThumbstickID;
 
 extern Console_t console;
 
@@ -100,12 +101,16 @@ void FireParticleEmitter(vec3 position, vec3 direction)
 	Audio_PlaySample(&AssetManager_GetAsset(assets, RandRange(SOUND_PEW1, SOUND_PEW3))->sound, false, 1.0f, position);
 }
 
-static uint32_t activeID=UINT32_MAX;
-static vec2 mousePosition={ 0.0f, 0.0f };
+#define MAX_TOUCHES 4
 
-#ifdef ANDROID
-static vec2 oldMousePosition={ 0.0f, 0.0f };
-#endif
+static uint32_t activeID[MAX_TOUCHES]={ UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX };
+static vec2 mousePosition[MAX_TOUCHES]=
+{
+	{ 0.0f, 0.0f },
+	{ 0.0f, 0.0f },
+	{ 0.0f, 0.0f },
+	{ 0.0f, 0.0f },
+};
 
 bool Event_Trigger(EventID ID, void *arg)
 {
@@ -164,31 +169,31 @@ bool Event_Trigger(EventID ID, void *arg)
 				return true;
 			}
 
-			UI_Control_t *control=UI_FindControlByID(&UI, activeID);
+			UI_Control_t *control=UI_FindControlByID(&UI, activeID[0]);
 
-			if(activeID!=UINT32_MAX&&control->type==UI_CONTROL_EDITTEXT)
+			if(activeID[0]!=UINT32_MAX&&control->type==UI_CONTROL_EDITTEXT)
 			{
 				switch(key)
 				{
 					case KB_LEFT:
-						UI_EditTextMoveCursor(&UI, activeID, -1);
+						UI_EditTextMoveCursor(&UI, activeID[0], -1);
 						break;
 
 					case KB_RIGHT:
-						UI_EditTextMoveCursor(&UI, activeID, 1);
+						UI_EditTextMoveCursor(&UI, activeID[0], 1);
 						break;
 
 					case KB_BACKSPACE:
-						UI_EditTextBackspace(&UI, activeID);
+						UI_EditTextBackspace(&UI, activeID[0]);
 						break;
 
 					case KB_DEL:
-						UI_EditTextDelete(&UI, activeID);
+						UI_EditTextDelete(&UI, activeID[0]);
 						break;
 
 					default:
 						if(key>=32&&key<=126)
-							UI_EditTextInsertChar(&UI, activeID, tolower(key));
+							UI_EditTextInsertChar(&UI, activeID[0], tolower(key));
 						break;
 				}
 
@@ -266,20 +271,23 @@ bool Event_Trigger(EventID ID, void *arg)
 		{
 #ifndef ANDROID
 			if(mouseEvent->button&MOUSE_BUTTON_LEFT)
-				activeID=UI_TestHit(&UI, mousePosition);
-
-			if(activeID==thumbstickID)
-				UI_SetVirtualStickActive(&UI, thumbstickID, true);
+				activeID[0]=UI_TestHit(&UI, mousePosition[0]);
 #else
-			mousePosition.x=(float)mouseEvent->dx;
-			mousePosition.y=(float)mouseEvent->dy;
-
-			if(mouseEvent->button&MOUSE_TOUCH)
+			for(uint32_t i=0;i<MAX_TOUCHES;i++)
 			{
-				activeID=UI_TestHit(&UI, mousePosition);
+				if(mouseEvent->button&(MOUSE_TOUCH1<<i))
+				{
+					mousePosition[i].x=(float)mouseEvent->dx;
+					mousePosition[i].y=(float)mouseEvent->dy;
 
-				if(activeID!=UINT32_MAX)
-					UI_ProcessControl(&UI, activeID, mousePosition);
+					activeID[i]=UI_TestHit(&UI, mousePosition[i]);
+				}
+
+				if(activeID[i]==leftThumbstickID)
+					UI_SetVirtualStickActive(&UI, leftThumbstickID, true);
+
+				if(activeID[i]==rightThumbstickID)
+					UI_SetVirtualStickActive(&UI, rightThumbstickID, true);
 			}
 #endif
 			break;
@@ -288,17 +296,25 @@ bool Event_Trigger(EventID ID, void *arg)
 		case EVENT_MOUSEUP:
 		{
 #ifndef ANDROID
-			if(activeID==thumbstickID)
-				UI_SetVirtualStickActive(&UI, thumbstickID, false);
-
 			if(mouseEvent->button&MOUSE_BUTTON_LEFT)
-				activeID=UINT32_MAX;
+				activeID[0]=UINT32_MAX;
 #else
-			mousePosition.x=(float)mouseEvent->dx;
-			mousePosition.y=(float)mouseEvent->dy;
+			for(uint32_t i=0;i<MAX_TOUCHES;i++)
+			{
+				if(activeID[i]==leftThumbstickID)
+					UI_SetVirtualStickActive(&UI, leftThumbstickID, false);
 
-			if(mouseEvent->button&MOUSE_TOUCH)
-				activeID=UINT32_MAX;
+				if(activeID[i]==rightThumbstickID)
+					UI_SetVirtualStickActive(&UI, rightThumbstickID, false);
+
+				if(mouseEvent->button&(MOUSE_TOUCH1<<i))
+				{
+					mousePosition[i].x=(float)mouseEvent->dx;
+					mousePosition[i].y=(float)mouseEvent->dy;
+
+					activeID[i]=UINT32_MAX;
+				}
+			}
 #endif
 			break;
 		}
@@ -307,30 +323,53 @@ bool Event_Trigger(EventID ID, void *arg)
 		{
 #ifndef ANDROID
 			// Calculate relative movement
-			mousePosition=Vec2_Add(mousePosition, (float)mouseEvent->dx, (float)mouseEvent->dy);
+			mousePosition[0]=Vec2_Add(mousePosition[0], (float)mouseEvent->dx, (float)mouseEvent->dy);
 
-			mousePosition.x=clampf(mousePosition.x, 0.0f, (float)config.renderWidth);
-			mousePosition.y=clampf(mousePosition.y, 0.0f, (float)config.renderHeight);
+			mousePosition[0].x=clampf(mousePosition[0].x, 0.0f, (float)config.renderWidth);
+			mousePosition[0].y=clampf(mousePosition[0].y, 0.0f, (float)config.renderHeight);
 
-			UI_UpdateCursorPosition(&UI, cursorID, mousePosition);
+			UI_UpdateCursorPosition(&UI, cursorID, mousePosition[0]);
 
-			if(activeID!=UINT32_MAX&&mouseEvent->button&MOUSE_BUTTON_LEFT)
-				UI_ProcessControl(&UI, activeID, mousePosition);
+			if(activeID[0]!=UINT32_MAX&&mouseEvent->button&MOUSE_BUTTON_LEFT)
+				UI_ProcessControl(&UI, activeID[0], mousePosition[0]);
 			else if(mouseEvent->button&MOUSE_BUTTON_LEFT)
 			{
 				camera.body.angularVelocity.x-=(float)mouseEvent->dy/200.0f;
 				camera.body.angularVelocity.y-=(float)mouseEvent->dx/200.0f;
 			}
 #else
-			oldMousePosition=mousePosition;
-			mousePosition.x=(float)mouseEvent->dx;
-			mousePosition.y=(float)mouseEvent->dy;
-
-			if(activeID==UINT32_MAX&&mouseEvent->button&MOUSE_TOUCH)
+			if(activeID[0]!=UINT32_MAX&&mouseEvent->button&MOUSE_TOUCH1)
 			{
-				camera.body.angularVelocity.x-=(float)(mousePosition.y-oldMousePosition.y)/200.0f;
-				camera.body.angularVelocity.y-=(float)(mousePosition.x-oldMousePosition.x)/200.0f;
+				mousePosition[0].x=(float)mouseEvent->dx;
+				mousePosition[0].y=(float)mouseEvent->dy;
+
+				UI_ProcessControl(&UI, activeID[0], mousePosition[0]);
 			}
+
+			if(activeID[1]!=UINT32_MAX&&mouseEvent->button&MOUSE_TOUCH2)
+			{
+				mousePosition[1].x=(float)mouseEvent->dx;
+				mousePosition[1].y=(float)mouseEvent->dy;
+
+				UI_ProcessControl(&UI, activeID[1], mousePosition[1]);
+			}
+
+			if(activeID[2]!=UINT32_MAX&&mouseEvent->button&MOUSE_TOUCH3)
+			{
+				mousePosition[2].x=(float)mouseEvent->dx;
+				mousePosition[2].y=(float)mouseEvent->dy;
+
+				UI_ProcessControl(&UI, activeID[2], mousePosition[2]);
+			}
+
+			if(activeID[3]!=UINT32_MAX&&mouseEvent->button&MOUSE_TOUCH4)
+			{
+				mousePosition[3].x=(float)mouseEvent->dx;
+				mousePosition[3].y=(float)mouseEvent->dy;
+
+				UI_ProcessControl(&UI, activeID[3], mousePosition[3]);
+			}
+
 #endif
 			break;
 		}
