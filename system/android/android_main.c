@@ -30,7 +30,7 @@ extern uint32_t renderWidth, renderHeight;
 
 float fps=0.0f, fTimeStep=0.0f, fTime=0.0;
 
-static const uint32_t scale=2;
+static const float scale=2.0;
 
 struct
 {
@@ -38,22 +38,9 @@ struct
 	struct android_app *app;
 } appState;
 
-typedef struct
-{
-    int32_t pointerId;
-	uint32_t code;
-    vec2 pos;
-} Touch_t;
-
 #define MAX_TOUCHES 4
 
-static Touch_t touches[MAX_TOUCHES]=
-{
-	{ -1, MOUSE_TOUCH1 },
-	{ -1, MOUSE_TOUCH2 },
-	{ -1, MOUSE_TOUCH3 },
-	{ -1, MOUSE_TOUCH4 },
-};
+static int32_t touchID[MAX_TOUCHES]={ -1, -1, -1, -1 };
 
 void Render(void);
 bool Init(void);
@@ -87,18 +74,16 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 				{
 					for(int i=0;i<MAX_TOUCHES;i++)
 					{
-						if(touches[i].pointerId==-1)
+						if(touchID[i]==-1)
 						{
-							touches[i].pointerId=pointerId;
-							touches[i].pos.x=AMotionEvent_getX(event, pointerIndex)/scale;
-							touches[i].pos.y=(config.windowHeight-AMotionEvent_getY(event, pointerIndex))/scale;
+							touchID[i]=pointerId;
 
 							MouseEvent_t ev=
 							{
-								.dx=(int32_t)touches[i].pos.x,
-								.dy=(int32_t)touches[i].pos.y,
+								.dx=(int32_t)					  (AMotionEvent_getX(event, pointerIndex)/scale),
+								.dy=(int32_t)(config.windowHeight-(AMotionEvent_getY(event, pointerIndex)/scale)),
 								.dz=0,
-								.button=touches[i].code
+								.button=MOUSE_TOUCH1<<i
 							};
 
 							Event_Trigger(EVENT_MOUSEDOWN, &ev);
@@ -117,17 +102,14 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 
 						for(int i=0;i<MAX_TOUCHES;i++)
 				        {
-					        if(touches[i].pointerId==pid)
+					        if(touchID[i]==pid)
 					        {
-								touches[i].pos.x=AMotionEvent_getX(event, p)/scale;
-						        touches[i].pos.y=(config.windowHeight-AMotionEvent_getY(event, p))/scale;
-
 								MouseEvent_t ev=
 								{
-						            .dx=(int32_t)touches[i].pos.x,
-						            .dy=(int32_t)touches[i].pos.y,
+						            .dx=(int32_t)					  (AMotionEvent_getX(event, p)/scale),
+						            .dy=(int32_t)(config.windowHeight-(AMotionEvent_getY(event, p)/scale)),
 						            .dz=0,
-						            .button=touches[i].code
+						            .button=MOUSE_TOUCH1<<i
 								};
 
 								Event_Trigger(EVENT_MOUSEMOVE, &ev);
@@ -143,19 +125,19 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 				{
 					for(int i=0;i<MAX_TOUCHES;i++)
 			        {
-				        if(touches[i].pointerId==pointerId)
+				        if(touchID[i]==pointerId)
 				        {
 					        MouseEvent_t ev=
 							{
-								.dx=(int32_t)touches[i].pos.x,
-					            .dy=(int32_t)touches[i].pos.y,
+								.dx=(int32_t)					  (AMotionEvent_getX(event, pointerIndex)/scale),
+					            .dy=(int32_t)(config.windowHeight-(AMotionEvent_getY(event, pointerIndex)/scale)),
 					            .dz=0,
-					            .button=touches[i].code
+					            .button=MOUSE_TOUCH1<<i
 							};
 
 							Event_Trigger(EVENT_MOUSEUP, &ev);
 
-							touches[i].pointerId=-1;
+							touchID[i]=-1;
 					        break;
 				        }
 			        }
@@ -166,18 +148,18 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 		        {
 			        for(int i=0;i<MAX_TOUCHES;i++)
 			        {
-				        if(touches[i].pointerId!=-1)
+				        if(touchID[i]!=-1)
 				        {
 					        MouseEvent_t ev=
 							{
-								.dx=(int32_t)touches[i].pos.x,
-					            .dy=(int32_t)touches[i].pos.y,
+								.dx=(int32_t)AMotionEvent_getX(event, pointerIndex),
+					            .dy=(int32_t)(config.windowHeight-AMotionEvent_getY(event, pointerIndex)),
 					            .dz=0,
-					            .button=touches[i].code
+					            .button=MOUSE_TOUCH1<<i
 							};
 
 							Event_Trigger(EVENT_MOUSEUP, &ev);
-					        touches[i].pointerId=-1;
+					        touchID[i]=-1;
 				        }
 			        }
 			        break;
@@ -276,12 +258,6 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 	switch(cmd)
 	{
 		case APP_CMD_INIT_WINDOW:
-			config.windowWidth=ANativeWindow_getWidth(app->window)/scale;
-			config.windowHeight=ANativeWindow_getHeight(app->window)/scale;
-			ANativeWindow_setBuffersGeometry(app->window, config.windowWidth, config.windowHeight, AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM);
-
-			vkContext.window=app->window;
-
 			DBGPRINTF(DEBUG_INFO, "Allocating zone memory (%dMiB)...\n", MEMZONE_SIZE/1024/1024);
 			zone=Zone_Init(MEMZONE_SIZE);
 
@@ -298,6 +274,13 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 				DBGPRINTF(DEBUG_ERROR, "Unable to read config.ini.\n");
 				return;
 			}
+
+			config.windowWidth=(uint32_t)((float)ANativeWindow_getWidth(app->window)/scale);
+			config.windowHeight=(uint32_t)((float)ANativeWindow_getHeight(app->window)/scale);
+			DBGPRINTF(DEBUG_ERROR, "Window size: %dx%d\n", config.windowWidth, config.windowHeight);
+			ANativeWindow_setBuffersGeometry(app->window, config.windowWidth, config.windowHeight, 0);
+
+			vkContext.window=app->window;
 
 			vkContext.deviceIndex=0;
 
@@ -332,6 +315,8 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 				config.renderWidth=swapchain.extent.width;
 				config.renderHeight=swapchain.extent.height;
 			}
+
+			DBGPRINTF(DEBUG_ERROR, "Render size: %dx%d\n", config.renderWidth, config.renderHeight);
 
 			DBGPRINTF(DEBUG_INFO, "Initializing VR...\n");
 			if(!VR_Init(&xrContext, vkInstance, &vkContext))

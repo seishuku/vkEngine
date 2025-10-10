@@ -431,7 +431,12 @@ void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye)
 
 	vkCmdBindPipeline(perFrame[frameIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gaussianPipeline.pipeline.pipeline);
 
+#ifdef ANDROID
+	// TODO: Need a better fix for this, Android/Vulkan pre-transform screws this up
+	vkCmdPushConstants(perFrame[frameIndex].commandBuffer, gaussianPipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &(vec2){ (float)config.renderWidth/config.renderHeight, 0.0 });
+#else
 	vkCmdPushConstants(perFrame[frameIndex].commandBuffer, gaussianPipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &(vec2){ 1.0f, 0.0 });
+#endif
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianPipeline.descriptorSet, 0, colorBlur[eye].sampler, colorBlur[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuAllocateUpdateDescriptorSet(&gaussianPipeline.descriptorSet, perFrame[frameIndex].descriptorPool);
@@ -454,7 +459,12 @@ void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye)
 		.renderArea={ { 0, 0 }, { config.renderWidth>>2, config.renderHeight>>2 } },
 	}, VK_SUBPASS_CONTENTS_INLINE);
 
+#ifdef ANDROID
+	// TODO: Need a better fix for this, Android/Vulkan pre-transform screws this up
+	vkCmdPushConstants(perFrame[frameIndex].commandBuffer, gaussianPipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &(vec2){ 0.0f, (float)config.renderHeight/config.renderWidth });
+#else
 	vkCmdPushConstants(perFrame[frameIndex].commandBuffer, gaussianPipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(vec2), &(vec2){ 0.0f, 1.0f });
+#endif
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&gaussianPipeline.descriptorSet, 0, colorTemp[eye].sampler, colorTemp[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuAllocateUpdateDescriptorSet(&gaussianPipeline.descriptorSet, perFrame[frameIndex].descriptorPool);
@@ -506,7 +516,11 @@ void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye)
 	PC.uSize[1]=config.renderHeight;
 	PC.uSamples=config.msaaSamples;
 
+#ifdef ANDROID
+	matrix mvp=MatrixMult(MatrixScale(1.0f, -1.0f, 1.0f), MatrixRotate(PI/2.0f, 0.0f, 0.0f, 1.0f));
+#else
 	matrix mvp=MatrixScale(1.0f, -1.0f, 1.0f);
+#endif
 
 	if(config.isVR)
 		mvp=MatrixMult(MatrixMult(MatrixScale(((float)config.renderWidth/config.renderHeight)*1.0f, 1.0f, 1.0f), MatrixTranslate(0.0f, 0.0f, -1.0f)), MatrixMult(perFrame[frameIndex].mainUBO[eye]->HMD, perFrame[frameIndex].mainUBO[eye]->projection));

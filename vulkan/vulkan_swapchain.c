@@ -162,7 +162,7 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 		.imageSharingMode=VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount=0,
 		.pQueueFamilyIndices=VK_NULL_HANDLE,
-		.preTransform=VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+		.preTransform=surfaceCaps.currentTransform, //VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
 		.compositeAlpha=compositeAlpha,
 		.presentMode=swapchainPresentMode,
 		.clipped=VK_TRUE,

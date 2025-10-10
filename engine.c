@@ -895,8 +895,6 @@ void TestCollision(void *a, void *b)
 
 	if(impactSpeed>0.1f)
 	{
-		DBGPRINTF(DEBUG_ERROR, "Collision detected between %p and %p with impact speed of %f\n", objA, objB, impactSpeed);
-
 		// If both objects are asteroids
 		if(objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_FIELD)
 		{
@@ -1323,7 +1321,11 @@ void Render(void)
 			return;
 		}
 
+#ifdef ANDROID
+		projection[0]=MatrixMult(MatrixInfPerspective(90.0f, (float)config.renderWidth/config.renderHeight, 0.01f), MatrixRotate(PI/2.0f, 0.0f, 0.0f, 1.0f));
+#else
 		projection[0]=MatrixInfPerspective(90.0f, (float)config.renderWidth/config.renderHeight, 0.01f);
+#endif
 		headPose[0]=MatrixIdentity();
 
 		// TODO: Find a better place for gamepad input handling!
