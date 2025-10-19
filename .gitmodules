@@ -1,9 +1,6 @@
 [submodule "deps/OpenXR-SDK"]
 	path = deps/OpenXR-SDK
 	url = https://github.com/KhronosGroup/OpenXR-SDK.git
-[submodule "deps/portaudio"]
-	path = deps/portaudio
-	url = https://github.com/PortAudio/portaudio.git
 [submodule "deps/ogg"]
 	path = deps/ogg
 	url = https://github.com/xiph/ogg.git
