@@ -1,7 +1,7 @@
 #ifndef __MEMZONE_H__
 #define __MEMZONE_H__
 
-#include <threads.h>
+#include "threads.h"
 #include <stdbool.h>
 
 typedef struct

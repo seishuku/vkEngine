@@ -26,6 +26,7 @@ function("buildWindows")
         ole32
         ws2_32
         xinput
+        stdc++
     )
 
     if(CMAKE_C_COMPILER_ID MATCHES "MSVC")

@@ -13,6 +13,11 @@
 #ifndef XR_USE_PLATFORM_WIN32
 #define XR_USE_PLATFORM_WIN32
 #endif
+
+#ifdef __MINGW32__
+#include <unknwnbase.h>
+#endif
+
 #endif
 
 #ifdef LINUX

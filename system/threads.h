@@ -1,7 +1,12 @@
 #ifndef __THREADS_H__
 #define __THREADS_H__
 
+#ifdef __MINGW32__
+#include "threads_win32.h"
+#else
 #include <threads.h>
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdatomic.h>

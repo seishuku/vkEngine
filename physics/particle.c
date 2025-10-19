@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <threads.h>
 #include <string.h>
 #include "../system/system.h"
+#include "../system/threads.h"
 #include "../vulkan/vulkan.h"
 #include "../image/image.h"
 #include "../math/math.h"

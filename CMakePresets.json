@@ -1,29 +1,9 @@
 {
     "version": 3,
-    "configurePresets": [
+    "configurePresets":
+    [
         {
-            "name": "Windows x64 Debug",
-            "displayName": "Windows x64 Debug",
-            "architecture": {
-                "value": "x64",
-                "strategy": "external"
-            },
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/out/build/${presetName}",
-            "installDir": "${sourceDir}/${presetName}",
-            "cacheVariables": {
-                "CMAKE_C_COMPILER": "clang-cl",
-                "CMAKE_CXX_COMPILER": "clang-cl",
-                "CMAKE_BUILD_TYPE": "Debug"
-            },
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            }
-        },
-        {
-            "name": "Windows x64 Release",
+            "name": "windows_x64_release",
             "displayName": "Windows x64 Release",
             "architecture": {
                 "value": "x64",
@@ -44,25 +24,45 @@
             }
         },
         {
-            "name": "Linux x64 Debug",
-            "displayName": "Linux x64 Debug",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "name": "windows_x64_debug",
+            "displayName": "Windows x64 Debug",
+            "inherits": "windows_x64_release",
             "cacheVariables": {
-                "CMAKE_INSTALL_PREFIX": "${sourceDir}/${presetName}",
-                "CMAKE_C_COMPILER": "/usr/bin/clang",
-                "CMAKE_CXX_COMPILER": "/usr/bin/clang++",
-                "CMAKE_BUILD_TYPE": "Debug",
-                "WAYLAND": true
+                "CMAKE_BUILD_TYPE": "Debug"
             },
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
-                "rhs": "Linux"
+                "rhs": "Windows"
+            }
+        },
+ 
+        {
+            "name": "windows_x64_release_cross",
+            "displayName": "Windows x64 Release (cross build)",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "installDir": "${sourceDir}/${presetName}",
+            "toolchainFile": "cmake/windows-toolchain.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
             }
         },
         {
-            "name": "Linux x64 Release",
+            "name": "windows_x64_debug_cross",
+            "displayName": "Windows x64 Debug (cross build)",
+            "inherits": "windows_x64_release_cross",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+ 
+        {
+            "name": "linux_x64_release",
             "displayName": "Linux x64 Release",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
@@ -80,20 +80,21 @@
             }
         },
         {
-            "name": "Android Debug",
-            "displayName": "Android Debug",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/out/build/${presetName}",
-            "toolchainFile": "$env{ANDROID_HOME}/ndk/29.0.13846066/build/cmake/android.toolchain.cmake",
+            "name": "linux_x64_debug",
+            "displayName": "Linux x64 Debug",
+            "inherits": "linux_x64_release",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "ANDROID_PLATFORM": "android-28",
-                "ANDROID_ABI": "arm64-v8a"
+                "CMAKE_BUILD_TYPE": "Debug"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
             }
         },
         {
-            "name": "Android Release",
-            "displayName": "Android Release",
+            "name": "android_arm64_release",
+            "displayName": "Android ARM64 Release",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
             "toolchainFile": "$env{ANDROID_HOME}/ndk/29.0.13846066/build/cmake/android.toolchain.cmake",
@@ -101,6 +102,14 @@
                 "CMAKE_BUILD_TYPE": "Release",
                 "ANDROID_PLATFORM": "android-28",
                 "ANDROID_ABI": "arm64-v8a"
+            }
+        },
+        {
+            "name": "android_arm64_debug",
+            "displayName": "Android ARM64 Debug",
+            "inherits": "android_arm64_release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
             }
         }
     ]

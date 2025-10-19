@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdatomic.h>
-#include <threads.h>
+#include "../system/threads.h"
 #include "../utils/list.h"
 #include "../math/math.h"
 #include "../vulkan/vulkan.h"

@@ -1,6 +1,6 @@
 #include <windows.h>
 #include <hidusage.h>
-#include <Xinput.h>
+#include <xinput.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
