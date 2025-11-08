@@ -506,15 +506,14 @@ void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye)
 
 	struct
 	{
-		uint32_t uFrame;
 		uint32_t uSize[2];
-		uint32_t uSamples;
+		uint32_t uSamples, uFrame;
 	} PC;
 
-	PC.uFrame=uFrame++;
 	PC.uSize[0]=config.renderWidth;
 	PC.uSize[1]=config.renderHeight;
 	PC.uSamples=config.msaaSamples;
+	PC.uFrame=uFrame++;
 
 #ifdef ANDROID
 	matrix mvp=MatrixMult(MatrixScale(1.0f, -1.0f, 1.0f), MatrixRotate(PI/2.0f, 0.0f, 0.0f, 1.0f));

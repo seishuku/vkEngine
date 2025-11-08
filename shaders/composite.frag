@@ -19,9 +19,8 @@ layout(binding=4) uniform MainUBO
 
 layout(push_constant) uniform PC
 {
-	uint uFrame;
 	uint uWidth, uHeight;
-	uint uSamples;
+	uint uSamples, uFrame;
 };
 
 layout(location=0) out vec4 Output;
@@ -31,24 +30,6 @@ const mat4 biasMat = mat4(
 	0.0, 0.5, 0.0, 0.0,
 	0.0, 0.0, 1.0, 0.0,
 	0.5, 0.5, 0.0, 1.0 );
-
-uint seed;
-
-uint wang_hash()
-{
-	seed=(seed^61u)^(seed>>16u);
-	seed*=9u;
-	seed=seed^(seed>>4u);
-	seed*=0x27d4eb2du;
-	seed=seed^(seed>>15u);
-
-	return seed;
-}
-
-float randomFloat()
-{
-	return float(wang_hash())/4294967296.0;
-}
 
 float ShadowPCF(vec3 pos)
 {
@@ -82,6 +63,11 @@ float MiePhase(float cosTheta, float g)
     return (1.0+gSq)/pow(1.0-2.0*g*cosTheta+gSq, 1.5)/(4.0*3.1415926);
 }
 
+float IGN(vec2 pixel, uint frame)
+{
+	return fract(52.9829189*fract(dot(pixel+5.588238f*float(frame), vec2(0.06711056, 0.00583715))));
+}
+
 float volumetricLightScattering(const vec3 lightPos, const vec3 rayOrigin, const vec3 rayEnd)
 {
 	const float g=0.01, mieCoefficient=0.09;
@@ -97,9 +83,12 @@ float volumetricLightScattering(const vec3 lightPos, const vec3 rayOrigin, const
 	const float miePhase=MiePhase(cosTheta, g);
 	const float scattering=mieCoefficient/(1.0-g*g);
 
+	// interleaved gradient noise
+	const float ign=IGN(gl_FragCoord.xy, uFrame);
+
 	float L=0.0;
 	float lDecay=1.0;
-	vec3 rayPos=rayOrigin+rayStep*randomFloat();
+	vec3 rayPos=rayOrigin+rayStep*ign;
 
 	for(int i=0;i<numSteps;i++)
 	{
@@ -128,8 +117,6 @@ vec4 depth2World()
 
 void main(void)
 {
-	seed=uint(gl_FragCoord.x+uWidth*gl_FragCoord.y)*uFrame;
-
     vec3 ro=inverse(HMD*modelview)[3].xyz;
 
 	vec4 worldPos=depth2World();

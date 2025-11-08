@@ -79,24 +79,6 @@ vec2 intersectBox(vec3 origin, vec3 direction)
     return vec2(t0, t1);
 }
 
-uint seed;
-
-uint wang_hash()
-{
-	seed=(seed^61u)^(seed>>16u);
-	seed*=9u;
-	seed=seed^(seed>>4u);
-	seed*=0x27d4eb2du;
-	seed=seed^(seed>>15u);
-
-	return seed;
-}
-
-float randomFloat()
-{
-	return float(wang_hash())/4294967296.0;
-}
-
 vec3 hsv2rgb(vec3 c)
 {
     vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
@@ -144,6 +126,11 @@ float CloudPhase(float cosTheta) {
     return mix(forward, backward, 0.1)+isotropic;
 }
 
+float IGN(vec2 pixel, uint frame)
+{
+	return fract(52.9829189*fract(dot(pixel+5.588238f*float(frame), vec2(0.06711056, 0.00583715))));
+}
+
 void main()
 {
 	const vec3 eye=inverse(modelview)[3].xyz;
@@ -161,10 +148,11 @@ void main()
 	const vec4 worldPos=depth2Eye()/Scale;
 	const float localSceneDepth=length(worldPos);
 
-	seed=uint(gl_FragCoord.x+uWidth*gl_FragCoord.y)*uFrame;
+	// interleaved gradient noise
+	const float ign=IGN(gl_FragCoord.xy, uFrame);
 
 	// make sure near hit doesn't go negative and apply some random jitter to smooth banding
-	hit.x=max(hit.x, 0.0)+randomFloat()*0.1;
+	hit.x=max(hit.x, 0.0)+ign*0.1;
 	// clamp far hit to scene depth for proper mixing with exisiting scene
 	hit.y=min(hit.y, localSceneDepth);
 
