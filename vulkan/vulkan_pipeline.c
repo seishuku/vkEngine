@@ -17,7 +17,9 @@ VkShaderModule vkuCreateShaderModuleMemory(VkDevice device, const uint32_t *data
 	VkShaderModuleCreateInfo CreateInfo={ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, NULL, 0, size, data };
 	VkResult Result=vkCreateShaderModule(device, &CreateInfo, VK_NULL_HANDLE, &shaderModule);
 
-	parseSpv(data, size);
+	SpvReflectionInfo_t reflectionInfo={ 0 };
+	parseSpv(data, size, &reflectionInfo);
+	spvReflectDump(&reflectionInfo);
 
 	if(Result==VK_SUCCESS)
 		return shaderModule;
@@ -51,6 +53,8 @@ VkShaderModule vkuCreateShaderModule(VkDevice device, const char *shaderFile)
 	shaderModule=vkuCreateShaderModuleMemory(device, data, size);
 
 	Zone_Free(zone, data);
+
+	DBGPRINTF(DEBUG_INFO, "Shader: %s\n", shaderFile);
 
 	return shaderModule;
 }

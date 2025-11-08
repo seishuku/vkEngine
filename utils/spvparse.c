@@ -4,9 +4,9 @@
 #include <string.h>
 #include "../math/math.h"
 #include "../system/system.h"
-
 // Local copy from the Vulkan SDK, because some SDK deployments are dumb and don't include this or are in differing locations.
 #include "spirv.h"
+#include "spvparse.h"
 
 #define SPV_SPIRV_VERSION_MAJOR_PART(WORD) (((uint32_t)(WORD)>>16)&0xFF)
 #define SPV_SPIRV_VERSION_MINOR_PART(WORD) (((uint32_t)(WORD)>>8)&0xFF)
@@ -37,6 +37,7 @@ typedef struct
 			uint32_t decorationValue;
 		} decorations[SPV_MAX_MEMBER_DECORATIONS];
 		uint32_t decorationCount;
+		char name[SPV_REFLECT_MAX_NAME];
 	} member[SPV_MAX_MEMBERS];
 } SpvMemberDecorate_t;
 
@@ -127,6 +128,7 @@ typedef struct
 typedef struct
 {
 	SpvOp opCode;
+	char name[SPV_REFLECT_MAX_NAME];
 
 	SpvDecorate_t decoration;
 	SpvMemberDecorate_t memberDecoration;
@@ -638,7 +640,7 @@ static inline const char *printSpvStorageClass(const SpvStorageClass storageClas
 	}
 }
 
-void printSpvHeader(const SpvHeader_t *header)
+static void printSpvHeader(const SpvHeader_t *header)
 {
 	DBGPRINTF(DEBUG_INFO, "SPIR-V Header:\n");
 	DBGPRINTF(DEBUG_INFO, "\tMagic Number: 0x%x\n", header->magicNumber);
@@ -648,7 +650,117 @@ void printSpvHeader(const SpvHeader_t *header)
 	DBGPRINTF(DEBUG_INFO, "\tSchema: %d\n", header->schema);
 }
 
-bool parseSpv(const uint32_t *opCodes, const uint32_t codeSize)
+static uint32_t spvTypeSize(const SpvID_t *type, const SpvID_t *IDs)
+{
+	switch(type->opCode)
+	{
+		case SpvOpTypeBool:
+			return 4;
+
+		case SpvOpTypeInt:
+			return type->type.intWidth/8;
+
+		case SpvOpTypeFloat:
+			return type->type.floatWidth/8;
+
+		case SpvOpTypeVector:
+		{
+			const SpvID_t *comp=&IDs[type->type.vectorComponentTypeID];
+			return type->type.vectorComponentCount*spvTypeSize(comp, IDs);
+		}
+
+		case SpvOpTypeMatrix:
+		{
+			const SpvID_t *col=&IDs[type->type.matrixColumnTypeID];
+			return type->type.matrixColumnCount*spvTypeSize(col, IDs);
+		}
+
+		case SpvOpTypeArray:
+		{
+			const SpvID_t *elem=&IDs[type->type.arrayElementTypeID];
+			const SpvID_t *lenID=&IDs[type->type.arrayLengthID];
+			uint32_t len=(lenID->opCode==SpvOpConstant)?(uint32_t)lenID->constant.literals[0].iLiteral:1;
+
+			return len*spvTypeSize(elem, IDs);
+		}
+
+		case SpvOpTypeStruct:
+		{
+			uint32_t size=0;
+
+			for(uint32_t i=0;i<type->type.structMemberCount;i++)
+			{
+				const SpvID_t *memberType=&IDs[type->type.structMemberTypeIDs[i]];
+				uint32_t memberSize=spvTypeSize(memberType, IDs);
+				uint32_t offset=0;
+
+				for(uint32_t j=0;j<type->memberDecoration.member[i].decorationCount;j++)
+				{
+					if(type->memberDecoration.member[i].decorations[j].decoration==SpvDecorationOffset)
+					{
+						offset=type->memberDecoration.member[i].decorations[j].decorationValue;
+						break;
+					}
+				}
+
+				if(offset+memberSize>size)
+					size=offset+memberSize;
+			}
+
+			return size;
+		}
+
+		default:
+			return 0;
+	}
+}
+
+static uint32_t spvFillMembers(const SpvID_t *type, const SpvID_t *IDs, SpvStructMember_t *members, uint32_t maxMembers)
+{
+	if(type->opCode!=SpvOpTypeStruct)
+		return 0;
+
+	uint32_t count=0;
+
+	for(uint32_t i=0;i<type->type.structMemberCount&&count<maxMembers;i++)
+	{
+		SpvStructMember_t *m=&members[count];
+		const SpvID_t *memberType=&IDs[type->type.structMemberTypeIDs[i]];
+
+		strncpy(m->name, type->memberDecoration.member[i].name, SPV_REFLECT_MAX_NAME-1);
+		m->name[SPV_REFLECT_MAX_NAME-1]='\0';
+
+		m->typeOp=memberType->opCode;
+		m->sizeBytes=spvTypeSize(memberType, IDs);
+		m->offset=0;
+		m->arrayCount=0;
+
+		// Find SpvDecorationOffset
+		for(uint32_t j=0;j<type->memberDecoration.member[i].decorationCount;j++)
+		{
+			if(type->memberDecoration.member[i].decorations[j].decoration==SpvDecorationOffset)
+			{
+				m->offset=type->memberDecoration.member[i].decorations[j].decorationValue;
+				break;
+			}
+		}
+
+		// Handle arrays
+		if(memberType->opCode==SpvOpTypeArray)
+		{
+			const SpvID_t *lenID=&IDs[memberType->type.arrayLengthID];
+
+			if(lenID->opCode==SpvOpConstant)
+				m->arrayCount=(uint32_t)lenID->constant.literals[0].iLiteral;
+		}
+
+		count++;
+	}
+
+	return count;
+}
+
+bool parseSpv(const uint32_t *opCodes, uint32_t codeSize, SpvReflectionInfo_t *reflOut)
 {
 	if(opCodes==NULL)
 		return false;
@@ -664,7 +776,7 @@ bool parseSpv(const uint32_t *opCodes, const uint32_t codeSize)
 
 	const SpvHeader_t *header=(const SpvHeader_t *)opCodes;
 
-	printSpvHeader(header);
+	// printSpvHeader(header);
 
 	SpvID_t *IDs=(SpvID_t *)Zone_Malloc(zone, sizeof(SpvID_t)*header->bound);
 
@@ -680,46 +792,82 @@ bool parseSpv(const uint32_t *opCodes, const uint32_t codeSize)
 
 		switch(opCode)
 		{
-			case SpvOpEntryPoint:
-			{
-				if(wordCount<4)
-				{
-					DBGPRINTF(DEBUG_ERROR, "SpvOpEntryPoint word count too small.\n");
-					return false;
-				}
-
-				SpvExecutionModel executionModel=(SpvExecutionModel)opCodes[offset+1];
-				uint32_t entryPointID=opCodes[offset+2];
-				const char *entryPointName=(const char *)&opCodes[offset+3];
-
-				DBGPRINTF(DEBUG_INFO, "SpvOpEntryPoint:\n\tExecution model: %s\n\tEntry point ID: %u\n\tEntry point name: %s\n", printSpvExecutionModel(executionModel), entryPointID, entryPointName);
-				break;
-			}
-
-			case SpvOpExecutionMode:
+			case SpvOpName:
 			{
 				if(wordCount<3)
 				{
-					DBGPRINTF(DEBUG_ERROR, "SpvOpExecutionMode word count too small.\n");
+					DBGPRINTF(DEBUG_ERROR, "SpvOpName word count too small.\n");
 					return false;
 				}
 
-				const uint32_t entryPointID=opCodes[offset+1];
-				const SpvExecutionMode executionMode=(SpvExecutionMode)opCodes[offset+2];
+				uint32_t targetID=opCodes[offset+1];
+				const char *str=(const char *)&opCodes[offset+2];
 
-				DBGPRINTF(DEBUG_INFO, "SpvOpExecutionMode:\n\tEntry point ID: %u\n\tExecution mode: %s\n", entryPointID, printSpvExecutionMode(executionMode));
-
-				switch(executionMode)
-				{
-					case SpvExecutionModeLocalSize:
-						// Local sizes for compute shaders:
-						// localSizeX=opCodes[offset+3];
-						// localSizeY=opCodes[offset+4];
-						// localSizeZ=opCodes[offset+5];
-						break;
-				}
+				strncpy(IDs[targetID].name, str, SPV_REFLECT_MAX_NAME-1);
+				IDs[targetID].name[SPV_REFLECT_MAX_NAME-1]='\0';
 				break;
 			}
+
+			case SpvOpMemberName:
+		    {
+			    if(wordCount<4)
+			    {
+				    DBGPRINTF(DEBUG_ERROR, "SpvOpMemberName word count too small.\n");
+				    return false;
+			    }
+
+				uint32_t typeID=opCodes[offset+1];
+			    uint32_t memberIdx=opCodes[offset+2];
+			    const char *str=(const char *)&opCodes[offset+3];
+
+			    if(memberIdx<SPV_MAX_MEMBERS)
+			    {
+				    strncpy(IDs[typeID].memberDecoration.member[memberIdx].name, str, SPV_REFLECT_MAX_NAME-1);
+				    IDs[typeID].memberDecoration.member[memberIdx].name[SPV_REFLECT_MAX_NAME-1]='\0';
+			    }
+			    break;
+		    }
+
+		    // case SpvOpEntryPoint:
+			// {
+			// 	if(wordCount<4)
+			// 	{
+			// 		DBGPRINTF(DEBUG_ERROR, "SpvOpEntryPoint word count too small.\n");
+			// 		return false;
+			// 	}
+
+			// 	SpvExecutionModel executionModel=(SpvExecutionModel)opCodes[offset+1];
+			// 	uint32_t entryPointID=opCodes[offset+2];
+			// 	const char *entryPointName=(const char *)&opCodes[offset+3];
+
+			// 	DBGPRINTF(DEBUG_INFO, "SpvOpEntryPoint:\n\tExecution model: %s\n\tEntry point ID: %u\n\tEntry point name: %s\n", printSpvExecutionModel(executionModel), entryPointID, entryPointName);
+			// 	break;
+			// }
+
+			// case SpvOpExecutionMode:
+			// {
+			// 	if(wordCount<3)
+			// 	{
+			// 		DBGPRINTF(DEBUG_ERROR, "SpvOpExecutionMode word count too small.\n");
+			// 		return false;
+			// 	}
+
+			// 	const uint32_t entryPointID=opCodes[offset+1];
+			// 	const SpvExecutionMode executionMode=(SpvExecutionMode)opCodes[offset+2];
+
+			// 	DBGPRINTF(DEBUG_INFO, "SpvOpExecutionMode:\n\tEntry point ID: %u\n\tExecution mode: %s\n", entryPointID, printSpvExecutionMode(executionMode));
+
+			// 	switch(executionMode)
+			// 	{
+			// 		case SpvExecutionModeLocalSize:
+			// 			// Local sizes for compute shaders:
+			// 			// localSizeX=opCodes[offset+3];
+			// 			// localSizeY=opCodes[offset+4];
+			// 			// localSizeZ=opCodes[offset+5];
+			// 			break;
+			// 	}
+			// 	break;
+			// }
 
 			case SpvOpDecorate:
 			{
@@ -1014,7 +1162,7 @@ bool parseSpv(const uint32_t *opCodes, const uint32_t codeSize)
 				const uint32_t literalCount=wordCount-3;
 
 				if(literalCount>SPV_MAX_MEMBERS)
-					DBGPRINTF(DEBUG_WARNING, "WARNING: targetID %d has more literals than code supports (%d), clamping to max supported.\n", targetID, SPV_MAX_LITERALS);
+					DBGPRINTF(DEBUG_WARNING, "WARNING: targetID %d has more literals than code supports (%d), no more will be added.\n", targetID, SPV_MAX_LITERALS);
 
 				IDs[targetID].constant.literalCount=min(SPV_MAX_LITERALS, literalCount);
 
@@ -1039,77 +1187,201 @@ bool parseSpv(const uint32_t *opCodes, const uint32_t codeSize)
 
 				if(wordCount==5)
 					IDs[targetID].variable.initializerID=opCodes[offset+4];
+
+			    // Reflection capture
+			    if(reflOut&&IDs[targetID].variable.storageClass!=SpvStorageClassInput&&IDs[targetID].variable.storageClass!=SpvStorageClassOutput)
+			    {
+				    uint32_t set=0, binding=0;
+
+					for(uint32_t j=0;j<IDs[targetID].decoration.decorationCount;j++)
+				    {
+					    switch(IDs[targetID].decoration.decorations[j].decoration)
+					    {
+							case SpvDecorationDescriptorSet:
+								set=IDs[targetID].decoration.decorations[j].decorationValue;
+								break;
+
+							case SpvDecorationBinding:
+								binding=IDs[targetID].decoration.decorations[j].decorationValue;
+								break;
+
+							default:
+								break;
+					    }
+				    }
+
+				    SpvID_t *ptrType=&IDs[IDs[targetID].variable.resultTypeID];
+				    SpvID_t *baseType=&IDs[ptrType->type.pointerTypeID];
+
+				    SpvResourceBinding_t *res=&reflOut->bindings[reflOut->numBindings++];
+
+					if(reflOut->numBindings>=SPV_REFLECT_MAX_BINDINGS)
+					{
+						DBGPRINTF(DEBUG_WARNING, "WARNING: targetID %d has more bindings than code supports (%d), no more will be added.\n", targetID, SPV_REFLECT_MAX_BINDINGS);
+						break;
+					}
+
+				    res->set=set;
+				    res->binding=binding;
+					res->typeOp=baseType->opCode;
+
+				    res->sizeBytes=spvTypeSize(baseType, IDs);
+
+				    if(baseType->opCode==SpvOpTypeStruct)
+					    res->memberCount=spvFillMembers(baseType, IDs, res->members, SPV_REFLECT_MAX_MEMBERS);
+
+				    switch(IDs[targetID].variable.storageClass)
+				    {
+						case SpvStorageClassUniform:
+							res->type=SPV_RESOURCE_UNIFORM_BUFFER;
+							break;
+
+						case SpvStorageClassStorageBuffer:
+							res->type=SPV_RESOURCE_STORAGE_BUFFER;
+							break;
+
+						case SpvStorageClassUniformConstant:
+							if(baseType->opCode==SpvOpTypeImage)
+								res->type = SPV_RESOURCE_SAMPLED_IMAGE;
+							else if(baseType->opCode==SpvOpTypeSampler)
+								res->type=SPV_RESOURCE_SAMPLER;
+							else
+								res->type=SPV_RESOURCE_UNIFORM_BUFFER;
+							break;
+
+						case SpvStorageClassPushConstant:
+							res->type=SPV_RESOURCE_PUSH_CONSTANT;
+							break;
+
+						default:
+							break;
+				    }
+			    }
+
 				break;
-			}
+		    }
 		}
 
 		offset+=wordCount;
 	}
 
-	for(uint32_t i=0;i<header->bound;i++)
-	{
-		SpvID_t *id=&IDs[i];
-
-		if(id->opCode==SpvOpVariable)
-		{
-			// Don't care about input or output variables for info output
-			if(!(id->variable.storageClass==SpvStorageClassInput||id->variable.storageClass==SpvStorageClassOutput))
-			{
-				// Get the ID pointer to the type of this variable.
-				// TODO: This is typically through a pointer ID to the actual ID, but might not be? Should do checking.
-				SpvID_t *resultTypeKind=&IDs[IDs[id->variable.resultTypeID].type.pointerTypeID];
-
-				// Some decorations that we want that are associated with this variable.
-				// These are in the decorations list for this ID, so extract them.
-				uint32_t descriptorSet=0, binding=0;
-
-				for(uint32_t j=0;j<id->decoration.decorationCount;j++)
-				{
-					switch(id->decoration.decorations[j].decoration)
-					{
-						case SpvDecorationDescriptorSet:
-							descriptorSet=id->decoration.decorations[j].decorationValue;
-							break;
-
-						case SpvDecorationBinding:
-							binding=id->decoration.decorations[j].decorationValue;
-							break;
-					}
-				}
-
-				// Print out a header for the ID
-				DBGPRINTF(DEBUG_INFO, "ID: %d set: %d binding: %d %s %s\n", i, descriptorSet, binding, printSpvOp(resultTypeKind->opCode), printSpvStorageClass(id->variable.storageClass));
-
-				// If it a struct type, print out the member info.
-				if(resultTypeKind->opCode==SpvOpTypeStruct)
-				{
-					for(uint32_t j=0;j<resultTypeKind->type.structMemberCount;j++)
-					{
-						// Get the pointer to the member type ID from the struct member type IDs list.
-						SpvID_t *memberType=&IDs[resultTypeKind->type.structMemberTypeIDs[j]];
-
-						// Decoration associated with most members, search for them just like other decorations.
-						uint32_t offset=0;
-
-						for(uint32_t k=0;k<resultTypeKind->memberDecoration.member[j].decorationCount;k++)
-						{
-							switch(resultTypeKind->memberDecoration.member[j].decorations[k].decoration)
-							{
-								case SpvDecorationOffset:
-									offset=resultTypeKind->memberDecoration.member[j].decorations[k].decorationValue;
-									break;
-							}
-						}
-
-						// Print out the information for the member.
-						DBGPRINTF(DEBUG_INFO, "\tmember: %d type: %s offset: %d\n", j, printSpvOp(memberType->opCode), offset);
-					}
-				}
-			}
-		}
-	}
-
 	Zone_Free(zone, IDs);
 
 	return true;
+}
+
+static const char *spv_reflect_type_string(SpvOp typeOp, uint32_t sizeBytes)
+{
+	switch (typeOp)
+	{
+		case SpvOpTypeBool:          return "bool";
+		case SpvOpTypeInt:
+			switch (sizeBytes)
+			{
+				case 1:  return "int8";  case 2:  return "int16";
+				case 4:  return "int32"; case 8:  return "int64";
+				default: return "int";
+			}
+		case SpvOpTypeFloat:
+			switch (sizeBytes)
+			{
+				case 2: return "half"; case 4: return "float";
+				case 8: return "double";
+				default: return "float";
+			}
+		case SpvOpTypeVector:        return "vecN";
+		case SpvOpTypeMatrix:        return "matN";
+		case SpvOpTypeStruct:        return "struct";
+		case SpvOpTypeSampler:       return "sampler";
+		case SpvOpTypeImage:         return "image";
+		case SpvOpTypeSampledImage:  return "sampler2D";
+		case SpvOpTypeArray:         return "array";
+		case SpvOpTypeRuntimeArray:  return "runtime_array";
+		default:                     return "(unknown)";
+	}
+}
+
+// More refined for vectors/matrices if we can infer from sizeBytes
+static const char *spv_reflect_guess_compound_type(SpvOp op, uint32_t sizeBytes)
+{
+	static char buf[32];
+
+	switch (op)
+	{
+		case SpvOpTypeVector:
+			// 4 bytes per component, guess vec2/3/4
+			switch (sizeBytes)
+			{
+				case 8:  return "vec2";
+				case 12: return "vec3";
+				case 16: return "vec4";
+				default: snprintf(buf, sizeof(buf), "vec? (%uB)", sizeBytes); return buf;
+			}
+		case SpvOpTypeMatrix:
+			// 16 bytes per column, guess mat2/3/4
+			switch (sizeBytes)
+			{
+				case 32: return "mat2";
+				case 48: return "mat3";
+				case 64: return "mat4";
+				default: snprintf(buf, sizeof(buf), "mat? (%uB)", sizeBytes); return buf;
+			}
+		default:
+			return spv_reflect_type_string(op, sizeBytes);
+	}
+}
+
+void spvReflectDump(const SpvReflectionInfo_t *refl)
+{
+	if (!refl)
+		return;
+
+	DBGPRINTF(DEBUG_INFO, "=== SPIR-V Reflection Dump ===\n");
+	DBGPRINTF(DEBUG_INFO, "Total bindings: %u\n", refl->numBindings);
+	DBGPRINTF(DEBUG_INFO, "------------------------------------------\n");
+
+	for (uint32_t i = 0; i < refl->numBindings; i++)
+	{
+		const SpvResourceBinding_t *b = &refl->bindings[i];
+		const char *bname = (b->name[0]) ? b->name : "(unnamed)";
+
+		const char *typeStr = "(unknown)";
+		switch (b->type)
+		{
+			case SPV_RESOURCE_UNIFORM_BUFFER:  typeStr = "UniformBuffer"; break;
+			case SPV_RESOURCE_STORAGE_BUFFER:  typeStr = "StorageBuffer"; break;
+			case SPV_RESOURCE_SAMPLED_IMAGE:   typeStr = "SampledImage";  break;
+			case SPV_RESOURCE_STORAGE_IMAGE:   typeStr = "StorageImage";  break;
+			case SPV_RESOURCE_SAMPLER:         typeStr = "Sampler";       break;
+			case SPV_RESOURCE_PUSH_CONSTANT:   typeStr = "PushConstant";  break;
+			default: break;
+		}
+
+		DBGPRINTF(DEBUG_INFO, "Set %u, Binding %u — %s\n", b->set, b->binding, bname);
+		DBGPRINTF(DEBUG_INFO, "\tType: %-15s  SPIR-V Base: %-16s\n", typeStr, spv_reflect_type_string(b->typeOp, b->sizeBytes));
+		DBGPRINTF(DEBUG_INFO, "\tTotal Size: %u bytes\n", b->sizeBytes);
+
+		if (b->memberCount > 0)
+		{
+			DBGPRINTF(DEBUG_INFO, "\tMembers (%u):\n", b->memberCount);
+			for (uint32_t m = 0; m < b->memberCount; m++)
+			{
+				const SpvStructMember_t *mem = &b->members[m];
+				const char *mname = (mem->name[0]) ? mem->name : "(unnamed)";
+
+				const char *desc = spv_reflect_guess_compound_type(mem->typeOp, mem->sizeBytes);
+
+				DBGPRINTF(DEBUG_INFO, "\t\t[%2u] %-16s offset=%-4u size=%-4u %-12s", m, mname, mem->offset, mem->sizeBytes, desc);
+
+				if (mem->arrayCount > 0)
+					DBGPRINTF(DEBUG_INFO, "\tarray[%u]", mem->arrayCount);
+
+				DBGPRINTF(DEBUG_INFO, "\n");
+			}
+		}
+
+		DBGPRINTF(DEBUG_INFO, "------------------------------------------\n");
+	}
+
+	DBGPRINTF(DEBUG_INFO, "=== End of Reflection ===\n");
 }
