@@ -195,7 +195,7 @@ static void HRIRInterpolate(vec3 xyz)
 	if(triangleIndex<0||(3*triangleIndex)>=sphere.numIndex)
 		return;
 
-	PushPoint(localPosition, triangleIndex);
+	// PushPoint(localPosition, triangleIndex);
 
 	// Calculate the barycentric coordinates and use them to interpolate the HRIR samples.
 	const HRIR_Vertex_t *v0=&sphere.vertices[sphere.indices[3*triangleIndex+0]];

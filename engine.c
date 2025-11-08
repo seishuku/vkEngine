@@ -160,7 +160,7 @@ Enemy_t enemyAI[NUM_ENEMY];
 
 LineGraph_t frameTimes, audioTimes, physicsTimes;
 
-#define MAX_POINTS 1000
+#define MAX_POINTS 10000
 struct
 {
 	vec3 point;
@@ -169,26 +169,59 @@ struct
 
 uint32_t numPoints=0;
 
+bool pointMutexInit=false;
+mtx_t pointMutex;
+
 bool PushPoint(const vec3 point, const uint32_t index)
 {
+	if(!pointMutexInit)
+	{
+		if(mtx_init(&pointMutex, mtx_plain)!=thrd_success)
+			return false;
+
+		pointMutexInit=true;
+	}
+
+	mtx_lock(&pointMutex);
+
 	if(numPoints>=MAX_POINTS)
+	{
+		mtx_unlock(&pointMutex);
 		return false;
+	}
 
 	points[numPoints].point=point;
 	points[numPoints].index=index;
 	numPoints++;
+
+	mtx_unlock(&pointMutex);
 
 	return true;
 }
 
 bool PopPoint(vec3 *point, uint32_t *index)
 {
+	if(!pointMutexInit)
+	{
+		if(mtx_init(&pointMutex, mtx_plain)!=thrd_success)
+			return false;
+
+		pointMutexInit=true;
+	}
+
+	mtx_lock(&pointMutex);
+
 	if(numPoints==0)
+	{
+		mtx_unlock(&pointMutex);
 		return false;
+	}
 
 	numPoints--;
 	*point=points[numPoints].point;
 	*index=points[numPoints].index;
+
+	mtx_unlock(&pointMutex);
 
 	return true;
 }
