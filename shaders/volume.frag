@@ -133,6 +133,8 @@ float IGN(vec2 pixel, uint frame)
 
 void main()
 {
+	const float stepSize=0.01;
+
 	const vec3 eye=inverse(modelview)[3].xyz;
     const vec3 ro=eye/Scale;
     const vec3 rd=normalize(Position-eye);
@@ -152,12 +154,9 @@ void main()
 	const float ign=IGN(gl_FragCoord.xy, uFrame);
 
 	// make sure near hit doesn't go negative and apply some random jitter to smooth banding
-	hit.x=max(hit.x, 0.0)+ign*0.1;
+	hit.x=max(hit.x, 0.0)+ign*stepSize;
 	// clamp far hit to scene depth for proper mixing with exisiting scene
 	hit.y=min(hit.y, localSceneDepth);
-
-	const vec3 dt_vec=1.0/(Scale.xxx*abs(rd));
-	const float stepSize=min(dt_vec.x, min(dt_vec.y, dt_vec.z))*8.0;
 
 	// Phase angle between light and view
 	const float cosTheta=dot(rd, lightDirection.xyz);
@@ -169,7 +168,8 @@ void main()
 	{
 		const vec3 pos=ro+rd*dist;
 
-		const float density=1.0-exp(-(texture(volumeTex, pos*0.5+0.5).r)*2.0);
+		const float densitySample=texture(volumeTex, pos*0.5+0.5).r;
+		const float density=1.0-exp(-densitySample);
 
 		// colorize the cloud sample
 		vec4 val_color=vec4(hsv2rgb(vec3(density+fShift, 1.0, 1.0)), density);
@@ -181,13 +181,10 @@ void main()
 		Output.a+=(1.0-Output.a)*val_color.a;
 
 		// Jump distance in low density areas where it doesn't matter
-		if(density<0.0001)
+		if(densitySample<0.001)
 			dist+=stepSize;
 
 		if(Output.a>=0.99)
 			break;
 	}
-
-	// boost final color some for a more dramatic cloud
-	Output=clamp(Output*1.3, 0.0, 1.0);
 }
