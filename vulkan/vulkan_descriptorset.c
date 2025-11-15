@@ -118,7 +118,7 @@ VkBool32 vkuAllocateUpdateDescriptorSet(VkuDescriptorSet_t *descriptorSet, VkDes
 	};
 
 	VkResult result;
-	if(result=vkAllocateDescriptorSets(descriptorSet->device, &AllocateInfo, &descriptorSet->descriptorSet)!=VK_SUCCESS)
+	if((result=vkAllocateDescriptorSets(descriptorSet->device, &AllocateInfo, &descriptorSet->descriptorSet))!=VK_SUCCESS)
 		return VK_FALSE;
 
 	// Need to update destination set handle now that one has been allocated.
