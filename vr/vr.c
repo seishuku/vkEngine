@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <unistd.h>
 #include "../system/system.h"
 #include "../math/math.h"
 #include "../vulkan/vulkan.h"
@@ -46,19 +47,26 @@ static void xruPollEvents(XruContext_t *xrContext)
 							.primaryViewConfigurationType=xrContext->viewType
 						};
 
-						xrBeginSession(xrContext->session, &sessionBeginInfo);
+						xruCheck(xrContext->instance, xrBeginSession(xrContext->session, &sessionBeginInfo));
 
-						DBGPRINTF(DEBUG_INFO, "VR: State ready, begin session.\n");
+						DBGPRINTF(DEBUG_INFO, "VR: State ready.\n");
 						xrContext->sessionRunning=true;
-
 						break;
 					}
+
+					case XR_SESSION_STATE_SYNCHRONIZED:
+						DBGPRINTF(DEBUG_INFO, "VR: State synchronized.\n");
+						break;
+
+					case XR_SESSION_STATE_FOCUSED:
+						DBGPRINTF(DEBUG_INFO, "VR: State focused.\n");
+						break;
 
 					case XR_SESSION_STATE_STOPPING:
 					{
 						xrContext->sessionRunning=false;
-						xrEndSession(xrContext->session);
-						DBGPRINTF(DEBUG_WARNING, "VR: State stopping, end session.\n");
+						xruCheck(xrContext->instance, xrEndSession(xrContext->session));
+						DBGPRINTF(DEBUG_WARNING, "VR: State stopping.\n");
 						break;
 					}
 
@@ -97,14 +105,18 @@ bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex)
 
 	if(!xrContext->sessionRunning)
 		return false;
-	
-	if(!xruCheck(xrContext->instance, xrWaitFrame(xrContext->session, &(XrFrameWaitInfo) { .type=XR_TYPE_FRAME_WAIT_INFO }, &xrContext->frameState)))
+
+	XrFrameWaitInfo waitFrame={ .type=XR_TYPE_FRAME_WAIT_INFO };
+
+	if(!xruCheck(xrContext->instance, xrWaitFrame(xrContext->session, &waitFrame, &xrContext->frameState)))
 	{
 		DBGPRINTF(DEBUG_ERROR, "VR: xrWaitFrame() was not successful.\n");
 		return false;
 	}
 
-	if(!xruCheck(xrContext->instance, xrBeginFrame(xrContext->session, &(XrFrameBeginInfo) { .type=XR_TYPE_FRAME_BEGIN_INFO })))
+	XrFrameBeginInfo frameBegin={ .type=XR_TYPE_FRAME_BEGIN_INFO };
+
+	if(!xruCheck(xrContext->instance, xrBeginFrame(xrContext->session, &frameBegin)))
 	{
 		DBGPRINTF(DEBUG_ERROR, "VR: xrBeginFrame() was not successful.\n");
 		return false;
@@ -112,6 +124,27 @@ bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex)
 	
 	if(xrContext->frameState.shouldRender)
 	{
+		uint32_t viewCount=0;
+		XrViewState viewState={ .type=XR_TYPE_VIEW_STATE };
+		XrViewLocateInfo locateInfo=
+		{
+			.type=XR_TYPE_VIEW_LOCATE_INFO,
+			.viewConfigurationType=xrContext->viewType,
+			.displayTime=xrContext->frameState.predictedDisplayTime,
+			.space=xrContext->refSpace
+		};
+		XrView views[2]=
+		{
+			{.type=XR_TYPE_VIEW },
+			{.type=XR_TYPE_VIEW }
+		};
+
+		if(!xruCheck(xrContext->instance, xrLocateViews(xrContext->session, &locateInfo, &viewState, 2, &viewCount, views)))
+		{
+			DBGPRINTF(DEBUG_ERROR, "VR: xrLocateViews failed.\n");
+			return false;
+		}
+
 		if(!xruCheck(xrContext->instance, xrAcquireSwapchainImage(xrContext->swapchain[0].swapchain, &(XrSwapchainImageAcquireInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO }, &imageIndex[0])))
 		{
 			DBGPRINTF(DEBUG_ERROR, "VR: Failed to acquire swapchain image 0.\n");
@@ -133,27 +166,6 @@ bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex)
 		if(!xruCheck(xrContext->instance, xrWaitSwapchainImage(xrContext->swapchain[1].swapchain, &(XrSwapchainImageWaitInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .timeout=INT64_MAX })))
 		{
 			DBGPRINTF(DEBUG_ERROR, "VR: Failed to wait for swapchain image 1.\n");
-			return false;
-		}
-
-		uint32_t viewCount=0;
-		XrViewState viewState={ .type=XR_TYPE_VIEW_STATE };
-		XrViewLocateInfo locateInfo=
-		{
-			.type=XR_TYPE_VIEW_LOCATE_INFO,
-			.viewConfigurationType=xrContext->viewType,
-			.displayTime=xrContext->frameState.predictedDisplayTime,
-			.space=xrContext->refSpace
-		};
-		XrView views[2]=
-		{
-			{.type=XR_TYPE_VIEW },
-			{.type=XR_TYPE_VIEW }
-		};
-
-		if(!xruCheck(xrContext->instance, xrLocateViews(xrContext->session, &locateInfo, &viewState, 2, &viewCount, views)))
-		{
-			DBGPRINTF(DEBUG_ERROR, "VR: xrLocateViews failed.\n");
 			return false;
 		}
 
@@ -187,49 +199,50 @@ bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex)
 
 bool VR_EndFrame(XruContext_t *xrContext)
 {
-	if((!xrContext->sessionRunning)||(!xrContext->frameState.shouldRender))
+	if(!xrContext->sessionRunning)
 		return false;
+		
+	XrCompositionLayerProjection projectionLayer={
+		.type=XR_TYPE_COMPOSITION_LAYER_PROJECTION,
+		.next=NULL,
+		.layerFlags=0,
+		.space=xrContext->refSpace,
+		.viewCount=2,
+		.views=(const XrCompositionLayerProjectionView[]) { xrContext->projViews[0], xrContext->projViews[1] },
+	};
 
-	if(!xruCheck(xrContext->instance, xrReleaseSwapchainImage(xrContext->swapchain[0].swapchain, &(XrSwapchainImageReleaseInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next=XR_NULL_HANDLE })))
-	{
-		DBGPRINTF(DEBUG_ERROR, "VR: Failed to release swapchain image 0.\n");
-		return false;
-	}
+	const XrCompositionLayerBaseHeader *layers[1]={ (const XrCompositionLayerBaseHeader *const)&projectionLayer };
 
-	if(!xruCheck(xrContext->instance, xrReleaseSwapchainImage(xrContext->swapchain[1].swapchain, &(XrSwapchainImageReleaseInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next=XR_NULL_HANDLE })))
+	XrFrameEndInfo frameEndInfo=
 	{
-		DBGPRINTF(DEBUG_ERROR, "VR: Failed to release swapchain image 1.\n");
-		return false;
-	}
+		.type=XR_TYPE_FRAME_END_INFO,
+		.next=XR_NULL_HANDLE,
+		.displayTime=xrContext->frameState.predictedDisplayTime,
+		.environmentBlendMode=XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
+	};
 
 	if(xrContext->frameState.shouldRender)
 	{
-		XrCompositionLayerProjection projectionLayer={
-			.type=XR_TYPE_COMPOSITION_LAYER_PROJECTION,
-			.next=NULL,
-			.layerFlags=0,
-			.space=xrContext->refSpace,
-			.viewCount=2,
-			.views=(const XrCompositionLayerProjectionView[]) { xrContext->projViews[0], xrContext->projViews[1] },
-		};
-
-		const XrCompositionLayerBaseHeader *layers[1]={ (const XrCompositionLayerBaseHeader *const)&projectionLayer };
-
-		XrFrameEndInfo frameEndInfo=
+		if(!xruCheck(xrContext->instance, xrReleaseSwapchainImage(xrContext->swapchain[0].swapchain, &(XrSwapchainImageReleaseInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next=XR_NULL_HANDLE })))
 		{
-			.type=XR_TYPE_FRAME_END_INFO,
-			.next=XR_NULL_HANDLE,
-			.displayTime=xrContext->frameState.predictedDisplayTime,
-			.environmentBlendMode=XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
-			.layerCount=1,
-			.layers=layers,
-		};
-
-		if(!xruCheck(xrContext->instance, xrEndFrame(xrContext->session, &frameEndInfo)))
-		{
-			DBGPRINTF(DEBUG_ERROR, "VR: xrEndFrame() was not successful.\n");
+			DBGPRINTF(DEBUG_ERROR, "VR: Failed to release swapchain image 0.\n");
 			return false;
 		}
+
+		if(!xruCheck(xrContext->instance, xrReleaseSwapchainImage(xrContext->swapchain[1].swapchain, &(XrSwapchainImageReleaseInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next=XR_NULL_HANDLE })))
+		{
+			DBGPRINTF(DEBUG_ERROR, "VR: Failed to release swapchain image 1.\n");
+			return false;
+		}
+
+		frameEndInfo.layerCount=1;
+		frameEndInfo.layers=layers;
+	}
+
+	if(!xruCheck(xrContext->instance, xrEndFrame(xrContext->session, &frameEndInfo)))
+	{
+		DBGPRINTF(DEBUG_ERROR, "VR: xrEndFrame() was not successful.\n");
+		return false;
 	}
 
 	return true;
@@ -455,8 +468,9 @@ static bool VR_GetViewConfig(XruContext_t *xrContext, const XrViewConfigurationT
 
 	xrContext->viewType=viewType;
 
-	xrContext->swapchainExtent.width=(xrContext->viewConfigViews[0].recommendedImageRectWidth*2)/3;
-	xrContext->swapchainExtent.height=(xrContext->viewConfigViews[0].recommendedImageRectHeight*2)/3;
+	// Set half recommended res
+	xrContext->swapchainExtent.width=xrContext->viewConfigViews[0].recommendedImageRectWidth/2;
+	xrContext->swapchainExtent.height=xrContext->viewConfigViews[0].recommendedImageRectHeight/2;
 
 	return true;
 }
