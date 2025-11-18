@@ -2,7 +2,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include <unistd.h>
 #include "../system/system.h"
 #include "../math/math.h"
 #include "../vulkan/vulkan.h"
