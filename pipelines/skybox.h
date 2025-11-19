@@ -40,8 +40,11 @@ typedef struct
 	vec4 uSunColor;
 } Skybox_UBO_t;
 
+extern VkuImage_t skyboxTex;
+
 bool CreateSkyboxPipeline(void);
 void DestroySkybox(void);
+VkBool32 GenSkybox(void);
 void DrawSkybox(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool);
 
 #endif

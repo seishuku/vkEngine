@@ -435,6 +435,8 @@ void GenerateWorld(void)
 	ResetPhysicsCubes();
 
 	playerHealth=100.0f;
+
+	GenSkybox();
 }
 //////
 
