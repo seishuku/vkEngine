@@ -33,7 +33,7 @@ struct
 	uint32_t numIndex;
 	uint32_t *indices;
 	HRIR_Vertex_t *vertices;
-} sphere;
+} HRIRSphere;
 
 static float HRIRWindow[MAX_HRIR_SAMPLES]={ 0 };
 
@@ -42,18 +42,16 @@ static float HRIRWindow[MAX_HRIR_SAMPLES]={ 0 };
 typedef struct
 {
 	Sample_t *sample;
-	uint32_t position;
+	size_t position;
 	bool looping;
 	float volume;
 	vec3 xyz;
+	int16_t FIRKernel[2*MAX_HRIR_SAMPLES];
 } Channel_t;
 
 static Channel_t channels[MAX_CHANNELS];
 
-// HRIR interpolation result kernel buffer 
-static int16_t HRIRKernel[2*MAX_HRIR_SAMPLES];
-
-// Audio buffers for HRTF convolve
+// Temp audio buffers for HRTF convolve
 static int16_t preConvolve[MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES];
 static int16_t postConvole[2*(MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES)];
 
@@ -156,9 +154,10 @@ static vec3 ClosestPointOnTriangle(vec3 p, vec3 a, vec3 b, vec3 c)
 	return Vec3_Addv(a, Vec3_Addv(Vec3_Muls(ab, vb*denom), Vec3_Muls(ac, vc*denom)));
 }
 
-// HRIR sample interpolation, takes world-space position as input.
+// Naive HRIR sample interpolation, takes world-space position as input.
 // HRIR samples are taken as float, but interpolated output is int16.
-static void HRIRInterpolate(vec3 xyz)
+// TODO: Optimize.
+static void HRIRInterpolate(vec3 xyz, int16_t *FIRKernel)
 {
 	// Sound distance drop-off constant, this is the radius of the hearable range
 	const float invRadius=1.0f/500.0f;
@@ -175,11 +174,11 @@ static void HRIRInterpolate(vec3 xyz)
 	int triangleIndex=-1;
 	float distSq=FLT_MAX;
 
-	for(uint32_t i=0;i<sphere.numIndex;i+=3)
+	for(uint32_t i=0;i<HRIRSphere.numIndex;i+=3)
 	{
-		vec3 a=sphere.vertices[sphere.indices[i+0]].vertex;
-		vec3 b=sphere.vertices[sphere.indices[i+1]].vertex;
-		vec3 c=sphere.vertices[sphere.indices[i+2]].vertex;
+		vec3 a=HRIRSphere.vertices[HRIRSphere.indices[i+0]].vertex;
+		vec3 b=HRIRSphere.vertices[HRIRSphere.indices[i+1]].vertex;
+		vec3 c=HRIRSphere.vertices[HRIRSphere.indices[i+2]].vertex;
 
 		vec3 cp=ClosestPointOnTriangle(localPosition, a, b, c);
 
@@ -192,15 +191,15 @@ static void HRIRInterpolate(vec3 xyz)
 		}
 	}
 
-	if(triangleIndex<0||(3*triangleIndex)>=sphere.numIndex)
+	if(triangleIndex<0||(3*triangleIndex)>=HRIRSphere.numIndex)
 		return;
 
 	// PushPoint(localPosition, triangleIndex);
 
 	// Calculate the barycentric coordinates and use them to interpolate the HRIR samples.
-	const HRIR_Vertex_t *v0=&sphere.vertices[sphere.indices[3*triangleIndex+0]];
-	const HRIR_Vertex_t *v1=&sphere.vertices[sphere.indices[3*triangleIndex+1]];
-	const HRIR_Vertex_t *v2=&sphere.vertices[sphere.indices[3*triangleIndex+2]];
+	const HRIR_Vertex_t *v0=&HRIRSphere.vertices[HRIRSphere.indices[3*triangleIndex+0]];
+	const HRIR_Vertex_t *v1=&HRIRSphere.vertices[HRIRSphere.indices[3*triangleIndex+1]];
+	const HRIR_Vertex_t *v2=&HRIRSphere.vertices[HRIRSphere.indices[3*triangleIndex+2]];
 	const vec2 g=CalculateBarycentric(localPosition, v0->vertex, v1->vertex, v2->vertex);
 
 	vec3 coords=Vec3(fmaxf(0.0f, g.x), fmaxf(0.0f, g.y), fmaxf(0.0f, 1.0f-g.x-g.y));
@@ -214,42 +213,40 @@ static void HRIRInterpolate(vec3 xyz)
 	else
 		coords=Vec3(1.0f, 0.0f, 0.0f);
 
-	for(uint32_t i=0;i<sphere.sampleLength;i++)
+	for(uint32_t i=0;i<HRIRSphere.sampleLength;i++)
 	{
 		const vec3 left=Vec3(v0->left[i], v1->left[i], v2->left[i]);
 		const vec3 right=Vec3(v0->right[i], v1->right[i], v2->right[i]);
 		const float gain=4.0f;
 		const float final=falloffDist*gain*HRIRWindow[i];
 
-		HRIRKernel[2*i+0]=(int16_t)clampf(final*Vec3_Dot(left, coords)*INT16_MAX, INT16_MIN, INT16_MAX);
-		HRIRKernel[2*i+1]=(int16_t)clampf(final*Vec3_Dot(right, coords)*INT16_MAX, INT16_MIN, INT16_MAX);
+		FIRKernel[2*i+0]=(int16_t)clampf(final*Vec3_Dot(left, coords)*INT16_MAX, INT16_MIN, INT16_MAX);
+		FIRKernel[2*i+1]=(int16_t)clampf(final*Vec3_Dot(right, coords)*INT16_MAX, INT16_MIN, INT16_MAX);
 	}
 }
 
-// Integer audio convolution, this is a current chokepoint in the audio system at 25% CPU usage in the profiler.
-// I don't think I can optimize this any more without going to SIMD or multithreading.
+// Integer audio convolution
 static void Convolve(const int16_t *input, int16_t *output, const size_t length, const int16_t *kernel, const size_t kernelLength)
 {
 	int16_t *outputPtr=output;
-	int32_t sum[2];
 
 	for(size_t i=0;i<length+kernelLength-1;i++)
 	{
 		const int16_t *inputPtr=&input[i+kernelLength];
 		const int16_t *kernelPtr=kernel;
 
-		sum[0]=1<<14;
-		sum[1]=1<<14;
+		int32_t sumL=1<<14;
+		int32_t sumR=1<<14;
 
 		for(size_t j=0;j<kernelLength;j++)
 		{
-			sum[0]+=(int32_t)(*kernelPtr++)*(int32_t)(*inputPtr);
-			sum[1]+=(int32_t)(*kernelPtr++)*(int32_t)(*inputPtr);
+			sumL+=(int32_t)(*kernelPtr++)*(int32_t)(*inputPtr);
+			sumR+=(int32_t)(*kernelPtr++)*(int32_t)(*inputPtr);
 			inputPtr--;
 		}
 
-		*outputPtr++=(int16_t)(bitwiseClamp32(sum[0], -0x40000000, 0x3FFFFFFF)>>15);
-		*outputPtr++=(int16_t)(bitwiseClamp32(sum[1], -0x40000000, 0x3FFFFFFF)>>15);
+		*outputPtr++=(int16_t)(bitwiseClamp32(sumL, -0x40000000, 0x3FFFFFFF)>>15);
+		*outputPtr++=(int16_t)(bitwiseClamp32(sumR, -0x40000000, 0x3FFFFFFF)>>15);
 	}
 }
 
@@ -280,8 +277,7 @@ void Audio_FillBuffer(void *buffer, uint32_t length)
 	int16_t *out=(int16_t *)buffer;
 
 	// Clear the output buffer, so we don't get annoying repeating samples.
-	for(size_t dataIdx=0;dataIdx<length*2;dataIdx++)
-		out[dataIdx]=0;
+	memset(out, 0, sizeof(int16_t)*length*2);
 
 	for(uint32_t i=0;i<MAX_CHANNELS;i++)
 	{
@@ -292,8 +288,8 @@ void Audio_FillBuffer(void *buffer, uint32_t length)
 		if(channel->sample==NULL)
 			continue;
 
-		// Interpolate HRIR samples that are closest to the sound's position
-		HRIRInterpolate(channel->xyz);
+		// Interpolate HRIR samples that are closest to the sound's position.
+		HRIRInterpolate(channel->xyz, channel->FIRKernel);
 
 		// Calculate the remaining amount of data to process.
 		size_t remainingData=channel->sample->length-channel->position;
@@ -303,34 +299,25 @@ void Audio_FillBuffer(void *buffer, uint32_t length)
 		if(remainingData>=length)
 			remainingData=length;
 
-		// Calculate the amount to fill the convolution buffer.
-		// The convolve buffer needs to be at least NUM_SAMPLE+HRIR length,
-		//   but to stop annoying pops/clicks and other discontinuities, we need to copy ahead,
-		//   which is either the full input sample length OR the full buffer+HRIR sample length.
+		// Fill pre-convolve buffer with audio data
 		size_t toFill=(channel->sample->length-channel->position);
 
-		if(toFill>=(MAX_AUDIO_SAMPLES+sphere.sampleLength))
-			toFill=(MAX_AUDIO_SAMPLES+sphere.sampleLength);
+		if(toFill>=(MAX_AUDIO_SAMPLES+HRIRSphere.sampleLength))
+			toFill=(MAX_AUDIO_SAMPLES+HRIRSphere.sampleLength);
 		else if(toFill>=channel->sample->length)
 			toFill=channel->sample->length;
 
-		// Copy the samples and zero out the remaining buffer size.
-		for(size_t dataIdx=0;dataIdx<(MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES);dataIdx++)
-		{
-			if(dataIdx<=toFill)
-				preConvolve[dataIdx]=channel->sample->data[channel->position+dataIdx];
-			else
-				preConvolve[dataIdx]=0;
-		}
+		memset(preConvolve, 0, sizeof(int16_t)*(MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES));
+		memcpy(preConvolve, &channel->sample->data[channel->position], sizeof(int16_t)*toFill);
 
 		// Convolve the samples with the interpolated HRIR sample to produce a stereo sample to mix into the output buffer
-		Convolve(preConvolve, postConvole, remainingData, HRIRKernel, sphere.sampleLength);
+		Convolve(preConvolve, postConvole, remainingData, channel->FIRKernel, HRIRSphere.sampleLength);
 
 		// Mix out the samples into the output buffer
 		MixAudio(out, postConvole, (uint32_t)remainingData, channel->volume);
 
 		// Advance the sample position by what we've used, next time around will take another chunk.
-		channel->position+=(uint32_t)remainingData;
+		channel->position+=remainingData;
 
 		// Reached end of audio sample, either remove from channels list, or
 		//     if loop flag was set, reset position to 0.
@@ -339,10 +326,7 @@ void Audio_FillBuffer(void *buffer, uint32_t length)
 			if(channel->looping)
 				channel->position=0;
 			else
-			{
-				// Remove from list
 				memset(channel, 0, sizeof(Channel_t));
-			}
 		}
 	}
 
@@ -467,69 +451,69 @@ static bool HRIR_Init(void)
 	if(!stream)
 		return false;
 
-	if(fread(&sphere, sizeof(uint32_t), 5, stream)!=5)
+	if(fread(&HRIRSphere, sizeof(uint32_t), 5, stream)!=5)
 	{
 		fclose(stream);
 		return false;
 	}
 
-	if(sphere.magic!=HRIR_MAGIC)
+	if(HRIRSphere.magic!=HRIR_MAGIC)
 	{
 		fclose(stream);
 		return false;
 	}
 
-	if(sphere.sampleLength>MAX_HRIR_SAMPLES)
+	if(HRIRSphere.sampleLength>MAX_HRIR_SAMPLES)
 	{
 		fclose(stream);
 		return false;
 	}
 
-	sphere.indices=(uint32_t *)Zone_Malloc(zone, sizeof(uint32_t)*sphere.numIndex);
+	HRIRSphere.indices=(uint32_t *)Zone_Malloc(zone, sizeof(uint32_t)*HRIRSphere.numIndex);
 
-	if(sphere.indices==NULL)
+	if(HRIRSphere.indices==NULL)
 	{
 		fclose(stream);
 		return false;
 	}
 
-	fread(sphere.indices, sizeof(uint32_t), sphere.numIndex, stream);
+	fread(HRIRSphere.indices, sizeof(uint32_t), HRIRSphere.numIndex, stream);
 
-	sphere.vertices=(HRIR_Vertex_t *)Zone_Malloc(zone, sizeof(HRIR_Vertex_t)*sphere.numVertex);
+	HRIRSphere.vertices=(HRIR_Vertex_t *)Zone_Malloc(zone, sizeof(HRIR_Vertex_t)*HRIRSphere.numVertex);
 
-	if(sphere.vertices==NULL)
+	if(HRIRSphere.vertices==NULL)
 	{
-		Zone_Free(zone, sphere.indices);
+		Zone_Free(zone, HRIRSphere.indices);
 		fclose(stream);
 		return false;
 	}
 
-	memset(sphere.vertices, 0, sizeof(HRIR_Vertex_t)*sphere.numVertex);
+	memset(HRIRSphere.vertices, 0, sizeof(HRIR_Vertex_t)*HRIRSphere.numVertex);
 
-	for(uint32_t i=0;i<sphere.numVertex;i++)
+	for(uint32_t i=0;i<HRIRSphere.numVertex;i++)
 	{
-		if(fread(&sphere.vertices[i].vertex, sizeof(vec3), 1, stream)!=1)
+		if(fread(&HRIRSphere.vertices[i].vertex, sizeof(vec3), 1, stream)!=1)
 		{
-			Zone_Free(zone, sphere.vertices);
-			Zone_Free(zone, sphere.indices);
+			Zone_Free(zone, HRIRSphere.vertices);
+			Zone_Free(zone, HRIRSphere.indices);
 			fclose(stream);
 			return false;
 		}
 
 		// TODO: I'm not sure which is correct, the math in the interpolation function seems correct, but resulting audio is channel swapped.
 		// TODO: Figure out if this is a problem in this program or in the HRIR sphere builder.
-		if(fread(sphere.vertices[i].right, sizeof(float), sphere.sampleLength, stream)!=sphere.sampleLength)
+		if(fread(HRIRSphere.vertices[i].right, sizeof(float), HRIRSphere.sampleLength, stream)!=HRIRSphere.sampleLength)
 		{
-			Zone_Free(zone, sphere.vertices);
-			Zone_Free(zone, sphere.indices);
+			Zone_Free(zone, HRIRSphere.vertices);
+			Zone_Free(zone, HRIRSphere.indices);
 			fclose(stream);
 			return false;
 		}
 
-		if(fread(sphere.vertices[i].left, sizeof(float), sphere.sampleLength, stream)!=sphere.sampleLength)
+		if(fread(HRIRSphere.vertices[i].left, sizeof(float), HRIRSphere.sampleLength, stream)!=HRIRSphere.sampleLength)
 		{
-			Zone_Free(zone, sphere.vertices);
-			Zone_Free(zone, sphere.indices);
+			Zone_Free(zone, HRIRSphere.vertices);
+			Zone_Free(zone, HRIRSphere.indices);
 			fclose(stream);
 			return false;
 		}
@@ -537,8 +521,8 @@ static bool HRIR_Init(void)
 
 	fclose(stream);
 
-	for(uint32_t i=0;i<sphere.sampleLength;i++)
-		HRIRWindow[i]=0.5f*(0.5f-cosf(2.0f*PI*(float)i/(sphere.sampleLength-1)));
+	for(uint32_t i=0;i<HRIRSphere.sampleLength;i++)
+		HRIRWindow[i]=0.5f*(0.5f-cosf(2.0f*PI*(float)i/(HRIRSphere.sampleLength-1)));
 
 	return true;
 }
@@ -593,8 +577,8 @@ void Audio_Destroy(void)
 #endif
 
 	// Clean up HRIR data
-	Zone_Free(zone, sphere.indices);
-	Zone_Free(zone, sphere.vertices);
+	Zone_Free(zone, HRIRSphere.indices);
+	Zone_Free(zone, HRIRSphere.vertices);
 }
 
 // Simple resample and conversion function to the audio engine's common format (44.1KHz/16bit).
