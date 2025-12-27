@@ -137,6 +137,8 @@ void DestroySkybox(void)
 		vkuDestroyBuffer(&vkContext, &perFrame[i].skyboxUBOBuffer[1]);
 	}
 
+	vkuDestroyImageBuffer(&vkContext, &skyboxTex);
+
 	DestroyPipeline(&vkContext, &skyboxPipeline);
 }
 
