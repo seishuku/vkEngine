@@ -160,16 +160,16 @@ void CameraInit(Camera_t *camera, const vec3 position, const vec3 up, const vec3
 	camera->body.inertia=0.9f*camera->body.mass*(camera->body.radius*camera->body.radius);
 	camera->body.invInertia=1.0f/camera->body.inertia;
 
-	camera->key_w=false;
-	camera->key_s=false;
-	camera->key_a=false;
-	camera->key_d=false;
-	camera->key_v=false;
-	camera->key_c=false;
-	camera->key_left=false;
-	camera->key_right=false;
-	camera->key_up=false;
-	camera->key_down=false;
+	camera->moveForward=false;
+	camera->moveBackward=false;
+	camera->moveLeft=false;
+	camera->moveRight=false;
+	camera->moveUp=false;
+	camera->moveDown=false;
+	camera->yawLeft=false;
+	camera->yawRight=false;
+	camera->pitchUp=false;
+	camera->pitchDown=false;
 }
 
 matrix CameraUpdate(Camera_t *camera, float dt)
@@ -180,40 +180,40 @@ matrix CameraUpdate(Camera_t *camera, float dt)
 	if(camera->shift)
 		speed*=2.0f;
 
-	if(camera->key_a)
+	if(camera->moveLeft)
 		camera->body.velocity=Vec3_Addv(camera->body.velocity, Vec3_Muls(camera->right, speed));
 
-	if(camera->key_d)
+	if(camera->moveRight)
 		camera->body.velocity=Vec3_Subv(camera->body.velocity, Vec3_Muls(camera->right, speed));
 
-	if(camera->key_v)
+	if(camera->moveUp)
 		camera->body.velocity=Vec3_Addv(camera->body.velocity, Vec3_Muls(camera->up, speed));
 
-	if(camera->key_c)
+	if(camera->moveDown)
 		camera->body.velocity=Vec3_Subv(camera->body.velocity, Vec3_Muls(camera->up, speed));
 
-	if(camera->key_w)
+	if(camera->moveForward)
 		camera->body.velocity=Vec3_Addv(camera->body.velocity, Vec3_Muls(camera->forward, speed));
 
-	if(camera->key_s)
+	if(camera->moveBackward)
 		camera->body.velocity=Vec3_Subv(camera->body.velocity, Vec3_Muls(camera->forward, speed));
 
-	if(camera->key_up)
+	if(camera->pitchUp)
 		camera->body.angularVelocity=Vec3_Subv(camera->body.angularVelocity, Vec3(rotation, 0.0f, 0.0f));
 
-	if(camera->key_down)
+	if(camera->pitchDown)
 		camera->body.angularVelocity=Vec3_Addv(camera->body.angularVelocity, Vec3(rotation, 0.0f, 0.0f));
 
-	if(camera->key_left)
+	if(camera->yawLeft)
 		camera->body.angularVelocity=Vec3_Addv(camera->body.angularVelocity, Vec3(0.0f, rotation, 0.0f));
 
-	if(camera->key_right)
+	if(camera->yawRight)
 		camera->body.angularVelocity=Vec3_Subv(camera->body.angularVelocity, Vec3(0.0f, rotation, 0.0f));
 
-	if(camera->key_q)
+	if(camera->rollLeft)
 		camera->body.angularVelocity=Vec3_Subv(camera->body.angularVelocity, Vec3(0.0f, 0.0f, rotation));
 
-	if(camera->key_e)
+	if(camera->rollRight)
 		camera->body.angularVelocity=Vec3_Addv(camera->body.angularVelocity, Vec3(0.0f, 0.0f, rotation));
 
 	const float maxVelocity=200.0f;
@@ -231,10 +231,7 @@ matrix CameraUpdate(Camera_t *camera, float dt)
 	camera->body.angularVelocity=Vec3_Muls(camera->body.angularVelocity, decay);
 
 	// Get a matrix from the orientation quat to maintain directional vectors
-	matrix orientation=QuatToMatrix(camera->body.orientation);
-	camera->right  =Vec3(orientation.x.x, orientation.x.y, orientation.x.z);
-	camera->up     =Vec3(orientation.y.x, orientation.y.y, orientation.y.z);
-	camera->forward=Vec3(orientation.z.x, orientation.z.y, orientation.z.z);
+	QuatAxes(camera->body.orientation, camera->axes);
 
 	if(camera->thirdPerson)
 		return ThirdPersonMatrix(MatrixLookAt(camera->body.position, Vec3_Addv(camera->body.position, camera->forward), camera->up), camera, dt);

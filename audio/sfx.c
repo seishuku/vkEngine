@@ -98,7 +98,7 @@ void SFXStreamData(void *buffer, size_t length)
 			sample=laserSample;
 		}
 
-		if(camera.key_w||camera.key_s||camera.key_a||camera.key_d||camera.key_v||camera.key_c)
+		if(camera.moveForward||camera.moveBackward||camera.moveLeft||camera.moveRight||camera.moveUp||camera.moveDown)
 		{
 			engineSample=sample+(int16_t)(GenerateWaveSample(&Engine)*INT16_MAX);
 

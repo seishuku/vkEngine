@@ -138,7 +138,6 @@ void QuatAxes(vec4 q, vec3 *axes)
 	float wy=q.w*q.y;
 	float wz=q.w*q.z;
 
-	// (column-major order)
 	axes[0]=Vec3(1.0f-2.0f*(yy+zz), 2.0f*(xy+wz), 2.0f*(xz-wy));
 	axes[1]=Vec3(2.0f*(xy-wz), 1.0f-2.0f*(xx+zz), 2.0f*(yz+wx));
 	axes[2]=Vec3(2.0f*(xz+wy), 2.0f*(yz-wx), 1.0f-2.0f*(xx+yy));

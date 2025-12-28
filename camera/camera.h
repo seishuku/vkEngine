@@ -16,16 +16,25 @@ typedef struct Camera_s
 	float trackSpeed;
 	vec3 targetPosition;
 
-	vec3 right;
-	vec3 up;
-	vec3 forward;
+	// Orientation vectors, updated by body orientation
+	union
+	{
+		struct
+		{
+			vec3 right;
+			vec3 up;
+			vec3 forward;
+		};
+		vec3 axes[3];
+	};
 
-	bool key_w, key_s;
-	bool key_a, key_d;
-	bool key_v, key_c;
-	bool key_q, key_e;
-	bool key_up, key_down;
-	bool key_left, key_right;
+	// Input states
+	bool moveForward, moveBackward;
+	bool moveLeft, moveRight;
+	bool moveUp, moveDown;
+	bool rollLeft, rollRight;
+	bool pitchUp, pitchDown;
+	bool yawLeft, yawRight;
 	bool shift;
 } Camera_t;
 

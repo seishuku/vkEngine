@@ -214,18 +214,18 @@ bool Event_Trigger(EventID ID, void *arg)
 					ResetPhysicsCubes();				break;
 				case KB_O:		GenerateWorld();		break;
 				case KB_P:		pausePhysics=!pausePhysics; break;
-				case KB_W:		camera.key_w=true;		break;
-				case KB_S:		camera.key_s=true;		break;
-				case KB_A:		camera.key_a=true;		break;
-				case KB_D:		camera.key_d=true;		break;
-				case KB_V:		camera.key_v=true;		break;
-				case KB_C:		camera.key_c=true;		break;
-				case KB_Q:		camera.key_q=true;		break;
-				case KB_E:		camera.key_e=true;		break;
-				case KB_UP:		camera.key_up=true;		break;
-				case KB_DOWN:	camera.key_down=true;	break;
-				case KB_LEFT:	camera.key_left=true;	break;
-				case KB_RIGHT:	camera.key_right=true;	break;
+				case KB_W:		camera.moveForward=true;		break;
+				case KB_S:		camera.moveBackward=true;		break;
+				case KB_A:		camera.moveLeft=true;		break;
+				case KB_D:		camera.moveRight=true;		break;
+				case KB_V:		camera.moveUp=true;		break;
+				case KB_C:		camera.moveDown=true;		break;
+				case KB_Q:		camera.rollLeft=true;		break;
+				case KB_E:		camera.rollRight=true;		break;
+				case KB_UP:		camera.pitchUp=true;		break;
+				case KB_DOWN:	camera.pitchDown=true;	break;
+				case KB_LEFT:	camera.yawLeft=true;	break;
+				case KB_RIGHT:	camera.yawRight=true;	break;
 				case KB_LSHIFT:
 				case KB_RSHIFT:	camera.shift=true;		break;
 				case KB_Z:
@@ -244,18 +244,18 @@ bool Event_Trigger(EventID ID, void *arg)
 		{
 			switch(key)
 			{
-				case KB_W:		camera.key_w=false;		break;
-				case KB_S:		camera.key_s=false;		break;
-				case KB_A:		camera.key_a=false;		break;
-				case KB_D:		camera.key_d=false;		break;
-				case KB_V:		camera.key_v=false;		break;
-				case KB_C:		camera.key_c=false;		break;
-				case KB_Q:		camera.key_q=false;		break;
-				case KB_E:		camera.key_e=false;		break;
-				case KB_UP:		camera.key_up=false;	break;
-				case KB_DOWN:	camera.key_down=false;	break;
-				case KB_LEFT:	camera.key_left=false;	break;
-				case KB_RIGHT:	camera.key_right=false;	break;
+				case KB_W:		camera.moveForward=false;		break;
+				case KB_S:		camera.moveBackward=false;		break;
+				case KB_A:		camera.moveLeft=false;		break;
+				case KB_D:		camera.moveRight=false;		break;
+				case KB_V:		camera.moveUp=false;		break;
+				case KB_C:		camera.moveDown=false;		break;
+				case KB_Q:		camera.rollLeft=false;		break;
+				case KB_E:		camera.rollRight=false;		break;
+				case KB_UP:		camera.pitchUp=false;	break;
+				case KB_DOWN:	camera.pitchDown=false;	break;
+				case KB_LEFT:	camera.yawLeft=false;	break;
+				case KB_RIGHT:	camera.yawRight=false;	break;
 				case KB_LSHIFT:
 				case KB_RSHIFT:	camera.shift=false;		break;
 				case KB_LCTRL:

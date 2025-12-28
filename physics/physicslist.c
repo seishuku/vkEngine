@@ -19,13 +19,8 @@ static PhysicsObject_t SetPhysicsObject(RigidBody_t *body, PhysicsObjectType_e o
     }
     else if(body->type==RIGIDBODY_OBB)
     {
-        matrix orientation=QuatToMatrix(body->orientation);
-        vec3 axis[3]=
-        {
-            Vec3(orientation.x.x, orientation.x.y, orientation.x.z),
-            Vec3(orientation.y.x, orientation.y.y, orientation.y.z),
-            Vec3(orientation.z.x, orientation.z.y, orientation.z.z)
-        };
+        vec3 axis[3];
+		QuatAxes(body->orientation, axis);
 
         vec3 extents={
             fabsf(axis[0].x)*body->size.x+fabsf(axis[1].x)*body->size.y+fabsf(axis[2].x)*body->size.z,
@@ -38,10 +33,10 @@ static PhysicsObject_t SetPhysicsObject(RigidBody_t *body, PhysicsObjectType_e o
     }
 	else if(body->type==RIGIDBODY_CAPSULE)
 	{
-		matrix orientation=QuatToMatrix(body->orientation);
-		vec3 up=Vec3(orientation.y.x, orientation.y.y, orientation.y.z);
+        vec3 axis[3];
+		QuatAxes(body->orientation, axis);
 
-		vec3 offset=Vec3_Muls(up, body->size.y);
+		vec3 offset=Vec3_Muls(axis[1], body->size.y);
 
 		vec3 a=Vec3_Subv(body->position, offset);
 		vec3 b=Vec3_Addv(body->position, offset);

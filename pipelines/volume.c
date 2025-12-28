@@ -299,8 +299,6 @@ VkBool32 InitNebulaVolume(void)
 	if(vkCreateFence(vkContext.device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &fence)!=VK_SUCCESS)
 		return VK_FALSE;
 
-	GenNebulaVolume();
-
 	return VK_TRUE;
 }
 
@@ -329,8 +327,11 @@ VkBool32 GenNebulaVolume(void)
 
 	vkCmdBindDescriptorSets(computeCommand, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline.pipelineLayout, 0, 1, &computePipeline.descriptorSet.descriptorSet, 0, 0);
 
-	static vec4 vRandom={ 0.0f, 0.0f, 0.0f, 0.0f };
-	vRandom=Vec4(0.0f, 0.0f, 0.0f, 0.0f);
+	vec4 vRandom={
+		RandFloatRange(-1.0f, 1.0f),
+		RandFloatRange(-1.0f, 1.0f),
+		RandFloatRange(-1.0f, 1.0f)
+	};
 	vkCmdPushConstants(computeCommand, computePipeline.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(vec4), &vRandom);
 
 	vkCmdDispatch(computeCommand, width/8, height/8, depth/8);
