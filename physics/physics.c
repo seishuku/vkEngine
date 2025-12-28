@@ -311,6 +311,235 @@ static float OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 	return ResolveCollision(a, b, contact, normal, penetration);
 }
 
+static float CapsuleToSphereCollision(RigidBody_t *capsule, RigidBody_t *sphere)
+{
+	// Capsule endpoints
+	vec3 axes[3];
+	QuatAxes(capsule->orientation, axes);
+
+	vec3 offset=Vec3_Muls(axes[1], capsule->size.y);
+
+	vec3 a=Vec3_Subv(capsule->position, offset);
+	vec3 b=Vec3_Addv(capsule->position, offset);
+
+	// Closest point on capsule segment to sphere center
+	vec3 slope=Vec3_Subv(b, a);
+	float slopeLen=Vec3_Dot(slope, slope);
+	vec3 closest=Vec3_Addv(a, Vec3_Muls(slope, clampf(Vec3_Dot(Vec3_Subv(sphere->position, a), slope)/slopeLen, 0.0, 1.0)));
+
+	vec3 delta=Vec3_Subv(sphere->position, closest);
+
+	float distSq=Vec3_LengthSq(delta);
+	float r=capsule->radius+sphere->radius;
+
+	if(distSq>r*r||distSq<FLT_EPSILON)
+		return 0.0f;
+
+	float dist=sqrtf(distSq);
+	float penetration=r-dist;
+
+	vec3 normal=Vec3_Muls(delta, 1.0f/dist);
+	vec3 contact=Vec3_Subv(sphere->position, Vec3_Muls(normal, sphere->radius-penetration*0.5f));
+
+	return ResolveCollision(capsule, sphere, contact, normal, penetration);
+}
+
+static float CapsuleToCapsuleCollision(RigidBody_t *a, RigidBody_t *b)
+{
+	vec3 axes[3], offset;
+
+	// Capsule A endpoints
+	QuatAxes(a->orientation, axes);
+	offset=Vec3_Muls(axes[1], a->size.y);
+	vec3 a0=Vec3_Subv(a->position, offset);
+	vec3 a1=Vec3_Addv(a->position, offset);
+
+	// Capsule B endpoints
+	QuatAxes(b->orientation, axes);
+	offset=Vec3_Muls(axes[1], b->size.y);
+	vec3 b0=Vec3_Subv(b->position, offset);
+	vec3 b1=Vec3_Addv(b->position, offset);
+
+	// Closest points between segments
+	vec3 d1=Vec3_Subv(a1, a0);
+	vec3 d2=Vec3_Subv(b1, b0);
+	vec3 r=Vec3_Subv(a0, b0);
+
+	float aDot=Vec3_Dot(d1, d1);
+	float eDot=Vec3_Dot(d2, d2);
+	float fDot=Vec3_Dot(d2, r);
+
+	float s, t;
+	if(aDot<=FLT_EPSILON&&eDot<=FLT_EPSILON)
+	{
+		s=0.0f;
+		t=0.0f;
+	}
+	else if(aDot <= FLT_EPSILON)
+	{
+		s=0.0f;
+		t=clampf(fDot/eDot, 0.0f, 1.0f);
+	}
+	else
+	{
+		float cDot=Vec3_Dot(d1, r);
+
+		if(eDot<=FLT_EPSILON)
+		{
+			t=0.0f;
+			s=clampf(-cDot/aDot, 0.0f, 1.0f);
+		}
+		else
+		{
+			float bDot=Vec3_Dot(d1, d2);
+			float denom=aDot*eDot-bDot*bDot;
+
+			if(fabsf(denom)>FLT_EPSILON)
+				s=clampf((bDot*fDot-cDot*eDot)/denom, 0.0f, 1.0f);
+			else
+				s=0.0f;
+
+			t=(bDot*s+fDot)/eDot;
+			t=clampf(t, 0.0f, 1.0f);
+		}
+	}
+
+	vec3 pA=Vec3_Addv(a0, Vec3_Muls(d1, s));
+	vec3 pB=Vec3_Addv(b0, Vec3_Muls(d2, t));
+
+	vec3 delta=Vec3_Subv(pB, pA);
+	float distSq=Vec3_LengthSq(delta);
+
+	float rSum=a->radius+b->radius;
+
+	if(distSq>rSum*rSum||distSq<FLT_EPSILON)
+		return 0.0f;
+
+	float dist=sqrtf(distSq);
+	float penetration=rSum-dist;
+
+	vec3 normal=Vec3_Muls(delta, 1.0f/dist);
+	vec3 contact=Vec3_Muls(Vec3_Addv(pA, pB), 0.5f);
+
+	return ResolveCollision(a, b, contact, normal, penetration);
+}
+
+static float CapsuleToOBBCollision(RigidBody_t *capsule, RigidBody_t *obb)
+{
+	// Capsule endpoints
+	vec3 capAxes[3];
+	QuatAxes(capsule->orientation, capAxes);
+
+	vec3 offset=Vec3_Muls(capAxes[1], capsule->size.y);
+
+	vec3 capA=Vec3_Subv(capsule->position, offset);
+	vec3 capB=Vec3_Addv(capsule->position, offset);
+
+	// OBB axes
+	vec3 axes[3];
+	QuatAxes(obb->orientation, axes);
+
+	// Transform capsule endpoints into OBB local space
+	vec3 relA=Vec3_Subv(capA, obb->position);
+	vec3 aLocal=Vec3(
+		Vec3_Dot(relA, axes[0]),
+		Vec3_Dot(relA, axes[1]),
+		Vec3_Dot(relA, axes[2])
+	);
+
+	vec3 relB=Vec3_Subv(capB, obb->position);
+	vec3 bLocal=Vec3(
+		Vec3_Dot(relB, axes[0]),
+		Vec3_Dot(relB, axes[1]),
+		Vec3_Dot(relB, axes[2])
+	);
+
+	vec3 dLocal=Vec3_Subv(bLocal, aLocal);
+
+	// Perform ternary search along capsule segment in OBB local space
+	float lo=0.0f, hi=1.0f;
+	float bestT=0.0f;
+	float bestDistSq=FLT_MAX;
+	vec3 bestClosestLocal=Vec3b(0.0f);
+
+	for(int i=0;i<10;i++)
+	{
+		float t1=lo+(hi-lo)*(1.0f/3.0f);
+		float t2=hi-(hi-lo)*(1.0f/3.0f);
+
+		// Closest point on OBB to capsule point at t1 and t2
+		vec3 p1=Vec3_Addv(aLocal, Vec3_Muls(dLocal, t1));
+		vec3 c1=Vec3(
+			clampf(p1.x, -obb->size.x, obb->size.x),
+			clampf(p1.y, -obb->size.y, obb->size.y),
+			clampf(p1.z, -obb->size.z, obb->size.z)
+		);
+		float d1=Vec3_LengthSq(Vec3_Subv(p1, c1));
+
+		vec3 p2=Vec3_Addv(aLocal, Vec3_Muls(dLocal, t2));
+		vec3 c2=Vec3(
+			clampf(p2.x, -obb->size.x, obb->size.x),
+			clampf(p2.y, -obb->size.y, obb->size.y),
+			clampf(p2.z, -obb->size.z, obb->size.z)
+		);
+		float d2=Vec3_LengthSq(Vec3_Subv(p2, c2));
+
+		if(d1<d2)
+		{
+			hi=t2;
+
+			if(d1<bestDistSq)
+			{
+				bestDistSq=d1;
+				bestT=t1;
+				bestClosestLocal=c1;
+			}
+		}
+		else
+		{
+			lo=t1;
+
+			if(d2<bestDistSq)
+			{
+				bestDistSq=d2;
+				bestT=t2;
+				bestClosestLocal=c2;
+			}
+		}
+	}
+
+	// Final closest points
+	vec3 pLocal=Vec3_Addv(aLocal, Vec3_Muls(dLocal, bestT));
+	vec3 closestLocal=Vec3(
+		clampf(pLocal.x, -obb->size.x, obb->size.x),
+		clampf(pLocal.y, -obb->size.y, obb->size.y),
+		clampf(pLocal.z, -obb->size.z, obb->size.z)
+	);
+	float distSq=Vec3_LengthSq(Vec3_Subv(pLocal, closestLocal));
+
+	if(distSq>capsule->radius*capsule->radius||distSq<FLT_EPSILON)
+		return 0.0f;
+
+	float dist=sqrtf(distSq);
+	float penetration=capsule->radius-dist;
+
+	// Convert closest point on OBB back to world space
+	vec3 closestWorld=obb->position;
+	closestWorld=Vec3_Addv(closestWorld, Vec3_Muls(axes[0], closestLocal.x));
+	closestWorld=Vec3_Addv(closestWorld, Vec3_Muls(axes[1], closestLocal.y));
+	closestWorld=Vec3_Addv(closestWorld, Vec3_Muls(axes[2], closestLocal.z));
+
+	// Closest point on capsule axis in world space
+	vec3 pSegWorld=Vec3_Addv(capA, Vec3_Muls(Vec3_Subv(capB, capA), bestT));
+
+	vec3 delta=Vec3_Subv(pSegWorld, closestWorld);
+	vec3 normal=Vec3_Muls(delta, 1.0f/dist);
+
+	vec3 contact=Vec3_Subv(pSegWorld, Vec3_Muls(normal, capsule->radius-penetration*0.5f));
+
+	return ResolveCollision(obb, capsule, contact, normal, penetration);
+}
+
 float PhysicsCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 {
 	if(a->type==RIGIDBODY_SPHERE&&b->type==RIGIDBODY_SPHERE)
@@ -321,6 +550,16 @@ float PhysicsCollisionResponse(RigidBody_t *a, RigidBody_t *b)
 		return SphereToOBBCollision(b, a);
 	else if(a->type==RIGIDBODY_OBB&&b->type==RIGIDBODY_OBB)
 		return OBBToOBBCollision(b, a);
+	else if(a->type==RIGIDBODY_CAPSULE&&b->type==RIGIDBODY_SPHERE)
+		return CapsuleToSphereCollision(a, b);
+	else if(a->type==RIGIDBODY_SPHERE&&b->type==RIGIDBODY_CAPSULE)
+		return CapsuleToSphereCollision(b, a);
+	else if(a->type==RIGIDBODY_CAPSULE&&b->type==RIGIDBODY_CAPSULE)
+		return CapsuleToCapsuleCollision(a, b);
+	else if(a->type==RIGIDBODY_CAPSULE&&b->type==RIGIDBODY_OBB)
+		return CapsuleToOBBCollision(a, b);
+	else if(a->type==RIGIDBODY_OBB&&b->type==RIGIDBODY_CAPSULE)
+		return CapsuleToOBBCollision(b, a);
 
 	return 0.0f;
 }

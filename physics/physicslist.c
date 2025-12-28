@@ -36,6 +36,27 @@ static PhysicsObject_t SetPhysicsObject(RigidBody_t *body, PhysicsObjectType_e o
         object.min=Vec3_Subv(body->position, extents);
         object.max=Vec3_Addv(body->position, extents);
     }
+	else if(body->type==RIGIDBODY_CAPSULE)
+	{
+		matrix orientation=QuatToMatrix(body->orientation);
+		vec3 up=Vec3(orientation.y.x, orientation.y.y, orientation.y.z);
+
+		vec3 offset=Vec3_Muls(up, body->size.y);
+
+		vec3 a=Vec3_Subv(body->position, offset);
+		vec3 b=Vec3_Addv(body->position, offset);
+
+		object.min=Vec3(
+			fminf(a.x, b.x)-body->radius,
+			fminf(a.y, b.y)-body->radius,
+			fminf(a.z, b.z)-body->radius
+		);
+		object.max=Vec3(
+			fmaxf(a.x, b.x)+body->radius,
+			fmaxf(a.y, b.y)+body->radius,
+			fmaxf(a.z, b.z)+body->radius
+		);
+	}
 
     return object;
 }
