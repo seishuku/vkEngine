@@ -80,8 +80,6 @@ uint32_t fighterTexture=0;
 
 //#define NUM_CUBE 14
 RigidBody_t cubeBody[NUM_CUBE];
-RigidBody_t capsuleBody;
-RigidBody_t capsuleBBody;
 
 SpatialHash_t collisionHash;
 
@@ -277,50 +275,6 @@ void ResetPhysicsCubes(void)
 			}
 		}
 	}
-
-	capsuleBody=(RigidBody_t)
-	{
-		.position=Vec3(
-			0.0f,
-			0.0f,
-			50.0f
-		),
-
-		.velocity=Vec3b(0.0f),
-		.force=Vec3b(0.0f),
-		.mass=mass*10,
-		.invMass=1.0f/mass,
-
-		.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
-		.angularVelocity=Vec3b(0.0f),
-		.inertia=inertia,
-		.invInertia=1.0f/inertia,
-
-		.type=RIGIDBODY_CAPSULE,
-		.size=Vec3(10.0f, 20.0f, 0.0f),
-	};
-
-	capsuleBBody=(RigidBody_t)
-	{
-		.position=Vec3(
-			50.0f,
-			0.0f,
-			50.0f
-		),
-
-		.velocity=Vec3b(0.0f),
-		.force=Vec3b(0.0f),
-		.mass=mass*10,
-		.invMass=1.0f/mass,
-
-		.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
-		.angularVelocity=Vec3b(0.0f),
-		.inertia=inertia,
-		.invInertia=1.0f/inertia,
-
-		.type=RIGIDBODY_CAPSULE,
-		.size=Vec3(10.0f, 20.0f, 0.0f),
-	};
 }
 
 // Build up random data for skybox and asteroid field
@@ -631,8 +585,6 @@ void Thread_Destructor(void *arg)
 	}
 }
 
-Spring_t testSpring={ 0 };
-
 typedef struct
 {
 	vec3 vertex;
@@ -708,46 +660,6 @@ void Thread_Main(void *arg)
 	////// Asteroids
 	DrawLighting(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, data->perFrame[data->index].descriptorPool[data->eye]);
 	//////
-
-	// Draw sprung object
-	{
-		struct
-		{
-			matrix mvp;
-			vec4 color;
-			vec2 radiusHeight;
-		} spherePC;
-
-		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
-		spherePC.radiusHeight=Vec2(capsuleBody.size.x, capsuleBody.size.y);
-
-		matrix local=QuatToMatrix(capsuleBody.orientation);
-		local=MatrixMult(local, MatrixTranslatev(capsuleBody.position));
-		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
-		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
-		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
-
-		DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
-	}
-	{
-		struct
-		{
-			matrix mvp;
-			vec4 color;
-			vec2 radiusHeight;
-		} spherePC;
-
-		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
-		spherePC.radiusHeight=Vec2(capsuleBBody.size.x, capsuleBBody.size.y);
-
-		matrix local=QuatToMatrix(capsuleBBody.orientation);
-		local=MatrixMult(local, MatrixTranslatev(capsuleBBody.position));
-		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
-		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
-		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
-
-		DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
-	}
 
 #if 1
 	if(isControlPressed)
@@ -1099,8 +1011,6 @@ void Thread_Physics(void *arg)
 	const uint32_t index=*((uint32_t *)arg);
 	double startTime=GetClock();
 
-	SpringIntegrate(&testSpring, camera.body.position, fTimeStep);
-
 	// Set up physics objects to be processed
 	ClearPhysicsObjectList();
 
@@ -1124,9 +1034,6 @@ void Thread_Physics(void *arg)
 
 	for(uint32_t i=0;i<NUM_CUBE;i++)
 		AddPhysicsObject(&cubeBody[i], PHYSICSOBJECTTYPE_FIELD);
-
-	AddPhysicsObject(&capsuleBody, PHYSICSOBJECTTYPE_FIELD);
-	AddPhysicsObject(&capsuleBBody, PHYSICSOBJECTTYPE_FIELD);
 	//////
 		
 	//SpatialHash_Clear(&collisionHash);
@@ -1631,14 +1538,6 @@ bool Init(void)
 	ConsoleRegisterCommand(&console, "explode", Console_CmdExplode);
 
 	CameraInit(&camera, Vec3(0.0f, 0.0f, -100.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
-
-	testSpring.position=Vec3(0.0f, 0.0f, -100.0f);
-	testSpring.velocity=Vec3b(0.0f);
-	testSpring.stiffness=800.0f;
-	testSpring.damping=2.0f;
-	testSpring.length=10.0f;
-	testSpring.mass=1.0f;
-	testSpring.invMass=1.0f/testSpring.mass;
 
 	if(!Audio_Init())
 	{

@@ -45,8 +45,6 @@ layout (binding=2) uniform sampler2DArrayShadow TexShadow;
 
 layout (location=0) out vec4 Output;
 
-const float CASCADE_BLEND_RATIO=0.1;
-
 void SelectCascade(float viewDepth, out int cascadeIndex, out float blend)
 {
 	cascadeIndex=NUM_CASCADES-1;
@@ -62,7 +60,7 @@ void SelectCascade(float viewDepth, out int cascadeIndex, out float blend)
 			cascadeIndex=i;
 
 			float range=splitFar-splitNear;
-			float blendStart=splitFar-range*CASCADE_BLEND_RATIO;
+			float blendStart=splitFar-range*0.5;
 
 			blend=clamp((viewDepth-blendStart)/(splitFar-blendStart), 0.0, 1.0);
 
@@ -107,10 +105,7 @@ void main()
 	float shadow=shadow0;
 
 	if(blend>0.0&&cascade<NUM_CASCADES-1)
-	{
-		float shadow1=ShadowPCF(cascade+1);
-		shadow=mix(shadow0, shadow1, blend);
-	}
+		shadow=mix(shadow0, ShadowPCF(cascade+1), blend);
 
 	Output=vec4(BaseTex.xyz*lightColor.xyz*max(0.01, dot(n, lightDirection.xyz)*shadow), 1.0);
 }
