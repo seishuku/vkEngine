@@ -4,15 +4,22 @@
 #include "vulkan/vulkan.h"
 #include "math/math.h"
 #include "pipelines/skybox.h"
+#include "pipelines/shadow.h"
 
 typedef struct
 {
 	matrix HMD;
 	matrix projection;
 	matrix modelView;
-	matrix lightMVP;
+	matrix lightMVP[NUM_CASCADES];
 	vec4 lightColor;
 	vec4 lightDirection;
+	// Ugh, stupid alignment requirements
+	struct
+	{
+		float x;
+		float padding[3];
+	} cascadeSplits[NUM_CASCADES+1];
 } Main_UBO_t;
 
 typedef struct

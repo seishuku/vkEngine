@@ -5,16 +5,19 @@ layout(location=0) in vec2 UV;
 layout(binding=0) uniform sampler2D original;
 layout(binding=1) uniform sampler2D blur;
 layout(binding=2) uniform sampler2DMS depthTex;
-layout(binding=3) uniform sampler2DShadow shadowTex;
+layout(binding=3) uniform sampler2DArrayShadow shadowTex;
+
+#define NUM_CASCADES 4
 
 layout(binding=4) uniform MainUBO
 {
 	mat4 HMD;
 	mat4 projection;
     mat4 modelview;
-	mat4 lightMVP;
+	mat4 lightMVP[NUM_CASCADES];
 	vec4 lightColor;
 	vec4 lightDirection;
+	float cascadeSplits[NUM_CASCADES+1];
 };
 
 layout(push_constant) uniform PC
@@ -25,31 +28,27 @@ layout(push_constant) uniform PC
 
 layout(location=0) out vec4 Output;
 
-const mat4 biasMat = mat4( 
-	0.5, 0.0, 0.0, 0.0,
-	0.0, 0.5, 0.0, 0.0,
-	0.0, 0.0, 1.0, 0.0,
-	0.5, 0.5, 0.0, 1.0 );
-
-float ShadowPCF(vec3 pos)
+float ShadowPCF(int cascade, vec3 pos)
 {
 	const mat4 biasMat = mat4( 
 		0.5, 0.0, 0.0, 0.0,
 		0.0, 0.5, 0.0, 0.0,
 		0.0, 0.0, 1.0, 0.0,
 		0.5, 0.5, 0.0, 1.0 );
-	const vec4 projCoords=biasMat*lightMVP*vec4(pos, 1.0);
+	vec4 projCoords=biasMat*lightMVP[cascade]*vec4(pos, 1.0);
 	const vec2 delta=(lightDirection.w*300.0)*(1.0/vec2(textureSize(shadowTex, 0)));
 
 	float shadow=0.0;
 	int count=0;
 	const int range=1;
+
+	projCoords.xyz/=projCoords.w;
 	
 	for(int x=-range;x<range;x++)
 	{
 		for(int y=-range;y<range;y++)
 		{
-			shadow+=texture(shadowTex, (projCoords.xyz+vec3(delta*vec2(x, y), 0.0))/projCoords.w);
+			shadow+=texture(shadowTex, vec4(projCoords.xy+delta*vec2(x, y), cascade, projCoords.z));
 			count++;
 		}
 	}
@@ -68,7 +67,7 @@ float IGN(vec2 pixel, uint frame)
 	return fract(52.9829189*fract(dot(pixel+5.588238f*float(frame), vec2(0.06711056, 0.00583715))));
 }
 
-float volumetricLightScattering(const vec3 lightPos, const vec3 rayOrigin, const vec3 rayEnd)
+float volumetricLightScattering(const float viewDepth, const vec3 lightPos, const vec3 rayOrigin, const vec3 rayEnd)
 {
 	const float g=0.01, mieCoefficient=0.09;
 	const int numSteps=8;
@@ -93,7 +92,7 @@ float volumetricLightScattering(const vec3 lightPos, const vec3 rayOrigin, const
 	for(int i=0;i<numSteps;i++)
 	{
 		// TODO: sign/biasing cosTheta and raising it's power seems to be better, but are there better ways of handling this?
-		L+=(ShadowPCF(rayPos)*pow(cosTheta, 4.0))*scattering*lDecay;
+		L+=(ShadowPCF(0, rayPos)*pow(cosTheta, 4.0))*scattering*lDecay;
 		lDecay*=decay;
 		rayPos.xyz+=rayStep;
 	}
@@ -121,6 +120,6 @@ void main(void)
 
 	vec4 worldPos=depth2World();
 
-	vec3 lightVolume=volumetricLightScattering(lightDirection.xyz, ro, worldPos.xyz)*lightColor.xyz;
+	vec3 lightVolume=volumetricLightScattering(worldPos.z, lightDirection.xyz, ro, worldPos.xyz)*lightColor.xyz;
 	Output=1.0-exp(-(texture(original, UV)+texture(blur, UV))*1.0)+vec4(lightVolume, 0.0);
 }

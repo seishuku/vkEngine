@@ -5,16 +5,19 @@ layout(location=1) flat in float Scale;
 
 layout(binding=0) uniform sampler3D volumeTex;
 layout(binding=1) uniform sampler2DMS depthTex;
-layout(binding=2) uniform sampler2DShadow shadowTex;
+layout(binding=2) uniform sampler2DArrayShadow shadowTex;
+
+#define NUM_CASCADES 4
 
 layout(binding=3) uniform MainUBO
 {
 	mat4 HMD;
 	mat4 projection;
     mat4 modelview;
-	mat4 lightMVP;
+	mat4 lightMVP[NUM_CASCADES];
 	vec4 lightColor;
 	vec4 lightDirection;
+	float cascadeSplits[NUM_CASCADES+1];
 };
 
 layout (binding=4) uniform SkyboxUBO
@@ -86,15 +89,17 @@ vec3 hsv2rgb(vec3 c)
     return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
-float ShadowPCF(vec3 pos)
+float ShadowPCF(int cascade, vec3 pos)
 {
 	const mat4 biasMat = mat4( 
 		0.5, 0.0, 0.0, 0.0,
 		0.0, 0.5, 0.0, 0.0,
 		0.0, 0.0, 1.0, 0.0,
 		0.5, 0.5, 0.0, 1.0 );
-	const vec4 projCoords=biasMat*lightMVP*vec4(pos, 1.0);
 	const vec2 delta=(lightDirection.w*300.0)*(1.0/vec2(textureSize(shadowTex, 0)));
+	vec4 projCoords=biasMat*lightMVP[cascade]*vec4(pos, 1.0);
+
+	projCoords.xyz/=projCoords.w;
 
 	float shadow=0.0;
 	int count=0;
@@ -104,7 +109,7 @@ float ShadowPCF(vec3 pos)
 	{
 		for(int y=-range;y<range;y++)
 		{
-			shadow+=texture(shadowTex, (projCoords.xyz+vec3(delta*vec2(x, y), 0.0))/projCoords.w);
+			shadow+=texture(shadowTex, vec4(projCoords.xy+delta*vec2(x, y), float(cascade), projCoords.z));
 			count++;
 		}
 	}
@@ -175,7 +180,7 @@ void main()
 		vec4 val_color=vec4(hsv2rgb(vec3(density+fShift, 1.0, 1.0)), density);
 
 		// Apply scattering term
-		val_color.rgb*=lightColor.rgb*phase*mix(1.0, ShadowPCF(pos*Scale), 0.3);
+		val_color.rgb*=lightColor.rgb*phase*mix(1.0, ShadowPCF(0, pos*Scale), 0.3);
 
 		Output.rgb+=(1.0-Output.a)*val_color.rgb*val_color.a;
 		Output.a+=(1.0-Output.a)*val_color.a;

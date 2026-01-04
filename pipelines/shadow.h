@@ -4,7 +4,12 @@
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
 
-extern matrix shadowMVP;
+#ifndef NUM_CASCADES
+#define NUM_CASCADES 4
+#endif
+
+extern matrix shadowMVP[NUM_CASCADES];
+extern float cascadeSplits[NUM_CASCADES+1];
 extern VkuImage_t shadowDepth;
 
 void CreateShadowMap(void);

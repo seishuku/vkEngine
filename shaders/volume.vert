@@ -1,13 +1,16 @@
 #version 450
 
+#define NUM_CASCADES 4
+
 layout (binding=3) uniform MainUBO
 {
 	mat4 HMD;
 	mat4 projection;
     mat4 modelview;
-	mat4 lightMVP;
+	mat4 lightMVP[NUM_CASCADES];
 	vec4 lightColor;
 	vec4 lightDirection;
+	float cascadeSplits[NUM_CASCADES+1];
 };
 
 layout(location=0) out vec3 Position;
@@ -24,7 +27,8 @@ vec3 Cube[]=
 };
 
 void main()
-{
+{	float cascadeSplits[NUM_CASCADES+1];
+
 	Scale=1500.0;
 	vec3 vPosition=Cube[gl_VertexIndex]*Scale.xxx;
 

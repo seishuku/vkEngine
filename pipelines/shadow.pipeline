@@ -8,6 +8,7 @@ pipeline {
 	cullMode(back)
 
 	depthTest(true)
+	depthClamp(true)
 	depthBias(true)
 	depthBiasConstantFactor(0.001)
 	depthBiasSlopeFactor(1.75)

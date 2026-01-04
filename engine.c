@@ -928,7 +928,13 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	perFrame[index].mainUBO[eye]->lightDirection=perFrame[index].skyboxUBO[eye]->uSunPosition;
 	perFrame[index].mainUBO[eye]->lightDirection.w=perFrame[index].skyboxUBO[eye]->uSunSize;
 
-	perFrame[index].mainUBO[eye]->lightMVP=shadowMVP;
+	for(uint32_t i=0;i<NUM_CASCADES;i++)
+	{
+		perFrame[index].mainUBO[eye]->lightMVP[i]=shadowMVP[i];
+		perFrame[index].mainUBO[eye]->cascadeSplits[i].x=cascadeSplits[i];
+	}
+	perFrame[index].mainUBO[eye]->cascadeSplits[NUM_CASCADES].x=cascadeSplits[NUM_CASCADES];
+
 
 	vkuTransitionLayout(perFrame[index].commandBuffer, colorImage[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	vkuTransitionLayout(perFrame[index].commandBuffer, depthImage[eye].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
