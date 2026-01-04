@@ -77,7 +77,7 @@ float ShadowPCF(const int cascade)
 
 	float shadow=0.0;
 	int count=0;
-	int range=5/cascade; // Reduce samples for higher cascades, not sure if I like this
+	int range=5/(cascade+1); // Reduce samples for higher cascades, not sure if I like this
 
 	vec3 projCoords=Shadow[cascade].xyz/Shadow[cascade].w;
 	
