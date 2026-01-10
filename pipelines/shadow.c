@@ -78,7 +78,7 @@ static matrix BuildShadowMatrix(float fovyDeg, float aspect, float near, float f
 			radius=dist;
 	}
 
-	// Light view (same as before, but fix eye distance)
+	// Light view
 	vec3 eye=Vec3_Subv(center, Vec3_Muls(lightDir, radius*2));
 	matrix lightView=MatrixLookAt(eye, center, Vec3(0, 1, 0));
 
