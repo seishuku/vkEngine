@@ -1727,7 +1727,7 @@ bool Init(void)
 								UI_CONTROL_HORIZONTAL,					// Bar is horizontal
 								0.0f, 100.0f, 100.0f);					// min/max/initial value
 
-	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), UI_CONTROL_HIDDEN, &AssetManager_GetAsset(assets, TEXTURE_FIGHTER1)->image, 0.0f);
+	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), UI_CONTROL_HIDDEN, &AssetManager_GetAsset(assets, TEXTURE_CONSOLEBG)->image, 0.0f);
 
 	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3b(1.0f), UI_CONTROL_VISIBLE);
 

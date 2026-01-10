@@ -8,18 +8,22 @@
 
 void ConsoleInit(Console_t *console)
 {
+	if(!console)
+		return;
+
     memset(console, 0, sizeof(Console_t));
 
     ConsoleRegisterCommand(console, "clear", ConsoleClear);
     ConsoleRegisterCommand(console, "echo", ConsolePrint);
     ConsoleRegisterCommand(console, "listcommands", ConsolePrintCommands);
     ConsoleRegisterCommand(console, "listvariables", ConsolePrintVariables);
-
-    ConsoleRegisterVariable(console, "testvar", 123.0f);
 }
 
 void ConsolePrint(Console_t *console, const char *text)
 {
+	if(!console||!text)
+		return;
+
     if(console->numLine>=CONSOLE_MAX_LINES)
     {
         // Scroll up to make room for the new line
@@ -136,27 +140,50 @@ void ConsoleExecuteCommand(Console_t *console, const char *input)
     char name[CONSOLE_MAX_NAME]={ 0 };
     const char *args=NULL;
 
-    // Split the input between the name and arguments
+	// Strip input whitespace
+	while(*input==' '||*input=='\t'||*input=='\n'||*input=='\r')
+		input++;
+
+	// Split the input between the name and arguments
     const char *separatorToken=strchr(input, ' ');
 
+	// If a separator is found, split the command and arguments... Otherwise just copy the whole input as the command name
     if(separatorToken)
     {
-        strncpy(name, input, separatorToken-input);
-        args=separatorToken+1;
+		// Copy command name
+		size_t nameLength=separatorToken-input;
+
+		if(nameLength>=CONSOLE_MAX_NAME)
+			nameLength=CONSOLE_MAX_NAME-1;
+
+		strncpy(name, input, nameLength);
+
+		// Assign arguments pointer
+		args=separatorToken;
+
+		// Skip any whitespace before the arguments
+		while(*args==' '||*args=='\t'||*args=='\n'||*args=='\r')
+			args++;
     }
     else
         strncpy(name, input, CONSOLE_MAX_NAME-1);
 
     // Search variable list first
-    for(uint32_t i=0; i<console->numVariable; i++)
+    for(uint32_t i=0;i<console->numVariable;i++)
     {
         if(strncmp(name, console->variables[i].name, CONSOLE_MAX_NAME)==0)
         {
             // If there's a value, set the variable, if no value, just print the variable's value
             if(args)
             {
-                float value=atof(args);
-                ConsoleSetVariable(console, name, value);
+                char *endptr=NULL;
+
+				float parsed=strtof(args, &endptr);
+
+				if(endptr==args)
+                    ConsolePrint(console, "Invalid value.");
+                else
+                    console->variables[i].value=parsed;
             }
             else
             {
@@ -176,7 +203,7 @@ void ConsoleExecuteCommand(Console_t *console, const char *input)
         {
             if(console->commands[i].func)
             {
-                console->commands[i].func(console, args?args:"");
+                console->commands[i].func(console, args);
                 return;
             }
         }
@@ -235,13 +262,6 @@ void ConsoleAutocomplete(Console_t *console)
     char matches[CONSOLE_MAX_COMMANDS+CONSOLE_MAX_VARIABLES][CONSOLE_MAX_NAME];
     uint32_t numMatches=0;
 
-    // Find command matches
-    for(uint32_t i=0;i<console->numCommand;i++)
-    {
-        if(strncmp(console->input, console->commands[i].name, console->inputLength)==0)
-            strncpy(matches[numMatches++], console->commands[i].name, CONSOLE_MAX_NAME-1);
-    }
-
     // Find variable matches
     for(uint32_t i=0; i<console->numVariable; i++)
     {
@@ -249,7 +269,14 @@ void ConsoleAutocomplete(Console_t *console)
             strncpy(matches[numMatches++], console->variables[i].name, CONSOLE_MAX_NAME-1);
     }
 
-    if(numMatches==1)
+    // Find command matches
+    for(uint32_t i=0;i<console->numCommand;i++)
+    {
+        if(strncmp(console->input, console->commands[i].name, console->inputLength)==0)
+            strncpy(matches[numMatches++], console->commands[i].name, CONSOLE_MAX_NAME-1);
+    }
+
+	if(numMatches==1)
     {
         // Single match: auto-complete
         strncpy(console->input, matches[0], CONSOLE_LINE_LENGTH-1);
@@ -285,7 +312,7 @@ void ConsoleKeyInput(Console_t *console, char key)
     }
     else if(key=='\t')
     {
-        // Tab (autocomplete placeholder)
+        // Tab
         ConsoleAutocomplete(console);
     }
     else if(key>=32&&key<127)
