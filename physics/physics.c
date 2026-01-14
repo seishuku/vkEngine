@@ -459,7 +459,6 @@ static float CapsuleToOBBCollision(RigidBody_t *capsule, RigidBody_t *obb)
 	float lo=0.0f, hi=1.0f;
 	float bestT=0.0f;
 	float bestDistSq=FLT_MAX;
-	vec3 bestClosestLocal=Vec3b(0.0f);
 
 	for(int i=0;i<10;i++)
 	{
@@ -491,7 +490,6 @@ static float CapsuleToOBBCollision(RigidBody_t *capsule, RigidBody_t *obb)
 			{
 				bestDistSq=d1;
 				bestT=t1;
-				bestClosestLocal=c1;
 			}
 		}
 		else
@@ -502,7 +500,6 @@ static float CapsuleToOBBCollision(RigidBody_t *capsule, RigidBody_t *obb)
 			{
 				bestDistSq=d2;
 				bestT=t2;
-				bestClosestLocal=c2;
 			}
 		}
 	}
