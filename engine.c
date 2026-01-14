@@ -16,6 +16,7 @@
 #include "model/bmodel.h"
 #include "network/network.h"
 #include "network/client_network.h"
+#include "physics/bvh.h"
 #include "physics/particle.h"
 #include "physics/physics.h"
 #include "physics/physicslist.h"
@@ -82,6 +83,7 @@ uint32_t fighterTexture=0;
 RigidBody_t cubeBody[NUM_CUBE];
 
 SpatialHash_t collisionHash;
+BVH_t bvh;
 
 LoadingScreen_t loadingScreen;
 
@@ -630,6 +632,41 @@ void DrawAABBCube(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, v
 	}
 }
 
+void BVH_DrawDebug(const BVH_t *bvh, VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye)
+{
+	typedef struct
+	{
+		int32_t nodeIndex;
+		uint32_t depth;
+	} BVHDrawStackObj_t;
+
+	BVHDrawStackObj_t stack[BVH_MAX_NODES];
+	uint32_t stackTop=0;
+
+	stack[stackTop++]=(BVHDrawStackObj_t) { 0, 0 };
+
+	while(stackTop>0)
+	{
+		BVHDrawStackObj_t stackObj=stack[--stackTop];
+		const BVHNode_t *node=&bvh->nodes[stackObj.nodeIndex];
+
+		int32_t isLeaf=(node->left==-1&&node->right==-1);
+
+		if(isLeaf)
+		{
+			float t=node->count/(float)BVH_MAX_OBJECTS_PER_LEAF;
+			DrawAABBCube(commandBuffer, index, eye, node->min, node->max, Vec4(t, 1.0f-t, 0.0f, 1.0f));
+		}
+
+		/* Traverse children */
+		if(!isLeaf)
+		{
+			stack[stackTop++]=(BVHDrawStackObj_t) { node->right, stackObj.depth+1 };
+			stack[stackTop++]=(BVHDrawStackObj_t) { node->left, stackObj.depth+1};
+		}
+	}
+}
+
 void Thread_Main(void *arg)
 {
 	ThreadData_t *data=(ThreadData_t *)arg;
@@ -789,6 +826,8 @@ void Thread_Main(void *arg)
 		DrawTrianglePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], sizeof(trianglePC), &trianglePC);
 	}
 #endif
+
+//	BVH_DrawDebug(&bvh, data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye);
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
@@ -1000,8 +1039,9 @@ void TestCollision(void *a, void *b)
 	}
 }
 
-// spatial hash 242FPS
-// sweep and prune 190FPS
+// spatial hash 280FPS
+// sweep and prune 242FPS
+// BVH 280FPS
 
 void SweepAndPrune3D();
 
@@ -1036,10 +1076,10 @@ void Thread_Physics(void *arg)
 		AddPhysicsObject(&cubeBody[i], PHYSICSOBJECTTYPE_FIELD);
 	//////
 		
-	//SpatialHash_Clear(&collisionHash);
+	// SpatialHash_Clear(&collisionHash);
 
-	//for(uint32_t i=0;i<numPhysicsObjects;i++)
-	//	SpatialHash_AddObject(&collisionHash, physicsObjects[i].rigidBody->position, &physicsObjects[i]);
+	// for(uint32_t i=0;i<numPhysicsObjects;i++)
+	// 	SpatialHash_AddObject(&collisionHash, physicsObjects[i].rigidBody->position, &physicsObjects[i]);
 
 	if(!pausePhysics)
 	{
@@ -1080,14 +1120,16 @@ void Thread_Physics(void *arg)
 			}
 		}
 
-		SweepAndPrune3D();
+		// SweepAndPrune3D();
+		BVH_Build(&bvh);
+		BVH_Test(&bvh);
 
 		// Run through the physics object list, run integration step and check for collisions against all other objects
 		for(uint32_t i=0;i<numPhysicsObjects;i++)
 		{
 			PhysicsIntegrate(physicsObjects[i].rigidBody, fTimeStep);
 
-			//SpatialHash_TestObjects(&collisionHash, physicsObjects[i].rigidBody->position, &physicsObjects[i], TestCollision);
+			// SpatialHash_TestObjects(&collisionHash, physicsObjects[i].rigidBody->position, &physicsObjects[i], TestCollision);
 
 #if 1
 			// Fire "laser beam"

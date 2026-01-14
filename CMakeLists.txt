@@ -33,6 +33,7 @@ set(PROJECT_SOURCES
 	"model/bmodel.c"
 	"network/client_network.c"
 	"network/network.c"
+	"physics/bvh.c"
 	"physics/particle.c"
 	"physics/physics.c"
 	"physics/physicslist.c"
