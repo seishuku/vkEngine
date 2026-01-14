@@ -16,8 +16,6 @@
 float audioTime=0.0;
 
 // HRIR sphere model and audio samples
-static const uint32_t HRIR_MAGIC='H'|'R'<<8|'I'<<16|'R'<<24;
-
 typedef struct
 {
 	vec3 vertex;
@@ -35,7 +33,8 @@ struct
 	HRIR_Vertex_t *vertices;
 } HRIRSphere;
 
-static float HRIRWindow[MAX_HRIR_SAMPLES]={ 0 };
+// Hann window FIR, initialized with audio system
+static float hannWindow[MAX_HRIR_SAMPLES]={ 0 };
 
 #define MAX_CHANNELS 128
 
@@ -44,8 +43,11 @@ typedef struct
 	Sample_t *sample;
 	size_t position;
 	bool looping;
+
 	float volume;
+
 	vec3 xyz;
+
 	int16_t FIRKernel[2*MAX_HRIR_SAMPLES];
 } Channel_t;
 
@@ -205,9 +207,9 @@ static void HRIRInterpolate(vec3 xyz, int16_t *FIRKernel)
 	vec3 coords=Vec3(fmaxf(0.0f, g.x), fmaxf(0.0f, g.y), fmaxf(0.0f, 1.0f-g.x-g.y));
 	const float sum=coords.x+coords.y+coords.z;
 
-	if(sum>1e-6f)
+	if(sum>FLT_EPSILON)
 	{
-		float invSum=1.0f/sum;
+		const float invSum=1.0f/sum;
 		coords=Vec3_Muls(coords, invSum);
 	}
 	else
@@ -218,7 +220,7 @@ static void HRIRInterpolate(vec3 xyz, int16_t *FIRKernel)
 		const vec3 left=Vec3(v0->left[i], v1->left[i], v2->left[i]);
 		const vec3 right=Vec3(v0->right[i], v1->right[i], v2->right[i]);
 		const float gain=4.0f;
-		const float final=falloffDist*gain*HRIRWindow[i];
+		const float final=falloffDist*gain*hannWindow[i];
 
 		FIRKernel[2*i+0]=(int16_t)clampf(final*Vec3_Dot(left, coords)*INT16_MAX, INT16_MIN, INT16_MAX);
 		FIRKernel[2*i+1]=(int16_t)clampf(final*Vec3_Dot(right, coords)*INT16_MAX, INT16_MIN, INT16_MAX);
@@ -309,7 +311,7 @@ void Audio_FillBuffer(void *buffer, uint32_t length)
 
 		memset(preConvolve, 0, sizeof(int16_t)*(MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES));
 		memcpy(preConvolve, &channel->sample->data[channel->position], sizeof(int16_t)*toFill);
-
+	
 		// Convolve the samples with the interpolated HRIR sample to produce a stereo sample to mix into the output buffer
 		Convolve(preConvolve, postConvole, remainingData, channel->FIRKernel, HRIRSphere.sampleLength);
 
@@ -444,6 +446,7 @@ bool Audio_StopStream(uint32_t stream)
 
 static bool HRIR_Init(void)
 {
+	const uint32_t HRIR_MAGIC='H'|'R'<<8|'I'<<16|'R'<<24;
 	FILE *stream=NULL;
 
 	stream=fopen("assets/hrir_full.bin", "rb");
@@ -522,7 +525,7 @@ static bool HRIR_Init(void)
 	fclose(stream);
 
 	for(uint32_t i=0;i<HRIRSphere.sampleLength;i++)
-		HRIRWindow[i]=0.5f*(0.5f-cosf(2.0f*PI*(float)i/(HRIRSphere.sampleLength-1)));
+		hannWindow[i]=0.5f*(0.5f-cosf(2.0f*PI*(float)i/(HRIRSphere.sampleLength-1)));
 
 	return true;
 }
@@ -546,9 +549,6 @@ int Audio_Init(void)
 		DBGPRINTF(DEBUG_ERROR, "Audio: DSP failed to initialize.\n");
 		return false;
 	}
-
-	DSP_AddEffect(DSP_Reverb);
-	DSP_AddEffect(DSP_LowPass);
 
 #ifdef ANDROID
 	if(!AudioAndroid_Init())
