@@ -5,7 +5,7 @@
 #include <float.h>
 #include "physics.h"
 
-static void ApplyConstraints(RigidBody_t *body)
+static void ApplyConstraints(RigidBody_t *body, const float dt)
 {
 	vec3 center={ 0.0f, 0.0f, 0.0f };
 	const float maxRadius=2000.0f;
@@ -26,13 +26,12 @@ static void ApplyConstraints(RigidBody_t *body)
 		body->force=Vec3_Addv(body->force, Vec3_Muls(normal, -distance));
 	}
 
-	// Apply linear velocity damping
-	const float linearDamping=0.999f;
-	body->velocity=Vec3_Muls(body->velocity, linearDamping);
+	// Dampen velocity
+	const float lambda=0.1f;
+	const float decay=expf(-lambda*dt);
 
-	// Apply angular velocity damping
-	const float angularDamping=0.998f;
-	body->angularVelocity=Vec3_Muls(body->angularVelocity, angularDamping);
+	body->velocity=Vec3_Muls(body->velocity, decay);
+	body->angularVelocity=Vec3_Muls(body->angularVelocity, decay);
 }
 
 static vec4 IntegrateAngularVelocity(const vec4 q, const vec3 w, const float dt)
@@ -84,7 +83,7 @@ void PhysicsIntegrate(RigidBody_t *body, const float dt)
 	// Integrate angular velocity using quaternions
 	body->orientation=IntegrateAngularVelocity(body->orientation, body->angularVelocity, dt);
 
-	ApplyConstraints(body);
+	ApplyConstraints(body, dt);
 }
 
 void PhysicsExplode(RigidBody_t *body)
