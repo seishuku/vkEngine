@@ -485,7 +485,7 @@ int main(int argc, char **argv)
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Creating swapchain...\n");
-	if(!vkuCreateSwapchain(&vkContext, &swapchain, VK_TRUE))
+	if(!vkuCreateSwapchain(&vkContext, &swapchain, config.vsync))
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
 		return -1;

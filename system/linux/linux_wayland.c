@@ -408,7 +408,7 @@ int main(int argc, char** argv)
     swapchain.extent.height=config.windowHeight;
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Swapchain...\n");
-	if(!vkuCreateSwapchain(&vkContext, &swapchain, VK_TRUE))
+	if(!vkuCreateSwapchain(&vkContext, &swapchain, config.vsync))
 	{
 		DBGPRINTF(DEBUG_ERROR, "...failed.\n");
 		return -1;

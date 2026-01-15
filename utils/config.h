@@ -12,6 +12,7 @@ typedef struct
 	uint32_t windowHeight;
 	uint32_t msaaSamples;
 	uint32_t deviceIndex;
+	bool vsync;
 
 	// System config states
 	uint32_t renderWidth;

@@ -303,7 +303,7 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			}
 
 			DBGPRINTF(DEBUG_INFO, "Creating swapchain...\n");
-			if(!vkuCreateSwapchain(&vkContext, &swapchain, VK_TRUE))
+			if(!vkuCreateSwapchain(&vkContext, &swapchain, config.vsync))
 			{
 				DBGPRINTF(DEBUG_ERROR, "\t...create swapchain failed.\n");
 				appState.app->destroyRequested=true;

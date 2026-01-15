@@ -16,7 +16,7 @@ static const char *keywords[]=
 	"config",
 
 	// Subsection definitions
-	"windowSize", "msaaSamples", "deviceIndex",
+	"windowSize", "msaaSamples", "deviceIndex", "vsync"
 };
 
 bool Config_ReadINI(Config_t *config, const char *filename)
@@ -159,6 +159,13 @@ bool Config_ReadINI(Config_t *config, const char *filename)
 								DBGPRINTF(DEBUG_ERROR, "Config device index out of range (%d).\n", deviceIndex);
 								return false;
 							}
+						}
+						else if(strcmp(token->string, "vsync")==0)
+						{
+							config->vsync=false;
+
+							if(!Tokenizer_ArgumentHelper(&tokenizer, "b", &config->vsync))
+								return false;
 						}
 						else
 						{
