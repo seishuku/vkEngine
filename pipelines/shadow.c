@@ -30,28 +30,28 @@ static VkImageView shadowDepthView[NUM_CASCADES];
 static VkFramebuffer shadowFrameBuffer[NUM_CASCADES];
 static VkFormat shadowDepthFormat=VK_FORMAT_D32_SFLOAT;
 
-static matrix BuildShadowMatrix(float fovyDeg, float aspect, float near, float far, const matrix cameraView, const vec3 lightDir)
+static matrix BuildShadowMatrix(float fovyDeg, float aspect, float zNear, float zFar, const matrix cameraView, const vec3 lightDir)
 {
 	// Camera frustum corners in view space
 	float tanY=tanf(deg2rad(fovyDeg)*0.5f);
 	float tanX=tanY*aspect;
 
-	float xn=near*tanX;
-	float yn=near*tanY;
-	float xf=far*tanX;
-	float yf=far*tanY;
+	float xn=zNear*tanX;
+	float yn=zNear*tanY;
+	float xf=zFar*tanX;
+	float yf=zFar*tanY;
 
 	vec3 vsCorners[8]={
 		// Near
-		{ -xn, -yn, -near },
-		{ +xn, -yn, -near },
-		{ -xn, +yn, -near },
-		{ +xn, +yn, -near },
+		{ -xn, -yn, -zNear },
+		{ +xn, -yn, -zNear },
+		{ -xn, +yn, -zNear },
+		{ +xn, +yn, -zNear },
 		// Far
-		{ -xf, -yf, -far },
-		{ +xf, -yf, -far },
-		{ -xf, +yf, -far },
-		{ +xf, +yf, -far },
+		{ -xf, -yf, -zFar },
+		{ +xf, -yf, -zFar },
+		{ -xf, +yf, -zFar },
+		{ +xf, +yf, -zFar },
 	};
 
 	// Transform to world space
