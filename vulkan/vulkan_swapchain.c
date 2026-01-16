@@ -33,7 +33,7 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 	vkGetPhysicalDeviceSurfaceFormatsKHR(context->physicalDevice, context->surface, &formatCount, surfaceFormats);
 
 	// Find a suitable format, best match to top preferred format
-	for(uint32_t i=0;i<sizeof(preferredFormats);i++)
+	for(uint32_t i=0;i<sizeof(preferredFormats)/sizeof(preferredFormats[0]);i++)
 	{
 		for(uint32_t j=0;j<formatCount;j++)
 		{
@@ -93,7 +93,7 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 		};
 		bool foundPresentMode=false;
 
-		for(uint32_t i=0;i<sizeof(preferredPresentMode);i++)
+		for(uint32_t i=0;i<sizeof(preferredPresentMode)/sizeof(preferredPresentMode[0]);i++)
 		{
 			for(uint32_t j=0;j<presentModeCount;j++)
 			{
@@ -123,7 +123,7 @@ VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, Vk
 		VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR
 	};
 
-	for(uint32_t i=0;i<sizeof(preferredCompositeAlpha);i++)
+	for(uint32_t i=0;i<sizeof(preferredCompositeAlpha)/sizeof(preferredCompositeAlpha[0]);i++)
 	{
 		if(surfaceCaps.supportedCompositeAlpha&preferredCompositeAlpha[i])
 		{
