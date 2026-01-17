@@ -82,8 +82,7 @@ void main()
 {
 	vec3 v=ico[gl_VertexIndex];
 
-	gl_Position=mvp*vec4(v.x*radiusHeight.x, sign(clamp(v.y, -1.0, 1.0))*radiusHeight.y+radiusHeight.x, v.z*radiusHeight.x, 1.0);
-//	gl_Position=mvp*vec4(v.xyz, 1.0);
+	gl_Position=mvp*vec4(v.xyz, 1.0);
 
 	Color=color*normalize(v.xyzz*0.5+0.5);
 }
