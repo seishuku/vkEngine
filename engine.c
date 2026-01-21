@@ -136,6 +136,7 @@ uint32_t currentTrack=UINT32_MAX;
 uint32_t windowID=UINT32_MAX;
 uint32_t thirdPersonID=UINT32_MAX;
 uint32_t playerHealthID=UINT32_MAX;
+uint32_t sprite=UINT32_MAX;
 
 #ifdef ANDROID
 uint32_t leftThumbstickID=UINT32_MAX;
@@ -1276,10 +1277,27 @@ bool rightTriggerOnce=true;
 
 static vec3 lastLeftPosition={ 0.0f, 0.0f, 0.0f };
 
+static float timer=0.0;
+
 // Render call from system main event loop
 void Render(void)
 {
 	static uint32_t index=0, imageIndex[2]={ 0, 0 };
+
+	timer+=fTimeStep;
+
+	if(timer>0.15f)
+	{
+		// Get the sprite control directly, this makes incrementing frames easier.
+		UI_Control_t *control=UI_FindControlByID(&UI, sprite);
+		control->sprite.frame++;
+
+		if(control->sprite.frame>13)
+			control->sprite.frame=0;
+
+		timer=0.0f;
+	}
+
 
 	Thread_AddJob(&threadPhysics, Thread_Physics, (void *)&index);
 	//Thread_Physics((void *)&index);
@@ -1770,6 +1788,10 @@ bool Init(void)
 								0.0f, 100.0f, 100.0f);					// min/max/initial value
 
 	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), UI_CONTROL_HIDDEN, &AssetManager_GetAsset(assets, TEXTURE_CONSOLEBG)->image, 0.0f);
+
+	sprite=UI_AddSprite(&UI, Vec2(400.0f, 400.0f), Vec2(256.0f, 256.0f), Vec3b(1.0f), UI_CONTROL_VISIBLE, &AssetManager_GetAsset(assets, TEXTURE_FOX)->image, 0.0f);
+	// Negative crop sizes will flip the frame, useful for walking animations
+	UI_UpdateSpriteCropSize(&UI, sprite, Vec2(32.0f, 32.0f));
 
 	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3b(1.0f), UI_CONTROL_VISIBLE);
 

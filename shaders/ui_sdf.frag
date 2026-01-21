@@ -638,7 +638,17 @@ void main()
 
 		case UI_CONTROL_SPRITE:
 		{
-			Output=texture(Texture, vec2(UV.x, -UV.y)*0.5+0.5);
+			const vec2 textureSize=vec2(textureSize(Texture, 0));
+			const vec2 frameSize=abs(Value);
+			const vec2 frameFlip=sign(Value);
+			const int frame=int(Flag);
+
+			const int columns=int(textureSize.x/frameSize.x);
+
+			ivec2 frameIndex=ivec2(frame%columns, frame/columns);
+			vec2 frameScale=frameSize/textureSize;
+
+			Output=texture(Texture, (((vec2(UV.x, -UV.y)*frameFlip*0.5)+0.5)+frameIndex)*frameScale);
 			return;
 		}
 

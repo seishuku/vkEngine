@@ -42,8 +42,10 @@ AssetManager_t assets[]=
 	{ TEXTURE_FIGHTER8_NORMAL,  ASSET_TEXTURE, "assets/null_normal.qoi",	IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
 	{ TEXTURE_CUBE,             ASSET_TEXTURE, "assets/null_normal.qoi",	IMAGE_MIPMAP|IMAGE_BILINEAR },
 	{ TEXTURE_CUBE_NORMAL,      ASSET_TEXTURE, "assets/null_normal.qoi",	IMAGE_MIPMAP|IMAGE_BILINEAR|IMAGE_NORMALIZE },
+	{ TEXTURE_FOX,				ASSET_TEXTURE, "assets/fox.tga",			IMAGE_NEAREST },
+	// TODO: If I load this before the fox, the fox has corruption, if I load the fox before... Everything is fine? Why?
 	{ TEXTURE_CONSOLEBG,		ASSET_TEXTURE, "assets/splash.qoi",			IMAGE_NONE },
-
+	
 	{ MODEL_ASTEROID1,          ASSET_MODEL,   "assets/asteroid1.bmodel" },
 	{ MODEL_ASTEROID2,          ASSET_MODEL,   "assets/asteroid2.bmodel" },
 	{ MODEL_ASTEROID3,          ASSET_MODEL,   "assets/asteroid3.bmodel" },

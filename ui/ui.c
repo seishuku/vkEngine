@@ -824,6 +824,11 @@ bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 			instance->colorValue.w=control->sprite.rotation;
 
 			instance->type=UI_CONTROL_SPRITE;
+
+			instance->flag=control->sprite.frame;
+
+			instance->extra=control->sprite.cropSize;
+
 			instance++;
 
 			vkuDescriptorSet_UpdateBindingImageInfo(&UI->pipeline.descriptorSet, 0, control->sprite.image->sampler, control->sprite.image->imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

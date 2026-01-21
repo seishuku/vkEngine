@@ -108,8 +108,9 @@ typedef struct
 		struct
 		{
 			VkuImage_t *image;
-			vec2 size;
+			vec2 size, cropSize;
 			float rotation;
+			uint32_t frame;
 		} sprite;
 
 		// Text type
@@ -234,10 +235,12 @@ uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, UI_Control
 bool UI_UpdateSprite(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, VkuImage_t *image, float rotation);
 bool UI_UpdateSpritePosition(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_UpdateSpriteSize(UI_t *UI, uint32_t ID, vec2 size);
+bool UI_UpdateSpriteCropSize(UI_t *UI, uint32_t ID, vec2 cropSize);
 bool UI_UpdateSpriteColor(UI_t *UI, uint32_t ID, vec3 color);
+bool UI_UpdateSpriteVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility);
 bool UI_UpdateSpriteImage(UI_t *UI, uint32_t ID, VkuImage_t *image);
 bool UI_UpdateSpriteRotation(UI_t *UI, uint32_t ID, float rotation);
-bool UI_UpdateSpriteVisibility(UI_t *UI, uint32_t ID, UI_ControlVisibility visibility);
+bool UI_UpdateSpriteFrame(UI_t *UI, uint32_t ID, uint32_t frame);
 
 uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, UI_ControlVisibility visibility, const char *titleText);
 bool UI_UpdateText(UI_t *UI, uint32_t ID, vec2 position, float size, vec3 color, UI_ControlVisibility visibility, const char *titleText);

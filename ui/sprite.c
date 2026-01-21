@@ -29,7 +29,9 @@ uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, UI_Control
 		.visibility=visibility,
 		.sprite.image=image,
 		.sprite.size=size,
-		.sprite.rotation=rotation
+		.sprite.cropSize=size,
+		.sprite.rotation=rotation,
+		.sprite.frame=0
 	};
 
 	if(!UI_AddControl(UI, &control))
@@ -102,6 +104,24 @@ bool UI_UpdateSpriteSize(UI_t *UI, uint32_t ID, vec2 size)
 	return false;
 }
 
+bool UI_UpdateSpriteCropSize(UI_t *UI, uint32_t ID, vec2 cropSize)
+{
+	if(UI==NULL||ID==UINT32_MAX)
+		return false;
+
+	// Search list
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
+
+	if(control!=NULL&&control->type==UI_CONTROL_SPRITE)
+	{
+		control->sprite.cropSize=cropSize;
+		return true;
+	}
+
+	// Not found
+	return false;
+}
+
 bool UI_UpdateSpriteColor(UI_t *UI, uint32_t ID, vec3 color)
 {
 	if(UI==NULL||ID==UINT32_MAX)
@@ -167,6 +187,24 @@ bool UI_UpdateSpriteRotation(UI_t *UI, uint32_t ID, float rotation)
 	if(control!=NULL&&control->type==UI_CONTROL_SPRITE)
 	{
 		control->sprite.rotation=rotation;
+		return true;
+	}
+
+	// Not found
+	return false;
+}
+
+bool UI_UpdateSpriteFrame(UI_t *UI, uint32_t ID, uint32_t frame)
+{
+	if(UI==NULL||ID==UINT32_MAX)
+		return false;
+
+	// Search list
+	UI_Control_t *control=UI_FindControlByID(UI, ID);
+
+	if(control!=NULL&&control->type==UI_CONTROL_SPRITE)
+	{
+		control->sprite.frame=frame;
 		return true;
 	}
 
