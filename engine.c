@@ -608,20 +608,22 @@ extern struct
 void DrawAABBCube(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, vec3 min, vec3 max, vec4 color)
 {
 	// 8 cube corners
-	vec3 corners[8]={
-		{min.x, min.y, min.z}, // 0
-		{max.x, min.y, min.z}, // 1
-		{max.x, max.y, min.z}, // 2
-		{min.x, max.y, min.z}, // 3
-		{min.x, min.y, max.z}, // 4
-		{max.x, min.y, max.z}, // 5
-		{max.x, max.y, max.z}, // 6
-		{min.x, max.y, max.z}, // 7
+	vec3 corners[8]=
+	{
+	    { min.x, min.y, min.z }, // 0
+	    { max.x, min.y, min.z }, // 1
+	    { max.x, max.y, min.z }, // 2
+	    { min.x, max.y, min.z }, // 3
+	    { min.x, min.y, max.z }, // 4
+	    { max.x, min.y, max.z }, // 5
+	    { max.x, max.y, max.z }, // 6
+	    { min.x, max.y, max.z }, // 7
 	};
-	uint32_t edges[12][2]={
-		{0,1}, {1,2}, {2,3}, {3,0}, // bottom face
-		{4,5}, {5,6}, {6,7}, {7,4}, // top face
-		{0,4}, {1,5}, {2,6}, {3,7}  // vertical edges
+	uint32_t edges[12][2]=
+	{
+	    { 0, 1 }, { 1, 2 }, { 2, 3 }, { 3, 0 }, // bottom face
+	    { 4, 5 }, { 5, 6 }, { 6, 7 }, { 7, 4 }, // top face
+	    { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 }  // vertical edges
 	};
 
 	// Draw all 12 edges
@@ -1040,12 +1042,6 @@ void TestCollision(void *a, void *b)
 	}
 }
 
-// spatial hash 280FPS
-// sweep and prune 242FPS
-// BVH 280FPS
-
-void SweepAndPrune3D();
-
 // Runs anything physics related
 void Thread_Physics(void *arg)
 {
@@ -1076,11 +1072,6 @@ void Thread_Physics(void *arg)
 	for(uint32_t i=0;i<NUM_CUBE;i++)
 		AddPhysicsObject(&cubeBody[i], PHYSICSOBJECTTYPE_FIELD);
 	//////
-		
-	// SpatialHash_Clear(&collisionHash);
-
-	// for(uint32_t i=0;i<numPhysicsObjects;i++)
-	// 	SpatialHash_AddObject(&collisionHash, physicsObjects[i].rigidBody->position, &physicsObjects[i]);
 
 	if(!pausePhysics)
 	{
@@ -1121,7 +1112,6 @@ void Thread_Physics(void *arg)
 			}
 		}
 
-		// SweepAndPrune3D();
 		BVH_Build(&bvh);
 		BVH_Test(&bvh);
 
@@ -1129,9 +1119,6 @@ void Thread_Physics(void *arg)
 		for(uint32_t i=0;i<numPhysicsObjects;i++)
 		{
 			PhysicsIntegrate(physicsObjects[i].rigidBody, fTimeStep);
-
-			// SpatialHash_TestObjects(&collisionHash, physicsObjects[i].rigidBody->position, &physicsObjects[i], TestCollision);
-
 #if 1
 			// Fire "laser beam"
 			if(isControlPressed)
