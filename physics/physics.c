@@ -104,6 +104,19 @@ void PhysicsExplode(RigidBody_t *body)
 	body->velocity=Vec3_Addv(body->velocity, force);
 }
 
+void PhysicsApplyImpulse(RigidBody_t *body, const vec3 impulse, const vec3 point)
+{
+	// Linear impulse
+	body->velocity=Vec3_Addv(body->velocity, Vec3_Muls(impulse, body->invMass));
+
+	// Torque arm in local space
+	const vec3 torque=Vec3_Cross(Vec3_Subv(point, body->position), impulse);
+	const vec3 localTorque=QuatRotate(QuatInverse(body->orientation), torque);
+
+	// Update angular velocity
+	body->angularVelocity=Vec3_Addv(body->angularVelocity, Vec3_Muls(localTorque, body->invInertia));
+}
+
 static float ResolveCollision(RigidBody_t *a, RigidBody_t *b, const vec3 contact, const vec3 normal, const float penetration)
 {
 	// Pre-calculate inverse orientation quats

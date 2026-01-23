@@ -36,6 +36,7 @@ typedef struct RigidBody_s
 
 void PhysicsIntegrate(RigidBody_t *body, const float dt);
 void PhysicsExplode(RigidBody_t *body);
+void PhysicsApplyImpulse(RigidBody_t *body, const vec3 impulse, const vec3 point);
 float PhysicsCollisionResponse(RigidBody_t *a, RigidBody_t *b);
 
 typedef struct

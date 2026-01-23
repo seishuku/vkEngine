@@ -1145,38 +1145,34 @@ void Thread_Physics(void *arg)
 
 				if(distance>0.0f)
 				{
-					// This is a bit hacky, can't add particleBody as a physics object due to scope lifetime, so test in place.
-					RigidBody_t particleBody;
+					vec3 hitPoint=Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, distance));
 
-					particleBody.position=Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, distance*0.99f));
-					particleBody.velocity=Vec3_Muls(camera.forward, 300.0f);
+					// Directional impulse
+					const float impulseStrength=2.0f;
+					vec3 impulse=Vec3_Muls(camera.forward, impulseStrength);
 
-					particleBody.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-					particleBody.angularVelocity=Vec3b(0.0f);
+					PhysicsApplyImpulse(physicsObjects[i].rigidBody, impulse, hitPoint);
 
-					particleBody.type=RIGIDBODY_SPHERE;
-					particleBody.radius=2.0f;
+					// Limit particle and sound effects with a simple timer
+					static const float fxCooldownTime=0.1f;
+					static float fxCooldown=fxCooldownTime;
+					fxCooldown-=fTimeStep;
 
-					particleBody.mass=(1.0f/3000.0f)*(1.33333333f*PI*particleBody.radius)*1000.0f;
-					particleBody.invMass=1.0f/particleBody.mass;
-
-					particleBody.inertia=0.4f*particleBody.mass*(particleBody.radius*particleBody.radius);
-					particleBody.invInertia=1.0f/particleBody.inertia;
-
-					if(PhysicsCollisionResponse(&particleBody, physicsObjects[i].rigidBody)>1.0f)
+					if(fxCooldown<=0.0f)
 					{
-						Audio_PlaySample(&AssetManager_GetAsset(assets, RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3))->sound, false, 1.0f, particleBody.position);
+						fxCooldown=fxCooldownTime;
 
-						ParticleSystem_AddEmitter
-						(
+						Audio_PlaySample(&AssetManager_GetAsset(assets, RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3))->sound, false, 1.0f, hitPoint);
+
+						ParticleSystem_AddEmitter(
 							&particleSystem,
-							particleBody.position,		// Position
-							Vec3(100.0f, 12.0f, 5.0f),	// Start color
-							Vec3(0.0f, 0.0f, 0.0f),		// End color
-							5.0f,						// Radius of particles
-							1000,						// Number of particles in system
-							PARTICLE_EMITTER_ONCE,		// Type?
-							ExplodeEmitterCallback		// Callback for particle generation
+						    hitPoint,                  // Position
+						    Vec3(100.0f, 12.0f, 5.0f), // Start color
+						    Vec3(0.0f, 0.0f, 0.0f),    // End color
+						    5.0f,                      // Radius of particles
+						    1000,                      // Number of particles in system
+						    PARTICLE_EMITTER_ONCE,     // Type?
+						    ExplodeEmitterCallback     // Callback for particle generation
 						);
 					}
 				}
