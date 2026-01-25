@@ -16,7 +16,6 @@
 #include "model/bmodel.h"
 #include "network/network.h"
 #include "network/client_network.h"
-#include "physics/bvh.h"
 #include "physics/particle.h"
 #include "physics/physics.h"
 #include "physics/physicslist.h"
@@ -35,7 +34,6 @@
 #include "utils/bvh.h"
 #include "utils/event.h"
 #include "utils/list.h"
-#include "utils/spatialhash.h"
 #include "vr/vr.h"
 #include "vulkan/vulkan.h"
 #include "assetmanager.h"
@@ -67,7 +65,7 @@ float physicsTime=0.0f;
 // Main particle system struct
 ParticleSystem_t particleSystem;
 
-// Particle system emitters as rigid bodies with life and ID hashmaps
+// Particle system emitters as rigid bodies with life and ID hashmap
 #define MAX_EMITTERS 1000
 typedef struct
 {
@@ -78,12 +76,6 @@ typedef struct
 
 PhyParticleEmitter_t emitters[MAX_EMITTERS]={ 0 };
 
-uint32_t fighterTexture=0;
-
-//#define NUM_CUBE 14
-RigidBody_t cubeBody[NUM_CUBE];
-
-SpatialHash_t collisionHash;
 BVH_t bvh;
 
 LoadingScreen_t loadingScreen;
@@ -91,14 +83,15 @@ LoadingScreen_t loadingScreen;
 // Vulkan swapchain helper struct
 VkuSwapchain_t swapchain;
 
-// Color buffer left and right images
+// Per-eye color/depth buffers and Framebuffers objects
 VkuImage_t colorImage[2];
-
-// Depth buffer left and right images
 VkuImage_t depthImage[2];
-
-// Framebuffers, per-eye
 VkFramebuffer framebuffer[2];
+
+uint32_t fighterTexture=0;
+
+//#define NUM_CUBE 14
+RigidBody_t cubeBody[NUM_CUBE];
 
 // Asteroid data
 //#define NUM_ASTEROIDS 5000
@@ -1685,8 +1678,6 @@ bool Init(void)
 		};
 	}
 
-	SpatialHash_Create(&collisionHash, NUM_ASTEROIDS/2, 50.0f);
-
 	Font_Init(&font);
 
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)config.renderWidth, (float)config.renderHeight), compositeRenderPass);
@@ -2035,10 +2026,6 @@ void Destroy(void)
 
 	// Compositing pipeline
 	DestroyComposite();
-	//////////
-
-	// Spatial hash for collision destruction
-	SpatialHash_Destroy(&collisionHash);
 	//////////
 
 	// Particle system destruction
