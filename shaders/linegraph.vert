@@ -17,5 +17,5 @@ out gl_PerVertex
 
 void main()
 {
-	gl_Position=mvp*vec4((vPosition.xy/(Viewport*0.5)-1.0)*vec2(1.0, 1.0), 0.0, 1.0);
+	gl_Position=mvp*vec4((vPosition.xy/(Viewport*0.5)-1.0), 0.0, 1.0);
 }

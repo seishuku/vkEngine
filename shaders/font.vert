@@ -18,7 +18,7 @@ void main()
 	vec2 Vert=vVert.xy*InstancePos.w;
 
 	// Transform vertex from window coords to NDC, plus flip the Y coord for Vulkan
-	gl_Position=mvp*vec4(((Vert+InstancePos.xy)/(Viewport*0.5)-1.0)*vec2(1.0, 1.0), 0.0, 1.0);
+	gl_Position=mvp*vec4(((Vert+InstancePos.xy)/(Viewport*0.5)-1.0), 0.0, 1.0);
 
 	// Offset texture coords to position in texture atlas
 	UV=vec4(vVert.zw, InstancePos.z, InstancePos.w);
