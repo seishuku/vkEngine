@@ -100,24 +100,24 @@ void SweepAndPrune3D()
 	{
 		PhysicsObject_t *obj=&physicsObjects[i];
 
-		endpointsX[2*i+0].value=obj->min.x;
+		endpointsX[2*i+0].value=obj->bounds.min.x;
 		endpointsX[2*i+0].object=obj;
 		endpointsX[2*i+0].isMin=true;
-		endpointsX[2*i+1].value=obj->max.x;
+		endpointsX[2*i+1].value=obj->bounds.max.x;
 		endpointsX[2*i+1].object=obj;
 		endpointsX[2*i+1].isMin=false;
 
-		endpointsY[2*i+0].value=obj->min.y;
+		endpointsY[2*i+0].value=obj->bounds.min.y;
 		endpointsY[2*i+0].object=obj;
 		endpointsY[2*i+0].isMin=true;
-		endpointsY[2*i+1].value=obj->max.y;
+		endpointsY[2*i+1].value=obj->bounds.max.y;
 		endpointsY[2*i+1].object=obj;
 		endpointsY[2*i+1].isMin=false;
 
-		endpointsZ[2*i+0].value=obj->min.z;
+		endpointsZ[2*i+0].value=obj->bounds.min.z;
 		endpointsZ[2*i+0].object=obj;
 		endpointsZ[2*i+0].isMin=true;
-		endpointsZ[2*i+1].value=obj->max.z;
+		endpointsZ[2*i+1].value=obj->bounds.max.z;
 		endpointsZ[2*i+1].object=obj;
 		endpointsZ[2*i+1].isMin=false;
 	}

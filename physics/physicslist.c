@@ -14,8 +14,8 @@ static PhysicsObject_t SetPhysicsObject(RigidBody_t *body, PhysicsObjectType_e o
 
     if(body->type==RIGIDBODY_SPHERE)
     {
-        object.min=Vec3(body->position.x-body->radius, body->position.y-body->radius, body->position.z-body->radius);
-        object.max=Vec3(body->position.x+body->radius, body->position.y+body->radius, body->position.z+body->radius);
+        object.bounds.min=Vec3(body->position.x-body->radius, body->position.y-body->radius, body->position.z-body->radius);
+        object.bounds.max=Vec3(body->position.x+body->radius, body->position.y+body->radius, body->position.z+body->radius);
     }
     else if(body->type==RIGIDBODY_OBB)
     {
@@ -28,8 +28,8 @@ static PhysicsObject_t SetPhysicsObject(RigidBody_t *body, PhysicsObjectType_e o
             fabsf(axis[0].z)*body->size.x+fabsf(axis[1].z)*body->size.y+fabsf(axis[2].z)*body->size.z
         };
 
-        object.min=Vec3_Subv(body->position, extents);
-        object.max=Vec3_Addv(body->position, extents);
+        object.bounds.min=Vec3_Subv(body->position, extents);
+        object.bounds.max=Vec3_Addv(body->position, extents);
     }
 	else if(body->type==RIGIDBODY_CAPSULE)
 	{
@@ -41,12 +41,12 @@ static PhysicsObject_t SetPhysicsObject(RigidBody_t *body, PhysicsObjectType_e o
 		vec3 a=Vec3_Subv(body->position, offset);
 		vec3 b=Vec3_Addv(body->position, offset);
 
-		object.min=Vec3(
+		object.bounds.min=Vec3(
 			fminf(a.x, b.x)-body->radius,
 			fminf(a.y, b.y)-body->radius,
 			fminf(a.z, b.z)-body->radius
 		);
-		object.max=Vec3(
+		object.bounds.max=Vec3(
 			fmaxf(a.x, b.x)+body->radius,
 			fmaxf(a.y, b.y)+body->radius,
 			fmaxf(a.z, b.z)+body->radius

@@ -32,6 +32,7 @@
 #include "system/system.h"
 #include "system/threads.h"
 #include "ui/ui.h"
+#include "utils/bvh.h"
 #include "utils/event.h"
 #include "utils/list.h"
 #include "utils/spatialhash.h"
@@ -658,7 +659,7 @@ void BVH_DrawDebug(const BVH_t *bvh, VkCommandBuffer commandBuffer, uint32_t ind
 		if(isLeaf)
 		{
 			float t=node->count/(float)BVH_MAX_OBJECTS_PER_LEAF;
-			DrawAABBCube(commandBuffer, index, eye, node->min, node->max, Vec4(t, 1.0f-t, 0.0f, 1.0f));
+			DrawAABBCube(commandBuffer, index, eye, node->bounds.min, node->bounds.max, Vec4(t, 1.0f-t, 0.0f, 1.0f));
 		}
 
 		/* Traverse children */
@@ -1112,8 +1113,8 @@ void Thread_Physics(void *arg)
 			}
 		}
 
-		BVH_Build(&bvh);
-		BVH_Test(&bvh);
+		BVH_Build(&bvh, physicsObjects, numPhysicsObjects, sizeof(PhysicsObject_t), 0);
+		BVH_Test(&bvh, physicsObjects, sizeof(PhysicsObject_t), TestCollision);
 
 		// Run through the physics object list, run integration step and check for collisions against all other objects
 		for(uint32_t i=0;i<numPhysicsObjects;i++)

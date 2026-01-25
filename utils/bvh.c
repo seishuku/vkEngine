@@ -1,11 +1,11 @@
 #include "bvh.h"
-#include "physicslist.h"
+#include "../system/system.h"
 #include "../math/math.h"
 #include <float.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-void BVH_Build(BVH_t *bvh)
+void BVH_Build(BVH_t *bvh, const void *AABBs, const uint32_t numAABBs, const uint32_t stride, const uint32_t offset)
 {
 	typedef struct
 	{
@@ -16,9 +16,16 @@ void BVH_Build(BVH_t *bvh)
 
 	BVHBuildStackObj_t stack[BVH_MAX_NODES];
 	uint32_t stackTop=0;
+	uint32_t numIndices=numAABBs;
+
+	if(numIndices>=BVH_MAX_OBJECTS)
+	{
+		numIndices=BVH_MAX_OBJECTS;
+		DBGPRINTF(DEBUG_WARNING, "BVH: numAABBs (%d) > MAX OBJECTS\n", numAABBs);
+	}
 
 	// Initialize object index list
-	for(uint32_t i=0;i<numPhysicsObjects;i++)
+	for(uint32_t i=0;i<numIndices;i++)
 		bvh->objectIndices[i]=i;
 
 	bvh->nodeCount=1;
@@ -26,7 +33,7 @@ void BVH_Build(BVH_t *bvh)
 	stack[stackTop++]=(BVHBuildStackObj_t)
 	{
 		.nodeIndex=0,
-	    .first=0, .count=numPhysicsObjects
+	    .first=0, .count=numIndices
 	};
 
 	while(stackTop>0)
@@ -40,19 +47,20 @@ void BVH_Build(BVH_t *bvh)
 		node->right=-1;
 
 		// Compute bounds
-		node->min=Vec3b(FLT_MAX);
-		node->max=Vec3b(-FLT_MAX);
+		node->bounds.min=Vec3b(FLT_MAX);
+		node->bounds.max=Vec3b(-FLT_MAX);
 
 		for(uint32_t i=0;i<stackObj.count;i++)
 		{
-			PhysicsObject_t *obj=&physicsObjects[bvh->objectIndices[stackObj.first+i]];
+			uint32_t index=bvh->objectIndices[stackObj.first+i];
+			aabb *bounds=(aabb *)((uint8_t *)AABBs+index*stride+offset);;
 
-			node->min.x=fminf(node->min.x, obj->min.x);
-			node->min.y=fminf(node->min.y, obj->min.y);
-			node->min.z=fminf(node->min.z, obj->min.z);
-			node->max.x=fmaxf(node->max.x, obj->max.x);
-			node->max.y=fmaxf(node->max.y, obj->max.y);
-			node->max.z=fmaxf(node->max.z, obj->max.z);
+			node->bounds.min.x=fminf(node->bounds.min.x, bounds->min.x);
+			node->bounds.min.y=fminf(node->bounds.min.y, bounds->min.y);
+			node->bounds.min.z=fminf(node->bounds.min.z, bounds->min.z);
+			node->bounds.max.x=fmaxf(node->bounds.max.x, bounds->max.x);
+			node->bounds.max.y=fmaxf(node->bounds.max.y, bounds->max.y);
+			node->bounds.max.z=fmaxf(node->bounds.max.z, bounds->max.z);
 		}
 
 		// Leaf
@@ -62,17 +70,17 @@ void BVH_Build(BVH_t *bvh)
 		// Choose split axis (largest extent)
 		vec3 extent=
 		{
-		    node->max.x-node->min.x,
-		    node->max.y-node->min.y,
-		    node->max.z-node->min.z
+		    node->bounds.max.x-node->bounds.min.x,
+		    node->bounds.max.y-node->bounds.min.y,
+		    node->bounds.max.z-node->bounds.min.z
 		};
 
 		int axis=(extent.x>=extent.y&&extent.x>=extent.z)?0:(extent.y>=extent.z)?1:2;
 
 		float splitPos;
-		if(axis==0)			splitPos=0.5f*(node->min.x+node->max.x);
-		else if(axis==1)	splitPos=0.5f*(node->min.y+node->max.y);
-		else				splitPos=0.5f*(node->min.z+node->max.z);
+		if(axis==0)			splitPos=0.5f*(node->bounds.min.x+node->bounds.max.x);
+		else if(axis==1)	splitPos=0.5f*(node->bounds.min.y+node->bounds.max.y);
+		else				splitPos=0.5f*(node->bounds.min.z+node->bounds.max.z);
 
 		// Partition objects
 		uint32_t mid=stackObj.first;
@@ -80,12 +88,13 @@ void BVH_Build(BVH_t *bvh)
 
 		for(uint32_t i=stackObj.first;i<end;i++)
 		{
-			PhysicsObject_t *obj=&physicsObjects[bvh->objectIndices[i]];
+			const uint32_t index=bvh->objectIndices[i];
+			aabb *bounds=(aabb *)((uint8_t *)AABBs+index*stride+offset);
 			vec3 centroid=(vec3)
 			{
-				0.5f*(obj->min.x+obj->max.x),
-				0.5f*(obj->min.y+obj->max.y),
-				0.5f*(obj->min.z+obj->max.z)
+				0.5f*(bounds->min.x+bounds->max.x),
+				0.5f*(bounds->min.y+bounds->max.y),
+				0.5f*(bounds->min.z+bounds->max.z)
 			};
 			float v=(axis==0)?centroid.x:(axis==1)?centroid.y:centroid.z;
 
@@ -111,9 +120,7 @@ void BVH_Build(BVH_t *bvh)
 	}
 }
 
-void TestCollision(void *a, void *b);
-
-void BVH_Test(const BVH_t *bvh)
+void BVH_Test(const BVH_t *bvh, void *objects, const uint32_t stride, void (*testFunc)(void *a, void *b))
 {
 	typedef struct
 	{
@@ -138,9 +145,9 @@ void BVH_Test(const BVH_t *bvh)
 
 		// Test for overlap
 		if(!(
-			(a->min.x<=b->max.x&&a->max.x>=b->min.x)&&
-	     	(a->min.y<=b->max.y&&a->max.y>=b->min.y)&&
-	     	(a->min.z<=b->max.z&&a->max.z>=b->min.z))
+			(a->bounds.min.x<=b->bounds.max.x&&a->bounds.max.x>=b->bounds.min.x)&&
+	     	(a->bounds.min.y<=b->bounds.max.y&&a->bounds.max.y>=b->bounds.min.y)&&
+	     	(a->bounds.min.z<=b->bounds.max.z&&a->bounds.max.z>=b->bounds.min.z))
 		)
 		 	continue;
 
@@ -153,18 +160,18 @@ void BVH_Test(const BVH_t *bvh)
 			for(uint32_t i=0;i<a->count;i++)
 			{
 				uint32_t ia=bvh->objectIndices[a->first+i];
-				PhysicsObject_t *objA=&physicsObjects[ia];
+				void *objA=objects+ia*stride;
 
 				for(uint32_t j=0;j<b->count;j++)
 				{
 					uint32_t ib=bvh->objectIndices[b->first+j];
-					PhysicsObject_t *objB=&physicsObjects[ib];
+					void *objB=objects+ib*stride;
 
 					/// Avoid self
 					if(ia==ib)
 						continue;
 
-					TestCollision(objA, objB);
+					testFunc(objA, objB);
 				}
 			}
 

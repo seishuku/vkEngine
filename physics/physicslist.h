@@ -13,7 +13,7 @@ typedef enum
 
 typedef struct
 {
-	vec3 min, max;
+	aabb bounds;
 	RigidBody_t *rigidBody;
 	PhysicsObjectType_e objectType;
 } PhysicsObject_t;
