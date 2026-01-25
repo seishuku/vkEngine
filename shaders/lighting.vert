@@ -34,15 +34,17 @@ layout (location=6) out vec4 Shadow[NUM_CASCADES];
 
 void main()
 {
-	gl_Position=projection*HMD*modelview*iPosition*vec4(vPosition.xyz, 1.0);
-
 	Position=(iPosition*vPosition).xyz;
-	ViewDepth=-(modelview*vec4(Position, 1.0)).z;
+	vec4 worldPosition=modelview*vec4(Position, 1.0);
+
+	gl_Position=projection*HMD*worldPosition;
+
+	ViewDepth=-worldPosition.z;
 	UV=vUV.xy;
 
 	Tangent=mat3(iPosition)*mat3(vTangent.xyz, vBinormal.xyz, vNormal.xyz);
 
-	const mat4 biasMat = mat4( 
+	const mat4 biasMat=mat4(
 		0.5, 0.0, 0.0, 0.0,
 		0.0, 0.5, 0.0, 0.0,
 		0.0, 0.0, 1.0, 0.0,
