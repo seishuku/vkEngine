@@ -1,11 +1,9 @@
 #version 450
 
-layout (location=0) in vec4 vVert;			// Incoming vertex position
-
-layout (location=1) in vec4 InstancePos;	// Instanced data position and size
-layout (location=2) in vec4 InstanceColor;	// Instanced data color and value
-layout (location=3) in uvec2 InstanceType;	// Instanced data type and flag
-layout (location=4) in vec2 InstanceValue;	// Instanced data extra value data
+layout (location=0) in vec4 InstancePos;	// Instanced data position and size
+layout (location=1) in vec4 InstanceColor;	// Instanced data color and value
+layout (location=2) in uvec2 InstanceType;	// Instanced data type and flag
+layout (location=3) in vec2 InstanceValue;	// Instanced data extra value data
 
 layout (push_constant) uniform ubo {
 	vec2 Viewport;	// Window width/height
@@ -30,6 +28,13 @@ const uint UI_CONTROL_TEXT			=6;
 const uint UI_CONTROL_VIRTUALSTICK	=7;
 const uint UI_CONTROL_WINDOW		=8;
 
+const vec4 Verts[4]={
+	vec4(-0.5f, 0.5f, -1.0f, 1.0f),
+	vec4(-0.5f, -0.5f, -1.0f, -1.0f),
+	vec4(0.5f, 0.5f, 1.0f, 1.0f),
+	vec4(0.5f, -0.5f, 1.0f, -1.0f)
+};
+
 vec2 rotate(vec2 v, float a)
 {
 	float s=sin(a);
@@ -40,7 +45,7 @@ vec2 rotate(vec2 v, float a)
 
 void main()
 {
-	vec2 Vert=vVert.xy;
+	vec2 Vert=Verts[gl_VertexIndex].xy;
 
 	if(InstanceType.x==UI_CONTROL_TEXT)
 		Vert*=InstancePos.w;
@@ -54,7 +59,7 @@ void main()
 	gl_Position=mvp*vec4(((Vert+InstancePos.xy)/(Viewport*0.5)-1.0), 0.0, 1.0);
 
 	// Offset texture coords to position in texture atlas
-	UV=vVert.zw;
+	UV=Verts[gl_VertexIndex].zw;
 
 	// Pass color
 	Color=InstanceColor;

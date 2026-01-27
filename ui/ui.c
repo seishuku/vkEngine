@@ -71,33 +71,6 @@ static bool UI_VulkanVertex(UI_t *UI)
 	}, VK_NULL_HANDLE, &UI->blankImage.imageView);
 	// ---
 
-	// Create static vertex data buffer
-	if(!vkuCreateGPUBuffer(&vkContext, &UI->vertexBuffer, sizeof(vec4)*4, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT))
-		return false;
-
-	// Create staging buffer, map it, and copy vertex data to it
-	if(!vkuCreateHostBuffer(&vkContext, &stagingBuffer, sizeof(vec4)*4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT))
-		return false;
-
-	// Map it
-	if(!stagingBuffer.memory->mappedPointer)
-		return false;
-
-	vec4 *vecPtr=(vec4 *)stagingBuffer.memory->mappedPointer;
-
-	*vecPtr++=Vec4(-0.5f, 0.5f, -1.0f, 1.0f);	// XYUV
-	*vecPtr++=Vec4(-0.5f, -0.5f, -1.0f, -1.0f);
-	*vecPtr++=Vec4(0.5f, 0.5f, 1.0f, 1.0f);
-	*vecPtr++=Vec4(0.5f, -0.5f, 1.0f, -1.0f);
-
-	VkCommandBuffer CopyCommand=vkuOneShotCommandBufferBegin(&vkContext);
-	vkCmdCopyBuffer(CopyCommand, stagingBuffer.buffer, UI->vertexBuffer.buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(vec4)*4 });
-	vkuOneShotCommandBufferEnd(&vkContext, CopyCommand);
-
-	// Delete staging data
-	vkuDestroyBuffer(&vkContext, &stagingBuffer);
-	// ---
-
 	// Create instance buffer and map it
 	vkuCreateHostBuffer(&vkContext, &UI->instanceBuffer, sizeof(UI_Instance_t)*UI_HASHTABLE_MAX, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -164,8 +137,6 @@ void UI_Destroy(UI_t *UI)
 	List_Destroy(&UI->controls);
 
 	vkuDestroyBuffer(&vkContext, &UI->instanceBuffer);
-
-	vkuDestroyBuffer(&vkContext, &UI->vertexBuffer);
 
 	vkuDestroyImageBuffer(&vkContext, &UI->blankImage);
 
@@ -787,10 +758,8 @@ bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipeline.pipeline);
 
-	// Bind vertex data buffer
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &UI->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 	// Bind object instance buffer
-	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &UI->instanceBuffer.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &UI->instanceBuffer.buffer, &(VkDeviceSize) { 0 });
 
 	struct
 	{

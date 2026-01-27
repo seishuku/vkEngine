@@ -151,8 +151,6 @@ typedef struct
 
 	VkuImage_t blankImage;
 
-	VkuBuffer_t vertexBuffer;
-
 	VkuBuffer_t instanceBuffer;
 	void *instanceBufferPtr;
 
