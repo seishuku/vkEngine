@@ -9,8 +9,8 @@ typedef struct
 {
 	Pipeline_t pipeline;
 
-	// Vertex data handles
-	VkuBuffer_t vertexBuffer;
+	// Screen extents
+	uint32_t width, height;
 
 	// Instance data handles
 	VkuBuffer_t instanceBuffer;
@@ -21,7 +21,7 @@ typedef struct
 	uint32_t numChar;
 } Font_t;
 
-bool Font_Init(Font_t *font);
+bool Font_Init(Font_t *font, uint32_t width, uint32_t height, VkRenderPass renderPass);
 const float Font_CharacterBaseWidth(const char ch);
 float Font_StringBaseWidth(const char *string);
 void Font_Print(Font_t *font, float size, float x, float y, const char *string, ...);

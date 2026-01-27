@@ -156,6 +156,12 @@ bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex)
 			return false;
 		}
 
+		if(!xruCheck(xrContext->instance, xrAcquireSwapchainImage(xrContext->uiSwapchain.swapchain, &(XrSwapchainImageAcquireInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO }, &imageIndex[2])))
+		{
+			DBGPRINTF(DEBUG_ERROR, "VR: Failed to acquire UI swapchain.\n");
+			return false;
+		}
+
 		if(!xruCheck(xrContext->instance, xrWaitSwapchainImage(xrContext->swapchain[0].swapchain, &(XrSwapchainImageWaitInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .timeout=INT64_MAX })))
 		{
 			DBGPRINTF(DEBUG_ERROR, "VR: Failed to wait for swapchain image 0.\n");
@@ -168,13 +174,19 @@ bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex)
 			return false;
 		}
 
+		if(!xruCheck(xrContext->instance, xrWaitSwapchainImage(xrContext->uiSwapchain.swapchain, &(XrSwapchainImageWaitInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .timeout=INT64_MAX })))
+		{
+			DBGPRINTF(DEBUG_ERROR, "VR: Failed to wait for UI swapchain.\n");
+			return false;
+		}
+
 		xrContext->projViews[0].subImage.swapchain=xrContext->swapchain[0].swapchain;
 		xrContext->projViews[0].subImage.imageRect.offset=(XrOffset2Di){ 0, 0 };
-		xrContext->projViews[0].subImage.imageRect.extent=xrContext->swapchainExtent;
+		xrContext->projViews[0].subImage.imageRect.extent=xrContext->swapchain[0].extent;
 
 		xrContext->projViews[1].subImage.swapchain=xrContext->swapchain[1].swapchain;
 		xrContext->projViews[1].subImage.imageRect.offset=(XrOffset2Di){ 0, 0 };
-		xrContext->projViews[1].subImage.imageRect.extent=xrContext->swapchainExtent;
+		xrContext->projViews[1].subImage.imageRect.extent=xrContext->swapchain[1].extent;
 
 		// Only transfer over the pose tracking if it's valid
 		if(viewState.viewStateFlags&(XR_VIEW_STATE_ORIENTATION_VALID_BIT|XR_VIEW_STATE_POSITION_VALID_BIT))
@@ -210,7 +222,26 @@ bool VR_EndFrame(XruContext_t *xrContext)
 		.views=(const XrCompositionLayerProjectionView[]) { xrContext->projViews[0], xrContext->projViews[1] },
 	};
 
-	const XrCompositionLayerBaseHeader *layers[1]={ (const XrCompositionLayerBaseHeader *const)&projectionLayer };
+	XrCompositionLayerQuad uiLayer=
+	{
+	    .type=XR_TYPE_COMPOSITION_LAYER_QUAD,
+		.layerFlags=XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT,
+	    .space=xrContext->refSpace,
+	    .eyeVisibility=XR_EYE_VISIBILITY_BOTH,
+	    .subImage=
+		{
+	        .swapchain=xrContext->uiSwapchain.swapchain,
+	        .imageRect={ { 0, 0 }, xrContext->uiSwapchain.extent }
+		},
+	    .size={ 16.0f/9.0f, 1.0f },
+	    .pose={ .orientation={ 0.0f, 0.0f, 0.0f, 1.0f }, .position={ 0.0f, 0.0f, -1.0f } }
+	};
+
+	const XrCompositionLayerBaseHeader *layers[2]=
+	{
+		(const XrCompositionLayerBaseHeader *const)&projectionLayer,
+		(const XrCompositionLayerBaseHeader *const)&uiLayer,
+	};
 
 	XrFrameEndInfo frameEndInfo=
 	{
@@ -234,7 +265,13 @@ bool VR_EndFrame(XruContext_t *xrContext)
 			return false;
 		}
 
-		frameEndInfo.layerCount=1;
+		if(!xruCheck(xrContext->instance, xrReleaseSwapchainImage(xrContext->uiSwapchain.swapchain, &(XrSwapchainImageReleaseInfo) {.type=XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next=XR_NULL_HANDLE })))
+		{
+			DBGPRINTF(DEBUG_ERROR, "VR: Failed to release swapchain image 1.\n");
+			return false;
+		}
+
+		frameEndInfo.layerCount=2;
 		frameEndInfo.layers=layers;
 	}
 
@@ -468,8 +505,11 @@ static bool VR_GetViewConfig(XruContext_t *xrContext, const XrViewConfigurationT
 	xrContext->viewType=viewType;
 
 	// Set half recommended res
-	xrContext->swapchainExtent.width=xrContext->viewConfigViews[0].recommendedImageRectWidth/2;
-	xrContext->swapchainExtent.height=xrContext->viewConfigViews[0].recommendedImageRectHeight/2;
+	xrContext->swapchain[0].extent.width=xrContext->viewConfigViews[0].recommendedImageRectWidth/2;
+	xrContext->swapchain[0].extent.height=xrContext->viewConfigViews[0].recommendedImageRectHeight/2;
+
+	xrContext->swapchain[1].extent.width=xrContext->viewConfigViews[1].recommendedImageRectWidth/2;
+	xrContext->swapchain[1].extent.height=xrContext->viewConfigViews[1].recommendedImageRectHeight/2;
 
 	return true;
 }
@@ -598,9 +638,55 @@ static bool VR_InitSwapchain(XruContext_t *xrContext, VkuContext_t *context)
 
 	Zone_Free(zone, swapchainFormats);
 
-	// Create swapchain images, imageviews, and transition to correct image layout
 	VkCommandBuffer CommandBuffer=vkuOneShotCommandBufferBegin(context);
 
+	xrContext->uiSwapchain.extent.width=1920;
+	xrContext->uiSwapchain.extent.height=1080;
+
+	// Create dedicated UI swapchain
+	XrSwapchainCreateInfo swapchainCreateInfo=
+	{
+		.type=XR_TYPE_SWAPCHAIN_CREATE_INFO, .next=NULL,
+		.createFlags=0, .usageFlags=XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT,
+		.format=xrContext->swapchainFormat, .sampleCount=VK_SAMPLE_COUNT_1_BIT,
+		.width=xrContext->uiSwapchain.extent.width, .height=xrContext->uiSwapchain.extent.height,
+		.faceCount=1, .arraySize=1, .mipCount=1,
+	};
+
+	if(!xruCheck(xrContext->instance, xrCreateSwapchain(xrContext->session, &swapchainCreateInfo, &xrContext->uiSwapchain.swapchain)))
+		return false;
+
+	xrContext->uiSwapchain.numImages=0;
+
+	if(!xruCheck(xrContext->instance, xrEnumerateSwapchainImages(xrContext->uiSwapchain.swapchain, 0, &xrContext->uiSwapchain.numImages, (XrSwapchainImageBaseHeader *)xrContext->uiSwapchain.images)))
+		return false;
+
+	for(uint32_t i=0;i<xrContext->uiSwapchain.numImages;i++)
+		xrContext->uiSwapchain.images[i].type=XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR;
+
+	if(!xruCheck(xrContext->instance, xrEnumerateSwapchainImages(xrContext->uiSwapchain.swapchain, xrContext->uiSwapchain.numImages, &xrContext->uiSwapchain.numImages, (XrSwapchainImageBaseHeader *)xrContext->uiSwapchain.images)))
+		return false;
+
+	for(uint32_t i=0;i<xrContext->uiSwapchain.numImages;i++)
+	{
+		vkuTransitionLayout(CommandBuffer, xrContext->uiSwapchain.images[i].image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		vkCreateImageView(context->device, &(VkImageViewCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.pNext=VK_NULL_HANDLE,
+			.image=xrContext->uiSwapchain.images[i].image,
+			.format=xrContext->swapchainFormat,
+			.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseMipLevel=0, .subresourceRange.levelCount=1,
+			.subresourceRange.baseArrayLayer=0, .subresourceRange.layerCount=1,
+			.viewType=VK_IMAGE_VIEW_TYPE_2D,
+			.flags=0,
+		}, VK_NULL_HANDLE, &xrContext->uiSwapchain.imageView[i]);
+	}
+	//////
+
+	// Create swapchain images, imageviews, and transition to correct image layout
 	for(uint32_t i=0;i<xrContext->viewCount;i++)
 	{
 		XrSwapchainCreateInfo swapchainCreateInfo=
@@ -608,7 +694,7 @@ static bool VR_InitSwapchain(XruContext_t *xrContext, VkuContext_t *context)
 			.type=XR_TYPE_SWAPCHAIN_CREATE_INFO, .next=NULL,
 			.createFlags=0, .usageFlags=XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT,
 			.format=xrContext->swapchainFormat, .sampleCount=VK_SAMPLE_COUNT_1_BIT,
-			.width=xrContext->swapchainExtent.width, .height=xrContext->swapchainExtent.height,
+			.width=xrContext->swapchain[i].extent.width, .height=xrContext->swapchain[i].extent.height,
 			.faceCount=1, .arraySize=1, .mipCount=1,
 		};
 
@@ -652,10 +738,8 @@ static bool VR_InitSwapchain(XruContext_t *xrContext, VkuContext_t *context)
 				.format=xrContext->swapchainFormat,
 				.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
 				.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-				.subresourceRange.baseMipLevel=0,
-				.subresourceRange.levelCount=1,
-				.subresourceRange.baseArrayLayer=0,
-				.subresourceRange.layerCount=1,
+				.subresourceRange.baseMipLevel=0, .subresourceRange.levelCount=1,
+				.subresourceRange.baseArrayLayer=0, .subresourceRange.layerCount=1,
 				.viewType=VK_IMAGE_VIEW_TYPE_2D,
 				.flags=0,
 			}, VK_NULL_HANDLE, &xrContext->swapchain[i].imageView[j]);
@@ -948,6 +1032,63 @@ bool VR_Init(XruContext_t *xrContext, VkInstance instance, VkuContext_t *context
 	VR_SuggestBindings(xrContext);
 
 	VR_AttachActionSet(xrContext, xrContext->actionSet);
+
+	vkCreateRenderPass(context->device, &(VkRenderPassCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+		.attachmentCount=1,
+		.pAttachments=(VkAttachmentDescription[])
+		{
+			{
+				.format=xrContext->swapchainFormat,
+				.samples=VK_SAMPLE_COUNT_1_BIT,
+				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
+				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
+				.initialLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				.finalLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			}
+		},
+		.subpassCount=1,
+		.pSubpasses=&(VkSubpassDescription)
+		{
+			.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS,
+			.colorAttachmentCount=1,
+			.pColorAttachments=&(VkAttachmentReference)
+			{
+				.attachment=0,
+				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			}
+		},
+		.dependencyCount=1,
+		.pDependencies=(VkSubpassDependency[])
+		{
+			{
+				.srcSubpass=VK_SUBPASS_EXTERNAL,
+				.dstSubpass=0,
+				.srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+				.dependencyFlags=0
+			},
+		},
+	}, 0, &xrContext->uiRenderPass);
+
+	for(uint32_t i=0;i<xrContext->uiSwapchain.numImages;i++)
+	{
+		vkCreateFramebuffer(context->device, &(VkFramebufferCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+			.renderPass=xrContext->uiRenderPass,
+			.attachmentCount=1,
+			.pAttachments=(VkImageView[]){ xrContext->uiSwapchain.imageView[i] },
+			.width=xrContext->uiSwapchain.extent.width,
+			.height=xrContext->uiSwapchain.extent.height,
+			.layers=1,
+		}, 0, &xrContext->uiFramebuffer[i]);
+	}
 
 	return true;
 }

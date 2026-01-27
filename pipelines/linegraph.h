@@ -10,7 +10,7 @@ typedef struct
 	float currentValue, min, max;
 } LineGraph_t;
 
-bool CreateLineGraphPipeline(void);
+bool CreateLineGraphPipeline(VkRenderPass renderPass);
 void DestroyLineGraphPipeline(void);
 
 bool CreateLineGraph(LineGraph_t *lineGraph, const uint32_t numPoints, const float updateRate, const float min, const float max, const vec2 size, const vec2 position, vec4 color);

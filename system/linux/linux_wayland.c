@@ -427,8 +427,8 @@ int main(int argc, char** argv)
 	}
 	else
 	{
-        config.renderWidth=xrContext.swapchainExtent.width;
-        config.renderHeight=xrContext.swapchainExtent.height;
+        config.renderWidth=xrContext.swapchain[0].extent.width;
+        config.renderHeight=xrContext.swapchain[0].extent.height;
 		config.windowWidth=config.renderWidth;
 		config.windowHeight=config.renderHeight;
         config.isVR=true;

@@ -44,6 +44,7 @@
 
 typedef struct
 {
+	XrExtent2Di extent;
 	XrSwapchain swapchain;
 	uint32_t numImages;
 	XrSwapchainImageVulkanKHR images[VKU_MAX_FRAME_COUNT];
@@ -59,9 +60,12 @@ typedef struct
 	XrViewConfigurationView viewConfigViews[2];
 	XrViewConfigurationType viewType;
 
-	XrExtent2Di swapchainExtent;
 	int64_t swapchainFormat;
 	XruSwapchain_t swapchain[2];
+
+	XruSwapchain_t uiSwapchain;
+	VkFramebuffer uiFramebuffer[VKU_MAX_FRAME_COUNT];
+	VkRenderPass uiRenderPass;
 
 	XrCompositionLayerProjectionView projViews[2];
 

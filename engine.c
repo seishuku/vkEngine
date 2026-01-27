@@ -1259,7 +1259,7 @@ static float timer=0.0;
 // Render call from system main event loop
 void Render(void)
 {
-	static uint32_t index=0, imageIndex[2]={ 0, 0 };
+	static uint32_t index=0, imageIndex[3]={ 0, 0, 0 };
 
 	timer+=fTimeStep;
 
@@ -1438,7 +1438,39 @@ void Render(void)
 
 	// Other eye compositing
 	if(config.isVR)
+	{
 		CompositeDraw(imageIndex[1], index, 1);
+
+		// Render VR UI
+		vkCmdBeginRenderPass(perFrame[index].commandBuffer, &(VkRenderPassBeginInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+			.renderPass=xrContext.uiRenderPass,
+			.framebuffer=xrContext.uiFramebuffer[imageIndex[2]],
+			.clearValueCount=1,
+			.pClearValues=(VkClearValue[]){ {{{ 0.0f, 0.0f, 0.0f, 0.0f }}} },
+			.renderArea={ { 0, 0 }, { xrContext.uiSwapchain.extent.width, xrContext.uiSwapchain.extent.height } },
+		}, VK_SUBPASS_CONTENTS_INLINE);
+
+		vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)xrContext.uiSwapchain.extent.width, (float)xrContext.uiSwapchain.extent.height, 0.0f, 1.0f });
+		vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { xrContext.uiSwapchain.extent.width, xrContext.uiSwapchain.extent.height } });
+
+		matrix mvp=MatrixScale(1.0f, -1.0f, 1.0f);
+
+		// Draw UI controls
+		UI_Draw(&UI, perFrame[index].commandBuffer, perFrame[index].descriptorPool, mvp, fTimeStep);
+
+		// Draw text in the compositing renderpass
+		Font_Print(&font, 16.0f, 0.0f, (float)xrContext.uiSwapchain.extent.height-16.0f, "FPS: %0.1f\n\x1B[33mFrame time: %0.3fms\nAudio time: %0.3fms\nPhysics time: %0.3fms", fps, fTimeStep*1000.0f, audioTime*1000.0f, physicsTime*1000.0f);
+
+		Font_Draw(&font, perFrame[index].commandBuffer, mvp);
+
+		DrawLineGraph(perFrame[index].commandBuffer, &frameTimes, mvp);
+		DrawLineGraph(perFrame[index].commandBuffer, &audioTimes, mvp);
+		DrawLineGraph(perFrame[index].commandBuffer, &physicsTimes, mvp);
+
+		vkCmdEndRenderPass(perFrame[index].commandBuffer);
+	}
 
 	// Reset the font text collection for the next frame
 	Font_Reset(&font);
@@ -1633,12 +1665,6 @@ bool Init(void)
 		CreateCompositeFramebuffers(1);
 	}
 
-	LoadingScreenAdvance(&loadingScreen);
-	CreateLineGraphPipeline();
-	CreateLineGraph(&frameTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, config.renderHeight-32.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
-	CreateLineGraph(&audioTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, config.renderHeight-48.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
-	CreateLineGraph(&physicsTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, config.renderHeight-64.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
-
 	// Set up particle system
 	if(!ParticleSystem_Init(&particleSystem))
 	{
@@ -1678,9 +1704,31 @@ bool Init(void)
 		};
 	}
 
-	Font_Init(&font);
+	uint32_t uiWidth=0, uiHeight=0;
+	VkRenderPass uiRenderPass=VK_NULL_HANDLE;
 
-	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)config.renderWidth, (float)config.renderHeight), compositeRenderPass);
+	if(config.isVR)
+	{
+		uiWidth=xrContext.uiSwapchain.extent.width;
+		uiHeight=xrContext.uiSwapchain.extent.height;
+		uiRenderPass=xrContext.uiRenderPass;
+	}
+	else
+	{
+		uiWidth=config.renderWidth;
+		uiHeight=config.renderHeight;
+		uiRenderPass=compositeRenderPass;
+	}
+
+	LoadingScreenAdvance(&loadingScreen);
+	CreateLineGraphPipeline(uiRenderPass);
+	CreateLineGraph(&frameTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, config.renderHeight-32.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
+	CreateLineGraph(&audioTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, config.renderHeight-48.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
+	CreateLineGraph(&physicsTimes, 200, 0.1f, 0.0f, 1.0f/30.0f, Vec2(200.0f, 16.0f), Vec2(120.0f, config.renderHeight-64.0f), Vec4(0.5f, 0.5f, 0.0f, 1.0f));
+
+	Font_Init(&font, uiWidth, uiHeight, uiRenderPass);
+
+	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)uiWidth, (float)uiHeight), uiRenderPass);
 
 	thirdPersonID=UI_AddCheckBox(&UI, Vec2(50, 50), 15, Vec3(1, 1, 1), UI_CONTROL_VISIBLE, "Third person camera", false);
 
@@ -1750,7 +1798,7 @@ bool Init(void)
 	UI_WindowAddControl(&UI, windowID, volumeID);
 	UI_WindowAddControl(&UI, windowID, colorShiftID);
 
-	UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, UI.size.y/2.0f), Vec2(50.0f, 50.0f), Vec3b(1.0f), UI_CONTROL_VISIBLE, &AssetManager_GetAsset(assets, TEXTURE_CROSSHAIR)->image, 0.0f);
+	UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, UI.size.y/2.0f), Vec2(64.0f, 64.0f), Vec3b(1.0f), UI_CONTROL_VISIBLE, &AssetManager_GetAsset(assets, TEXTURE_CROSSHAIR)->image, 0.0f);
 
 	playerHealthID=UI_AddBarGraph(&UI,
 								Vec2(5, 5),							// Position

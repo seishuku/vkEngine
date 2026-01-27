@@ -380,8 +380,8 @@ int main(int argc, char **argv)
 	}
 	else
 	{
-		config.renderWidth=xrContext.swapchainExtent.width;
-		config.renderHeight=xrContext.swapchainExtent.height;
+		config.renderWidth=xrContext.swapchain[0].extent.width;
+		config.renderHeight=xrContext.swapchain[0].extent.height;
 		config.windowWidth=config.renderWidth;
 		config.windowHeight=config.renderHeight;
 		XMoveResizeWindow(vkContext.display, vkContext.window, 0, 0, config.windowWidth/2, config.windowHeight/2);

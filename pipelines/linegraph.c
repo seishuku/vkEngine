@@ -9,16 +9,12 @@
 #include "linegraph.h"
 
 extern VkuContext_t vkContext;
-extern VkuSwapchain_t swapchain;
-extern VkRenderPass compositeRenderPass;
-extern XruContext_t xrContext;
-extern matrix modelView, projection[2], headPose;
 
-Pipeline_t lineGraphPipeline;
+static Pipeline_t lineGraphPipeline;
 
-bool CreateLineGraphPipeline(void)
+bool CreateLineGraphPipeline(VkRenderPass renderPass)
 {
-	if(!CreatePipeline(&vkContext, &lineGraphPipeline, compositeRenderPass, "pipelines/linegraph.pipeline"))
+	if(!CreatePipeline(&vkContext, &lineGraphPipeline, renderPass, "pipelines/linegraph.pipeline"))
 		return false;
 
 	return true;

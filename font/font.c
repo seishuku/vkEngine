@@ -22,44 +22,16 @@
 
 // external Vulkan context data/functions for this module:
 extern VkuContext_t vkContext;
-extern VkRenderPass compositeRenderPass;
-
-extern XruContext_t xrContext;
-extern matrix modelView, projection[2], headPose;
 // ---
 
-bool Font_Init(Font_t *font)
+bool Font_Init(Font_t *font, uint32_t width, uint32_t height, VkRenderPass renderPass)
 {
-	VkuBuffer_t stagingBuffer;
-	VkCommandBuffer copyCommand;
+	font->width=width;
+	font->height=height;
 
 	// Load and create pipeline
-	if(!CreatePipeline(&vkContext, &font->pipeline, compositeRenderPass, "pipelines/font.pipeline"))
+	if(!CreatePipeline(&vkContext, &font->pipeline, renderPass, "pipelines/font.pipeline"))
 		return false;
-
-	// Create static vertex data buffer
-	vkuCreateGPUBuffer(&vkContext, &font->vertexBuffer, sizeof(float)*4*4, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-
-	// Create staging buffer, map it, and copy vertex data to it
-	vkuCreateHostBuffer(&vkContext, &stagingBuffer, sizeof(float)*4*4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-
-	// Map it
-	if(stagingBuffer.memory->mappedPointer==NULL)
-		return false;
-
-	vec4 *ptr=(vec4 *)stagingBuffer.memory->mappedPointer;
-
-	*ptr++=Vec4(-0.5f, 1.0f, -1.0f, 1.0f);	// XYUV
-	*ptr++=Vec4(-0.5f, 0.0f, -1.0f, -1.0f);
-	*ptr++=Vec4(0.5f, 1.0f, 1.0f, 1.0f);
-	*ptr++=Vec4(0.5f, 0.0f, 1.0f, -1.0f);
-
-	copyCommand=vkuOneShotCommandBufferBegin(&vkContext);
-	vkCmdCopyBuffer(copyCommand, stagingBuffer.buffer, font->vertexBuffer.buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(vec4)*4 });
-	vkuOneShotCommandBufferEnd(&vkContext, copyCommand);
-
-	// Delete staging data
-	vkuDestroyBuffer(&vkContext, &stagingBuffer);
 
 	// Create instance buffer and map it
 	vkuCreateHostBuffer(&vkContext, &font->instanceBuffer, sizeof(vec4)*2*8192, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
@@ -298,7 +270,7 @@ void Font_Draw(Font_t *font, VkCommandBuffer commandBuffer, matrix mvp)
 		matrix mvp;
 	} fontPC;
 
-	fontPC.extent=(VkExtent2D){ config.renderWidth, config.renderHeight };
+	fontPC.extent=(VkExtent2D){ font->width, font->height };
 	fontPC.mvp=mvp;
 
 	// Bind the font rendering pipeline (sets states and shaders)
@@ -306,10 +278,8 @@ void Font_Draw(Font_t *font, VkCommandBuffer commandBuffer, matrix mvp)
 
 	vkCmdPushConstants(commandBuffer, font->pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(fontPC), &fontPC);
 
-	// Bind vertex data buffer
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &font->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
 	// Bind object instance buffer
-	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &font->instanceBuffer.buffer, &(VkDeviceSize) { 0 });
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &font->instanceBuffer.buffer, &(VkDeviceSize) { 0 });
 
 	// Draw the number of characters
 	vkCmdDraw(commandBuffer, 4, font->numChar, 0, 0);
@@ -326,9 +296,6 @@ void Font_Destroy(Font_t *font)
 {
 	// Instance buffer handles
 	vkuDestroyBuffer(&vkContext, &font->instanceBuffer);
-
-	// Vertex data handles
-	vkuDestroyBuffer(&vkContext, &font->vertexBuffer);
 
 	// Pipeline
 	DestroyPipeline(&vkContext, &font->pipeline);

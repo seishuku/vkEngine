@@ -258,18 +258,21 @@ void CreateCompositeFramebuffers(uint32_t eye)
 
 bool CreateCompositePipeline(void)
 {
+	VkImageLayout initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;
 	VkImageLayout attachementFinalLayout=VK_IMAGE_LAYOUT_UNDEFINED;
 	VkFormat surfaceFormat=VK_FORMAT_UNDEFINED;
 
 	// VR gets rendered directly to HMD, desktop needs to be presented
 	if(!config.isVR)
 	{
+		initialLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		attachementFinalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		surfaceFormat=swapchain.surfaceFormat.format;
 	}
 	else
 	{
-		attachementFinalLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		initialLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		attachementFinalLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		surfaceFormat=xrContext.swapchainFormat;
 	}
 
@@ -286,7 +289,7 @@ bool CreateCompositePipeline(void)
 				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.initialLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+				.initialLayout=initialLayout,
 				.finalLayout=attachementFinalLayout,
 			}
 		},
@@ -528,17 +531,20 @@ void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye)
 
 	vkCmdDraw(perFrame[frameIndex].commandBuffer, 3, 1, 0, 0);
 
-	// Draw UI controls
-	UI_Draw(&UI, perFrame[frameIndex].commandBuffer, perFrame[frameIndex].descriptorPool, mvp, fTimeStep);
+	if(!config.isVR)
+	{
+		// Draw UI controls
+		UI_Draw(&UI, perFrame[frameIndex].commandBuffer, perFrame[frameIndex].descriptorPool, mvp, fTimeStep);
 
-	// Draw text in the compositing renderpass
-	Font_Print(&font, 16.0f, 0.0f, (float)config.renderHeight-16.0f, "FPS: %0.1f\n\x1B[33mFrame time: %0.3fms\nAudio time: %0.3fms\nPhysics time: %0.3fms", fps, fTimeStep*1000.0f, audioTime*1000.0f, physicsTime*1000.0f);
+		// Draw text in the compositing renderpass
+		Font_Print(&font, 16.0f, 0.0f, (float)config.renderHeight-16.0f, "FPS: %0.1f\n\x1B[33mFrame time: %0.3fms\nAudio time: %0.3fms\nPhysics time: %0.3fms", fps, fTimeStep*1000.0f, audioTime*1000.0f, physicsTime*1000.0f);
 
-	Font_Draw(&font, perFrame[frameIndex].commandBuffer, mvp);
+		Font_Draw(&font, perFrame[frameIndex].commandBuffer, mvp);
 
-	DrawLineGraph(perFrame[frameIndex].commandBuffer, &frameTimes, mvp);
-	DrawLineGraph(perFrame[frameIndex].commandBuffer, &audioTimes, mvp);
-	DrawLineGraph(perFrame[frameIndex].commandBuffer, &physicsTimes, mvp);
+		DrawLineGraph(perFrame[frameIndex].commandBuffer, &frameTimes, mvp);
+		DrawLineGraph(perFrame[frameIndex].commandBuffer, &audioTimes, mvp);
+		DrawLineGraph(perFrame[frameIndex].commandBuffer, &physicsTimes, mvp);
+	}
 
 	vkCmdEndRenderPass(perFrame[frameIndex].commandBuffer);
 }
