@@ -68,7 +68,6 @@ layout(push_constant) uniform ubo
 {
 	mat4 mvp;
 	vec4 color;
-	vec2 radiusHeight;
 };
 
 out gl_PerVertex

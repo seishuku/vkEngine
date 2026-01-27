@@ -128,7 +128,7 @@ void CreateShadowMap(void)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.image=shadowDepth.image,
-		.viewType=VK_IMAGE_VIEW_TYPE_2D,
+		.viewType=VK_IMAGE_VIEW_TYPE_2D_ARRAY,
 		.format=shadowDepthFormat,
 		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
 		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
