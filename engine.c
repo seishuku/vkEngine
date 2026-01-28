@@ -1286,6 +1286,14 @@ void Render(void)
 	// Handle VR frame start
 	if(config.isVR)
 	{
+		if(xrContext.exitRequested)
+		{
+			isDone=true;
+			// Wait for physics to finish, then dump the frame and start over
+			ThreadBarrier_Wait(&physicsThreadBarrier);
+			return;
+		}
+
 		if(!VR_StartFrame(&xrContext, imageIndex))
 		{
 			VR_EndFrame(&xrContext);

@@ -181,22 +181,20 @@ bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex)
 		}
 
 		xrContext->projViews[0].subImage.swapchain=xrContext->swapchain[0].swapchain;
-		xrContext->projViews[0].subImage.imageRect.offset=(XrOffset2Di){ 0, 0 };
-		xrContext->projViews[0].subImage.imageRect.extent=xrContext->swapchain[0].extent;
+		xrContext->projViews[0].subImage.imageRect=(XrRect2Di) { { 0, 0 }, xrContext->swapchain[0].extent };
 
 		xrContext->projViews[1].subImage.swapchain=xrContext->swapchain[1].swapchain;
-		xrContext->projViews[1].subImage.imageRect.offset=(XrOffset2Di){ 0, 0 };
-		xrContext->projViews[1].subImage.imageRect.extent=xrContext->swapchain[1].extent;
+		xrContext->projViews[1].subImage.imageRect=(XrRect2Di) { { 0, 0 }, xrContext->swapchain[1].extent };
 
 		// Only transfer over the pose tracking if it's valid
 		if(viewState.viewStateFlags&(XR_VIEW_STATE_ORIENTATION_VALID_BIT|XR_VIEW_STATE_POSITION_VALID_BIT))
 		{
+			xrContext->projViews[0].fov=views[0].fov;
 			xrContext->projViews[0].pose=views[0].pose;
+
+			xrContext->projViews[1].fov=views[1].fov;
 			xrContext->projViews[1].pose=views[1].pose;
 		}
-
-		xrContext->projViews[0].fov=views[0].fov;
-		xrContext->projViews[1].fov=views[1].fov;
 
 		XrActiveActionSet activeActionSet={ xrContext->actionSet, XR_NULL_PATH };
 		XrActionsSyncInfo syncInfo={ .type=XR_TYPE_ACTIONS_SYNC_INFO, .countActiveActionSets=1, .activeActionSets=&activeActionSet };
@@ -228,11 +226,8 @@ bool VR_EndFrame(XruContext_t *xrContext)
 		.layerFlags=XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT,
 	    .space=xrContext->refSpace,
 	    .eyeVisibility=XR_EYE_VISIBILITY_BOTH,
-	    .subImage=
-		{
-	        .swapchain=xrContext->uiSwapchain.swapchain,
-	        .imageRect={ { 0, 0 }, xrContext->uiSwapchain.extent }
-		},
+	    .subImage.swapchain=xrContext->uiSwapchain.swapchain,
+	    .subImage.imageRect={ { 0, 0 }, xrContext->uiSwapchain.extent },
 	    .size={ 16.0f/9.0f, 1.0f },
 	    .pose={ .orientation={ 0.0f, 0.0f, 0.0f, 1.0f }, .position={ 0.0f, 0.0f, -1.0f } }
 	};
@@ -574,7 +569,8 @@ static bool VR_InitReferenceSpace(XruContext_t *xrContext, XrReferenceSpaceType 
 		.next=NULL,
 		.referenceSpaceType=spaceType,
 		.poseInReferenceSpace.orientation={ .x=0.0f, .y=0.0f, .z=0.0f, .w=1.0f },
-		.poseInReferenceSpace.position={ .x=0.0f, .y=0.0f, .z=0.0f }
+		// TODO: Why does my VR need to be shifted down like this for proper seated viewing?
+		.poseInReferenceSpace.position={ .x=0.0f, .y=-0.5f, .z=0.0f }
 	};
 
 	if(!xruCheck(xrContext->instance, xrCreateReferenceSpace(xrContext->session, &refSpaceCreateInfo, &xrContext->refSpace)))
