@@ -408,7 +408,7 @@ VkCommandBuffer vkuOneShotCommandBufferBegin(VkuContext_t *context)
 		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount=1,
 	}, &commandBuffer)!=VK_SUCCESS)
-		return VK_FALSE;
+		return VK_NULL_HANDLE;
 
 	if(vkBeginCommandBuffer(commandBuffer, &(VkCommandBufferBeginInfo) {.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO })!=VK_SUCCESS)
 	{
