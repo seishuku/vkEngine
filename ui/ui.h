@@ -121,7 +121,7 @@ typedef struct
 			float size;
 		} text;
 
-		// Virtual thumbsick type
+		// Virtual thumbstick type
 		struct
 		{
 			uint32_t titleTextID;
@@ -148,16 +148,14 @@ typedef struct
 
 	// Unique Vulkan data
 	Pipeline_t pipeline;
+	VkRenderPass renderPass;
 
 	VkuImage_t blankImage;
 
 	VkuBuffer_t instanceBuffer;
 	void *instanceBufferPtr;
 
-	VkRenderPass renderPass;
-
 	// Base ID for generating IDs
-	//uint32_t baseID;
 	ID_t baseID;
 
 	// List of controls in UI
@@ -174,7 +172,7 @@ bool UI_AddControl(UI_t *UI, UI_Control_t *control);
 UI_Control_t *UI_FindControlByID(UI_t *UI, uint32_t ID);
 
 uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, const char *titleText, UI_ControlMutability mutability, UI_BarGraphDirection direction, float min, float max, float value);
-bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, const char *titleText, UI_ControlMutability mutability, UI_BarGraphDirection direction, float Min, float Max, float value);
+bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, const char *titleText, UI_ControlMutability mutability, UI_BarGraphDirection direction, float min, float max, float value);
 bool UI_UpdateBarGraphPosition(UI_t *UI, uint32_t ID, vec2 position);
 bool UI_UpdateBarGraphSize(UI_t *UI, uint32_t ID, vec2 size);
 bool UI_UpdateBarGraphColor(UI_t *UI, uint32_t ID, vec3 color);

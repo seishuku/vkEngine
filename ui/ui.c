@@ -14,8 +14,6 @@
 
 // external Vulkan data and font
 extern VkuContext_t vkContext;
-
-extern matrix modelView, projection[2], headPose;
 // ---
 
 typedef struct
@@ -26,9 +24,10 @@ typedef struct
 	vec2 extra;
 } UI_Instance_t;
 
-static bool UI_VulkanVertex(UI_t *UI)
+static bool UI_VulkanPipeline(UI_t *UI)
 {
-	VkuBuffer_t stagingBuffer;
+	if(!CreatePipeline(&vkContext, &UI->pipeline, UI->renderPass, "pipelines/ui_sdf.pipeline"))
+		return false;
 
 	// Create a dummy blank image for binding to descriptor sets when no texture is needed
 	if(!vkuCreateImageBuffer(&vkContext, &UI->blankImage,
@@ -42,7 +41,7 @@ static bool UI_VulkanVertex(UI_t *UI)
 	vkuTransitionLayout(commandBuffer, UI->blankImage.image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuOneShotCommandBufferEnd(&vkContext, commandBuffer);
 
-	vkCreateSampler(vkContext.device, &(VkSamplerCreateInfo)
+	if(vkCreateSampler(vkContext.device, &(VkSamplerCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 		.magFilter=VK_FILTER_NEAREST,
@@ -58,9 +57,10 @@ static bool UI_VulkanVertex(UI_t *UI)
 		.maxAnisotropy=1.0f,
 		.anisotropyEnable=VK_FALSE,
 		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-	}, VK_NULL_HANDLE, &UI->blankImage.sampler);
+	}, VK_NULL_HANDLE, &UI->blankImage.sampler)!=VK_SUCCESS)
+		return false;
 
-	vkCreateImageView(vkContext.device, &(VkImageViewCreateInfo)
+	if(vkCreateImageView(vkContext.device, &(VkImageViewCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.image=UI->blankImage.image,
@@ -68,24 +68,16 @@ static bool UI_VulkanVertex(UI_t *UI)
 		.format=VK_FORMAT_B8G8R8A8_UNORM,
 		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
 		.subresourceRange={ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
-	}, VK_NULL_HANDLE, &UI->blankImage.imageView);
+	}, VK_NULL_HANDLE, &UI->blankImage.imageView)!=VK_SUCCESS)
+		return false;
 	// ---
 
 	// Create instance buffer and map it
-	vkuCreateHostBuffer(&vkContext, &UI->instanceBuffer, sizeof(UI_Instance_t)*UI_HASHTABLE_MAX, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	if(!vkuCreateHostBuffer(&vkContext, &UI->instanceBuffer, sizeof(UI_Instance_t)*UI_HASHTABLE_MAX, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT))
+		return false;
 
 	UI->instanceBufferPtr=UI->instanceBuffer.memory->mappedPointer;
 	// ---
-
-	return true;
-}
-
-static bool UI_VulkanPipeline(UI_t *UI)
-{
-	if(!CreatePipeline(&vkContext, &UI->pipeline, UI->renderPass, "pipelines/ui_sdf.pipeline"))
-		return false;
-
-	UI_VulkanVertex(UI);
 
 	return true;
 }
@@ -105,7 +97,7 @@ bool UI_Init(UI_t *UI, vec2 position, vec2 size, VkRenderPass renderPass)
 	UI->position=position;
 	UI->size=size;
 
-	// Initial 10 pre-allocated list of buttons, uninitialized
+	// Initial 10 pre-allocated list of controls, uninitialized
 	List_Init(&UI->controls, sizeof(UI_Control_t), 10, NULL);
 
 	memset(UI->controlsHashtable, 0, sizeof(UI_Control_t *)*UI_HASHTABLE_MAX);

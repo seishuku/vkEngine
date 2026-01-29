@@ -53,7 +53,7 @@ uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, UI_Contr
 	return ID;
 }
 
-bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, const char *titleText, UI_ControlMutability mutability, UI_BarGraphDirection direction, float Min, float Max, float value)
+bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 color, UI_ControlVisibility visibility, const char *titleText, UI_ControlMutability mutability, UI_BarGraphDirection direction, float min, float max, float value)
 {
 	if(UI==NULL||ID==UINT32_MAX)
 		return false;
@@ -75,8 +75,8 @@ bool UI_UpdateBarGraph(UI_t *UI, uint32_t ID, vec2 position, vec2 size, vec3 col
 		control->barGraph.size=size;
 		control->barGraph.mutability=mutability;
 		control->barGraph.direction=direction;
-		control->barGraph.min=Min;
-		control->barGraph.max=Max;
+		control->barGraph.min=min;
+		control->barGraph.max=max;
 		control->barGraph.value=value;
 
 		return true;

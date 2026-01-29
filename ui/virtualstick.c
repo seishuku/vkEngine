@@ -191,8 +191,6 @@ vec2 UI_GetVirtualStickValue(UI_t *UI, uint32_t ID)
 	return Vec2b(0.0f);
 }
 
-#include "../system/system.h"
-
 // Set the active flag of the virtual thumbstick by ID
 // Returns false on error
 bool UI_SetVirtualStickActive(UI_t *UI, uint32_t ID, bool active)
@@ -205,7 +203,6 @@ bool UI_SetVirtualStickActive(UI_t *UI, uint32_t ID, bool active)
 
 	if(control!=NULL&&control->type==UI_CONTROL_VIRTUALSTICK)
 	{
-		DBGPRINTF(DEBUG_ERROR, "VirtualStick %d: %s\n", ID, active?"true":"false");
 		control->virtualStick.active=active;
 		return true;
 	}
