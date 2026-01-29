@@ -326,8 +326,8 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			}
 			else
 			{
-				config.renderWidth=xrContext.swapchainExtent.width;
-				config.renderHeight=xrContext.swapchainExtent.height;
+				config.renderWidth=xrContext.swapchain[0].extent.width;
+				config.renderHeight=xrContext.swapchain[0].extent.height;
 				config.isVR=true;
 			}
 
