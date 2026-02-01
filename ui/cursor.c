@@ -24,6 +24,7 @@ uint32_t UI_AddCursor(UI_t *UI, vec2 position, float radius, vec3 color, UI_Cont
 		.color=color,
 		.childParentID=UINT32_MAX,
 		.visibility=visibility,
+		.zOrder=INT32_MAX,
 		.cursor.radius=radius,
 	};
 

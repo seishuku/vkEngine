@@ -23,6 +23,7 @@ uint32_t UI_AddEditText(UI_t *UI, vec2 position, vec2 size, vec3 color, UI_Contr
 		.color=color,
 		.childParentID=UINT32_MAX,
 		.visibility=visibility,
+		.zOrder=0,
 		.editText.size=size,
 		.editText.mutability=mutability,
 		.editText.maxLength=maxLength,

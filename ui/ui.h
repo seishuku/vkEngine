@@ -57,6 +57,7 @@ typedef struct
 	vec3 color;
 	uint32_t childParentID;
 	UI_ControlVisibility visibility;
+	int32_t zOrder;
 
 	// Specific to type
 	union
@@ -143,6 +144,16 @@ typedef struct
 
 typedef struct
 {
+    uint32_t controlIndex;
+    int32_t z;
+    vec2 parentOffset;
+
+	uint32_t firstInstance;
+	uint32_t instanceCount;
+} UI_DrawIndex_t;
+
+typedef struct
+{
 	// Position and size of whole UI system
 	vec2 position, size;
 
@@ -163,6 +174,10 @@ typedef struct
 
 	// Hashtable for quick lookup by ID
 	UI_Control_t *controlsHashtable[UI_HASHTABLE_MAX];
+
+	// Drawing list for sorting
+	UI_DrawIndex_t drawList[UI_HASHTABLE_MAX];
+	uint32_t drawCount;
 } UI_t;
 
 bool UI_Init(UI_t *UI, vec2 position, vec2 size, VkRenderPass renderPass);

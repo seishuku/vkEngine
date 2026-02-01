@@ -22,6 +22,7 @@ uint32_t UI_AddBarGraph(UI_t *UI, vec2 position, vec2 size, vec3 color, UI_Contr
 		.color=color,
 		.childParentID=UINT32_MAX,
 		.visibility=visibility,
+		.zOrder=0,
 		.barGraph.size=size,
 		.barGraph.mutability=mutability,
 		.barGraph.direction=direction,

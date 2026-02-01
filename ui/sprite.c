@@ -27,6 +27,7 @@ uint32_t UI_AddSprite(UI_t *UI, vec2 position, vec2 size, vec3 color, UI_Control
 		.color=color,
 		.childParentID=UINT32_MAX,
 		.visibility=visibility,
+		.zOrder=0,
 		.sprite.image=image,
 		.sprite.size=size,
 		.sprite.cropSize=size,

@@ -24,6 +24,7 @@ uint32_t UI_AddVirtualStick(UI_t *UI, vec2 position, float radius, vec3 color, U
 		.color=color,
 		.childParentID=UINT32_MAX,
 		.visibility=visibility,
+		.zOrder=0,
 		.virtualStick.radius=radius,
 		.virtualStick.value=Vec2b(0.0f),
 	};

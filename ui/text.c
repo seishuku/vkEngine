@@ -27,6 +27,7 @@ uint32_t UI_AddText(UI_t *UI, vec2 position, float size, vec3 color, UI_ControlV
 		.color=color,
 		.childParentID=UINT32_MAX,
 		.visibility=visibility,
+		.zOrder=0,
 		.text.size=size,
 	};
 

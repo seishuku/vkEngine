@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
-#include <stdio.h>
+#include <stdlib.h>
 #include "../system/system.h"
 #include "../vulkan/vulkan.h"
 #include "../perframe.h"
@@ -38,7 +38,9 @@ static bool UI_VulkanPipeline(UI_t *UI)
 		return VK_FALSE;
 
 	VkCommandBuffer commandBuffer=vkuOneShotCommandBufferBegin(&vkContext);
-	vkuTransitionLayout(commandBuffer, UI->blankImage.image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuTransitionLayout(commandBuffer, UI->blankImage.image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	vkCmdClearColorImage(commandBuffer, UI->blankImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &(VkClearColorValue) { .float32={ 0.75f, 0.125f, 0.75f, 1.0f } }, 1, &(VkImageSubresourceRange){ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
+	vkuTransitionLayout(commandBuffer, UI->blankImage.image, 1, 0, 1, 0, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuOneShotCommandBufferEnd(&vkContext, commandBuffer);
 
 	if(vkCreateSampler(vkContext.device, &(VkSamplerCreateInfo)
@@ -698,9 +700,51 @@ static bool UI_AddControlInstance(UI_Instance_t **instance, uint32_t *instanceCo
 		}
 
 		case UI_CONTROL_SPRITE:
+		{
+			(*instance)->positionSize.x=control->position.x;
+			(*instance)->positionSize.y=control->position.y;
+			(*instance)->positionSize.z=control->sprite.size.x;
+			(*instance)->positionSize.w=control->sprite.size.y;
+
+			(*instance)->colorValue.x=control->color.x;
+			(*instance)->colorValue.y=control->color.y;
+			(*instance)->colorValue.z=control->color.z;
+			(*instance)->colorValue.w=control->sprite.rotation;
+
+			(*instance)->type=UI_CONTROL_SPRITE;
+
+			(*instance)->flag=control->sprite.frame;
+
+			(*instance)->extra=control->sprite.cropSize;
+
+			(*instance)++;
+			(*instanceCount)++;
+
+			return true;
+		}
 		default:
 			return false;
 	}	
+}
+
+static int UI_DrawIndexCompare(const void *a, const void *b)
+{
+	const UI_DrawIndex_t *A=a;
+	const UI_DrawIndex_t *B=b;
+
+	if(A->z<B->z)
+		return -1;
+
+	if(A->z>B->z)
+		return 1;
+
+	if(A->controlIndex<B->controlIndex)
+		return -1;
+
+	if(A->controlIndex>B->controlIndex)
+		return 1;
+
+	return 0;
 }
 
 bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool, matrix mvp, float dt)
@@ -708,23 +752,25 @@ bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 	if(UI==NULL)
 		return false;
 
-	UI_Instance_t *instance=(UI_Instance_t *)UI->instanceBufferPtr;
-	uint32_t instanceCount=0;
+	// Build a draw list
+	UI->drawCount=0;
 
-	const size_t controlCount=List_GetCount(&UI->controls);
-
-	// Build a list of instanceable UI controls
-	for(uint32_t i=0;i<controlCount;i++)
+	for(uint32_t i=0;i<List_GetCount(&UI->controls);i++)
 	{
 		UI_Control_t *control=List_GetPointer(&UI->controls, i);
 
-		// Only add controls that are non-child and visible controls
+		// Skip hidden or child controls
 		if(control->childParentID!=UINT32_MAX||control->visibility)
 			continue;
 
-		UI_AddControlInstance(&instance, &instanceCount, control, Vec2b(0.0f), dt);
+		UI->drawList[UI->drawCount++]=(UI_DrawIndex_t)
+		{
+			.controlIndex=i,
+			.z=control->zOrder,
+			.parentOffset=Vec2b(0.0f)
+		};
 
-		// If it was a window control, add children control instances
+		// Window children
 		if(control->type==UI_CONTROL_WINDOW)
 		{
 			for(uint32_t j=0;j<List_GetCount(&control->window.children);j++)
@@ -732,11 +778,38 @@ bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 				uint32_t *childID=List_GetPointer(&control->window.children, j);
 				UI_Control_t *child=UI_FindControlByID(UI, *childID);
 
-				// Add child control instances with offset of parent control, but only if visible
-				if(!child->visibility)
-					UI_AddControlInstance(&instance, &instanceCount, child, control->position, dt);
+				if(!child||child->visibility)
+					continue;
+
+				UI->drawList[UI->drawCount++]=(UI_DrawIndex_t)
+				{
+					.controlIndex=*childID,
+					.z=child->zOrder+control->zOrder,
+					.parentOffset=control->position
+				};
 			}
 		}
+	}
+
+	// Sort draw list by z order
+	qsort(UI->drawList, UI->drawCount, sizeof(UI_DrawIndex_t), UI_DrawIndexCompare);
+
+	// Build instance buffer and calculate instance counts/offsets
+	UI_Instance_t *instance=(UI_Instance_t *)UI->instanceBufferPtr;
+	uint32_t instanceCursor=0;
+
+	for(uint32_t i=0;i<UI->drawCount;i++)
+	{
+		UI_DrawIndex_t *item=&UI->drawList[i];
+		UI_Control_t *control=List_GetPointer(&UI->controls, item->controlIndex);
+
+		item->firstInstance=instanceCursor;
+
+		uint32_t before=instanceCursor;
+
+		UI_AddControlInstance(&instance, &instanceCursor, control, item->parentOffset, dt);
+
+		item->instanceCount=instanceCursor-before;
 	}
 
 	// Flush instance buffer caches, mostly needed for Android and maybe some iGPUs
@@ -765,48 +838,43 @@ bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 
 	vkCmdPushConstants(commandBuffer, UI->pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(UIPC), &UIPC);
 
-	// Draw sprites, they need descriptor set changes and aren't easy to draw instanced...
-	uint32_t spriteCount=instanceCount;
-	for(uint32_t i=0;i<controlCount;i++)
+	// Draw ordered widgets while maintaining large instances
+	for(uint32_t i=0;i<UI->drawCount;)
 	{
-		UI_Control_t *control=(UI_Control_t *)List_GetPointer(&UI->controls, i);
+		UI_DrawIndex_t *item=&UI->drawList[i];
+		UI_Control_t *control=List_GetPointer(&UI->controls, item->controlIndex);
 
-		if(control->type==UI_CONTROL_SPRITE&&!control->visibility)
+		// Sprites
+		if(control->type==UI_CONTROL_SPRITE)
 		{
-			// TODO: This may be a problem on integrated or mobile platforms, flush needed?
-			instance->positionSize.x=control->position.x;
-			instance->positionSize.y=control->position.y;
-			instance->positionSize.z=control->sprite.size.x;
-			instance->positionSize.w=control->sprite.size.y;
-
-			instance->colorValue.x=control->color.x;
-			instance->colorValue.y=control->color.y;
-			instance->colorValue.z=control->color.z;
-			instance->colorValue.w=control->sprite.rotation;
-
-			instance->type=UI_CONTROL_SPRITE;
-
-			instance->flag=control->sprite.frame;
-
-			instance->extra=control->sprite.cropSize;
-
-			instance++;
-
 			vkuDescriptorSet_UpdateBindingImageInfo(&UI->pipeline.descriptorSet, 0, control->sprite.image->sampler, control->sprite.image->imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			vkuAllocateUpdateDescriptorSet(&UI->pipeline.descriptorSet, descriptorPool);
 			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipelineLayout, 0, 1, &UI->pipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
-
-			// Use the last unused instanced data slot for drawing
-			vkCmdDraw(commandBuffer, 4, 1, 0, spriteCount++);
+		    vkCmdDraw(commandBuffer, 4, item->instanceCount, 0, item->firstInstance);
+			i++;
+			continue;
 		}
+
+		// Everything else, accumulate instances until next sprite or end of list
+		uint32_t run=0;
+
+		while(i<UI->drawCount)
+		{
+			UI_DrawIndex_t *peekDraw=&UI->drawList[i];
+			UI_Control_t *peekControl=List_GetPointer(&UI->controls, peekDraw->controlIndex);
+
+			if(peekControl->type==UI_CONTROL_SPRITE)
+				break;
+
+			run+=peekDraw->instanceCount;
+			i++;
+		}
+
+		vkuDescriptorSet_UpdateBindingImageInfo(&UI->pipeline.descriptorSet, 0, UI->blankImage.sampler, UI->blankImage.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		vkuAllocateUpdateDescriptorSet(&UI->pipeline.descriptorSet, descriptorPool);
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipelineLayout, 0, 1, &UI->pipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+		vkCmdDraw(commandBuffer, 4, run, 0, item->firstInstance);
 	}
-
-	vkuDescriptorSet_UpdateBindingImageInfo(&UI->pipeline.descriptorSet, 0, UI->blankImage.sampler, UI->blankImage.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuAllocateUpdateDescriptorSet(&UI->pipeline.descriptorSet, descriptorPool);
-	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UI->pipeline.pipelineLayout, 0, 1, &UI->pipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
-
-	// Draw instanced UI elements
-	vkCmdDraw(commandBuffer, 4, instanceCount, 0, 0);
 
 	return true;
 }

@@ -1739,6 +1739,12 @@ bool Init(void)
 	UI_Init(&UI, Vec2(0.0f, 0.0f), Vec2((float)uiWidth, (float)uiHeight), uiRenderPass);
 
 	thirdPersonID=UI_AddCheckBox(&UI, Vec2(50, 50), 15, Vec3(1, 1, 1), UI_CONTROL_VISIBLE, "Third person camera", false);
+	{
+		UI_Control_t *temp=UI_FindControlByID(&UI, thirdPersonID);
+		temp->zOrder=0;
+		temp=UI_FindControlByID(&UI, temp->checkBox.titleTextID);
+		temp->zOrder=0;
+	}
 
 #ifdef ANDROID
 	leftThumbstickID=UI_AddVirtualStick(&UI, Vec2(200, 200), 64, Vec3(1, 1, 1), UI_CONTROL_VISIBLE, "MOVE");
@@ -1749,6 +1755,12 @@ bool Init(void)
 #endif
 
 	windowID=UI_AddWindow(&UI, Vec2(UI.size.x-450, UI.size.y-50), Vec2(400, 128), Vec3(0.1, 0.1, 0.1), UI_CONTROL_VISIBLE, "Controls");
+	{
+		UI_Control_t *temp=UI_FindControlByID(&UI, windowID);
+		temp->zOrder=1;
+		temp=UI_FindControlByID(&UI, temp->checkBox.titleTextID);
+		temp->zOrder=1;
+	}
 
 	uint32_t playButton=UI_AddButton(&UI,
 				 Vec2(0, -50),							// Position
@@ -1823,6 +1835,10 @@ bool Init(void)
 	sprite=UI_AddSprite(&UI, Vec2(400.0f, 400.0f), Vec2(256.0f, 256.0f), Vec3b(1.0f), UI_CONTROL_VISIBLE, &AssetManager_GetAsset(assets, TEXTURE_FOX)->image, 0.0f);
 	// Negative crop sizes will flip the frame, useful for walking animations
 	UI_UpdateSpriteCropSize(&UI, sprite, Vec2(32.0f, 32.0f));
+	{
+		UI_Control_t *temp=UI_FindControlByID(&UI, sprite);
+		temp->zOrder=2;
+	}
 
 	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3b(1.0f), UI_CONTROL_VISIBLE);
 

@@ -24,6 +24,7 @@ uint32_t UI_AddCheckBox(UI_t *UI, vec2 position, float radius, vec3 color, UI_Co
 		.color=color,
 		.childParentID=UINT32_MAX,
 		.visibility=visibility,
+		.zOrder=0,
 		.checkBox.radius=radius,
 		.checkBox.value=value
 	};
