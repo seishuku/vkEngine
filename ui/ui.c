@@ -177,10 +177,14 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 	// offset by UI position
 	position=Vec2_Addv(position, UI->position);
 
+	// A bit crude, but does work for z ordered hit tests...
+	//   Does rely on UI_Draw being called at least once for it to work, though that shouldn't be a huge issue in most rendering cases.
+	//   But it is convenient that drawList already has a sorted list of control indices.
+
 	// Loop through all controls in the UI
-	for(uint32_t i=0;i<List_GetCount(&UI->controls);i++)
+	for(int32_t i=UI->drawCount-1;i>=0;i--)
 	{
-		UI_Control_t *control=List_GetPointer(&UI->controls, i);
+		UI_Control_t *control=List_GetPointer(&UI->controls, UI->drawList[i].controlIndex);
 
 		// Only test non-child and visible controls here
 		if(control->childParentID!=UINT32_MAX||control->visibility)
@@ -254,7 +258,16 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 			}
 
 			case UI_CONTROL_SPRITE:
+			{
+				vec2 relPos=Vec2_Addv(position, Vec2_Muls(control->sprite.size, 0.5f));
+
+				if(relPos.x>=control->position.x&&relPos.x<=control->position.x+control->sprite.size.x&&
+					relPos.y>=control->position.y&&relPos.y<=control->position.y+control->sprite.size.y)
+				{
+					return control->ID;
+				}
 				break;
+			}
 
 			case UI_CONTROL_CURSOR:
 				break;
