@@ -176,8 +176,7 @@ typedef struct
 	UI_Control_t *controlsHashtable[UI_HASHTABLE_MAX];
 
 	// Drawing list for sorting
-	UI_DrawIndex_t drawList[UI_HASHTABLE_MAX];
-	uint32_t drawCount;
+	List_t drawList;
 } UI_t;
 
 bool UI_Init(UI_t *UI, vec2 position, vec2 size, VkRenderPass renderPass);

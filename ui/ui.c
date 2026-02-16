@@ -102,7 +102,11 @@ bool UI_Init(UI_t *UI, vec2 position, vec2 size, VkRenderPass renderPass)
 	// Initial 10 pre-allocated list of controls, uninitialized
 	List_Init(&UI->controls, sizeof(UI_Control_t), 10, NULL);
 
+	// Clear hashtable
 	memset(UI->controlsHashtable, 0, sizeof(UI_Control_t *)*UI_HASHTABLE_MAX);
+
+	// Initial 10 pre-allocated list of draw indices, uninitialized
+	List_Init(&UI->drawList, sizeof(UI_DrawIndex_t), 10, NULL);
 
 	// Vulkan stuff
 	if(!UI_VulkanPipeline(UI))
@@ -129,6 +133,7 @@ void UI_Destroy(UI_t *UI)
 	}
 
 	List_Destroy(&UI->controls);
+	List_Destroy(&UI->drawList);
 
 	vkuDestroyBuffer(&vkContext, &UI->instanceBuffer);
 
@@ -182,9 +187,10 @@ uint32_t UI_TestHit(UI_t *UI, vec2 position)
 	//   But it is convenient that drawList already has a sorted list of control indices.
 
 	// Loop through all controls in the UI
-	for(int32_t i=UI->drawCount-1;i>=0;i--)
+	for(int32_t i=List_GetCount(&UI->drawList)-1;i>=0;i--)
 	{
-		UI_Control_t *control=List_GetPointer(&UI->controls, UI->drawList[i].controlIndex);
+		UI_DrawIndex_t *drawItem=(UI_DrawIndex_t *)List_GetPointer(&UI->drawList, i);
+		UI_Control_t *control=List_GetPointer(&UI->controls, drawItem->controlIndex);
 
 		// Only test non-child and visible controls here
 		if(control->childParentID!=UINT32_MAX||control->visibility)
@@ -766,7 +772,7 @@ bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 		return false;
 
 	// Build a draw list
-	UI->drawCount=0;
+	List_Clear(&UI->drawList);
 
 	for(uint32_t i=0;i<List_GetCount(&UI->controls);i++)
 	{
@@ -776,12 +782,12 @@ bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 		if(control->childParentID!=UINT32_MAX||control->visibility)
 			continue;
 
-		UI->drawList[UI->drawCount++]=(UI_DrawIndex_t)
+		List_Add(&UI->drawList, &(UI_DrawIndex_t)
 		{
 			.controlIndex=i,
 			.z=control->zOrder,
 			.parentOffset=Vec2b(0.0f)
-		};
+		});
 
 		// Window children
 		if(control->type==UI_CONTROL_WINDOW)
@@ -794,26 +800,26 @@ bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 				if(!child||child->visibility)
 					continue;
 
-				UI->drawList[UI->drawCount++]=(UI_DrawIndex_t)
+				List_Add(&UI->drawList, &(UI_DrawIndex_t)
 				{
 					.controlIndex=*childID,
 					.z=child->zOrder+control->zOrder,
 					.parentOffset=control->position
-				};
+				});
 			}
 		}
 	}
 
 	// Sort draw list by z order
-	qsort(UI->drawList, UI->drawCount, sizeof(UI_DrawIndex_t), UI_DrawIndexCompare);
+	qsort(UI->drawList.buffer, List_GetCount(&UI->drawList), sizeof(UI_DrawIndex_t), UI_DrawIndexCompare);
 
 	// Build instance buffer and calculate instance counts/offsets
 	UI_Instance_t *instance=(UI_Instance_t *)UI->instanceBufferPtr;
 	uint32_t instanceCursor=0;
 
-	for(uint32_t i=0;i<UI->drawCount;i++)
+	for(uint32_t i=0;i<List_GetCount(&UI->drawList);i++)
 	{
-		UI_DrawIndex_t *item=&UI->drawList[i];
+		UI_DrawIndex_t *item=(UI_DrawIndex_t *)List_GetPointer(&UI->drawList, i);
 		UI_Control_t *control=List_GetPointer(&UI->controls, item->controlIndex);
 
 		item->firstInstance=instanceCursor;
@@ -852,9 +858,9 @@ bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 	vkCmdPushConstants(commandBuffer, UI->pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(UIPC), &UIPC);
 
 	// Draw ordered widgets while maintaining large instances
-	for(uint32_t i=0;i<UI->drawCount;)
+	for(uint32_t i=0;i<List_GetCount(&UI->drawList);)
 	{
-		UI_DrawIndex_t *item=&UI->drawList[i];
+		UI_DrawIndex_t *item=(UI_DrawIndex_t *)List_GetPointer(&UI->drawList, i);
 		UI_Control_t *control=List_GetPointer(&UI->controls, item->controlIndex);
 
 		// Sprites
@@ -871,9 +877,9 @@ bool UI_Draw(UI_t *UI, VkCommandBuffer commandBuffer, VkDescriptorPool descripto
 		// Everything else, accumulate instances until next sprite or end of list
 		uint32_t run=0;
 
-		while(i<UI->drawCount)
+		while(i<List_GetCount(&UI->drawList))
 		{
-			UI_DrawIndex_t *peekDraw=&UI->drawList[i];
+			UI_DrawIndex_t *peekDraw=(UI_DrawIndex_t *)List_GetPointer(&UI->drawList, i);
 			UI_Control_t *peekControl=List_GetPointer(&UI->controls, peekDraw->controlIndex);
 
 			if(peekControl->type==UI_CONTROL_SPRITE)
