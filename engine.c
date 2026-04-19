@@ -1025,6 +1025,7 @@ void TestCollision(void *a, void *b)
 
 			ParticleSystem_AddEmitter(&particleSystem,
 									  whichProjectile->rigidBody->position,	// Position
+									  Vec3b(0.0f),					// Initial velocity
 									  Vec3(100.0f, 12.0f, 5.0f),	// Start color
 									  Vec3(0.0f, 0.0f, 0.0f),		// End color
 									  5.0f,						// Radius of particles
@@ -1148,6 +1149,7 @@ void Thread_Physics(void *arg)
 						ParticleSystem_AddEmitter(
 							&particleSystem,
 						    hitPoint,                  // Position
+							Vec3b(0.0f),               // Initial velocity
 						    Vec3(100.0f, 12.0f, 5.0f), // Start color
 						    Vec3(0.0f, 0.0f, 0.0f),    // End color
 						    5.0f,                      // Radius of particles
@@ -1681,7 +1683,7 @@ bool Init(void)
 	}
 	
 	ParticleSystem_SetGravity(&particleSystem, 0.0f, 0.0f, 0.0f);
-	em=ParticleSystem_AddEmitter(&particleSystem, Vec3(0.0f, 0.0f, 50.0f), Vec3b(10.0f), Vec3b(0.0f), 2.0f, 50, PARTICLE_EMITTER_BURST, NULL);
+	em=ParticleSystem_AddEmitter(&particleSystem, Vec3(0.0f, 0.0f, -50.0f), Vec3b(0.0f), Vec3b(1.0f), Vec3b(0.0f), 10.0f, 1000, PARTICLE_EMITTER_BURST, NULL);
 
 	// Set up emitter initial state and projectile rigid body parameters
 	for(uint32_t i=0;i<MAX_EMITTERS;i++)

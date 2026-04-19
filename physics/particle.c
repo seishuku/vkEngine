@@ -63,7 +63,7 @@ static bool addParticle(ParticleSystem_t *system, Particle_t particle)
 
 // Adds a particle emitter to the system
 // Note: numParticles is total number of particles for burst/once types, but is particles-per-second for continous type.
-uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3 startColor, vec3 endColor, float particleSize, uint32_t numParticles, ParticleEmitterType_e type, ParticleInitCallback initCallback)
+uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3 velocity, vec3 startColor, vec3 endColor, float particleSize, uint32_t numParticles, ParticleEmitterType_e type, ParticleInitCallback initCallback)
 {
 	if(system==NULL)
 		return UINT32_MAX;
@@ -79,6 +79,7 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3
 		.ID=ID,
 		.type=type,
 		.position=position,
+		.velocity=velocity,
 		.startColor=startColor,
 		.endColor=endColor,
 		.particleSize=particleSize,
@@ -106,6 +107,7 @@ uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3
 			particle.endColor=emitter.endColor;
 			particle.particleSize=emitter.particleSize;
 			particle.position=Vec3_Addv(particle.position, emitter.position);
+			particle.velocity=Vec3_Addv(particle.velocity, emitter.velocity);
 
 			addParticle(system, particle);
 		}
@@ -197,6 +199,23 @@ void ParticleSystem_SetEmitterPosition(ParticleSystem_t *system, uint32_t ID, ve
 	}
 }
 
+void ParticleSystem_SetEmitterVelocity(ParticleSystem_t *system, uint32_t ID, vec3 velocity)
+{
+	if(system==NULL||ID==UINT32_MAX)
+		return;
+
+	for(uint32_t i=0;i<List_GetCount(&system->emitters);i++)
+	{
+		ParticleEmitter_t *emitter=(ParticleEmitter_t*)List_GetPointer(&system->emitters, i);
+
+		if(emitter->ID==ID)
+		{
+			emitter->velocity=velocity;
+			return;
+		}
+	}
+}
+
 bool ParticleSystem_SetGravity(ParticleSystem_t *system, float x, float y, float z)
 {
 	if(system==NULL)
@@ -275,7 +294,7 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 
 	// Pre-allocate minimal sized buffers
 	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
-		vkuCreateHostBuffer(&vkContext, &system->particleBuffer[i], sizeof(vec4)*2*system->maxParticles, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+		vkuCreateHostBuffer(&vkContext, &system->particleBuffer[i], sizeof(ParticleVertex_t)*system->maxParticles, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
 	return true;
 }
@@ -325,6 +344,7 @@ void ParticleSystem_Step(ParticleSystem_t *system, float dt)
 				particle.endColor=emitter->endColor;
 				particle.particleSize=emitter->particleSize;
 				particle.position=Vec3_Addv(particle.position, emitter->position);
+				particle.velocity=Vec3_Addv(particle.velocity, emitter->velocity);
 
 				addParticle(system, particle);
 			}
@@ -427,6 +447,7 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 		{
 			vec3 color=Vec3_Lerp(system->particles[i].startColor, system->particles[i].endColor, system->particles[i].life);
 			vertices->posSize=Vec4_Vec3(system->particles[i].position, system->particles[i].particleSize);
+			vertices->velocity=Vec4_Vec3(system->particles[i].velocity, 0.0f);
 			vertices->colorLife=Vec4_Vec3(color, clampf(system->particles[i].life, 0.0f, 1.0f));
 			vertices++;
 			system->numParticles++;

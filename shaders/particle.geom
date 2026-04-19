@@ -10,10 +10,13 @@ layout(push_constant) uniform ParticlePC
 };
 
 layout(location=0) in vec4 gPosition[1];
-layout(location=1) in vec4 gColor[1];
+layout(location=1) in vec4 gVelocity[1];
+layout(location=2) in vec4 gColor[1];
 
-layout(location=0) out vec4 vColor;
+layout(location=0) out flat vec4 vColor;
 layout(location=1) out vec2 vUV;
+layout(location=2) out flat vec3 vVelocity;
+layout(location=3) out flat vec3 vPosition;
 
 void main()
 {
@@ -31,24 +34,24 @@ void main()
 		1 *----* 3
 	*/
 
+	vColor=gColor[0];
+	vVelocity=(modelview * vec4(gVelocity[0].xyz, 0.0)).xyz;
+	vPosition=(modelview * vec4(gPosition[0].xyz, 1.0)).xyz;
+
 	gl_Position=projection*modelview*vec4(gPosition[0].xyz-Right.xyz*Scale+Up.xyz*Scale, 1.0);
 	vUV=vec2(0.0, 1.0);
-	vColor=gColor[0];
 	EmitVertex();
 
 	gl_Position=projection*modelview*vec4(gPosition[0].xyz-Right.xyz*Scale-Up.xyz*Scale, 1.0);
 	vUV=vec2(0.0, 0.0);
-	vColor=gColor[0];
 	EmitVertex();
 
 	gl_Position=projection*modelview*vec4(gPosition[0].xyz+Right.xyz*Scale+Up.xyz*Scale, 1.0);
 	vUV=vec2(1.0, 1.0);
-	vColor=gColor[0];
 	EmitVertex();
 
 	gl_Position=projection*modelview*vec4(gPosition[0].xyz+Right.xyz*Scale-Up.xyz*Scale, 1.0);
 	vUV=vec2(1.0, 0.0);
-	vColor=gColor[0];
 	EmitVertex();
 
 	EndPrimitive();                                                                 

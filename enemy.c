@@ -147,6 +147,7 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 
 		ParticleSystem_AddEmitter(&particleSystem,
 								  enemy->camera->body.position,	// Position
+								  Vec3b(0.0f),					// Velocity
 								  Vec3(1000.0f, 0.0f, 0.0f),	// Start color
 								  Vec3(0.0f, 0.0f, 0.0f),		// End color
 								  20.0f,						// Radius of particles

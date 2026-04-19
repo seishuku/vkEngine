@@ -30,7 +30,7 @@ typedef struct ParticleEmitter_s
 {
 	uint32_t ID;
 	ParticleEmitterType_e type;
-	vec3 position;
+	vec3 position, velocity;
 	vec3 startColor, endColor;
 	float particleSize;
 	float emissionRate, emissionInterval, emissionTime;
@@ -41,6 +41,7 @@ typedef struct ParticleEmitter_s
 typedef struct
 {
 	vec4 posSize;
+	vec4 velocity;
 	vec4 colorLife;
 } ParticleVertex_t;
 
@@ -61,10 +62,11 @@ typedef struct ParticleSystem_s
 	ParticleVertex_t *systemBuffer;
 } ParticleSystem_t;
 
-uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3 startColor, vec3 endColor, float particleSize, uint32_t numParticles, ParticleEmitterType_e type, ParticleInitCallback initCallback);
+uint32_t ParticleSystem_AddEmitter(ParticleSystem_t *system, vec3 position, vec3 velocity, vec3 startColor, vec3 endColor, float particleSize, uint32_t numParticles, ParticleEmitterType_e type, ParticleInitCallback initCallback);
 void ParticleSystem_DeleteEmitter(ParticleSystem_t *system, uint32_t ID);
 void ParticleSystem_ResetEmitter(ParticleSystem_t *system, uint32_t ID);
 void ParticleSystem_SetEmitterPosition(ParticleSystem_t *system, uint32_t ID, vec3 position);
+void ParticleSystem_SetEmitterVelocity(ParticleSystem_t *system, uint32_t ID, vec3 velocity);
 
 bool ParticleSystem_SetGravity(ParticleSystem_t *system, float x, float y, float z);
 bool ParticleSystem_SetGravityv(ParticleSystem_t *system, vec3 v);
