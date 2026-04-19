@@ -97,7 +97,7 @@
             "displayName": "Android ARM64 Release",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
-            "toolchainFile": "$env{ANDROID_HOME}/ndk/29.0.13846066/build/cmake/android.toolchain.cmake",
+            "toolchainFile": "$env{ANDROID_HOME}/ndk/30.0.14904198/build/cmake/android.toolchain.cmake",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "ANDROID_PLATFORM": "android-28",
