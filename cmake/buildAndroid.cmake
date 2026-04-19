@@ -32,6 +32,7 @@ function("buildAndroid")
 	list(APPEND PROJECT_SOURCES
 		audio/backend/android.c
 		system/android/android_fopen.c
+		system/android/android_input.c
 		system/android/android_main.c
 		system/android/android_native_app_glue.c
 	)

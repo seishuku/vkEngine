@@ -12,6 +12,7 @@
 #include "../../utils/list.h"
 #include "../../utils/event.h"
 #include "../../vr/vr.h"
+#include "../../input/input.h"
 
 MemZone_t *zone;
 
@@ -28,8 +29,6 @@ extern VkuContext_t vkContext;
 extern VkuSwapchain_t swapchain;
 
 float fps=0.0f, fTimeStep=0.0f, fTime=0.0f;
-
-extern vec2 leftThumbstick, rightThumbstick;
 
 void Render(void);
 bool Init(void);
@@ -106,6 +105,88 @@ static bool UnregisterRawInput(void)
 	{
 		DBGPRINTF(DEBUG_ERROR, "\t...failed to unregister raw input devices.\n");
 		return false;
+	}
+}
+
+static Keycodes_t ConvertKeymap(uint32_t vkey)
+{
+	switch (vkey)
+	{
+		case VK_BACK:			return KB_BACKSPACE;
+		case VK_TAB:			return KB_TAB;
+		case VK_RETURN:			return KB_ENTER;
+		case VK_PAUSE:			return KB_PAUSE;
+		case VK_CAPITAL:		return KB_CAPS_LOCK;
+		case VK_ESCAPE:			return KB_ESCAPE;
+		case VK_SPACE:			return KB_SPACE;
+		case VK_PRIOR:			return KB_PAGE_UP;
+		case VK_NEXT:			return KB_PAGE_DOWN;
+		case VK_END:			return KB_END;
+		case VK_HOME:			return KB_HOME;
+		case VK_LEFT:			return KB_LEFT;
+		case VK_UP:				return KB_UP;
+		case VK_RIGHT:			return KB_RIGHT;
+		case VK_DOWN:			return KB_DOWN;
+		case VK_SNAPSHOT:		return KB_PRINT_SCREEN;
+		case VK_INSERT:			return KB_INSERT;
+		case VK_DELETE:			return KB_DEL;
+		case VK_LWIN:			return KB_LSUPER;
+		case VK_RWIN:			return KB_RSUPER;
+		case VK_APPS:			return KB_MENU;
+		case VK_NUMPAD0:		return KB_NP_0;
+		case VK_NUMPAD1:		return KB_NP_1;
+		case VK_NUMPAD2:		return KB_NP_2;
+		case VK_NUMPAD3:		return KB_NP_3;
+		case VK_NUMPAD4:		return KB_NP_4;
+		case VK_NUMPAD5:		return KB_NP_5;
+		case VK_NUMPAD6:		return KB_NP_6;
+		case VK_NUMPAD7:		return KB_NP_7;
+		case VK_NUMPAD8:		return KB_NP_8;
+		case VK_NUMPAD9:		return KB_NP_9;
+		case VK_MULTIPLY:		return KB_NP_MULTIPLY;
+		case VK_ADD:			return KB_NP_ADD;
+		case VK_SUBTRACT:		return KB_NP_SUBTRACT;
+		case VK_DECIMAL:		return KB_NP_DECIMAL;
+		case VK_DIVIDE:			return KB_NP_DIVIDE;
+		case VK_F1:				return KB_F1;
+		case VK_F2:				return KB_F2;
+		case VK_F3:				return KB_F3;
+		case VK_F4:				return KB_F4;
+		case VK_F5:				return KB_F5;
+		case VK_F6:				return KB_F6;
+		case VK_F7:				return KB_F7;
+		case VK_F8:				return KB_F8;
+		case VK_F9:				return KB_F9;
+		case VK_F10:			return KB_F10;
+		case VK_F11:			return KB_F11;
+		case VK_F12:			return KB_F12;
+		case VK_NUMLOCK:		return KB_NUM_LOCK;
+		case VK_SCROLL:			return KB_SCROLL_LOCK;
+		case VK_LSHIFT:			return KB_LSHIFT;
+		case VK_RSHIFT:			return KB_RSHIFT;
+		case VK_LCONTROL:		return KB_LCTRL;
+		case VK_RCONTROL:		return KB_RCTRL;
+		case VK_LMENU:			return KB_LALT;
+		case VK_RMENU:			return KB_RALT;
+		case VK_OEM_PLUS:		return KB_EQUAL;
+		case VK_OEM_MINUS:		return KB_MINUS;
+		case VK_OEM_PERIOD:		return KB_PERIOD;
+		case VK_OEM_COMMA:		return KB_COMMA;
+		case VK_OEM_1:			return KB_SEMICOLON;
+		case VK_OEM_2:			return KB_SLASH;
+		case VK_OEM_3:			return KB_GRAVE_ACCENT;
+		case VK_OEM_4:			return KB_LEFT_BRACKET;
+		case VK_OEM_5:			return KB_BACKSLASH;
+		case VK_OEM_6:			return KB_RIGHT_BRACKET;
+		case VK_OEM_7:			return KB_APOSTROPHE;
+		default:
+			// Handle ASCII codes (A-Z, 0-9)
+			if(vkey>='A'&&vkey<='Z')
+				return (Keycodes_t)vkey;
+			if (vkey >= '0' && vkey <= '9')
+				return (Keycodes_t)vkey;
+
+			return KB_UNKNOWN;
 	}
 }
 
@@ -217,95 +298,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					if(keyboard.VKey==VK_MENU)
 						keyboard.VKey=MapVirtualKey(keyboard.MakeCode, MAPVK_VSC_TO_VK_EX);
 
-					// Remap from Windows virtual keys to application key enums
-					// (will probably reformat this later)
-					uint32_t code=KB_UNKNOWN;
+					// Convert Windows virtual key to engine keycode
+					Keycodes_t code=ConvertKeymap(keyboard.VKey);
 
-					switch(keyboard.VKey)
-					{
-						case VK_BACK:		code=KB_BACKSPACE;				break;	// Backspace
-						case VK_TAB:		code=KB_TAB;					break;	// Tab
-						case VK_RETURN:		if(keyboard.Flags&RI_KEY_E0)
-							code=KB_NP_ENTER;					// Numpad enter
-									  else
-							code=KB_ENTER;						// Enter
-							break;
-						case VK_PAUSE:		code=KB_PAUSE;					break;	// pause
-						case VK_CAPITAL:	code=KB_CAPS_LOCK;				break;	// Caps Lock
-						case VK_ESCAPE:		code=KB_ESCAPE;					break;	// Esc
-						case VK_SPACE:		code=KB_SPACE;					break;	// Space
-						case VK_PRIOR:		code=KB_PAGE_UP;				break;	// Page Up
-						case VK_NEXT:		code=KB_PAGE_DOWN;				break;	// Page Down
-						case VK_END:		code=KB_END;					break;	// End
-						case VK_HOME:		code=KB_HOME;					break;	// Home
-						case VK_LEFT:		code=KB_LEFT;					break;	// Left
-						case VK_UP:			code=KB_UP;						break;	// Up
-						case VK_RIGHT:		code=KB_RIGHT;					break;	// Right
-						case VK_DOWN:		code=KB_DOWN;					break;	// Down
-						case VK_SNAPSHOT:	code=KB_PRINT_SCREEN;			break;	// Prnt Scrn
-						case VK_INSERT:		code=KB_INSERT;					break;	// Insert
-						case VK_DELETE:		code=KB_DEL;					break;	// Delete
-						case VK_LWIN:		code=KB_LSUPER;					break;	// Left Windows
-						case VK_RWIN:		code=KB_RSUPER;					break;	// Right Windows
-						case VK_APPS:		code=KB_MENU;					break;	// Application
-						case VK_NUMPAD0:	code=KB_NP_0;					break;	// Num 0
-						case VK_NUMPAD1:	code=KB_NP_1;					break;	// Num 1
-						case VK_NUMPAD2:	code=KB_NP_2;					break;	// Num 2
-						case VK_NUMPAD3:	code=KB_NP_3;					break;	// Num 3
-						case VK_NUMPAD4:	code=KB_NP_4;					break;	// Num 4
-						case VK_NUMPAD5:	code=KB_NP_5;					break;	// Num 5
-						case VK_NUMPAD6:	code=KB_NP_6;					break;	// Num 6
-						case VK_NUMPAD7:	code=KB_NP_7;					break;	// Num 7
-						case VK_NUMPAD8:	code=KB_NP_8;					break;	// Num 8
-						case VK_NUMPAD9:	code=KB_NP_9;					break;	// Num 9
-						case VK_MULTIPLY:	code=KB_NP_MULTIPLY;			break;	// Num *
-						case VK_ADD:		code=KB_NP_ADD;					break;	// Num +
-						case VK_SUBTRACT:	code=KB_NP_SUBTRACT;			break;	// Num -
-						case VK_DECIMAL:	code=KB_NP_DECIMAL;				break;	// Num Del
-						case VK_DIVIDE:		code=KB_NP_DIVIDE;				break;	// Num /
-						case VK_F1:			code=KB_F1;						break;	// F1
-						case VK_F2:			code=KB_F2;						break;	// F2
-						case VK_F3:			code=KB_F3;						break;	// F3
-						case VK_F4:			code=KB_F4;						break;	// F4
-						case VK_F5:			code=KB_F5;						break;	// F5
-						case VK_F6:			code=KB_F6;						break;	// F6
-						case VK_F7:			code=KB_F7;						break;	// F7
-						case VK_F8:			code=KB_F8;						break;	// F8
-						case VK_F9:			code=KB_F9;						break;	// F9
-						case VK_F10:		code=KB_F10;					break;	// F10
-						case VK_F11:		code=KB_F11;					break;	// F11
-						case VK_F12:		code=KB_F12;					break;	// F12
-						case VK_NUMLOCK:	code=KB_NUM_LOCK;				break;	// Num Lock
-						case VK_SCROLL:		code=KB_SCROLL_LOCK;			break;	// Scroll Lock
-						case VK_LSHIFT:		code=KB_LSHIFT;					break;	// Shift
-						case VK_RSHIFT:		code=KB_RSHIFT;					break;	// Right Shift
-						case VK_OEM_PLUS:	code=KB_EQUAL;					break;	// =
-						case VK_OEM_MINUS:	code=KB_MINUS;					break;	// -
-						case VK_OEM_PERIOD:	code=KB_PERIOD;					break;	// .
-						case VK_OEM_1:		code=KB_SEMICOLON;				break;	// ;
-						case VK_OEM_2:		code=KB_SLASH;					break;	// Frontslash
-						case VK_OEM_3:		code=KB_GRAVE_ACCENT;			break;	// `
-						case VK_OEM_4:		code=KB_LEFT_BRACKET;			break;	// [
-						case VK_OEM_5:		code=KB_BACKSLASH;				break;	// Backslash
-						case VK_OEM_6:		code=KB_RIGHT_BRACKET;			break;	// ]
-						case VK_OEM_7:		code=KB_APOSTROPHE;				break;	// '
-						case VK_LCONTROL:	if(keyboard.Flags&RI_KEY_E0)
-							code=KB_RCTRL;						// Right control
-										else
-							code=KB_LCTRL;						// Left control
-							break;
-						case VK_LMENU:		if(keyboard.Flags&RI_KEY_E0)
-							code=KB_RALT;						// Right alt
-									 else
-							code=KB_LALT;						// Left alt
-							break;
-						default:			code=keyboard.VKey;	break;	// All others
-					}
-
-					if(keyboard.Flags&RI_KEY_BREAK)
-						Event_Trigger(EVENT_KEYUP, &code);
-					else
-						Event_Trigger(EVENT_KEYDOWN, &code);
+					// Route through input system
+					bool pressed=!(keyboard.Flags&RI_KEY_BREAK);
+					Input_OnKeyEvent(code, pressed);
 
 					break;
 				}
@@ -314,36 +312,58 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				{
 					RAWMOUSE mouse=input->data.mouse;
 					static MouseEvent_t mouseEvent={ 0, 0, 0, 0 };
+					static vec2 mousePos = {0, 0};
 
-					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_1_DOWN)
+					if(mouse.usButtonFlags & RI_MOUSE_BUTTON_1_DOWN)
+			        {
 						mouseEvent.button|=MOUSE_BUTTON_1;
-
-					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_1_UP)
+				        Input_OnMouseButtonEvent(MOUSE_BUTTON_1, true);
+			        }
+			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_1_UP)
+			        {
 						mouseEvent.button&=~MOUSE_BUTTON_1;
-
-					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_2_DOWN)
+				        Input_OnMouseButtonEvent(MOUSE_BUTTON_1, false);
+			        }
+			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_2_DOWN)
+			        {
 						mouseEvent.button|=MOUSE_BUTTON_2;
-
-					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_2_UP)
+				        Input_OnMouseButtonEvent(MOUSE_BUTTON_2, true);
+			        }
+			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_2_UP)
+			        {
 						mouseEvent.button&=~MOUSE_BUTTON_2;
-
-					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_3_DOWN)
+				        Input_OnMouseButtonEvent(MOUSE_BUTTON_2, false);
+			        }
+			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_3_DOWN)
+			        {
 						mouseEvent.button|=MOUSE_BUTTON_3;
-
-					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_3_UP)
+				        Input_OnMouseButtonEvent(MOUSE_BUTTON_3, true);
+			        }
+			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_3_UP)
+			        {
 						mouseEvent.button&=~MOUSE_BUTTON_3;
-
-					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_4_DOWN)
+				        Input_OnMouseButtonEvent(MOUSE_BUTTON_3, false);
+			        }
+			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_4_DOWN)
+			        {
 						mouseEvent.button|=MOUSE_BUTTON_4;
-
-					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_4_UP)
+				        Input_OnMouseButtonEvent(MOUSE_BUTTON_4, true);
+			        }
+			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_4_UP)
+			        {
 						mouseEvent.button&=~MOUSE_BUTTON_4;
-
-					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_5_DOWN)
+				        Input_OnMouseButtonEvent(MOUSE_BUTTON_4, false);
+			        }
+			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_5_DOWN)
+			        {
 						mouseEvent.button|=MOUSE_BUTTON_5;
-
-					if(mouse.usButtonFlags&RI_MOUSE_BUTTON_5_UP)
+				        Input_OnMouseButtonEvent(MOUSE_BUTTON_5, true);
+			        }
+			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_5_UP)
+			        {
 						mouseEvent.button&=~MOUSE_BUTTON_5;
+				        Input_OnMouseButtonEvent(MOUSE_BUTTON_5, false);
+			        }
 
 					if(mouse.usButtonFlags&RI_MOUSE_WHEEL)
 						mouseEvent.dz=mouse.usButtonData;
@@ -354,19 +374,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						{
 							mouseEvent.dx=mouse.lLastX;
 							mouseEvent.dy=-mouse.lLastY;
-							Event_Trigger(EVENT_MOUSEMOVE, &mouseEvent);
-						}
-					}
 
-					if(mouse.usButtonFlags&(RI_MOUSE_BUTTON_1_DOWN|RI_MOUSE_BUTTON_2_DOWN|RI_MOUSE_BUTTON_3_DOWN|RI_MOUSE_BUTTON_4_DOWN|RI_MOUSE_BUTTON_5_DOWN))
-					{
-						Event_Trigger(EVENT_MOUSEDOWN, &mouseEvent);
-						Event_Trigger(EVENT_MOUSEMOVE, &mouseEvent);
-					}
-					else if(mouse.usButtonFlags&(RI_MOUSE_BUTTON_1_UP|RI_MOUSE_BUTTON_2_UP|RI_MOUSE_BUTTON_3_UP|RI_MOUSE_BUTTON_4_UP|RI_MOUSE_BUTTON_5_UP))
-					{
-						Event_Trigger(EVENT_MOUSEUP, &mouseEvent);
-						Event_Trigger(EVENT_MOUSEMOVE, &mouseEvent);
+							// Route through input system (cursor is at window center after warp)
+							Input_OnMouseEvent(&mouseEvent, Vec2(config.windowWidth/2.0f, config.windowHeight/2.0f));
+
+							// Warp cursor back to center of window
+							RECT rc;
+							GetWindowRect(vkContext.hWnd, &rc);
+							SetCursorPos((rc.left+rc.right)/2, (rc.top+rc.bottom)/2);
+						}
 					}
 					break;
 				}
@@ -381,18 +397,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	}
 
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
-}
-
-static vec2 ApplyScaleDeadzone(LONG x, LONG y, LONG maxX, LONG maxY, float deadzoneThreshold)
-{
-	vec2 d={ ((float)x/maxX), ((float)y/maxY) };
-
-	if(fabsf(d.x)<deadzoneThreshold)
-		d.x=0.0f;
-	if(fabsf(d.y)<deadzoneThreshold)
-		d.y=0.0f;
-
-	return d;
 }
 
 #if 0
@@ -553,85 +557,7 @@ int main(int argc, char **argv)
 		}
 		else
 		{
-			// TODO: Find a better place for gamepad input handling!
-			XINPUT_STATE state={ 0 };
-
-			if(XInputGetState(0, &state)==ERROR_SUCCESS)
-			{
-				static uint32_t qKeyShot=0, eKeyShot=0, cKeyShot=0, vKeyShot=0;
-
-				leftThumbstick=ApplyScaleDeadzone(state.Gamepad.sThumbLX, state.Gamepad.sThumbLY, INT16_MAX, INT16_MAX, 0.1f);
-				rightThumbstick=ApplyScaleDeadzone(state.Gamepad.sThumbRX, state.Gamepad.sThumbRY, INT16_MAX, INT16_MAX, 0.1f);
-
-				if(state.Gamepad.wButtons&XINPUT_GAMEPAD_A)
-				{
-					if(!cKeyShot)
-					{
-						cKeyShot=KB_C;
-						Event_Trigger(EVENT_KEYDOWN, &cKeyShot);
-					}
-				}
-				else
-				{
-					if(cKeyShot)
-					{
-						Event_Trigger(EVENT_KEYUP, &cKeyShot);
-						cKeyShot=0;
-					}
-				}
-
-				if(state.Gamepad.wButtons&XINPUT_GAMEPAD_X)
-				{
-					if(!vKeyShot)
-					{
-						vKeyShot=KB_V;
-						Event_Trigger(EVENT_KEYDOWN, &vKeyShot);
-					}
-				}
-				else
-				{
-					if(vKeyShot)
-					{
-						Event_Trigger(EVENT_KEYUP, &vKeyShot);
-						vKeyShot=0;
-					}
-				}
-
-				if(state.Gamepad.wButtons&XINPUT_GAMEPAD_LEFT_SHOULDER)
-				{
-					if(!qKeyShot)
-					{
-						qKeyShot=KB_Q;
-						Event_Trigger(EVENT_KEYDOWN, &qKeyShot);
-					}
-				}
-				else
-				{
-					if(qKeyShot)
-					{
-						Event_Trigger(EVENT_KEYUP, &qKeyShot);
-						qKeyShot=0;
-					}
-				}
-
-				if(state.Gamepad.wButtons&XINPUT_GAMEPAD_RIGHT_SHOULDER)
-				{
-					if(!eKeyShot)
-					{
-						eKeyShot=KB_E;
-						Event_Trigger(EVENT_KEYDOWN, &eKeyShot);
-					}
-				}
-				else
-				{
-					if(eKeyShot)
-					{
-						Event_Trigger(EVENT_KEYUP, &eKeyShot);
-						eKeyShot=0;
-					}
-				}
-			}
-
+			// Render frame
 			static float avgFPS=0.0f;
 
 			double startTime=GetClock();
@@ -642,6 +568,7 @@ int main(int argc, char **argv)
 				rdoc_api->StartFrameCapture(NULL, NULL);
 #endif
 
+			Input_Update();
 			Render();
 
 			fTimeStep=(float)(GetClock()-startTime);

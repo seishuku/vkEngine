@@ -68,6 +68,7 @@ set(PROJECT_SOURCES
 	"utils/spatialhash.c"
 	"utils/spvparse.c"
 	"utils/tokenizer.c"
+	"input/input.c"
 	"vr/vr.c"
 	"vulkan/vulkan_buffer.c"
 	"vulkan/vulkan_context.c"

@@ -34,6 +34,7 @@
 #include "utils/bvh.h"
 #include "utils/event.h"
 #include "utils/list.h"
+#include "input/input.h"
 #include "vr/vr.h"
 #include "vulkan/vulkan.h"
 #include "assetmanager.h"
@@ -141,11 +142,6 @@ uint32_t rightThumbstickID=UINT32_MAX;
 float playerHealth=100.0f;
 
 Console_t console;
-
-XrPosef leftHand, rightHand;
-float leftTrigger, rightTrigger;
-float leftGrip, rightGrip;
-vec2 leftThumbstick, rightThumbstick;
 
 bool isControlPressed=false;
 
@@ -728,16 +724,21 @@ void Thread_Main(void *arg)
 
 		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
-		vec3 leftPos=Vec3(leftHand.position.x, leftHand.position.y, leftHand.position.z);
-		vec4 leftRot=Vec4(leftHand.orientation.x, leftHand.orientation.y, leftHand.orientation.z, leftHand.orientation.w);
+		vec4 leftHandOrientation=Input_GetVRHandOrientation(0), rightHandOrientation=Input_GetVRHandOrientation(1);
+		vec3 leftHandPosition=Input_GetVRHandPosition(0), rightHandPosition=Input_GetVRHandPosition(1);
+		float leftTrigger=Input_GetVRTrigger(0), rightTrigger=Input_GetVRTrigger(1);
+		float leftGrip=Input_GetVRGrip(0), rightGrip=Input_GetVRGrip(1);
+
+		vec3 leftPos=Vec3(leftHandPosition.x, leftHandPosition.y, leftHandPosition.z);
+		vec4 leftRot=Vec4(leftHandOrientation.x, leftHandOrientation.y, leftHandOrientation.z, leftHandOrientation.w);
 		matrix local=MatrixMult(MatrixMult(QuatToMatrix(leftRot), MatrixScale(0.1f, 0.1f, 0.1f)), MatrixTranslatev(leftPos));
 		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
 		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
 		DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
 
-		vec3 rightPos=Vec3(rightHand.position.x, rightHand.position.y, rightHand.position.z);
-		vec4 rightRot=Vec4(rightHand.orientation.x, rightHand.orientation.y, rightHand.orientation.z, rightHand.orientation.w);
+		vec3 rightPos=Vec3(rightHandPosition.x, rightHandPosition.y, rightHandPosition.z);
+		vec4 rightRot=Vec4(rightHandOrientation.x, rightHandOrientation.y, rightHandOrientation.z, rightHandOrientation.w);
 		local=MatrixMult(MatrixMult(QuatToMatrix(rightRot), MatrixScale(0.1f, 0.1f, 0.1f)), MatrixTranslatev(rightPos));
 		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
 		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
@@ -1315,15 +1316,18 @@ void Render(void)
 		headPose[1]=VR_GetHeadPose(&xrContext, 1);
 
 		// TODO: Find a better place for VR input handling!
-		leftHand=VR_GetActionPose(&xrContext, xrContext.handPose, xrContext.leftHandSpace, 0);
-		leftTrigger=VR_GetActionFloat(&xrContext, xrContext.handTrigger, 0);
-		leftGrip=VR_GetActionFloat(&xrContext, xrContext.handGrip, 0);
-		leftThumbstick=VR_GetActionVec2(&xrContext, xrContext.handThumbstick, 0);
+		// VR input is now handled by the input module - read from unified input state
+		vec4 leftHandOrientation=Input_GetVRHandOrientation(0);
+		vec3 leftHandPosition=Input_GetVRHandPosition(0);
+		float leftTrigger=Input_GetVRTrigger(0);
+		float leftGrip=Input_GetVRGrip(0);
+		vec2 leftThumbstick=Input_GetVRThumbstick(0);
 
-		rightHand=VR_GetActionPose(&xrContext, xrContext.handPose, xrContext.rightHandSpace, 1);
-		rightTrigger=VR_GetActionFloat(&xrContext, xrContext.handTrigger, 1);
-		rightGrip=VR_GetActionFloat(&xrContext, xrContext.handGrip, 1);
-		rightThumbstick=VR_GetActionVec2(&xrContext, xrContext.handThumbstick, 1);
+		vec4 rightHandOrientation=Input_GetVRHandOrientation(1);
+		vec3 rightHandPosition=Input_GetVRHandPosition(1);
+		float rightTrigger=Input_GetVRTrigger(1);
+		float rightGrip=Input_GetVRGrip(1);
+		vec2 rightThumbstick=Input_GetVRThumbstick(1);
 
 		const float speed=240.0f;
 		const float rotation=5.0f;
@@ -1336,7 +1340,7 @@ void Render(void)
 
 		if(leftTrigger>0.1f)
 		{
-			vec3 deltaLeftPosition=Vec3_Muls(Vec3_Subv(Vec3(leftHand.position.x, leftHand.position.y, leftHand.position.z), lastLeftPosition), 100.0f);
+			vec3 deltaLeftPosition=Vec3_Muls(Vec3_Subv(Vec3(leftHandPosition.x, leftHandPosition.y, leftHandPosition.z), lastLeftPosition), 100.0f);
 			MouseEvent_t MouseEvent={ .dx=(int32_t)deltaLeftPosition.x, .dy=(int32_t)deltaLeftPosition.y };
 
 			Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
@@ -1355,13 +1359,13 @@ void Render(void)
 				leftTriggerOnce=true;
 		}
 		else
-			lastLeftPosition=Vec3(leftHand.position.x, leftHand.position.y, leftHand.position.z);
+			lastLeftPosition=Vec3(leftHandPosition.x, leftHandPosition.y, leftHandPosition.z);
 
 		if(rightTrigger>0.75f&&rightTriggerOnce)
 		{
 			rightTriggerOnce=false;
 
-			vec4 rightOrientation=Vec4(rightHand.orientation.x, rightHand.orientation.y, rightHand.orientation.z, rightHand.orientation.w);
+			vec4 rightOrientation=Vec4(rightHandOrientation.x, rightHandOrientation.y, rightHandOrientation.z, rightHandOrientation.w);
 			vec3 direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatToMatrix(rightOrientation), MatrixInverse(modelView)));
 
 			FireParticleEmitter(Vec3_Addv(camera.body.position, Vec3_Muls(direction, camera.body.radius)), direction);
@@ -1396,6 +1400,13 @@ void Render(void)
 		headPose[0]=MatrixIdentity();
 
 		// TODO: Find a better place for gamepad input handling!
+#ifdef ANDROID
+		vec2 leftThumbstick=UI_GetVirtualStickValue(&UI, leftThumbstickID);
+		vec2 rightThumbstick=UI_GetVirtualStickValue(&UI, rightThumbstickID);
+#else
+		vec2 leftThumbstick=Input_GetGamepadStick(0);
+		vec2 rightThumbstick=Input_GetGamepadStick(1);
+#endif
 		const float speed=240.0f;
 		const float rotation=5.0f;
 
@@ -1416,11 +1427,6 @@ void Render(void)
 
 	camera.thirdPerson=UI_GetCheckBoxValue(&UI, thirdPersonID);
 	UI_UpdateBarGraphValue(&UI, playerHealthID, playerHealth);
-
-#ifdef ANDROID
-	leftThumbstick=UI_GetVirtualStickValue(&UI, leftThumbstickID);
-	rightThumbstick=UI_GetVirtualStickValue(&UI, rightThumbstickID);
-#endif
 
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
@@ -1598,6 +1604,8 @@ void Console_CmdExplode(Console_t *console, const char *param)
 // Initialization call from system main
 bool Init(void)
 {
+	Input_PlatformInit();
+
 	vkuMemAllocator_Init(&vkContext);
 
 	LoadingScreenInit(&loadingScreen, NUM_ASSETS+11);

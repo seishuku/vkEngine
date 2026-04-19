@@ -12,6 +12,7 @@
 #include "../../vulkan/vulkan.h"
 #include "../../math/math.h"
 #include "../../vr/vr.h"
+#include "../../input/input.h"
 #include "../../utils/config.h"
 #include "../../utils/event.h"
 
@@ -57,6 +58,71 @@ double GetClock(void)
 	return 0.0;
 }
 
+static Keycodes_t ConvertKeymap(int32_t code)
+{
+	switch(code)
+	{
+		case AKEYCODE_DEL:				return KB_BACKSPACE;			break;	// Backspace
+		case AKEYCODE_TAB:				return KB_TAB;					break;	// Tab
+		case AKEYCODE_ENTER:			return KB_ENTER;				break;	// Enter
+		case AKEYCODE_BREAK:			return KB_PAUSE;				break;	// Pause
+		case AKEYCODE_CAPS_LOCK:		return KB_CAPS_LOCK;			break;	// Caps Lock
+		case AKEYCODE_ESCAPE:			return KB_ESCAPE;				break;	// Esc
+		case AKEYCODE_PAGE_UP:			return KB_PAGE_UP;				break;	// Page Up
+		case AKEYCODE_PAGE_DOWN:		return KB_PAGE_DOWN;			break;	// Page Down
+		case AKEYCODE_MOVE_END:			return KB_END;					break;	// End
+		case AKEYCODE_MOVE_HOME:		return KB_HOME;					break;	// Home
+		case AKEYCODE_DPAD_LEFT:		return KB_LEFT;					break;	// Left
+		case AKEYCODE_DPAD_UP:			return KB_UP;					break;	// Up
+		case AKEYCODE_DPAD_RIGHT:		return KB_RIGHT;				break;	// Right
+		case AKEYCODE_DPAD_DOWN:		return KB_DOWN;					break;	// Down
+		case AKEYCODE_SYSRQ:			return KB_PRINT_SCREEN;			break;	// Prnt Scrn
+		case AKEYCODE_INSERT:			return KB_INSERT;				break;	// Insert
+		case AKEYCODE_FORWARD_DEL:		return KB_DEL;					break;	// Delete
+		case AKEYCODE_META_LEFT:		return KB_LSUPER;				break;	// Left Windows?
+		case AKEYCODE_META_RIGHT:		return KB_RSUPER;				break;	// Right Windows?
+		case AKEYCODE_MENU:				return KB_MENU;					break;	// Application
+		case AKEYCODE_NUMPAD_0:			return KB_NP_0;					break;	// Num 0
+		case AKEYCODE_NUMPAD_1:			return KB_NP_1;					break;	// Num 1
+		case AKEYCODE_NUMPAD_2:			return KB_NP_2;					break;	// Num 2
+		case AKEYCODE_NUMPAD_3:			return KB_NP_3;					break;	// Num 3
+		case AKEYCODE_NUMPAD_4:			return KB_NP_4;					break;	// Num 4
+		case AKEYCODE_NUMPAD_5:			return KB_NP_5;					break;	// Num 5
+		case AKEYCODE_NUMPAD_6:			return KB_NP_6;					break;	// Num 6
+		case AKEYCODE_NUMPAD_7:			return KB_NP_7;					break;	// Num 7
+		case AKEYCODE_NUMPAD_8:			return KB_NP_8;					break;	// Num 8
+		case AKEYCODE_NUMPAD_9:			return KB_NP_9;					break;	// Num 9
+		case AKEYCODE_NUMPAD_MULTIPLY:	return KB_NP_MULTIPLY;			break;	// Num *
+		case AKEYCODE_NUMPAD_ADD:		return KB_NP_ADD;				break;	// Num +
+		case AKEYCODE_NUMPAD_SUBTRACT:	return KB_NP_SUBTRACT;			break;	// Num -
+		case AKEYCODE_NUMPAD_DOT:		return KB_NP_DECIMAL;			break;	// Num Del
+		case AKEYCODE_NUMPAD_DIVIDE:	return KB_NP_DIVIDE;			break;	// Num /
+		case AKEYCODE_F1:				return KB_F1;					break;	// F1
+		case AKEYCODE_F2:				return KB_F2;					break;	// F2
+		case AKEYCODE_F3:				return KB_F3;					break;	// F3
+		case AKEYCODE_F4:				return KB_F4;					break;	// F4
+		case AKEYCODE_F5:				return KB_F5;					break;	// F5
+		case AKEYCODE_F6:				return KB_F6;					break;	// F6
+		case AKEYCODE_F7:				return KB_F7;					break;	// F7
+		case AKEYCODE_F8:				return KB_F8;					break;	// F8
+		case AKEYCODE_F9:				return KB_F9;					break;	// F9
+		case AKEYCODE_F10:				return KB_F10;					break;	// F10
+		case AKEYCODE_F11:				return KB_F11;					break;	// F11
+		case AKEYCODE_F12:				return KB_F12;					break;	// F12
+		case AKEYCODE_NUM_LOCK:			return KB_NUM_LOCK;				break;	// Num Lock
+		case AKEYCODE_SCROLL_LOCK:		return KB_SCROLL_LOCK;			break;	// Scroll Lock
+		case AKEYCODE_SHIFT_LEFT:		return KB_LSHIFT;				break;	// Shift
+		case AKEYCODE_SHIFT_RIGHT:		return KB_RSHIFT;				break;	// Right Shift
+		case AKEYCODE_CTRL_LEFT:		return KB_LCTRL;				break;	// Left control
+		case AKEYCODE_CTRL_RIGHT:		return KB_RCTRL;				break;	// Right control
+		case AKEYCODE_ALT_LEFT:			return KB_LALT;					break;	// Left alt
+		case AKEYCODE_ALT_RIGHT:		return KB_RALT;					break;	// Left alt
+		default:						return code-AKEYCODE_A+'A';		break;	// All others
+	}
+
+	return KB_UNKNOWN;
+}
+
 static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 {
 	switch(AInputEvent_getType(event))
@@ -78,15 +144,8 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 						{
 							touchID[i]=pointerId;
 
-							MouseEvent_t ev=
-							{
-								.dx=(int32_t)					  (AMotionEvent_getX(event, pointerIndex)/scale),
-								.dy=(int32_t)(config.windowHeight-(AMotionEvent_getY(event, pointerIndex)/scale)),
-								.dz=0,
-								.button=MOUSE_TOUCH1<<i
-							};
-
-							Event_Trigger(EVENT_MOUSEDOWN, &ev);
+							Mousecodes_t touchButton=MOUSE_TOUCH1<<i;
+							Input_OnMouseButtonEvent(touchButton, true);
 							break;
 						}
 					}
@@ -112,7 +171,7 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 						            .button=MOUSE_TOUCH1<<i
 								};
 
-								Event_Trigger(EVENT_MOUSEMOVE, &ev);
+								Input_OnMouseEvent(&ev, Vec2(ev.dx, ev.dy));
 						        break;
 					        }
 				        }
@@ -127,16 +186,8 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 			        {
 				        if(touchID[i]==pointerId)
 				        {
-					        MouseEvent_t ev=
-							{
-								.dx=(int32_t)					  (AMotionEvent_getX(event, pointerIndex)/scale),
-					            .dy=(int32_t)(config.windowHeight-(AMotionEvent_getY(event, pointerIndex)/scale)),
-					            .dz=0,
-					            .button=MOUSE_TOUCH1<<i
-							};
-
-							Event_Trigger(EVENT_MOUSEUP, &ev);
-
+							Mousecodes_t touchButton=MOUSE_TOUCH1<<i;
+							Input_OnMouseButtonEvent(touchButton, false);
 							touchID[i]=-1;
 					        break;
 				        }
@@ -150,15 +201,8 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 			        {
 				        if(touchID[i]!=-1)
 				        {
-					        MouseEvent_t ev=
-							{
-								.dx=(int32_t)AMotionEvent_getX(event, pointerIndex),
-					            .dy=(int32_t)(config.windowHeight-AMotionEvent_getY(event, pointerIndex)),
-					            .dz=0,
-					            .button=MOUSE_TOUCH1<<i
-							};
-
-							Event_Trigger(EVENT_MOUSEUP, &ev);
+							Mousecodes_t touchButton=MOUSE_TOUCH1<<i;
+							Input_OnMouseButtonEvent(touchButton, false);
 					        touchID[i]=-1;
 				        }
 			        }
@@ -171,76 +215,17 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 
 		case AINPUT_EVENT_TYPE_KEY:
 		{
-			uint32_t code=0, KeyCode=AKeyEvent_getKeyCode(event);
-
-			switch(KeyCode)
-			{
-				case AKEYCODE_DEL:				code=KB_BACKSPACE;				break;	// Backspace
-				case AKEYCODE_TAB:				code=KB_TAB;					break;	// Tab
-				case AKEYCODE_ENTER:			code=KB_ENTER;					break;	// Enter
-				case AKEYCODE_BREAK:			code=KB_PAUSE;					break;	// Pause
-				case AKEYCODE_CAPS_LOCK:		code=KB_CAPS_LOCK;				break;	// Caps Lock
-				case AKEYCODE_ESCAPE:			code=KB_ESCAPE;					break;	// Esc
-				case AKEYCODE_PAGE_UP:			code=KB_PAGE_UP;				break;	// Page Up
-				case AKEYCODE_PAGE_DOWN:		code=KB_PAGE_DOWN;				break;	// Page Down
-				case AKEYCODE_MOVE_END:			code=KB_END;					break;	// End
-				case AKEYCODE_MOVE_HOME:		code=KB_HOME;					break;	// Home
-				case AKEYCODE_DPAD_LEFT:		code=KB_LEFT;					break;	// Left
-				case AKEYCODE_DPAD_UP:			code=KB_UP;						break;	// Up
-				case AKEYCODE_DPAD_RIGHT:		code=KB_RIGHT;					break;	// Right
-				case AKEYCODE_DPAD_DOWN:		code=KB_DOWN;					break;	// Down
-				case AKEYCODE_SYSRQ:			code=KB_PRINT_SCREEN;			break;	// Prnt Scrn
-				case AKEYCODE_INSERT:			code=KB_INSERT;					break;	// Insert
-				case AKEYCODE_FORWARD_DEL:		code=KB_DEL;					break;	// Delete
-				case AKEYCODE_META_LEFT:		code=KB_LSUPER;					break;	// Left Windows?
-				case AKEYCODE_META_RIGHT:		code=KB_RSUPER;					break;	// Right Windows?
-				case AKEYCODE_MENU:				code=KB_MENU;					break;	// Application
-				case AKEYCODE_NUMPAD_0:			code=KB_NP_0;					break;	// Num 0
-				case AKEYCODE_NUMPAD_1:			code=KB_NP_1;					break;	// Num 1
-				case AKEYCODE_NUMPAD_2:			code=KB_NP_2;					break;	// Num 2
-				case AKEYCODE_NUMPAD_3:			code=KB_NP_3;					break;	// Num 3
-				case AKEYCODE_NUMPAD_4:			code=KB_NP_4;					break;	// Num 4
-				case AKEYCODE_NUMPAD_5:			code=KB_NP_5;					break;	// Num 5
-				case AKEYCODE_NUMPAD_6:			code=KB_NP_6;					break;	// Num 6
-				case AKEYCODE_NUMPAD_7:			code=KB_NP_7;					break;	// Num 7
-				case AKEYCODE_NUMPAD_8:			code=KB_NP_8;					break;	// Num 8
-				case AKEYCODE_NUMPAD_9:			code=KB_NP_9;					break;	// Num 9
-				case AKEYCODE_NUMPAD_MULTIPLY:	code=KB_NP_MULTIPLY;			break;	// Num *
-				case AKEYCODE_NUMPAD_ADD:		code=KB_NP_ADD;					break;	// Num +
-				case AKEYCODE_NUMPAD_SUBTRACT:	code=KB_NP_SUBTRACT;			break;	// Num -
-				case AKEYCODE_NUMPAD_DOT:		code=KB_NP_DECIMAL;				break;	// Num Del
-				case AKEYCODE_NUMPAD_DIVIDE:	code=KB_NP_DIVIDE;				break;	// Num /
-				case AKEYCODE_F1:				code=KB_F1;						break;	// F1
-				case AKEYCODE_F2:				code=KB_F2;						break;	// F2
-				case AKEYCODE_F3:				code=KB_F3;						break;	// F3
-				case AKEYCODE_F4:				code=KB_F4;						break;	// F4
-				case AKEYCODE_F5:				code=KB_F5;						break;	// F5
-				case AKEYCODE_F6:				code=KB_F6;						break;	// F6
-				case AKEYCODE_F7:				code=KB_F7;						break;	// F7
-				case AKEYCODE_F8:				code=KB_F8;						break;	// F8
-				case AKEYCODE_F9:				code=KB_F9;						break;	// F9
-				case AKEYCODE_F10:				code=KB_F10;					break;	// F10
-				case AKEYCODE_F11:				code=KB_F11;					break;	// F11
-				case AKEYCODE_F12:				code=KB_F12;					break;	// F12
-				case AKEYCODE_NUM_LOCK:			code=KB_NUM_LOCK;				break;	// Num Lock
-				case AKEYCODE_SCROLL_LOCK:		code=KB_SCROLL_LOCK;			break;	// Scroll Lock
-				case AKEYCODE_SHIFT_LEFT:		code=KB_LSHIFT;					break;	// Shift
-				case AKEYCODE_SHIFT_RIGHT:		code=KB_RSHIFT;					break;	// Right Shift
-				case AKEYCODE_CTRL_LEFT:		code=KB_LCTRL;					break;	// Left control
-				case AKEYCODE_CTRL_RIGHT:		code=KB_RCTRL;					break;	// Right control
-				case AKEYCODE_ALT_LEFT:			code=KB_LALT;					break;	// Left alt
-				case AKEYCODE_ALT_RIGHT:		code=KB_RALT;					break;	// Left alt
-				default:						code=KeyCode-AKEYCODE_A+'A';	break;	// All others
-			}
+			uint32_t KeyCode=AKeyEvent_getKeyCode(event);
+			Keycodes_t code=ConvertKeymap(KeyCode);
 
 			switch(AKeyEvent_getAction(event))
 			{
 				case AKEY_EVENT_ACTION_DOWN:
-					Event_Trigger(EVENT_KEYDOWN, &code);
+					Input_OnKeyEvent(code, true);
 					break;
 
 				case AKEY_EVENT_ACTION_UP:
-					Event_Trigger(EVENT_KEYUP, &code);
+					Input_OnKeyEvent(code, false);
 					break;
 			}
 			break;
@@ -434,6 +419,7 @@ void android_main(struct android_app *app)
 
 			double StartTime=GetClock();
 
+			Input_Update();
 			Render();
 
 			fTimeStep=(float)(GetClock()-StartTime);

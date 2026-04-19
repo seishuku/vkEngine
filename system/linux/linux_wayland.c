@@ -23,6 +23,7 @@
 #include "../../utils/list.h"
 #include "../../utils/event.h"
 #include "../../vr/vr.h"
+#include "../../input/input.h"
 
 MemZone_t *zone;
 
@@ -115,82 +116,105 @@ static void handleLeave(void *data, struct wl_keyboard *wl_keyboard, uint32_t se
 {
 }
 
+static Keycodes_t ConvertKeymap(uint32_t xkb_keycode)
+{
+	switch (xkb_keycode)
+	{
+		case XKB_KEY_BackSpace:		return KB_BACKSPACE;
+		case XKB_KEY_Tab:			return KB_TAB;
+		case XKB_KEY_Return:		return KB_ENTER;
+		case XKB_KEY_Pause:			return KB_PAUSE;
+		case XKB_KEY_Escape:		return KB_ESCAPE;
+		case XKB_KEY_space:			return KB_SPACE;
+		case XKB_KEY_Prior:			return KB_PAGE_UP;
+		case XKB_KEY_Next:			return KB_PAGE_DOWN;
+		case XKB_KEY_End:			return KB_END;
+		case XKB_KEY_Home:			return KB_HOME;
+		case XKB_KEY_Left:			return KB_LEFT;
+		case XKB_KEY_Up:			return KB_UP;
+		case XKB_KEY_Right:			return KB_RIGHT;
+		case XKB_KEY_Down:			return KB_DOWN;
+		case XKB_KEY_Print:			return KB_PRINT_SCREEN;
+		case XKB_KEY_Insert:		return KB_INSERT;
+		case XKB_KEY_Delete:		return KB_DEL;
+		case XKB_KEY_Super_L:		return KB_LSUPER;
+		case XKB_KEY_Super_R:		return KB_RSUPER;
+		case XKB_KEY_Menu:			return KB_MENU;
+		case XKB_KEY_KP_0:			return KB_NP_0;
+		case XKB_KEY_KP_1:			return KB_NP_1;
+		case XKB_KEY_KP_2:			return KB_NP_2;
+		case XKB_KEY_KP_3:			return KB_NP_3;
+		case XKB_KEY_KP_4:			return KB_NP_4;
+		case XKB_KEY_KP_5:			return KB_NP_5;
+		case XKB_KEY_KP_6:			return KB_NP_6;
+		case XKB_KEY_KP_7:			return KB_NP_7;
+		case XKB_KEY_KP_8:			return KB_NP_8;
+		case XKB_KEY_KP_9:			return KB_NP_9;
+		case XKB_KEY_KP_Multiply:	return KB_NP_MULTIPLY;
+		case XKB_KEY_KP_Add:		return KB_NP_ADD;
+		case XKB_KEY_KP_Subtract:	return KB_NP_SUBTRACT;
+		case XKB_KEY_KP_Decimal:	return KB_NP_DECIMAL;
+		case XKB_KEY_KP_Divide:		return KB_NP_DIVIDE;
+		case XKB_KEY_KP_Enter:		return KB_NP_ENTER;
+		case XKB_KEY_KP_Equal:		return KB_NP_EQUAL;
+		case XKB_KEY_F1:			return KB_F1;
+		case XKB_KEY_F2:			return KB_F2;
+		case XKB_KEY_F3:			return KB_F3;
+		case XKB_KEY_F4:			return KB_F4;
+		case XKB_KEY_F5:			return KB_F5;
+		case XKB_KEY_F6:			return KB_F6;
+		case XKB_KEY_F7:			return KB_F7;
+		case XKB_KEY_F8:			return KB_F8;
+		case XKB_KEY_F9:			return KB_F9;
+		case XKB_KEY_F10:			return KB_F10;
+		case XKB_KEY_F11:			return KB_F11;
+		case XKB_KEY_F12:			return KB_F12;
+		case XKB_KEY_Num_Lock:		return KB_NUM_LOCK;
+		case XKB_KEY_Scroll_Lock:	return KB_SCROLL_LOCK;
+		case XKB_KEY_Shift_L:		return KB_LSHIFT;
+		case XKB_KEY_Shift_R:		return KB_RSHIFT;
+		case XKB_KEY_Control_L:		return KB_LCTRL;
+		case XKB_KEY_Control_R:		return KB_RCTRL;
+		case XKB_KEY_Alt_L:			return KB_LALT;
+		case XKB_KEY_Alt_R:			return KB_RALT;
+		case XKB_KEY_Caps_Lock:		return KB_CAPS_LOCK;
+		case XKB_KEY_apostrophe:	return KB_APOSTROPHE;
+		case XKB_KEY_comma:			return KB_COMMA;
+		case XKB_KEY_minus:			return KB_MINUS;
+		case XKB_KEY_period:		return KB_PERIOD;
+		case XKB_KEY_slash:			return KB_SLASH;
+		case XKB_KEY_semicolon:		return KB_SEMICOLON;
+		case XKB_KEY_equal:			return KB_EQUAL;
+		case XKB_KEY_bracketleft:	return KB_LEFT_BRACKET;
+		case XKB_KEY_backslash:		return KB_BACKSLASH;
+		case XKB_KEY_bracketright:	return KB_RIGHT_BRACKET;
+		case XKB_KEY_grave:			return KB_GRAVE_ACCENT;
+		default:
+			// Handle ASCII codes
+			if(xkb_keycode>='A'&&xkb_keycode<='Z')
+				return (Keycodes_t)xkb_keycode;
+
+			if(xkb_keycode>='a'&&xkb_keycode<='z')
+				return (Keycodes_t)(xkb_keycode-'a'+'A');  // Convert to uppercase
+
+			if(xkb_keycode>='0'&&xkb_keycode<='9')
+				return (Keycodes_t)xkb_keycode;
+
+			return KB_UNKNOWN;
+	}
+}
+
 static void handleKey(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state)
 {
     xkb_keysym_t keysym=xkb_state_key_get_one_sym(xkbState, key+8);
-    uint32_t code=0;
-
-    // Convert lowercase to uppercase
-    if(keysym>=XKB_KEY_a&&keysym<=XKB_KEY_z)
-        keysym-=0x0020;
 
     if(keysym==XKB_KEY_Escape)
         isDone=true;
 
-    switch(keysym)
-    {
-        case XKB_KEY_BackSpace:	    code=KB_BACKSPACE;				break;	// Backspace
-        case XKB_KEY_Tab:		    code=KB_TAB;					break;	// Tab
-        case XKB_KEY_Return:	    code=KB_ENTER;					break;	// Enter
-        case XKB_KEY_Pause:		    code=KB_PAUSE;					break;	// Pause
-        case XKB_KEY_Caps_Lock:	    code=KB_CAPS_LOCK;				break;	// Caps Lock
-        case XKB_KEY_Escape:	    code=KB_ESCAPE;					break;	// Esc
-        case XKB_KEY_Prior:		    code=KB_PAGE_UP;				break;	// Page Up
-        case XKB_KEY_Next:		    code=KB_PAGE_DOWN;				break;	// Page Down
-        case XKB_KEY_End:		    code=KB_END;					break;	// End
-        case XKB_KEY_Home:		    code=KB_HOME;					break;	// Home
-        case XKB_KEY_Left:		    code=KB_LEFT;					break;	// Left
-        case XKB_KEY_Up:		    code=KB_UP;						break;	// Up
-        case XKB_KEY_Right:		    code=KB_RIGHT;					break;	// Right
-        case XKB_KEY_Down:		    code=KB_DOWN;					break;	// Down
-        case XKB_KEY_Print:		    code=KB_PRINT_SCREEN;			break;	// Prnt Scrn
-        case XKB_KEY_Insert:	    code=KB_INSERT;					break;	// Insert
-        case XKB_KEY_Delete:	    code=KB_DEL;					break;	// Delete
-        case XKB_KEY_Super_L:	    code=KB_LSUPER;					break;	// Left Windows
-        case XKB_KEY_Super_R:	    code=KB_RSUPER;					break;	// Right Windows
-        case XKB_KEY_Menu:		    code=KB_MENU;					break;	// Application
-        case XKB_KEY_KP_0:		    code=KB_NP_0;					break;	// Num 0
-        case XKB_KEY_KP_1:		    code=KB_NP_1;					break;	// Num 1
-        case XKB_KEY_KP_2:		    code=KB_NP_2;					break;	// Num 2
-        case XKB_KEY_KP_3:		    code=KB_NP_3;					break;	// Num 3
-        case XKB_KEY_KP_4:		    code=KB_NP_4;					break;	// Num 4
-        case XKB_KEY_KP_5:		    code=KB_NP_5;					break;	// Num 5
-        case XKB_KEY_KP_6:		    code=KB_NP_6;					break;	// Num 6
-        case XKB_KEY_KP_7:		    code=KB_NP_7;					break;	// Num 7
-        case XKB_KEY_KP_8:		    code=KB_NP_8;					break;	// Num 8
-        case XKB_KEY_KP_9:		    code=KB_NP_9;					break;	// Num 9
-        case XKB_KEY_KP_Multiply:   code=KB_NP_MULTIPLY;			break;	// Num *
-        case XKB_KEY_KP_Add:		code=KB_NP_ADD;					break;	// Num +
-        case XKB_KEY_KP_Subtract:   code=KB_NP_SUBTRACT;			break;	// Num -
-        case XKB_KEY_KP_Decimal:	code=KB_NP_DECIMAL;				break;	// Num Del
-        case XKB_KEY_KP_Divide: 	code=KB_NP_DIVIDE;				break;	// Num /
-        case XKB_KEY_F1:			code=KB_F1;						break;	// F1
-        case XKB_KEY_F2:			code=KB_F2;						break;	// F2
-        case XKB_KEY_F3:			code=KB_F3;						break;	// F3
-        case XKB_KEY_F4:			code=KB_F4;						break;	// F4
-        case XKB_KEY_F5:			code=KB_F5;						break;	// F5
-        case XKB_KEY_F6:			code=KB_F6;						break;	// F6
-        case XKB_KEY_F7:			code=KB_F7;						break;	// F7
-        case XKB_KEY_F8:			code=KB_F8;						break;	// F8
-        case XKB_KEY_F9:			code=KB_F9;						break;	// F9
-        case XKB_KEY_F10:		    code=KB_F10;					break;	// F10
-        case XKB_KEY_F11:		    code=KB_F11;					break;	// F11
-        case XKB_KEY_F12:		    code=KB_F12;					break;	// F12
-        case XKB_KEY_Num_Lock:	    code=KB_NUM_LOCK;				break;	// Num Lock
-        case XKB_KEY_Scroll_Lock:   code=KB_SCROLL_LOCK;			break;	// Scroll Lock
-        case XKB_KEY_Shift_L:	    code=KB_LSHIFT;					break;	// Shift
-        case XKB_KEY_Shift_R:	    code=KB_RSHIFT;					break;	// Right Shift
-        case XKB_KEY_Control_L:	    code=KB_LCTRL;					break;	// Left control
-        case XKB_KEY_Control_R:	    code=KB_RCTRL;					break;	// Right control
-        case XKB_KEY_Alt_L:		    code=KB_LALT;					break;	// Left alt
-        case XKB_KEY_Alt_R:		    code=KB_RALT;					break;	// Left alt
-        default:			        code=keysym;					break;	// All others
-    }
+	Keycodes_t code=ConvertKeymap(keysym);
+	bool pressed=(state==WL_KEYBOARD_KEY_STATE_PRESSED);
 
-    if(state==WL_KEYBOARD_KEY_STATE_PRESSED)
-        Event_Trigger(EVENT_KEYDOWN, &code);
-	else if(state==WL_KEYBOARD_KEY_STATE_RELEASED)
-        Event_Trigger(EVENT_KEYUP, &code);
+	Input_OnKeyEvent(code, pressed);
 }
 
 static void handleModifiers(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t mods_depressed, uint32_t mods_latched, uint32_t mods_locked, uint32_t group)
@@ -231,31 +255,38 @@ static void handlePointerMotion(void *data, struct wl_pointer *wl_pointer, uint3
 
 static void handlePointerButton(void *data, struct wl_pointer *wl_pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state)
 {
+    Mousecodes_t btn=0;
+    if(button==BTN_LEFT)
+        btn=MOUSE_BUTTON_1;
+    else if(button==BTN_MIDDLE)
+        btn=MOUSE_BUTTON_3;
+    else if(button==BTN_RIGHT)
+        btn=MOUSE_BUTTON_2;
+
     if(state==WL_POINTER_BUTTON_STATE_PRESSED)
     {
+        if(btn)
+            Input_OnMouseButtonEvent(btn, true);
+
+        // Keep button state for movement events
         if(button==BTN_LEFT)
             MouseEvent.button|=MOUSE_BUTTON_1;
-
         if(button==BTN_MIDDLE)
             MouseEvent.button|=MOUSE_BUTTON_3;
-
         if(button==BTN_RIGHT)
             MouseEvent.button|=MOUSE_BUTTON_2;
-
-        Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
     }
     else if(state==WL_POINTER_BUTTON_STATE_RELEASED)
     {
+        if(btn)
+            Input_OnMouseButtonEvent(btn, false);
+
         if(button==BTN_LEFT)
             MouseEvent.button&=~MOUSE_BUTTON_1;
-
         if(button==BTN_MIDDLE)
             MouseEvent.button&=~MOUSE_BUTTON_3;
-
         if(button==BTN_RIGHT)
             MouseEvent.button&=~MOUSE_BUTTON_2;
-
-        Event_Trigger(EVENT_MOUSEUP, &MouseEvent);
     }
 }
 
@@ -267,7 +298,7 @@ static void handleRelativePointerMotion(void *data, struct zwp_relative_pointer_
     MouseEvent.dx=deltaX;
     MouseEvent.dy=-deltaY;
 
-    Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
+    Input_OnMouseEvent(&MouseEvent, Vec2b(0.0f));
 }
 
 static void handlePointerAxis(void *data, struct wl_pointer *wl_pointer, uint32_t time, uint32_t axis, wl_fixed_t value)
@@ -450,6 +481,7 @@ int main(int argc, char** argv)
 		static float avgfps=0.0f;
 
 		double StartTime=GetClock();
+		Input_Update();
 		Render();
 
 		fTimeStep=(float)(GetClock()-StartTime);
