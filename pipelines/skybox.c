@@ -106,8 +106,8 @@ bool CreateSkyboxPipeline(void)
 	{
 		.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 		.maxSets=1024, // Max number of descriptor sets that can be allocated from this pool
-		.poolSizeCount=1,
-		.pPoolSizes=(VkDescriptorPoolSize[]){ {.type=VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount=1024, }, },
+		.poolSizeCount=2,
+		.pPoolSizes=(VkDescriptorPoolSize[]){ {.type=VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount=1024, }, {.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount=1024, }, },
 	}, VK_NULL_HANDLE, &computeDescriptorPool);
 
 	if(vkCreateCommandPool(vkContext.device, &(VkCommandPoolCreateInfo)
@@ -164,6 +164,51 @@ VkBool32 GenSkybox(void)
 		.image=skyboxTex.image,
 		.subresourceRange={ .aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel=0, .levelCount=1, .baseArrayLayer=0, .layerCount=1 }
 	});
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcAccessMask=VK_ACCESS_NONE, .dstAccessMask=VK_ACCESS_SHADER_WRITE_BIT,
+		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED, .newLayout=VK_IMAGE_LAYOUT_GENERAL,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=skyboxTex.image,
+		.subresourceRange={ .aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel=0, .levelCount=1, .baseArrayLayer=1, .layerCount=1 }
+	});
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcAccessMask=VK_ACCESS_NONE, .dstAccessMask=VK_ACCESS_SHADER_WRITE_BIT,
+		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED, .newLayout=VK_IMAGE_LAYOUT_GENERAL,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=skyboxTex.image,
+		.subresourceRange={ .aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel=0, .levelCount=1, .baseArrayLayer=2, .layerCount=1 }
+	});
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcAccessMask=VK_ACCESS_NONE, .dstAccessMask=VK_ACCESS_SHADER_WRITE_BIT,
+		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED, .newLayout=VK_IMAGE_LAYOUT_GENERAL,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=skyboxTex.image,
+		.subresourceRange={ .aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel=0, .levelCount=1, .baseArrayLayer=3, .layerCount=1 }
+	});
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcAccessMask=VK_ACCESS_NONE, .dstAccessMask=VK_ACCESS_SHADER_WRITE_BIT,
+		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED, .newLayout=VK_IMAGE_LAYOUT_GENERAL,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=skyboxTex.image,
+		.subresourceRange={ .aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel=0, .levelCount=1, .baseArrayLayer=4, .layerCount=1 }
+	});
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcAccessMask=VK_ACCESS_NONE, .dstAccessMask=VK_ACCESS_SHADER_WRITE_BIT,
+		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED, .newLayout=VK_IMAGE_LAYOUT_GENERAL,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=skyboxTex.image,
+		.subresourceRange={ .aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel=0, .levelCount=1, .baseArrayLayer=5, .layerCount=1 }
+	});
 
 	vkCmdBindPipeline(computeCommand, VK_PIPELINE_BIND_POINT_COMPUTE, skyboxGenPipeline.pipeline.pipeline);
 
@@ -183,6 +228,51 @@ VkBool32 GenSkybox(void)
 		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
 		.image=skyboxTex.image,
 		.subresourceRange={ .aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel=0, .levelCount=1, .baseArrayLayer=0, .layerCount=1 }
+	});
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcAccessMask=VK_ACCESS_SHADER_WRITE_BIT, .dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+		.oldLayout=VK_IMAGE_LAYOUT_GENERAL, .newLayout=VK_IMAGE_LAYOUT_GENERAL,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=skyboxTex.image,
+		.subresourceRange={ .aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel=0, .levelCount=1, .baseArrayLayer=1, .layerCount=1 }
+	});
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcAccessMask=VK_ACCESS_SHADER_WRITE_BIT, .dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+		.oldLayout=VK_IMAGE_LAYOUT_GENERAL, .newLayout=VK_IMAGE_LAYOUT_GENERAL,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=skyboxTex.image,
+		.subresourceRange={ .aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel=0, .levelCount=1, .baseArrayLayer=2, .layerCount=1 }
+	});
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcAccessMask=VK_ACCESS_SHADER_WRITE_BIT, .dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+		.oldLayout=VK_IMAGE_LAYOUT_GENERAL, .newLayout=VK_IMAGE_LAYOUT_GENERAL,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=skyboxTex.image,
+		.subresourceRange={ .aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel=0, .levelCount=1, .baseArrayLayer=3, .layerCount=1 }
+	});
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcAccessMask=VK_ACCESS_SHADER_WRITE_BIT, .dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+		.oldLayout=VK_IMAGE_LAYOUT_GENERAL, .newLayout=VK_IMAGE_LAYOUT_GENERAL,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=skyboxTex.image,
+		.subresourceRange={ .aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel=0, .levelCount=1, .baseArrayLayer=4, .layerCount=1 }
+	});
+	vkCmdPipelineBarrier(computeCommand, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &(VkImageMemoryBarrier)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcAccessMask=VK_ACCESS_SHADER_WRITE_BIT, .dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+		.oldLayout=VK_IMAGE_LAYOUT_GENERAL, .newLayout=VK_IMAGE_LAYOUT_GENERAL,
+		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+		.image=skyboxTex.image,
+		.subresourceRange={ .aspectMask=VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel=0, .levelCount=1, .baseArrayLayer=5, .layerCount=1 }
 	});
 
 	// End command buffer and submit
