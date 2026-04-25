@@ -317,52 +317,52 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					if(mouse.usButtonFlags & RI_MOUSE_BUTTON_1_DOWN)
 			        {
 						mouseEvent.button|=MOUSE_BUTTON_1;
-				        Input_OnMouseButtonEvent(MOUSE_BUTTON_1, true);
+				        Input_OnMouseButtonEvent(&mouseEvent, true);
 			        }
 			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_1_UP)
 			        {
 						mouseEvent.button&=~MOUSE_BUTTON_1;
-				        Input_OnMouseButtonEvent(MOUSE_BUTTON_1, false);
+				        Input_OnMouseButtonEvent(&mouseEvent, false);
 			        }
 			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_2_DOWN)
 			        {
 						mouseEvent.button|=MOUSE_BUTTON_2;
-				        Input_OnMouseButtonEvent(MOUSE_BUTTON_2, true);
+				        Input_OnMouseButtonEvent(&mouseEvent, true);
 			        }
 			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_2_UP)
 			        {
 						mouseEvent.button&=~MOUSE_BUTTON_2;
-				        Input_OnMouseButtonEvent(MOUSE_BUTTON_2, false);
+				        Input_OnMouseButtonEvent(&mouseEvent, false);
 			        }
 			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_3_DOWN)
 			        {
 						mouseEvent.button|=MOUSE_BUTTON_3;
-				        Input_OnMouseButtonEvent(MOUSE_BUTTON_3, true);
+				        Input_OnMouseButtonEvent(&mouseEvent, true);
 			        }
 			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_3_UP)
 			        {
 						mouseEvent.button&=~MOUSE_BUTTON_3;
-				        Input_OnMouseButtonEvent(MOUSE_BUTTON_3, false);
+				        Input_OnMouseButtonEvent(&mouseEvent, false);
 			        }
 			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_4_DOWN)
 			        {
 						mouseEvent.button|=MOUSE_BUTTON_4;
-				        Input_OnMouseButtonEvent(MOUSE_BUTTON_4, true);
+				        Input_OnMouseButtonEvent(&mouseEvent, true);
 			        }
 			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_4_UP)
 			        {
 						mouseEvent.button&=~MOUSE_BUTTON_4;
-				        Input_OnMouseButtonEvent(MOUSE_BUTTON_4, false);
+				        Input_OnMouseButtonEvent(&mouseEvent, false);
 			        }
 			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_5_DOWN)
 			        {
 						mouseEvent.button|=MOUSE_BUTTON_5;
-				        Input_OnMouseButtonEvent(MOUSE_BUTTON_5, true);
+				        Input_OnMouseButtonEvent(&mouseEvent, true);
 			        }
 			        if(mouse.usButtonFlags & RI_MOUSE_BUTTON_5_UP)
 			        {
 						mouseEvent.button&=~MOUSE_BUTTON_5;
-				        Input_OnMouseButtonEvent(MOUSE_BUTTON_5, false);
+				        Input_OnMouseButtonEvent(&mouseEvent, false);
 			        }
 
 					if(mouse.usButtonFlags&RI_MOUSE_WHEEL)
@@ -376,7 +376,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 							mouseEvent.dy=-mouse.lLastY;
 
 							// Route through input system (cursor is at window center after warp)
-							Input_OnMouseEvent(&mouseEvent, Vec2(config.windowWidth/2.0f, config.windowHeight/2.0f));
+							Input_OnMouseEvent(&mouseEvent);
 
 							// Warp cursor back to center of window
 							RECT rc;

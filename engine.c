@@ -1315,8 +1315,6 @@ void Render(void)
 		headPose[0]=VR_GetHeadPose(&xrContext, 0);
 		headPose[1]=VR_GetHeadPose(&xrContext, 1);
 
-		// TODO: Find a better place for VR input handling!
-		// VR input is now handled by the input module - read from unified input state
 		vec4 leftHandOrientation=Input_GetVRHandOrientation(0);
 		vec3 leftHandPosition=Input_GetVRHandPosition(0);
 		float leftTrigger=Input_GetVRTrigger(0);
@@ -1399,7 +1397,6 @@ void Render(void)
 #endif
 		headPose[0]=MatrixIdentity();
 
-		// TODO: Find a better place for gamepad input handling!
 #ifdef ANDROID
 		vec2 leftThumbstick=UI_GetVirtualStickValue(&UI, leftThumbstickID);
 		vec2 rightThumbstick=UI_GetVirtualStickValue(&UI, rightThumbstickID);
@@ -2015,6 +2012,9 @@ void DestroyFramebuffers(void)
 // Rebuild Vulkan swapchain and related data
 void RecreateSwapchain(void)
 {
+	if(config.isVR)
+		return;
+
 	// Wait for the device to complete any pending work
 	vkDeviceWaitIdle(vkContext.device);
 

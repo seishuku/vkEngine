@@ -56,7 +56,6 @@ typedef struct
 	bool keys[512];
 
 	// Mouse/Touch state
-	vec2 mousePos;
 	vec2 mouseDelta;
 	uint32_t mouseButtons;
 	float mouseWheel;
@@ -101,7 +100,7 @@ void Input_PlatformDestroy(void);
 void Input_Platform_Update(void);
 
 void Input_OnKeyEvent(Keycodes_t keycode, bool pressed);
-void Input_OnMouseEvent(const MouseEvent_t *event, vec2 mousePos);
-void Input_OnMouseButtonEvent(Mousecodes_t button, bool pressed);
+void Input_OnMouseEvent(const MouseEvent_t *event);
+void Input_OnMouseButtonEvent(const MouseEvent_t *event, bool pressed);
 
 #endif

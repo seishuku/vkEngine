@@ -144,6 +144,12 @@ void DestroySkybox(void)
 
 	vkuDestroyImageBuffer(&vkContext, &skyboxTex);
 
+	vkDestroyFence(vkContext.device, fence, VK_NULL_HANDLE);
+
+	vkDestroyCommandPool(vkContext.device, computeCommandPool, VK_NULL_HANDLE);
+	vkDestroyDescriptorPool(vkContext.device, computeDescriptorPool, VK_NULL_HANDLE);
+
+	DestroyPipeline(&vkContext, &skyboxGenPipeline);
 	DestroyPipeline(&vkContext, &skyboxPipeline);
 }
 

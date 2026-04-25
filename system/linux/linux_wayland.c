@@ -255,19 +255,8 @@ static void handlePointerMotion(void *data, struct wl_pointer *wl_pointer, uint3
 
 static void handlePointerButton(void *data, struct wl_pointer *wl_pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state)
 {
-    Mousecodes_t btn=0;
-    if(button==BTN_LEFT)
-        btn=MOUSE_BUTTON_1;
-    else if(button==BTN_MIDDLE)
-        btn=MOUSE_BUTTON_3;
-    else if(button==BTN_RIGHT)
-        btn=MOUSE_BUTTON_2;
-
     if(state==WL_POINTER_BUTTON_STATE_PRESSED)
     {
-        if(btn)
-            Input_OnMouseButtonEvent(btn, true);
-
         // Keep button state for movement events
         if(button==BTN_LEFT)
             MouseEvent.button|=MOUSE_BUTTON_1;
@@ -275,18 +264,19 @@ static void handlePointerButton(void *data, struct wl_pointer *wl_pointer, uint3
             MouseEvent.button|=MOUSE_BUTTON_3;
         if(button==BTN_RIGHT)
             MouseEvent.button|=MOUSE_BUTTON_2;
+
+		Input_OnMouseButtonEvent(&MouseEvent, true);
     }
     else if(state==WL_POINTER_BUTTON_STATE_RELEASED)
     {
-        if(btn)
-            Input_OnMouseButtonEvent(btn, false);
-
         if(button==BTN_LEFT)
             MouseEvent.button&=~MOUSE_BUTTON_1;
         if(button==BTN_MIDDLE)
             MouseEvent.button&=~MOUSE_BUTTON_3;
         if(button==BTN_RIGHT)
             MouseEvent.button&=~MOUSE_BUTTON_2;
+
+		Input_OnMouseButtonEvent(&MouseEvent, false);
     }
 }
 
@@ -298,7 +288,7 @@ static void handleRelativePointerMotion(void *data, struct zwp_relative_pointer_
     MouseEvent.dx=deltaX;
     MouseEvent.dy=-deltaY;
 
-    Input_OnMouseEvent(&MouseEvent, Vec2b(0.0f));
+    Input_OnMouseEvent(&MouseEvent);
 }
 
 static void handlePointerAxis(void *data, struct wl_pointer *wl_pointer, uint32_t time, uint32_t axis, wl_fixed_t value)

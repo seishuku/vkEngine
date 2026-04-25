@@ -144,8 +144,14 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 						{
 							touchID[i]=pointerId;
 
-							Mousecodes_t touchButton=MOUSE_TOUCH1<<i;
-							Input_OnMouseButtonEvent(touchButton, true);
+							MouseEvent_t ev=
+							{
+								.dx=(int32_t)					  (AMotionEvent_getX(event, pointerIndex)/scale),
+								.dy=(int32_t)(config.windowHeight-(AMotionEvent_getY(event, pointerIndex)/scale)),
+								.dz=0,
+								.button=MOUSE_TOUCH1<<i
+							};
+							Input_OnMouseButtonEvent(&ev, true);
 							break;
 						}
 					}
@@ -171,7 +177,7 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 						            .button=MOUSE_TOUCH1<<i
 								};
 
-								Input_OnMouseEvent(&ev, Vec2(ev.dx, ev.dy));
+								Input_OnMouseEvent(&ev);
 						        break;
 					        }
 				        }
@@ -186,8 +192,14 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 			        {
 				        if(touchID[i]==pointerId)
 				        {
-							Mousecodes_t touchButton=MOUSE_TOUCH1<<i;
-							Input_OnMouseButtonEvent(touchButton, false);
+							MouseEvent_t ev=
+							{
+								.dx=(int32_t)					  (AMotionEvent_getX(event, pointerIndex)/scale),
+								.dy=(int32_t)(config.windowHeight-(AMotionEvent_getY(event, pointerIndex)/scale)),
+								.dz=0,
+								.button=MOUSE_TOUCH1<<i
+							};
+							Input_OnMouseButtonEvent(&ev, false);
 							touchID[i]=-1;
 					        break;
 				        }
@@ -201,8 +213,14 @@ static int32_t app_handle_input(struct android_app *app, AInputEvent *event)
 			        {
 				        if(touchID[i]!=-1)
 				        {
-							Mousecodes_t touchButton=MOUSE_TOUCH1<<i;
-							Input_OnMouseButtonEvent(touchButton, false);
+							MouseEvent_t ev=
+							{
+								.dx=(int32_t)					  (AMotionEvent_getX(event, pointerIndex)/scale),
+								.dy=(int32_t)(config.windowHeight-(AMotionEvent_getY(event, pointerIndex)/scale)),
+								.dz=0,
+								.button=MOUSE_TOUCH1<<i
+							};
+							Input_OnMouseButtonEvent(&ev, false);
 					        touchID[i]=-1;
 				        }
 			        }
@@ -351,13 +369,13 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			Zone_Destroy(zone);
 			break;
 
-		case APP_CMD_WINDOW_RESIZED:
-		case APP_CMD_CONFIG_CHANGED:
+	    case APP_CMD_WINDOW_RESIZED:
+	    case APP_CMD_CONFIG_CHANGED:
 			RecreateSwapchain();
-			break;
+		    break;
 
-		case APP_CMD_LOST_FOCUS:
-			appState.running=false;
+	    case APP_CMD_LOST_FOCUS:
+		    appState.running=false;
 			break;
 
 		case APP_CMD_GAINED_FOCUS:

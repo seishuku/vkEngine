@@ -126,11 +126,6 @@ vec2 Input_GetMouseDelta(void)
 	return input_state.mouseDelta;
 }
 
-vec2 Input_GetMousePos(void)
-{
-	return input_state.mousePos;
-}
-
 float Input_GetMouseWheel(void)
 {
 	return input_state.mouseWheel;
@@ -226,24 +221,27 @@ void Input_OnKeyEvent(Keycodes_t keycode, bool pressed)
 	Event_Trigger(pressed?EVENT_KEYDOWN:EVENT_KEYUP, &keycode);
 }
 
-void Input_OnMouseButtonEvent(Mousecodes_t button, bool pressed)
+void Input_OnMouseButtonEvent(const MouseEvent_t *event, bool pressed)
 {
+	MouseEvent_t mouseEvent=*event;
+
 	if(pressed)
-		input_state.mouseButtons|=button;
+		input_state.mouseButtons|=mouseEvent.button;
 	else
-		input_state.mouseButtons&=~button;
+		input_state.mouseButtons&=~mouseEvent.button;
+
+	input_state.mouseDelta=Vec2(event->dx, event->dy);
+	input_state.mouseWheel=(float)event->dz;
 
 	// Send to event system with accumulated button state (for UI compatibility)
-	MouseEvent_t event={ .button=input_state.mouseButtons };
-	Event_Trigger(pressed?EVENT_MOUSEDOWN:EVENT_MOUSEUP, &event);
+	Event_Trigger(pressed?EVENT_MOUSEDOWN:EVENT_MOUSEUP, &mouseEvent);
 }
 
-void Input_OnMouseEvent(const MouseEvent_t *event, vec2 mousePos)
+void Input_OnMouseEvent(const MouseEvent_t *event)
 {
 	if(event==NULL)
 		return;
 
-	input_state.mousePos=mousePos;
 	input_state.mouseDelta=Vec2(event->dx, event->dy);
 	input_state.mouseWheel=(float)event->dz;
 
