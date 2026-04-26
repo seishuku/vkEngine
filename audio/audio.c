@@ -113,52 +113,29 @@ static vec2 CalculateBarycentric(const vec3 p, const vec3 a, const vec3 b, const
 
 bool PushPoint(const vec3 point, const uint32_t index);
 
-static vec3 ClosestPointOnTriangle(vec3 p, vec3 a, vec3 b, vec3 c)
+static vec3 *HRIRTriangleCentroids=NULL;
+
+static void BuildTriangleCentroids(void)
 {
-	vec3 ab=Vec3_Subv(b, a), ac=Vec3_Subv(c, a), ap=Vec3_Subv(p, a);
+    const uint32_t numTriangles=HRIRSphere.numIndex/3;
+    HRIRTriangleCentroids=Zone_Malloc(zone, numTriangles*sizeof(vec3));
 
-	float d1=Vec3_Dot(ab, ap);
-	float d2=Vec3_Dot(ac, ap);
+    for(uint32_t i=0;i<numTriangles;i++)
+    {
+        vec3 a=HRIRSphere.vertices[HRIRSphere.indices[i*3+0]].vertex;
+        vec3 b=HRIRSphere.vertices[HRIRSphere.indices[i*3+1]].vertex;
+        vec3 c=HRIRSphere.vertices[HRIRSphere.indices[i*3+2]].vertex;
 
-	if(d1<=0.0f&&d2<=0.0f)
-		return a;
-
-	vec3 bp=Vec3_Subv(p, b);
-	float d3=Vec3_Dot(ab, bp);
-	float d4=Vec3_Dot(ac, bp);
-
-	if(d3>=0.0f&&d4<=d3)
-		return b;
-
-	float vc=d1*d4-d3*d2;
-
-	if(vc<=0.0f&&d1>=0.0f&&d3<=0.0f)
-		return Vec3_Addv(a, Vec3_Muls(ab, d1/(d1-d3)));
-
-	vec3 cp=Vec3_Subv(p, c);
-	float d5=Vec3_Dot(ab, cp);
-	float d6=Vec3_Dot(ac, cp);
-
-	if(d6>=0.0f&&d5<=d6)
-		return c;
-
-	float vb=d5*d2-d1*d6;
-
-	if(vb<=0.0f&&d2>=0.0f&&d6<=0.0f)
-		return Vec3_Addv(a, Vec3_Muls(ac, d2/(d2-d6)));
-
-	float va=d3*d6-d5*d4;
-
-	if(va<=0.0f&&(d4-d3)>=0.0f&&(d5-d6)>=0.0f)
-		return Vec3_Addv(b, Vec3_Muls(Vec3_Subv(c, b), (d4-d3)/((d4-d3)+(d5-d6))));
-
-	float denom=1.0f/(va+vb+vc);
-	return Vec3_Addv(a, Vec3_Addv(Vec3_Muls(ab, vb*denom), Vec3_Muls(ac, vc*denom)));
+        // Average and project back onto unit sphere
+        vec3 centroid=Vec3_Muls(Vec3_Addv(a, Vec3_Addv(b, c)), 1.0f/3.0f);
+        Vec3_Normalize(&centroid);
+        HRIRTriangleCentroids[i]=centroid;
+    }
 }
 
 // Naive HRIR sample interpolation, takes world-space position as input.
 // HRIR samples are taken as float, but interpolated output is int16.
-// TODO: Optimize.
+// TODO: Optimize? Saved 4ms+ on worst case performance
 static void HRIRInterpolate(vec3 xyz, int16_t *FIRKernel)
 {
 	// Sound distance drop-off constant, this is the radius of the hearable range
@@ -173,27 +150,23 @@ static void HRIRInterpolate(vec3 xyz, int16_t *FIRKernel)
 
 	Vec3_Normalize(&localPosition);
 
+	// Find the closest triangle centroid to the local position
 	int triangleIndex=-1;
-	float distSq=FLT_MAX;
+	float bestDot=-FLT_MAX;
+	uint32_t numTriangles=HRIRSphere.numIndex/3;
 
-	for(uint32_t i=0;i<HRIRSphere.numIndex;i+=3)
+	for(uint32_t i=0;i<numTriangles;i++)
 	{
-		vec3 a=HRIRSphere.vertices[HRIRSphere.indices[i+0]].vertex;
-		vec3 b=HRIRSphere.vertices[HRIRSphere.indices[i+1]].vertex;
-		vec3 c=HRIRSphere.vertices[HRIRSphere.indices[i+2]].vertex;
+		float d=Vec3_Dot(HRIRTriangleCentroids[i], localPosition);
 
-		vec3 cp=ClosestPointOnTriangle(localPosition, a, b, c);
-
-		float d=Vec3_DistanceSq(cp, localPosition);
-
-		if(d<distSq)
+		if(d>bestDot)
 		{
-			triangleIndex=i/3;
-			distSq=d;
+			bestDot=d;
+			triangleIndex=(int)i;
 		}
 	}
 
-	if(triangleIndex<0||(3*triangleIndex)>=HRIRSphere.numIndex)
+	if(triangleIndex<0&&(3*triangleIndex)>=HRIRSphere.numIndex)
 		return;
 
 	// PushPoint(localPosition, triangleIndex);
@@ -527,6 +500,8 @@ static bool HRIR_Init(void)
 	for(uint32_t i=0;i<HRIRSphere.sampleLength;i++)
 		hannWindow[i]=0.5f*(0.5f-cosf(2.0f*PI*(float)i/(HRIRSphere.sampleLength-1)));
 
+	BuildTriangleCentroids();
+
 	return true;
 }
 
@@ -579,6 +554,7 @@ void Audio_Destroy(void)
 	// Clean up HRIR data
 	Zone_Free(zone, HRIRSphere.indices);
 	Zone_Free(zone, HRIRSphere.vertices);
+	Zone_Free(zone, HRIRTriangleCentroids);
 }
 
 // Simple resample and conversion function to the audio engine's common format (44.1KHz/16bit).
