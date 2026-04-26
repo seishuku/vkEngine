@@ -776,10 +776,10 @@ void Thread_Main(void *arg)
 	DrawPlayer(data->perFrame[data->index].secCommandBuffer[data->eye], data->perFrame[data->index].descriptorPool[data->eye], data->index, data->eye);
 
 #if 0
-	for(uint32_t i=0;i<numPhysicsObjects;i++)
-	{
-		DrawAABBCube(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, physicsObjects[i].min, physicsObjects[i].max, Vec4(1.0f, 1.0f, 0.0f, 1.0f));
-	}
+	// for(uint32_t i=0;i<numPhysicsObjects;i++)
+	// {
+	// 	DrawAABBCube(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, physicsObjects[i].bounds.min, physicsObjects[i].bounds.max, Vec4(1.0f, 1.0f, 0.0f, 1.0f));
+	// }
 
 	for(uint32_t i=0;i<numPoints;i++)
 	{
@@ -802,9 +802,9 @@ void Thread_Main(void *arg)
 
 		DrawLinePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], sizeof(linePC), &linePC);
 
-		const HRIR_Vertex_t *v0=&sphere.vertices[sphere.indices[3*index+0]];
-		const HRIR_Vertex_t *v1=&sphere.vertices[sphere.indices[3*index+1]];
-		const HRIR_Vertex_t *v2=&sphere.vertices[sphere.indices[3*index+2]];
+		const HRIR_Vertex_t *v0=&HRIRSphere.vertices[HRIRSphere.indices[3*index+0]];
+		const HRIR_Vertex_t *v1=&HRIRSphere.vertices[HRIRSphere.indices[3*index+1]];
+		const HRIR_Vertex_t *v2=&HRIRSphere.vertices[HRIRSphere.indices[3*index+2]];
 
 		struct
 		{
