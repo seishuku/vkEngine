@@ -127,9 +127,12 @@ static float ResolveCollision(RigidBody_t *a, RigidBody_t *b, const vec3 contact
 	const vec3 r1=Vec3_Subv(contact, a->position);
 	const vec3 r2=Vec3_Subv(contact, b->position);
 
+	const vec3 wA = QuatRotate(a->orientation, a->angularVelocity);
+	const vec3 wB = QuatRotate(b->orientation, b->angularVelocity);
+
 	const vec3 relativeVel=Vec3_Subv(
-		Vec3_Addv(b->velocity, Vec3_Cross(b->angularVelocity, r2)),
-		Vec3_Addv(a->velocity, Vec3_Cross(a->angularVelocity, r1))
+		Vec3_Addv(b->velocity, Vec3_Cross(wB, r2)),
+		Vec3_Addv(a->velocity, Vec3_Cross(wA, r1))
 	);
 
 	const float relativeSpeed=Vec3_Dot(relativeVel, normal);
@@ -208,13 +211,13 @@ static float SphereToSphereCollision(RigidBody_t *a, RigidBody_t *b)
 
 	// Penetration
 	const float distance=sqrtf(distanceSq);
-	const float penetration=fabsf(distance-radiiSum)*0.5f;
+	const float penetration=distance-radiiSum;
 
 	// Normal
 	const vec3 normal=Vec3_Muls(relativePosition, 1.0f/distance);
 
 	// Contact point
-	const vec3 contact=Vec3_Addv(a->position, Vec3_Muls(normal, a->radius-penetration));
+	const vec3 contact=Vec3_Addv(a->position, Vec3_Muls(normal, a->radius-penetration*0.5f));
 
 	return ResolveCollision(a, b, contact, normal, penetration);
 }
