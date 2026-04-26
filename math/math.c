@@ -225,3 +225,46 @@ uint32_t planeSphereIntersect(const vec4 plane, const vec3 center, const float r
 
 	return (distance==radius)?1:2;
 }
+
+vec3 ClosestPointOnTriangle(vec3 p, vec3 a, vec3 b, vec3 c)
+{
+	vec3 ab=Vec3_Subv(b, a), ac=Vec3_Subv(c, a), ap=Vec3_Subv(p, a);
+
+	float d1=Vec3_Dot(ab, ap);
+	float d2=Vec3_Dot(ac, ap);
+
+	if(d1<=0.0f&&d2<=0.0f)
+		return a;
+
+	vec3 bp=Vec3_Subv(p, b);
+	float d3=Vec3_Dot(ab, bp);
+	float d4=Vec3_Dot(ac, bp);
+
+	if(d3>=0.0f&&d4<=d3)
+		return b;
+
+	float vc=d1*d4-d3*d2;
+
+	if(vc<=0.0f&&d1>=0.0f&&d3<=0.0f)
+		return Vec3_Addv(a, Vec3_Muls(ab, d1/(d1-d3)));
+
+	vec3 cp=Vec3_Subv(p, c);
+	float d5=Vec3_Dot(ab, cp);
+	float d6=Vec3_Dot(ac, cp);
+
+	if(d6>=0.0f&&d5<=d6)
+		return c;
+
+	float vb=d5*d2-d1*d6;
+
+	if(vb<=0.0f&&d2>=0.0f&&d6<=0.0f)
+		return Vec3_Addv(a, Vec3_Muls(ac, d2/(d2-d6)));
+
+	float va=d3*d6-d5*d4;
+
+	if(va<=0.0f&&(d4-d3)>=0.0f&&(d5-d6)>=0.0f)
+		return Vec3_Addv(b, Vec3_Muls(Vec3_Subv(c, b), (d4-d3)/((d4-d3)+(d5-d6))));
+
+	float denom=1.0f/(va+vb+vc);
+	return Vec3_Addv(a, Vec3_Addv(Vec3_Muls(ab, vb*denom), Vec3_Muls(ac, vc*denom)));
+}
