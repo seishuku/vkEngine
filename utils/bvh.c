@@ -109,11 +109,24 @@ void BVH_Build(BVH_t *bvh, const void *AABBs, const uint32_t numAABBs, const uin
 
 		// Fallback split
 		if(mid==stackObj.first||mid==end)
-			mid=(stackObj.first+stackObj.count)/2;
+			mid=stackObj.first+stackObj.count/2;
 
 		// Create children
+		if(bvh->nodeCount+2>BVH_MAX_NODES)
+		{
+			DBGPRINTF(DEBUG_ERROR, "BVH: out of nodes\n");
+			node->left=node->right=-1;
+			continue;
+		}
+
 		node->left=bvh->nodeCount++;
 		node->right=bvh->nodeCount++;
+
+		if(stackTop+2>BVH_MAX_NODES)
+		{
+			DBGPRINTF(DEBUG_ERROR, "BVH: build stack out of space\n");
+			continue;
+		}
 
 		stack[stackTop++]=(BVHBuildStackObj_t) { node->right, mid, end-mid};
 		stack[stackTop++]=(BVHBuildStackObj_t) { node->left, stackObj.first, mid-stackObj.first };
