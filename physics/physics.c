@@ -69,7 +69,7 @@ void PhysicsIntegrate(RigidBody_t *body, const float dt)
 	const vec3 gravity=Vec3b(0.0f);
 
 	// Apply gravity
-	body->force=Vec3_Addv(body->force, Vec3_Muls(gravity, body->mass));
+		body->force=Vec3_Addv(body->force, Vec3_Muls(gravity, body->mass));
 
 	// Implicit Euler integration of position and velocity
 	// Velocity+=Force/Mass*dt
@@ -119,28 +119,28 @@ void PhysicsApplyImpulse(RigidBody_t *body, const vec3 impulse, const vec3 point
 
 static float ResolveCollision(RigidBody_t *a, RigidBody_t *b, const vec3 contact, const vec3 normal, const float penetration)
 {
-	// Pre-calculate inverse orientation quats
+    // Pre-calculate inverse orientation quats
 	const vec4 invOrientationA=QuatInverse(a->orientation);
 	const vec4 invOrientationB=QuatInverse(b->orientation);
 
-	// Torque arms
+    // Torque arms
 	const vec3 r1=Vec3_Subv(contact, a->position);
 	const vec3 r2=Vec3_Subv(contact, b->position);
 
-	const vec3 wA = QuatRotate(a->orientation, a->angularVelocity);
-	const vec3 wB = QuatRotate(b->orientation, b->angularVelocity);
+    const vec3 wA = QuatRotate(a->orientation, a->angularVelocity);
+    const vec3 wB = QuatRotate(b->orientation, b->angularVelocity);
 
 	const vec3 relativeVel=Vec3_Subv(
-		Vec3_Addv(b->velocity, Vec3_Cross(wB, r2)),
-		Vec3_Addv(a->velocity, Vec3_Cross(wA, r1))
-	);
+        Vec3_Addv(b->velocity, Vec3_Cross(wB, r2)),
+        Vec3_Addv(a->velocity, Vec3_Cross(wA, r1))
+    );
 
 	const float relativeSpeed=Vec3_Dot(relativeVel, normal);
 
 	if(relativeSpeed>0.0f)
-		return 0.0f;
+        return 0.0f;
 
-	// Masses
+    // Masses
 	const vec3 d1=Vec3_Cross(Vec3_Muls(Vec3_Cross(r1, normal), a->invInertia), r1);
 	const vec3 d2=Vec3_Cross(Vec3_Muls(Vec3_Cross(r2, normal), b->invInertia), r2);
 	const float invMassSum=a->invMass+b->invMass;
@@ -152,21 +152,21 @@ static float ResolveCollision(RigidBody_t *a, RigidBody_t *b, const vec3 contact
 
 	// Head-on collision velocities
 
-	// Linear velocity
+    // Linear velocity
 	a->velocity=Vec3_Subv(a->velocity, Vec3_Muls(impulse, a->invMass));
 	b->velocity=Vec3_Addv(b->velocity, Vec3_Muls(impulse, b->invMass));
 
-	// Transform torque to local space
+    // Transform torque to local space
 	vec3 localTorqueA=QuatRotate(invOrientationA, Vec3_Cross(r1, impulse));
 	vec3 localTorqueB=QuatRotate(invOrientationB, Vec3_Cross(r2, impulse));
 
-	// Angular velocity
+    // Angular velocity
 	a->angularVelocity=Vec3_Subv(a->angularVelocity, Vec3_Muls(localTorqueA, a->invInertia));
 	b->angularVelocity=Vec3_Addv(b->angularVelocity, Vec3_Muls(localTorqueB, b->invInertia));
 
 	// Calculate tangential velocities
 	vec3 tangentialVel=Vec3_Subv(relativeVel, Vec3_Muls(normal, Vec3_Dot(relativeVel, normal)));
-	Vec3_Normalize(&tangentialVel);
+    Vec3_Normalize(&tangentialVel);
 
 	const vec3 d1T=Vec3_Cross(Vec3_Muls(Vec3_Cross(r1, tangentialVel), a->invInertia), r1);
 	const vec3 d2T=Vec3_Cross(Vec3_Muls(Vec3_Cross(r2, tangentialVel), b->invInertia), r2);
@@ -194,7 +194,7 @@ static float ResolveCollision(RigidBody_t *a, RigidBody_t *b, const vec3 contact
 	a->position=Vec3_Subv(a->position, Vec3_Muls(correctionVector, a->invMass));
 	b->position=Vec3_Addv(b->position, Vec3_Muls(correctionVector, b->invMass));
 
-	return sqrtf(-relativeSpeed);
+    return sqrtf(-relativeSpeed);
 }
 
 static float SphereToSphereCollision(RigidBody_t *a, RigidBody_t *b)
@@ -255,43 +255,82 @@ static float SphereToOBBCollision(RigidBody_t *sphere, RigidBody_t *obb)
 	return ResolveCollision(obb, sphere, contact, normal, penetration);
 }
 
+#define MAX_CONTACT_POLY 8
+
+static int ClipPolygon(const vec3 *in, int inCount, vec3 *out, vec3 planeNormal, float planeDist)
+{
+    int outCount = 0;
+    if(inCount == 0) return 0;
+
+    for(int i = 0; i < inCount; i++)
+    {
+        const vec3 curr = in[i];
+        const vec3 next = in[(i + 1) % inCount];
+
+        const float dc = Vec3_Dot(curr, planeNormal) - planeDist;
+        const float dn = Vec3_Dot(next, planeNormal) - planeDist;
+
+        if(dc <= 0.0f)
+            out[outCount++] = curr;
+
+        if((dc < 0.0f) != (dn < 0.0f))
+        {
+            const float t = dc / (dc - dn);
+            out[outCount++] = Vec3_Addv(curr, Vec3_Muls(Vec3_Subv(next, curr), t));
+        }
+    }
+
+    return outCount;
+}
+
+static float SizeAxis(const RigidBody_t *body, int i)
+{
+    if(i==0)
+		return body->size.x;
+    if(i==1)
+		return body->size.y;
+
+	return body->size.z;
+}
+
 static float OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 {
 	// Extract axes
-	vec3 axesA[3], axesB[3];
-	QuatAxes(a->orientation, axesA);
-	QuatAxes(b->orientation, axesB);
+    vec3 axesA[3], axesB[3];
+    QuatAxes(a->orientation, axesA);
+    QuatAxes(b->orientation, axesB);
 
 	// Compute relative position
 	const vec3 relativePosition=Vec3_Subv(b->position, a->position);
 
 	// List of axes to test, at minimum test base axes of A and B OBBs
-	uint32_t axisCount=6;
-	vec3 axes[15]={
+    uint32_t axisCount=6;
+    vec3 axes[15]={
 		axesA[0], axesA[1], axesA[2],
 		axesB[0], axesB[1], axesB[2],
-	};
+    };
 
 	// Cross products add additional axes to test
 	for(uint32_t i=0;i<3;i++)
 	{
 		for(uint32_t j=0;j<3;j++)
-		{
+        {
 			vec3 axis=Vec3_Cross(axesA[i], axesB[j]);
 			const float length=Vec3_Normalize(&axis);
 
 			if(length>FLT_EPSILON)
 				axes[axisCount++]=axis;
-		}
+        }
 	}
 
 	// Minimum penetration depth and corresponding axis
 	float penetration=FLT_MAX;
 	vec3 normal=Vec3b(0.0f);
+	uint32_t minAxisIndex=0;
 
 	// Test axes
 	for(uint32_t i=0;i<axisCount;i++)
-	{
+    {
 		// Project OBBs onto axis
 		const float rA=fabsf(Vec3_Dot(axesA[0], axes[i]))*a->size.x+fabsf(Vec3_Dot(axesA[1], axes[i]))*a->size.y+fabsf(Vec3_Dot(axesA[2], axes[i]))*a->size.z;
 		const float rB=fabsf(Vec3_Dot(axesB[0], axes[i]))*b->size.x+fabsf(Vec3_Dot(axesB[1], axes[i]))*b->size.y+fabsf(Vec3_Dot(axesB[2], axes[i]))*b->size.z;
@@ -302,13 +341,14 @@ static float OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 		if(overlap<0.0f)
 		{
 			// Separating axis found, no collision
-			return 0.0f;
+            return 0.0f;
 		}
 		else if(overlap<penetration)
-		{
+        {
 			// Update minimum penetration depth and collision normal
 			penetration=overlap;
-			normal=axes[i];
+            normal=axes[i];
+			minAxisIndex=i;
 		}
 	}
 
@@ -318,12 +358,109 @@ static float OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 	if(Vec3_Dot(normal, relativePosition)<0.0f)
 		normal=Vec3_Muls(normal, -1.0f);
 
-	// Point of contact (TODO: some of this feels redundant)
-	const vec3 pointA=Vec3_Addv(a->position, Vec3_Mulv(normal, a->size));
-	const vec3 pointB=Vec3_Subv(b->position, Vec3_Mulv(normal, b->size));
-	const vec3 contact=Vec3_Muls(Vec3_Addv(pointA, pointB), 0.5f);
+    // Single point contact
+    if(minAxisIndex>=6)
+    {
+        const vec3 pA=Vec3_Addv(a->position, Vec3_Mulv(normal, a->size));
+        const vec3 pB=Vec3_Subv(b->position, Vec3_Mulv(normal, b->size));
+        const vec3 contact=Vec3_Muls(Vec3_Addv(pA, pB), 0.5f);
 
-	return ResolveCollision(a, b, contact, normal, penetration);
+		return ResolveCollision(a, b, contact, normal, penetration);
+    }
+
+    // Face contact
+    const bool refIsA=(minAxisIndex<3);
+    const RigidBody_t *ref=refIsA?a:b;
+    const RigidBody_t *inc=refIsA?b:a;
+    const vec3 *refAxes=refIsA?axesA:axesB;
+    const vec3 *incAxes=refIsA?axesB:axesA;
+
+    const int32_t refFaceAxis=refIsA?(int32_t)minAxisIndex:(int32_t)(minAxisIndex-3);
+    const vec3 refFaceNormal=refIsA?normal:Vec3_Muls(normal, -1.0f);
+
+    float minDot=FLT_MAX;
+    int32_t incFaceAxis=0;
+    float incFaceSign=1.0f;
+
+	for(uint32_t i=0;i<3;i++)
+    {
+        const float d=Vec3_Dot(incAxes[i], refFaceNormal);
+
+		if(d<minDot)
+		{
+			minDot=d;
+			incFaceAxis=i;
+			incFaceSign=1.0f;
+		}
+
+		if(-d<minDot)
+		{
+			minDot=-d;
+			incFaceAxis=i;
+			incFaceSign=-1.0f;
+		}
+    }
+
+    // Build the corners of the face
+    const vec3 incFaceCenter=Vec3_Addv(inc->position, Vec3_Muls(incAxes[incFaceAxis], incFaceSign*SizeAxis(inc, incFaceAxis)));
+
+    const int it1=(incFaceAxis+1)%3;
+    const int it2=(incFaceAxis+2)%3;
+    const vec3 ie1=Vec3_Muls(incAxes[it1], SizeAxis(inc, it1));
+    const vec3 ie2=Vec3_Muls(incAxes[it2], SizeAxis(inc, it2));
+
+    // Ping-pong between two buffers while clipping
+    vec3 buf0[8], buf1[8];
+    buf0[0]=Vec3_Addv(Vec3_Addv(incFaceCenter,  ie1),  ie2);
+    buf0[1]=Vec3_Addv(Vec3_Subv(incFaceCenter,  ie1),  ie2);
+    buf0[2]=Vec3_Subv(Vec3_Subv(incFaceCenter,  ie1),  ie2);
+    buf0[3]=Vec3_Subv(Vec3_Addv(incFaceCenter,  ie1),  ie2);
+    int count=4;
+
+    // Clip against the 4 side planes of the reference face
+    const int rt1=(refFaceAxis+1)%3;
+    const int rt2=(refFaceAxis+2)%3;
+    const float rs1=SizeAxis(ref, rt1);
+    const float rs2=SizeAxis(ref, rt2);
+    const float refDotRt1=Vec3_Dot(ref->position, refAxes[rt1]);
+    const float refDotRt2=Vec3_Dot(ref->position, refAxes[rt2]);
+
+    count=ClipPolygon(buf0, count, buf1, refAxes[rt1], refDotRt1+rs1);
+
+	if(!count)
+		return 0.0f;
+
+	count=ClipPolygon(buf1, count, buf0, Vec3_Muls(refAxes[rt1], -1.0f), -refDotRt1+rs1);
+
+	if(!count)
+		return 0.0f;
+
+	count=ClipPolygon(buf0, count, buf1, refAxes[rt2], refDotRt2+rs2);
+
+	if(!count)
+		return 0.0f;
+
+	count=ClipPolygon(buf1, count, buf0, Vec3_Muls(refAxes[rt2], -1.0f), -refDotRt2+rs2);
+
+	if(!count)
+		return 0.0f;
+
+    const float refFaceDist=Vec3_Dot(ref->position, refFaceNormal)+SizeAxis(ref, refFaceAxis);
+
+    float totalImpulse=0.0f;
+
+	for(uint32_t i=0;i<count;i++)
+    {
+        const float d=Vec3_Dot(buf0[i], refFaceNormal);
+
+		if(d<=refFaceDist+FLT_EPSILON)
+        {
+            const float contactPenetration=refFaceDist-d;
+           	totalImpulse+=ResolveCollision(a, b, buf0[i], normal, contactPenetration);
+        }
+    }
+
+    return totalImpulse;
 }
 
 static float CapsuleToSphereCollision(RigidBody_t *capsule, RigidBody_t *sphere)
