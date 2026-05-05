@@ -946,95 +946,29 @@ void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *p
 	particle->life=RandFloat()*0.5f+0.01f;
 }
 
-void TestCollision(void *a, void *b)
+// Test collision now only builds a list of manfifolds.
+#define MAX_MANIFOLDS 10000
+
+struct
 {
+	PhysicsObject_t *objA, *objB;
+	CollisionManifold_t manifold;
+} manifoldList[MAX_MANIFOLDS];
+
+uint32_t numManifolds;
+
+void TestCollision(void *a, void *b)
+		{
 	PhysicsObject_t *objA=(PhysicsObject_t *)a, *objB=(PhysicsObject_t *)b;
 
-	const float impactSpeed=PhysicsCollisionResponse(objA->rigidBody, objB->rigidBody);
+	CollisionManifold_t manifold=PhysicsCollision(objA->rigidBody, objB->rigidBody);
 
-	if(impactSpeed>0.1f)
-	{
-		// If both objects are asteroids
-		if(objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_FIELD)
-		{
-			Audio_PlaySample(&AssetManager_GetAsset(assets, RandRange(SOUND_STONE1, SOUND_STONE3))->sound, false, 1.0f, objB->rigidBody->position);
-		}
-		// If one is an asteroid and one is a player
-		else if((objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)||
-				(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_FIELD))
-		{
-			Audio_PlaySample(&AssetManager_GetAsset(assets, SOUND_CRASH)->sound, false, 1.0f, objB->rigidBody->position);
-		}
-		// If both objects are players
-		else if(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)
-		{
-			Audio_PlaySample(&AssetManager_GetAsset(assets, SOUND_CRASH)->sound, false, 1.0f, objB->rigidBody->position);
-		}
-		// If it was a projectile colliding with anything
-		else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE||objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
-		{
-			PhysicsObject_t *whichProjectile=NULL;
-			PhysicsObject_t *otherObject=NULL;
-
-			if(objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+	if(manifold.contactCount>0&&numManifolds<MAX_MANIFOLDS)
 			{
-				whichProjectile=objB;
-				otherObject=objA;
-			}
-			else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
-			{
-				whichProjectile=objA;
-				otherObject=objB;
-			}
-			else
-				return; // SHOULD NEVER BE HERE.
-
-			if(otherObject->objectType==PHYSICSOBJECTTYPE_PLAYER)
-			{
-				for(uint32_t i=0;i<NUM_ENEMY;i++)
-				{
-					if(&enemyAI[i].camera->body==otherObject->rigidBody)
-					{
-						enemyAI[i].health-=impactSpeed*0.5f;
-						break;
-					}
-					else if(&camera.body==otherObject->rigidBody)
-					{
-						playerHealth-=impactSpeed*0.5f;
-						break;
-					}
-				}
-			}
-
-			// It collided, kill it.
-			// Setting this directly to <0.0 seems to cause emitters that won't get removed,
-			//     so setting it to nearly 0.0 allows the natural progression kill it off.
-			// Need to find the source emitter first:
-			for(uint32_t k=0;k<MAX_EMITTERS;k++)
-			{
-				if(emitters[k].life>0.0f)
-				{
-					if(whichProjectile->rigidBody==&emitters[k].body)
-					{
-						emitters[k].life=0.001f;
-						break;
-					}
-				}
-			}
-
-			Audio_PlaySample(&AssetManager_GetAsset(assets, RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3))->sound, false, 1.0f, whichProjectile->rigidBody->position);
-
-			ParticleSystem_AddEmitter(&particleSystem,
-									  whichProjectile->rigidBody->position,	// Position
-									  Vec3b(0.0f),					// Initial velocity
-									  Vec3(100.0f, 12.0f, 5.0f),	// Start color
-									  Vec3(0.0f, 0.0f, 0.0f),		// End color
-									  5.0f,						// Radius of particles
-									  1000,						// Number of particles in system
-									  PARTICLE_EMITTER_ONCE,		// Type?
-									  ExplodeEmitterCallback		// Callback for particle generation
-			);
-		}
+		manifoldList[numManifolds].objA=objA;
+		manifoldList[numManifolds].objB=objB;
+		manifoldList[numManifolds].manifold=manifold;
+		numManifolds++;
 	}
 }
 
@@ -1108,9 +1042,6 @@ void Thread_Physics(void *arg)
 			}
 		}
 
-		BVH_Build(&bvh, physicsObjects, numPhysicsObjects, sizeof(PhysicsObject_t), 0);
-		BVH_Test(&bvh, physicsObjects, sizeof(PhysicsObject_t), TestCollision);
-
 		// Run through the physics object list, run integration step and check for collisions against all other objects
 		for(uint32_t i=0;i<numPhysicsObjects;i++)
 		{
@@ -1155,13 +1086,121 @@ void Thread_Physics(void *arg)
 						    Vec3(0.0f, 0.0f, 0.0f),    // End color
 						    5.0f,                      // Radius of particles
 						    1000,                      // Number of particles in system
-						    PARTICLE_EMITTER_ONCE,     // Type?
+						    PARTICLE_EMITTER_ONCE,     // One time
 						    ExplodeEmitterCallback     // Callback for particle generation
 						);
 					}
 				}
 			}
 #endif
+		}
+
+		// Run broadphase collision with BVH
+		memset(manifoldList, 0, sizeof(manifoldList));
+		numManifolds=0;
+
+		BVH_Build(&bvh, physicsObjects, numPhysicsObjects, sizeof(PhysicsObject_t), 0);
+		BVH_Test(&bvh, physicsObjects, sizeof(PhysicsObject_t), TestCollision);
+
+		// From the manifold collection, do narrow phase collision and response
+		for(uint32_t i=0;i<numManifolds;i++)
+		{
+			CollisionManifold_t *manifold=&manifoldList[i].manifold;
+			PhysicsObject_t *objA=manifoldList[i].objA, *objB=manifoldList[i].objB;
+
+			for(uint32_t j=0;j<manifold->contactCount;j++)
+			{
+				float impactSpeed=PhysicsResolveCollision(manifold->a, manifold->b, manifold->contacts[j]);
+
+				// Run "game logic"
+				if(impactSpeed>1.5f)
+				{
+					DBGPRINTF(DEBUG_INFO, "Impact speed: %f\n", impactSpeed);
+					// If both objects are asteroids
+					if(objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_FIELD)
+					{
+						Audio_PlaySample(&AssetManager_GetAsset(assets, RandRange(SOUND_STONE1, SOUND_STONE3))->sound, false, 1.0f, objB->rigidBody->position);
+					}
+					// If one is an asteroid and one is a player
+					else if((objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)||
+							(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_FIELD))
+					{
+						Audio_PlaySample(&AssetManager_GetAsset(assets, SOUND_CRASH)->sound, false, 1.0f, objB->rigidBody->position);
+					}
+					// If both objects are players
+					else if(objA->objectType==PHYSICSOBJECTTYPE_PLAYER&&objB->objectType==PHYSICSOBJECTTYPE_PLAYER)
+					{
+						Audio_PlaySample(&AssetManager_GetAsset(assets, SOUND_CRASH)->sound, false, 1.0f, objB->rigidBody->position);
+					}
+					// If it was a projectile colliding with anything
+					else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE||objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+					{
+						PhysicsObject_t *whichProjectile=NULL;
+						PhysicsObject_t *otherObject=NULL;
+
+						if(objB->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+						{
+							whichProjectile=objB;
+							otherObject=objA;
+						}
+						else if(objA->objectType==PHYSICSOBJECTTYPE_PROJECTILE)
+						{
+							whichProjectile=objA;
+							otherObject=objB;
+						}
+						else
+							continue;; // SHOULD NEVER BE HERE.
+
+						if(otherObject->objectType==PHYSICSOBJECTTYPE_PLAYER)
+						{
+							for(uint32_t i=0;i<NUM_ENEMY;i++)
+							{
+								if(&enemyAI[i].camera->body==otherObject->rigidBody)
+								{
+									enemyAI[i].health-=impactSpeed*0.5f;
+									break;
+								}
+								else if(&camera.body==otherObject->rigidBody)
+								{
+									playerHealth-=impactSpeed*0.5f;
+									break;
+								}
+							}
+						}
+
+						// It collided, kill it.
+						// Setting this directly to <0.0 seems to cause emitters that won't get removed,
+						//     so setting it to nearly 0.0 allows the natural progression kill it off.
+						// Need to find the source emitter first:
+						for(uint32_t k=0;k<MAX_EMITTERS;k++)
+						{
+							if(emitters[k].life>0.0f)
+							{
+								if(whichProjectile->rigidBody==&emitters[k].body)
+								{
+									emitters[k].life=0.001f;
+									break;
+								}
+							}
+						}
+
+						Audio_PlaySample(&AssetManager_GetAsset(assets, RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3))->sound, false, 1.0f, whichProjectile->rigidBody->position);
+
+						ParticleSystem_AddEmitter(&particleSystem,
+												whichProjectile->rigidBody->position,	// Position
+												Vec3b(0.0f),					// Initial velocity
+												Vec3(100.0f, 12.0f, 5.0f),	// Start color
+												Vec3(0.0f, 0.0f, 0.0f),		// End color
+												5.0f,						// Radius of particles
+												1000,						// Number of particles in system
+												PARTICLE_EMITTER_ONCE,		// Type?
+												ExplodeEmitterCallback		// Callback for particle generation
+						);
+					}
+				}
+
+				PhysicsPositionCorrection(manifold->a, manifold->b, manifold->contacts[j]);
+			}
 		}
 	}
 
