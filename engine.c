@@ -1113,9 +1113,8 @@ void Thread_Physics(void *arg)
 				float impactSpeed=PhysicsResolveCollision(manifold->a, manifold->b, manifold->contacts[j]);
 
 				// Run "game logic"
-				if(impactSpeed>1.75f)
+				if(impactSpeed>2.0f)
 				{
-					DBGPRINTF(DEBUG_INFO, "Impact speed: %f\n", impactSpeed);
 					// If both objects are asteroids
 					if(objA->objectType==PHYSICSOBJECTTYPE_FIELD&&objB->objectType==PHYSICSOBJECTTYPE_FIELD)
 					{

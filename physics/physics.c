@@ -283,8 +283,6 @@ static CollisionManifold_t SphereToOBBCollision(RigidBody_t *sphere, RigidBody_t
 	return manifold;
 }
 
-#define MAX_CONTACT_POLY 8
-
 static int ClipPolygon(const vec3 *in, int inCount, vec3 *out, vec3 planeNormal, float planeDist)
 {
     int outCount=0;
@@ -297,17 +295,20 @@ static int ClipPolygon(const vec3 *in, int inCount, vec3 *out, vec3 planeNormal,
         const vec3 curr=in[i];
         const vec3 next=in[(i+1)%inCount];
 
-        const float dc=Vec3_Dot(curr, planeNormal)-planeDist;
-        const float dn=Vec3_Dot(next, planeNormal)-planeDist;
+		const float dc=Vec3_Dot(curr, planeNormal)-planeDist;
+		const float dn=Vec3_Dot(next, planeNormal)-planeDist;
 
-        if(dc<=0.0f)
-            out[outCount++]=curr;
+		const bool insideC=dc<=0.0f;
+		const bool insideN=dn<=0.0f;
 
-        if((dc<0.0f)!=(dn<0.0f))
-            out[outCount++]=Vec3_Addv(curr, Vec3_Muls(Vec3_Subv(next, curr), dc/(dc-dn)));
-    }
+		if(insideC)
+			out[outCount++]=curr;
 
-    return outCount;
+		if(insideC!=insideN)
+			out[outCount++]=Vec3_Addv(curr, Vec3_Muls(Vec3_Subv(next, curr), dc/(dc-dn)));
+	}
+
+	return outCount;
 }
 
 static float SizeAxis(const RigidBody_t *body, int i)
@@ -393,19 +394,27 @@ static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 	// Single point contact
 	if(minAxisIndex>=6)
 	{
+		const vec3 sA=Vec3(
+			(Vec3_Dot(normal, axesA[0])>=0.0f)?a->size.x:-a->size.x,
+			(Vec3_Dot(normal, axesA[1])>=0.0f)?a->size.y:-a->size.y,
+			(Vec3_Dot(normal, axesA[2])>=0.0f)?a->size.z:-a->size.z
+		);
+
 		vec3 pA=a->position;
-		for(uint32_t ia=0;ia<3;ia++)
-		{
-			const float s=(Vec3_Dot(normal, axesA[ia])>=0.0f)?SizeAxis(a, ia):-SizeAxis(a, ia);
-			pA=Vec3_Addv(pA, Vec3_Muls(axesA[ia], s));
-		}
+		pA=Vec3_Addv(pA, Vec3_Muls(axesA[0], sA.x));
+		pA=Vec3_Addv(pA, Vec3_Muls(axesA[1], sA.y));
+		pA=Vec3_Addv(pA, Vec3_Muls(axesA[2], sA.z));
+
+		const vec3 sB=Vec3(
+			(Vec3_Dot(normal, axesB[0])>=0.0f)?b->size.x:-b->size.x,
+			(Vec3_Dot(normal, axesB[1])>=0.0f)?b->size.y:-b->size.y,
+			(Vec3_Dot(normal, axesB[2])>=0.0f)?b->size.z:-b->size.z
+		);
 
 		vec3 pB=b->position;
-		for(uint32_t ib=0;ib<3;ib++)
-		{
-			const float s=(Vec3_Dot(normal, axesB[ib])<=0.0f)?SizeAxis(b, ib):-SizeAxis(b, ib);
-			pB=Vec3_Addv(pB, Vec3_Muls(axesB[ib], s));
-		}
+		pB=Vec3_Addv(pB, Vec3_Muls(axesB[0], sB.x));
+		pB=Vec3_Addv(pB, Vec3_Muls(axesB[1], sB.y));
+		pB=Vec3_Addv(pB, Vec3_Muls(axesB[2], sB.z));
 
 		const vec3 contact=Vec3_Muls(Vec3_Addv(pA, pB), 0.5f);
 
