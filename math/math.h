@@ -18,10 +18,10 @@ inline static const int32_t max(const int32_t a, const int32_t b) { return (a>b)
 
 inline static float clampf(const float value, const float min, const float max) { return fminf(fmaxf(value, min), max); }
 
-typedef struct { float x, y; } vec2;
-typedef struct { float x, y, z; } vec3;
-typedef struct { float x, y, z, w; } vec4;
-typedef struct { vec4 x, y, z, w; } matrix;
+typedef union { struct { float x, y; }; float v[2]; } vec2;
+typedef union { struct { float x, y, z; }; float v[3]; } vec3;
+typedef union { struct { float x, y, z, w; }; float v[4]; } vec4;
+typedef union { struct { vec4 x, y, z, w; }; float m[16]; } matrix;
 typedef struct { vec3 min, max; } aabb;
 
 #define VEC_INLINE

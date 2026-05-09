@@ -162,10 +162,10 @@ matrix QuatToMatrix(const vec4 q)
 
 	return (matrix)
 	{
-		{ 1.0f-yy-zz, xy+wz, xz-wy, 0.0f },
-		{ xy-wz, 1.0f-xx-zz, yz+wx, 0.0f },
-		{ xz+wy, yz-wx, 1.0f-xx-yy, 0.0f },
-		{ 0.0f, 0.0f, 0.0f, 1.0f }
+		.x={ 1.0f-yy-zz, xy+wz, xz-wy, 0.0f },
+		.y={ xy-wz, 1.0f-xx-zz, yz+wx, 0.0f },
+		.z={ xz+wy, yz-wx, 1.0f-xx-yy, 0.0f },
+		.w={ 0.0f, 0.0f, 0.0f, 1.0f }
 	};
 }
 

@@ -73,10 +73,10 @@ static struct
 
 static matrix listenerModelView=
 {
-	{ 1.0f, 0.0f, 0.0f, 0.0f },
-	{ 0.0f, 1.0f, 0.0f, 0.0f },
-	{ 0.0f, 0.0f, 1.0f, 0.0f },
-	{ 0.0f, 0.0f, 0.0f, 1.0f }
+	.x={ 1.0f, 0.0f, 0.0f, 0.0f },
+	.y={ 0.0f, 1.0f, 0.0f, 0.0f },
+	.z={ 0.0f, 0.0f, 1.0f, 0.0f },
+	.w={ 0.0f, 0.0f, 0.0f, 1.0f }
 };
 
 static vec3 listenerPosition={ 0.0f, 0.0f, 0.0f };

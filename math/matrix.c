@@ -11,10 +11,10 @@ matrix MatrixIdentity(void)
 {
 	return (matrix)
 	{
-		{ 1.0f, 0.0f, 0.0f, 0.0f },
-		{ 0.0f, 1.0f, 0.0f, 0.0f },
-		{ 0.0f, 0.0f, 1.0f, 0.0f },
-		{ 0.0f, 0.0f, 0.0f, 1.0f }
+		.x={ 1.0f, 0.0f, 0.0f, 0.0f },
+		.y={ 0.0f, 1.0f, 0.0f, 0.0f },
+		.z={ 0.0f, 0.0f, 1.0f, 0.0f },
+		.w={ 0.0f, 0.0f, 0.0f, 1.0f }
 	};
 }
 
@@ -22,25 +22,25 @@ matrix MatrixMult(const matrix a, const matrix b)
 {
 	return (matrix)
 	{
-		{
+		.x={
 			a.x.x*b.x.x+a.x.y*b.y.x+a.x.z*b.z.x+a.x.w*b.w.x,
 			a.x.x*b.x.y+a.x.y*b.y.y+a.x.z*b.z.y+a.x.w*b.w.y,
 			a.x.x*b.x.z+a.x.y*b.y.z+a.x.z*b.z.z+a.x.w*b.w.z,
 			a.x.x*b.x.w+a.x.y*b.y.w+a.x.z*b.z.w+a.x.w*b.w.w
 		},
-		{
+		.y={
 			a.y.x*b.x.x+a.y.y*b.y.x+a.y.z*b.z.x+a.y.w*b.w.x,
 			a.y.x*b.x.y+a.y.y*b.y.y+a.y.z*b.z.y+a.y.w*b.w.y,
 			a.y.x*b.x.z+a.y.y*b.y.z+a.y.z*b.z.z+a.y.w*b.w.z,
 			a.y.x*b.x.w+a.y.y*b.y.w+a.y.z*b.z.w+a.y.w*b.w.w
 		},
-		{
+		.z={
 			a.z.x*b.x.x+a.z.y*b.y.x+a.z.z*b.z.x+a.z.w*b.w.x,
 			a.z.x*b.x.y+a.z.y*b.y.y+a.z.z*b.z.y+a.z.w*b.w.y,
 			a.z.x*b.x.z+a.z.y*b.y.z+a.z.z*b.z.z+a.z.w*b.w.z,
 			a.z.x*b.x.w+a.z.y*b.y.w+a.z.z*b.z.w+a.z.w*b.w.w
 		},
-		{
+		.w={
 			a.w.x*b.x.x+a.w.y*b.y.x+a.w.z*b.z.x+a.w.w*b.w.x,
 			a.w.x*b.x.y+a.w.y*b.y.y+a.w.z*b.z.y+a.w.w*b.w.y,
 			a.w.x*b.x.z+a.w.y*b.y.z+a.w.z*b.z.z+a.w.w*b.w.z,
@@ -53,10 +53,10 @@ matrix MatrixInverse(const matrix in)
 {
 	return (matrix)
 	{
-		{ in.x.x, in.y.x, in.z.x, 0.0f },
-		{ in.x.y, in.y.y, in.z.y, 0.0f },
-		{ in.x.z, in.y.z, in.z.z, 0.0f },
-		{
+		.x={ in.x.x, in.y.x, in.z.x, 0.0f },
+		.y={ in.x.y, in.y.y, in.z.y, 0.0f },
+		.z={ in.x.z, in.y.z, in.z.z, 0.0f },
+		.w={
 			-(in.w.x*in.x.x)-(in.w.y*in.x.y)-(in.w.z*in.x.z),
 			-(in.w.x*in.y.x)-(in.w.y*in.y.y)-(in.w.z*in.y.z),
 			-(in.w.x*in.z.x)-(in.w.y*in.z.y)-(in.w.z*in.z.z),
@@ -69,10 +69,10 @@ matrix MatrixTranspose(const matrix in)
 {
 	return (matrix)
 	{
-		{ in.x.x, in.y.x, in.z.x, in.w.x },
-		{ in.x.y, in.y.y, in.z.y, in.w.y },
-		{ in.x.z, in.y.z, in.z.z, in.w.z },
-		{ in.x.w, in.y.w, in.z.w, in.w.w }
+		.x={ in.x.x, in.y.x, in.z.x, in.w.x },
+		.y={ in.x.y, in.y.y, in.z.y, in.w.y },
+		.z={ in.x.z, in.y.z, in.z.z, in.w.z },
+		.w={ in.x.w, in.y.w, in.z.w, in.w.w }
 	};
 }
 
@@ -85,10 +85,10 @@ matrix MatrixRotate(const float angle, const float x, const float y, const float
 
 	return (matrix)
 	{
-		{ c+invCos[0]*x,       invCos[0]*y+s*z,   invCos[0]*z-s*y, 0.0f },
-		{   invCos[1]*x-s*z, c+invCos[1]*y,       invCos[1]*z+s*x, 0.0f },
-		{   invCos[2]*x+s*y,   invCos[2]*y-s*x, c+invCos[2]*z,     0.0f },
-		{   0.0f,              0.0f,              0.0f,            1.0f }
+		.x={ c+invCos[0]*x,       invCos[0]*y+s*z,   invCos[0]*z-s*y, 0.0f },
+		.y={   invCos[1]*x-s*z, c+invCos[1]*y,       invCos[1]*z+s*x, 0.0f },
+		.z={   invCos[2]*x+s*y,   invCos[2]*y-s*x, c+invCos[2]*z,     0.0f },
+		.w={   0.0f,              0.0f,              0.0f,            1.0f }
 	};
 }
 
@@ -101,10 +101,10 @@ matrix MatrixTranslate(const float x, const float y, const float z)
 {
 	return (matrix)
 	{
-		{ 1.0f, 0.0f, 0.0f, 0.0f },
-		{ 0.0f, 1.0f, 0.0f, 0.0f },
-		{ 0.0f, 0.0f, 1.0f, 0.0f },
-		{    x,    y,    z, 1.0f }
+		.x={ 1.0f, 0.0f, 0.0f, 0.0f },
+		.y={ 0.0f, 1.0f, 0.0f, 0.0f },
+		.z={ 0.0f, 0.0f, 1.0f, 0.0f },
+		.w={    x,    y,    z, 1.0f }
 	};
 }
 
@@ -117,10 +117,10 @@ matrix MatrixScale(const float x, const float y, const float z)
 {
 	return (matrix)
 	{
-		{    x, 0.0f, 0.0f, 0.0f },
-		{ 0.0f,    y, 0.0f, 0.0f },
-		{ 0.0f, 0.0f,    z, 0.0f },
-		{ 0.0f, 0.0f, 0.0f, 1.0f }
+		.x={    x, 0.0f, 0.0f, 0.0f },
+		.y={ 0.0f,    y, 0.0f, 0.0f },
+		.z={ 0.0f, 0.0f,    z, 0.0f },
+		.w={ 0.0f, 0.0f, 0.0f, 1.0f }
 	};
 }
 
@@ -152,10 +152,10 @@ matrix MatrixAlignPoints(const vec3 start, const vec3 end, const vec3 up)
 
 	return (matrix)
 	{
-		{ c+axis.x*axis.x*c1,			axis.y*axis.x*c1+axis.z*s,	axis.z*axis.x*c1-axis.y*s,	0.0f },
-		{ axis.x*axis.y*c1-axis.z*s,	c+axis.y*axis.y*c1,			axis.z*axis.y *c1+axis.x*s,	0.0f },
-		{ axis.x*axis.z*c1+axis.y*s,	axis.y*axis.z*c1-axis.x*s,	c+axis.z*axis.z*c1,			0.0f },
-		{ start.x,						start.y,					start.z,					1.0f }
+		.x={ c+axis.x*axis.x*c1,			axis.y*axis.x*c1+axis.z*s,	axis.z*axis.x*c1-axis.y*s,	0.0f },
+		.y={ axis.x*axis.y*c1-axis.z*s,	c+axis.y*axis.y*c1,			axis.z*axis.y *c1+axis.x*s,	0.0f },
+		.z={ axis.x*axis.z*c1+axis.y*s,	axis.y*axis.z*c1-axis.x*s,	c+axis.z*axis.z*c1,			0.0f },
+		.w={ start.x,						start.y,					start.z,					1.0f }
 	};
 }
 
@@ -203,10 +203,10 @@ matrix MatrixLookAt(const vec3 position, const vec3 forward, const vec3 up)
 
 	return (matrix)
 	{
-		{ s.x, u.x, -f.x, 0.0f },
-		{ s.y, u.y, -f.y, 0.0f },
-		{ s.z, u.z, -f.z, 0.0f },
-		{
+		.x={ s.x, u.x, -f.x, 0.0f },
+		.y={ s.y, u.y, -f.y, 0.0f },
+		.z={ s.z, u.z, -f.z, 0.0f },
+		.w={
 			-Vec3_Dot(s, position),
 			-Vec3_Dot(u, position),
 			Vec3_Dot(f, position),
@@ -222,10 +222,10 @@ matrix MatrixInfPerspective(const float fovy, const float aspect, const float zN
 
 	return (matrix)
 	{
-		{ 1.0f/(aspect*focal),  0.0f,        0.0f,  0.0f },
-		{ 0.0f,                 -1.0f/focal, 0.0f,  0.0f },
-		{ 0.0f,                 0.0f,        0.0f,  -1.0f },
-		{ 0.0f,                 0.0f,        zNear, 0.0f }
+		.x={ 1.0f/(aspect*focal),  0.0f,        0.0f,  0.0f },
+		.y={ 0.0f,                 -1.0f/focal, 0.0f,  0.0f },
+		.z={ 0.0f,                 0.0f,        0.0f,  -1.0f },
+		.w={ 0.0f,                 0.0f,        zNear, 0.0f }
 	};
 }
 
@@ -235,10 +235,10 @@ matrix MatrixPerspective(const float fovy, const float aspect, const float zNear
 
 	return (matrix)
 	{
-		{ 1.0f/(aspect*focal),  0.0f,        0.0f,                       0.0f },
-		{ 0.0f,                 -1.0f/focal, 0.0f,                       0.0f },
-		{ 0.0f,                 0.0f,        -2.0f/(zFar-zNear),         -1.0f },
-		{ 0.0f,                 0.0f,        -(zFar+zNear)/(zFar-zNear), 0.0f },
+		.x={ 1.0f/(aspect*focal),  0.0f,        0.0f,                       0.0f },
+		.y={ 0.0f,                 -1.0f/focal, 0.0f,                       0.0f },
+		.z={ 0.0f,                 0.0f,        -2.0f/(zFar-zNear),         -1.0f },
+		.w={ 0.0f,                 0.0f,        -(zFar+zNear)/(zFar-zNear), 0.0f },
 	};
 }
 
@@ -247,9 +247,9 @@ matrix MatrixOrtho(const float left, const float right, const float bottom, cons
 {
 	return (matrix)
 	{
-		{ 2.0f/(right-left),          0.0f,                       0.0f,               0.0f },
-		{ 0.0f,                       2.0f/(bottom-top),          0.0f,               0.0f },
-		{ 0.0f,                       0.0f,                       1.0f/(zNear-zFar),  0.0f },
-		{ -(right+left)/(right-left), -(bottom+top)/(bottom-top), zNear/(zNear-zFar), 1.0f }
+		.x={ 2.0f/(right-left),          0.0f,                       0.0f,               0.0f },
+		.y={ 0.0f,                       2.0f/(bottom-top),          0.0f,               0.0f },
+		.z={ 0.0f,                       0.0f,                       1.0f/(zNear-zFar),  0.0f },
+		.w={ -(right+left)/(right-left), -(bottom+top)/(bottom-top), zNear/(zNear-zFar), 1.0f }
 	};
 }
