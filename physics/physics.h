@@ -26,6 +26,9 @@ typedef struct RigidBody_s
 	vec3 angularVelocity;
 	float inertia, invInertia;
 
+	float restitution;
+	float friction;
+
 	RigidBodyType_e type;	// OBB, sphere, capsule
 	union
 	{

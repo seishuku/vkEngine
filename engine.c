@@ -262,6 +262,9 @@ void ResetPhysicsCubes(void)
 					.inertia=inertia,
 					.invInertia=1.0f/inertia,
 
+					.restitution=0.1f,
+					.friction=0.0f,
+
 					.type=RIGIDBODY_OBB,
 					.size=Vec3(radius/2, radius/2, radius/2),
 				};
@@ -387,6 +390,9 @@ void GenerateWorld(void)
 
 		asteroids[i].inertia=0.4f*asteroids[i].mass*(asteroids[i].radius*asteroids[i].radius);
 		asteroids[i].invInertia=1.0f/asteroids[i].inertia;
+
+		asteroids[i].restitution=0.8f;
+		asteroids[i].friction=0.5f;
 
 		asteroids[i].type=RIGIDBODY_SPHERE;
 	}
@@ -1751,6 +1757,9 @@ bool Init(void)
 			.angularVelocity=Vec3b(0.0f),
 			.inertia=inertia,
 			.invInertia=1.0f/inertia,
+
+			.restitution=1.0f,
+			.friction=1.0f,
 
 			.type=RIGIDBODY_SPHERE,
 			.radius=5.0f,

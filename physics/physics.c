@@ -143,7 +143,7 @@ float PhysicsResolveCollision(RigidBody_t *a, RigidBody_t *b, ContactPoint_t con
 	const vec3 d2=Vec3_Cross(Vec3_Muls(Vec3_Cross(r2, contact.normal), b->invInertia), r2);
 	const float invMassSum=a->invMass+b->invMass;
 
-	const float e=0.01f;
+	const float e=fminf(a->restitution, b->restitution);
 	const float j=-(1.0f+e)*relativeSpeed/(invMassSum+Vec3_Dot(contact.normal, Vec3_Addv(d1, d2)));
 
 	const vec3 impulse=Vec3_Muls(contact.normal, j);
@@ -173,7 +173,7 @@ float PhysicsResolveCollision(RigidBody_t *a, RigidBody_t *b, ContactPoint_t con
 	const vec3 d1T=Vec3_Cross(Vec3_Muls(Vec3_Cross(r1, tangentialVel), a->invInertia), r1);
 	const vec3 d2T=Vec3_Cross(Vec3_Muls(Vec3_Cross(r2, tangentialVel), b->invInertia), r2);
 
-	const float friction=0.8f;
+	const float friction=sqrtf(a->friction*b->friction);
 	const float maxjT=friction*j;
 
 	const float jT=clampf(-Vec3_Dot(relativeVel, tangentialVel)/(invMassSum+Vec3_Dot(tangentialVel, Vec3_Addv(d1T, d2T))), -maxjT, maxjT);
@@ -283,9 +283,9 @@ static CollisionManifold_t SphereToOBBCollision(RigidBody_t *sphere, RigidBody_t
 	return manifold;
 }
 
-static int ClipPolygon(const vec3 *in, int inCount, vec3 *out, vec3 planeNormal, float planeDist)
+static uint32_t ClipPolygon(const vec3 *in, uint32_t inCount, vec3 *out, vec3 planeNormal, float planeDist)
 {
-    int outCount=0;
+    uint32_t outCount=0;
 
 	if(inCount==0)
 		return 0;
@@ -309,16 +309,6 @@ static int ClipPolygon(const vec3 *in, int inCount, vec3 *out, vec3 planeNormal,
 	}
 
 	return outCount;
-}
-
-static float SizeAxis(const RigidBody_t *body, int i)
-{
-    if(i==0)
-		return body->size.x;
-    if(i==1)
-		return body->size.y;
-
-	return body->size.z;
 }
 
 static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
@@ -357,7 +347,7 @@ static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 	uint32_t minAxisIndex=0;
 
 	// Test axes
-	const float collisionEpsilon = 1e-4f;
+	const float collisionEpsilon=1e-4f;
 	for(uint32_t i=0;i<axisCount;i++)
     {
 		// Project OBBs onto axis
@@ -436,11 +426,11 @@ static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
     const vec3 *refAxes=refIsA?axesA:axesB;
     const vec3 *incAxes=refIsA?axesB:axesA;
 
-    const int32_t refFaceAxis=refIsA?(int32_t)minAxisIndex:(int32_t)(minAxisIndex-3);
+    const uint32_t refFaceAxis=refIsA?minAxisIndex:minAxisIndex-3;
     const vec3 refFaceNormal=refIsA?normal:Vec3_Muls(normal, -1.0f);
 
     float minDot=FLT_MAX;
-    int32_t incFaceAxis=0;
+    uint32_t incFaceAxis=0;
     float incFaceSign=1.0f;
 
 	for(uint32_t i=0;i<3;i++)
@@ -463,12 +453,12 @@ static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
     }
 
     // Build the corners of the face
-    const vec3 incFaceCenter=Vec3_Addv(inc->position, Vec3_Muls(incAxes[incFaceAxis], incFaceSign*SizeAxis(inc, incFaceAxis)));
+    const vec3 incFaceCenter=Vec3_Addv(inc->position, Vec3_Muls(incAxes[incFaceAxis], incFaceSign*inc->size.v[incFaceAxis]));
 
-    const int it1=(incFaceAxis+1)%3;
-    const int it2=(incFaceAxis+2)%3;
-    const vec3 ie1=Vec3_Muls(incAxes[it1], SizeAxis(inc, it1));
-    const vec3 ie2=Vec3_Muls(incAxes[it2], SizeAxis(inc, it2));
+    const uint32_t it1=(incFaceAxis+1)%3;
+    const uint32_t it2=(incFaceAxis+2)%3;
+    const vec3 ie1=Vec3_Muls(incAxes[it1], inc->size.v[it1]);
+    const vec3 ie2=Vec3_Muls(incAxes[it2], inc->size.v[it2]);
 
     // Ping-pong between two buffers while clipping
     vec3 buf0[8], buf1[8];
@@ -476,13 +466,13 @@ static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
     buf0[1]=Vec3_Addv(Vec3_Subv(incFaceCenter,  ie1),  ie2);
     buf0[2]=Vec3_Subv(Vec3_Subv(incFaceCenter,  ie1),  ie2);
     buf0[3]=Vec3_Subv(Vec3_Addv(incFaceCenter,  ie1),  ie2);
-    int count=4;
+    uint32_t count=4;
 
     // Clip against the 4 side planes of the reference face
-    const int rt1=(refFaceAxis+1)%3;
-    const int rt2=(refFaceAxis+2)%3;
-    const float rs1=SizeAxis(ref, rt1);
-    const float rs2=SizeAxis(ref, rt2);
+    const uint32_t rt1=(refFaceAxis+1)%3;
+    const uint32_t rt2=(refFaceAxis+2)%3;
+    const float rs1=ref->size.v[rt1];
+    const float rs2=ref->size.v[rt2];
     const float refDotRt1=Vec3_Dot(ref->position, refAxes[rt1]);
     const float refDotRt2=Vec3_Dot(ref->position, refAxes[rt2]);
 
@@ -506,7 +496,7 @@ static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 	if(!count)
 		return (CollisionManifold_t) { 0 };
 
-    const float refFaceDist=Vec3_Dot(ref->position, refFaceNormal)+SizeAxis(ref, refFaceAxis);
+    const float refFaceDist=Vec3_Dot(ref->position, refFaceNormal)+ref->size.v[refFaceAxis];
 
 	// Clip against the reference face itself (depth plane)
 	count=ClipPolygon(buf0, count, buf1, refFaceNormal, refFaceDist);
@@ -525,10 +515,9 @@ static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 
 		if(d<=refFaceDist+FLT_EPSILON)
         {
-            const float contactPenetration=refFaceDist-d;
 			manifold.contacts[manifold.contactCount].position=buf1[i];
 			manifold.contacts[manifold.contactCount].normal=normal;
-			manifold.contacts[manifold.contactCount].penetration=contactPenetration;
+			manifold.contacts[manifold.contactCount].penetration=refFaceDist-d;
 			manifold.contactCount++;
         }
     }

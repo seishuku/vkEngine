@@ -151,6 +151,9 @@ void CameraInit(Camera_t *camera, const vec3 position, const vec3 up, const vec3
 	camera->body.orientation=MatrixToQuat(cameraOrientation);
 	camera->body.angularVelocity=Vec3b(0.0f);
 
+	camera->body.restitution=0.8f;
+	camera->body.friction=0.1f;
+
 	camera->body.type=RIGIDBODY_SPHERE,
 	camera->body.radius=10.0f;
 
