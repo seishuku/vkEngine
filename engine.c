@@ -225,7 +225,7 @@ bool CreateFramebuffers(uint32_t eye);
 void ResetPhysicsCubes(void)
 {
 	const float radius=20.0f;
-	const float mass=(1.0f/3000.0f)*(1.33333333f*PI*radius)*10.0f;
+	const float mass=(1.0f/3000.0f)*(1.33333333f*PI*radius);
 	const float inertia=0.4f*mass*(radius*radius);
 
 	const uint32_t layers=4;
@@ -254,7 +254,7 @@ void ResetPhysicsCubes(void)
 
 					.velocity=Vec3b(0.0f),
 					.force=Vec3b(0.0f),
-					.mass=mass*10,
+					.mass=mass,
 					.invMass=1.0f/mass,
 
 					.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
@@ -1203,9 +1203,15 @@ void Thread_Physics(void *arg)
 						);
 					}
 				}
+					}
+				}
 
+		for(uint32_t i=0;i<numManifolds;i++)
+		{
+			CollisionManifold_t *manifold=&manifoldList[i].manifold;
+
+			for(uint32_t j=0;j<manifold->contactCount;j++)
 				PhysicsPositionCorrection(manifold->a, manifold->b, manifold->contacts[j]);
-			}
 		}
 	}
 

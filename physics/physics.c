@@ -223,7 +223,7 @@ static CollisionManifold_t SphereToSphereCollision(RigidBody_t *a, RigidBody_t *
 
 	// Penetration
 	const float distance=fmaxf(sqrtf(distanceSq), FLT_EPSILON);
-	const float penetration=distance-radiiSum;
+	const float penetration=radiiSum-distance;
 
 	// Normal
 	const vec3 normal=Vec3_Muls(relativePosition, 1.0f/distance);
@@ -264,7 +264,7 @@ static CollisionManifold_t SphereToOBBCollision(RigidBody_t *sphere, RigidBody_t
 
 	// Penetration
 	const float distance=fmaxf(sqrtf(distanceSq), FLT_EPSILON);
-	const float penetration=distance-sphere->radius;
+	const float penetration=sphere->radius-distance;
 
 	// Normal
 	const vec3 normal=Vec3_Muls(relativePosition, 1.0f/distance);
