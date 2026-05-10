@@ -396,9 +396,9 @@ static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 		pA=Vec3_Addv(pA, Vec3_Muls(axesA[2], sA.z));
 
 		const vec3 sB=Vec3(
-			(Vec3_Dot(normal, axesB[0])>=0.0f)?b->size.x:-b->size.x,
-			(Vec3_Dot(normal, axesB[1])>=0.0f)?b->size.y:-b->size.y,
-			(Vec3_Dot(normal, axesB[2])>=0.0f)?b->size.z:-b->size.z
+			(Vec3_Dot(normal, axesB[0])<=0.0f)?b->size.x:-b->size.x,
+			(Vec3_Dot(normal, axesB[1])<=0.0f)?b->size.y:-b->size.y,
+			(Vec3_Dot(normal, axesB[2])<=0.0f)?b->size.z:-b->size.z
 		);
 
 		vec3 pB=b->position;
