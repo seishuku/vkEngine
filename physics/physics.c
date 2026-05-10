@@ -283,7 +283,7 @@ static CollisionManifold_t SphereToOBBCollision(RigidBody_t *sphere, RigidBody_t
 	return manifold;
 }
 
-static uint32_t ClipPolygon(const vec3 *in, uint32_t inCount, vec3 *out, vec3 planeNormal, float planeDist)
+static uint32_t ClipPolygon(const vec3 *in, uint32_t inCount, vec3 *out, uint32_t maxOut, vec3 planeNormal, float planeDist)
 {
     uint32_t outCount=0;
 
@@ -292,24 +292,112 @@ static uint32_t ClipPolygon(const vec3 *in, uint32_t inCount, vec3 *out, vec3 pl
 
     for(uint32_t i=0;i<inCount;i++)
     {
-        const vec3 curr=in[i];
-        const vec3 next=in[(i+1)%inCount];
-
+        const vec3  curr=in[i];
+        const vec3  next=in[(i+1)%inCount];
 		const float dc=Vec3_Dot(curr, planeNormal)-planeDist;
 		const float dn=Vec3_Dot(next, planeNormal)-planeDist;
+        const bool insideC=(dc<=0.0f);
+        const bool insideN=(dn<=0.0f);
 
-		const bool insideC=dc<=0.0f;
-		const bool insideN=dn<=0.0f;
+        if(insideC&&outCount<maxOut)
+            out[outCount++] = curr;
 
-		if(insideC)
-			out[outCount++]=curr;
-
-		if(insideC!=insideN)
+		if(insideC!=insideN&&outCount<maxOut)
 			out[outCount++]=Vec3_Addv(curr, Vec3_Muls(Vec3_Subv(next, curr), dc/(dc-dn)));
 	}
 
 	return outCount;
 }
+
+static bool TestSATAxis(vec3 axis, const vec3 axesA[3], vec3 sA, const vec3 axesB[3], vec3 sB, vec3 relPos, uint32_t axisIndex, float *penetration, vec3 *normal, uint32_t *minAxisIndex)
+{
+	const float rA=fabsf(Vec3_Dot(axesA[0], axis))*sA.x+fabsf(Vec3_Dot(axesA[1], axis))*sA.y+fabsf(Vec3_Dot(axesA[2], axis))*sA.z;
+    const float rB=fabsf(Vec3_Dot(axesB[0], axis))*sB.x+fabsf(Vec3_Dot(axesB[1], axis))*sB.y+fabsf(Vec3_Dot(axesB[2], axis))*sB.z;
+    const float dist=fabsf(Vec3_Dot(relPos, axis));
+    float overlap=rA+rB-dist;
+
+	// Separating axis found — no collision.
+    if(overlap<-FLT_EPSILON)
+		return false;
+
+    overlap=fmaxf(overlap, 0.0f);
+
+    if(overlap<*penetration)
+	{
+		*penetration=overlap;
+		*normal=axis;
+		*minAxisIndex=axisIndex;
+	}
+
+	return true;
+}
+
+static bool TestCrossSATAxis(vec3 edgeA, vec3 edgeB, const vec3 axesA[3], vec3 sA, const vec3 axesB[3], vec3 sB, vec3 relPos, uint32_t axisIndex, float *penetration, vec3 *normal, uint32_t *minAxisIndex)
+{
+	vec3 axis=Vec3_Cross(edgeA, edgeB);
+
+	if(Vec3_Normalize(&axis)<=FLT_EPSILON)
+		return true;
+
+    return TestSATAxis(axis, axesA, sA, axesB, sB, relPos, axisIndex, penetration, normal, minAxisIndex);
+}
+
+static void ReduceManifoldContacts(CollisionManifold_t *m)
+{
+	if(m->contactCount<=4)
+		return;
+
+	// Keep the deepest penetration first.
+	uint32_t bestIndex=0;
+
+	for(uint32_t i=1;i<m->contactCount;i++)
+	{
+		if(m->contacts[i].penetration>m->contacts[bestIndex].penetration)
+			bestIndex=i;
+	}
+
+	ContactPoint_t reduced[4]={ m->contacts[bestIndex] };
+	m->contacts[bestIndex]=m->contacts[--m->contactCount];
+
+	// Greedily pick the point farthest from the current set.
+	uint32_t reducedCount=1;
+
+	while(reducedCount<4&&m->contactCount>0)
+	{
+		float bestDistance=-1.0f;
+		uint32_t bestCandidate=0;
+
+		for(uint32_t i=0;i<m->contactCount;i++)
+		{
+			const vec3 candidatePos=m->contacts[i].position;
+			float nearestDistance=FLT_MAX;
+
+			for(uint32_t j=0;j<reducedCount;j++)
+			{
+				const float distance=Vec3_LengthSq(Vec3_Subv(candidatePos, reduced[j].position));
+
+				if(distance<nearestDistance)
+					nearestDistance=distance;
+			}
+
+			if(nearestDistance>bestDistance)
+			{
+				bestDistance=nearestDistance;
+				bestCandidate=i;
+			}
+		}
+
+		reduced[reducedCount++]=m->contacts[bestCandidate];
+		m->contacts[bestCandidate]=m->contacts[--m->contactCount];
+	}
+
+	m->contactCount=reducedCount;
+
+	for(uint32_t i=0;i<reducedCount;i++)
+		m->contacts[i]=reduced[i];
+}
+
+#define MAX_CLIP_VERTS 16
 
 static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 {
@@ -318,100 +406,59 @@ static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
     QuatAxes(a->orientation, axesA);
     QuatAxes(b->orientation, axesB);
 
-	// Compute relative position
-	const vec3 relativePosition=Vec3_Subv(b->position, a->position);
+    const vec3 relPos=Vec3_Subv(b->position, a->position);
 
-	// List of axes to test, at minimum test base axes of A and B OBBs
-    uint32_t axisCount=6;
-    vec3 axes[15]={
-		axesA[0], axesA[1], axesA[2],
-		axesB[0], axesB[1], axesB[2],
-    };
-
-	// Cross products add additional axes to test
-	for(uint32_t i=0;i<3;i++)
-	{
-		for(uint32_t j=0;j<3;j++)
-        {
-			vec3 axis=Vec3_Cross(axesA[i], axesB[j]);
-			const float length=Vec3_Normalize(&axis);
-
-			if(length>FLT_EPSILON)
-				axes[axisCount++]=axis;
-        }
-	}
-
-	// Minimum penetration depth and corresponding axis
 	float penetration=FLT_MAX;
 	vec3 normal=Vec3b(0.0f);
 	uint32_t minAxisIndex=0;
 
-	// Test axes
-	const float collisionEpsilon=1e-4f;
-	for(uint32_t i=0;i<axisCount;i++)
-    {
-		// Project OBBs onto axis
-		const float rA=fabsf(Vec3_Dot(axesA[0], axes[i]))*a->size.x+fabsf(Vec3_Dot(axesA[1], axes[i]))*a->size.y+fabsf(Vec3_Dot(axesA[2], axes[i]))*a->size.z;
-		const float rB=fabsf(Vec3_Dot(axesB[0], axes[i]))*b->size.x+fabsf(Vec3_Dot(axesB[1], axes[i]))*b->size.y+fabsf(Vec3_Dot(axesB[2], axes[i]))*b->size.z;
-		const float distance=fabsf(Vec3_Dot(relativePosition, axes[i]));
+    if(!TestSATAxis(axesA[0], axesA, a->size, axesB, b->size, relPos, 0, &penetration, &normal, &minAxisIndex)) return (CollisionManifold_t) { 0 };
+    if(!TestSATAxis(axesA[1], axesA, a->size, axesB, b->size, relPos, 1, &penetration, &normal, &minAxisIndex)) return (CollisionManifold_t) { 0 };
+    if(!TestSATAxis(axesA[2], axesA, a->size, axesB, b->size, relPos, 2, &penetration, &normal, &minAxisIndex)) return (CollisionManifold_t) { 0 };
+    if(!TestSATAxis(axesB[0], axesA, a->size, axesB, b->size, relPos, 3, &penetration, &normal, &minAxisIndex)) return (CollisionManifold_t) { 0 };
+    if(!TestSATAxis(axesB[1], axesA, a->size, axesB, b->size, relPos, 4, &penetration, &normal, &minAxisIndex)) return (CollisionManifold_t) { 0 };
+    if(!TestSATAxis(axesB[2], axesA, a->size, axesB, b->size, relPos, 5, &penetration, &normal, &minAxisIndex)) return (CollisionManifold_t) { 0 };
 
-		float overlap=rA+rB-distance;
-
-		// Separating axis found, no collision
-		if(overlap<-collisionEpsilon)
-			return (CollisionManifold_t) { 0 };
-
-		// Clamp small negative overlaps to zero
-		overlap=fmaxf(overlap, 0.0f);
-
-		if(overlap<penetration)
-        {
-			// Update minimum penetration depth and collision normal
-			penetration=overlap;
-            normal=axes[i];
-			minAxisIndex=i;
-		}
-	}
+	if(!TestCrossSATAxis(axesA[0], axesB[0], axesA, a->size, axesB, b->size, relPos, 6, &penetration, &normal, &minAxisIndex)) return (CollisionManifold_t) { 0 };
+    if(!TestCrossSATAxis(axesA[0], axesB[1], axesA, a->size, axesB, b->size, relPos, 7, &penetration, &normal, &minAxisIndex)) return (CollisionManifold_t) { 0 };
+    if(!TestCrossSATAxis(axesA[0], axesB[2], axesA, a->size, axesB, b->size, relPos, 8, &penetration, &normal, &minAxisIndex)) return (CollisionManifold_t) { 0 };
+    if(!TestCrossSATAxis(axesA[1], axesB[0], axesA, a->size, axesB, b->size, relPos, 9, &penetration, &normal, &minAxisIndex)) return (CollisionManifold_t) { 0 };
+    if(!TestCrossSATAxis(axesA[1], axesB[1], axesA, a->size, axesB, b->size, relPos, 10, &penetration, &normal, &minAxisIndex)) return (CollisionManifold_t) { 0 };
+    if(!TestCrossSATAxis(axesA[1], axesB[2], axesA, a->size, axesB, b->size, relPos, 11, &penetration, &normal, &minAxisIndex)) return (CollisionManifold_t) { 0 };
+    if(!TestCrossSATAxis(axesA[2], axesB[0], axesA, a->size, axesB, b->size, relPos, 12, &penetration, &normal, &minAxisIndex)) return (CollisionManifold_t) { 0 };
+    if(!TestCrossSATAxis(axesA[2], axesB[1], axesA, a->size, axesB, b->size, relPos, 13, &penetration, &normal, &minAxisIndex)) return (CollisionManifold_t) { 0 };
+    if(!TestCrossSATAxis(axesA[2], axesB[2], axesA, a->size, axesB, b->size, relPos, 14, &penetration, &normal, &minAxisIndex)) return (CollisionManifold_t) { 0 };
 
 	// No separating axis found
 
 	// Ensure the collision normal points from A to B
-	if(Vec3_Dot(normal, relativePosition)<0.0f)
+    if(Vec3_Dot(normal, relPos)<0.0f)
 		normal=Vec3_Muls(normal, -1.0f);
 
 	Vec3_Normalize(&normal);
 
-	// Single point contact
+    // Edge to edge contact
 	if(minAxisIndex>=6)
 	{
-		const vec3 sA=Vec3(
-			(Vec3_Dot(normal, axesA[0])>=0.0f)?a->size.x:-a->size.x,
-			(Vec3_Dot(normal, axesA[1])>=0.0f)?a->size.y:-a->size.y,
-			(Vec3_Dot(normal, axesA[2])>=0.0f)?a->size.z:-a->size.z
+        const vec3 pA=Vec3_Addv(
+			Vec3_Addv(
+				Vec3_Addv(a->position,
+					Vec3_Muls(axesA[0], (Vec3_Dot(normal, axesA[0])>=0.0f)?a->size.x:-a->size.x)),
+					Vec3_Muls(axesA[1], (Vec3_Dot(normal, axesA[1])>=0.0f)?a->size.y:-a->size.y)),
+					Vec3_Muls(axesA[2], (Vec3_Dot(normal, axesA[2])>=0.0f)?a->size.z:-a->size.z)
 		);
-
-		vec3 pA=a->position;
-		pA=Vec3_Addv(pA, Vec3_Muls(axesA[0], sA.x));
-		pA=Vec3_Addv(pA, Vec3_Muls(axesA[1], sA.y));
-		pA=Vec3_Addv(pA, Vec3_Muls(axesA[2], sA.z));
-
-		const vec3 sB=Vec3(
-			(Vec3_Dot(normal, axesB[0])<=0.0f)?b->size.x:-b->size.x,
-			(Vec3_Dot(normal, axesB[1])<=0.0f)?b->size.y:-b->size.y,
-			(Vec3_Dot(normal, axesB[2])<=0.0f)?b->size.z:-b->size.z
+        const vec3 pB=Vec3_Addv(
+			Vec3_Addv(
+				Vec3_Addv(b->position,
+					Vec3_Muls(axesB[0], (Vec3_Dot(normal, axesB[0])<=0.0f)?b->size.x:-b->size.x)),
+					Vec3_Muls(axesB[1], (Vec3_Dot(normal, axesB[1])<=0.0f)?b->size.y:-b->size.y)),
+					Vec3_Muls(axesB[2], (Vec3_Dot(normal, axesB[2])<=0.0f)?b->size.z:-b->size.z)
 		);
-
-		vec3 pB=b->position;
-		pB=Vec3_Addv(pB, Vec3_Muls(axesB[0], sB.x));
-		pB=Vec3_Addv(pB, Vec3_Muls(axesB[1], sB.y));
-		pB=Vec3_Addv(pB, Vec3_Muls(axesB[2], sB.z));
-
-		const vec3 contact=Vec3_Muls(Vec3_Addv(pA, pB), 0.5f);
 
 		CollisionManifold_t manifold;
 		manifold.a=a;
 		manifold.b=b;
-		manifold.contacts[0].position=contact;
+        manifold.contacts[0].position=Vec3_Muls(Vec3_Addv(pA, pB), 0.5f);
 		manifold.contacts[0].normal=normal;
 		manifold.contacts[0].penetration=penetration;
 		manifold.contactCount=1;
@@ -429,27 +476,27 @@ static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
     const uint32_t refFaceAxis=refIsA?minAxisIndex:minAxisIndex-3;
     const vec3 refFaceNormal=refIsA?normal:Vec3_Muls(normal, -1.0f);
 
-    float minDot=FLT_MAX;
     uint32_t incFaceAxis=0;
     float incFaceSign=1.0f;
 
-	for(uint32_t i=0;i<3;i++)
-    {
-        const float d=Vec3_Dot(incAxes[i], refFaceNormal);
+	const float di0=Vec3_Dot(incAxes[0], refFaceNormal), adi0=fabsf(di0);
+	const float di1=Vec3_Dot(incAxes[1], refFaceNormal), adi1=fabsf(di1);
+	const float di2=Vec3_Dot(incAxes[2], refFaceNormal), adi2=fabsf(di2);
 
-		if(d<minDot)
+	if(adi0>=adi1&&adi0>=adi2)
 		{
-			minDot=d;
-			incFaceAxis=i;
-			incFaceSign=1.0f;
+		incFaceAxis=0;
+		incFaceSign=di0<=0.0f?1.0f:-1.0f;
 		}
-
-		if(-d<minDot)
+	else if(adi1>=adi2)
 		{
-			minDot=-d;
-			incFaceAxis=i;
-			incFaceSign=-1.0f;
+		incFaceAxis=1;
+		incFaceSign=di1<=0.0f?1.0f:-1.0f;
 		}
+	else
+	{
+		incFaceAxis=2;
+		incFaceSign=di2<=0.0f?1.0f:-1.0f;
     }
 
     // Build the corners of the face
@@ -460,67 +507,47 @@ static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
     const vec3 ie1=Vec3_Muls(incAxes[it1], inc->size.v[it1]);
     const vec3 ie2=Vec3_Muls(incAxes[it2], inc->size.v[it2]);
 
-    // Ping-pong between two buffers while clipping
-    vec3 buf0[8], buf1[8];
-    buf0[0]=Vec3_Addv(Vec3_Addv(incFaceCenter,  ie1),  ie2);
-    buf0[1]=Vec3_Addv(Vec3_Subv(incFaceCenter,  ie1),  ie2);
-    buf0[2]=Vec3_Subv(Vec3_Subv(incFaceCenter,  ie1),  ie2);
-    buf0[3]=Vec3_Subv(Vec3_Addv(incFaceCenter,  ie1),  ie2);
+    vec3 buf0[MAX_CLIP_VERTS], buf1[MAX_CLIP_VERTS];
+    buf0[0]=Vec3_Addv(Vec3_Addv(incFaceCenter, ie1), ie2);
+    buf0[1]=Vec3_Addv(Vec3_Subv(incFaceCenter, ie1), ie2);
+    buf0[2]=Vec3_Subv(Vec3_Subv(incFaceCenter, ie1), ie2);
+    buf0[3]=Vec3_Subv(Vec3_Addv(incFaceCenter, ie1), ie2);
     uint32_t count=4;
 
-    // Clip against the 4 side planes of the reference face
     const uint32_t rt1=(refFaceAxis+1)%3;
     const uint32_t rt2=(refFaceAxis+2)%3;
     const float rs1=ref->size.v[rt1];
     const float rs2=ref->size.v[rt2];
+
     const float refDotRt1=Vec3_Dot(ref->position, refAxes[rt1]);
     const float refDotRt2=Vec3_Dot(ref->position, refAxes[rt2]);
-
-    count=ClipPolygon(buf0, count, buf1, refAxes[rt1], refDotRt1+rs1);
-
-	if(!count)
-		return (CollisionManifold_t) { 0 };
-
-	count=ClipPolygon(buf1, count, buf0, Vec3_Muls(refAxes[rt1], -1.0f), -refDotRt1+rs1);
-
-	if(!count)
-		return (CollisionManifold_t) { 0 };
-
-	count=ClipPolygon(buf0, count, buf1, refAxes[rt2], refDotRt2+rs2);
-
-	if(!count)
-		return (CollisionManifold_t) { 0 };
-
-	count=ClipPolygon(buf1, count, buf0, Vec3_Muls(refAxes[rt2], -1.0f), -refDotRt2+rs2);
-
-	if(!count)
-		return (CollisionManifold_t) { 0 };
-
     const float refFaceDist=Vec3_Dot(ref->position, refFaceNormal)+ref->size.v[refFaceAxis];
 
-	// Clip against the reference face itself (depth plane)
-	count=ClipPolygon(buf0, count, buf1, refFaceNormal, refFaceDist);
-
-	if(!count)
-		return (CollisionManifold_t) { 0 };
+    count=ClipPolygon(buf0, count, buf1, MAX_CLIP_VERTS, refAxes[rt1], refDotRt1+rs1);
+	if(!count) return (CollisionManifold_t) { 0 };
+    count=ClipPolygon(buf1, count, buf0, MAX_CLIP_VERTS, Vec3_Muls(refAxes[rt1], -1.0f), -refDotRt1+rs1);
+	if(!count) return (CollisionManifold_t) { 0 };
+    count=ClipPolygon(buf0, count, buf1, MAX_CLIP_VERTS, refAxes[rt2], refDotRt2+rs2);
+    if(!count) return (CollisionManifold_t) { 0 };
+    count=ClipPolygon(buf1, count, buf0, MAX_CLIP_VERTS, Vec3_Muls(refAxes[rt2], -1.0f), -refDotRt2+rs2);
+    if(!count) return (CollisionManifold_t) { 0 };
+    count=ClipPolygon(buf0, count, buf1, MAX_CLIP_VERTS, refFaceNormal, refFaceDist);
+    if(!count) return (CollisionManifold_t) { 0 };
 
 	CollisionManifold_t manifold;
 	manifold.a=a;
 	manifold.b=b;
 	manifold.contactCount=0;
 
-	for(uint32_t i=0;i<(uint32_t)count;i++)
-    {
-        const float d=Vec3_Dot(buf1[i], refFaceNormal);
-
-		if(d<=refFaceDist+FLT_EPSILON)
+    for(uint32_t i=0;i<count&&manifold.contactCount<MAX_CONTACTS_PER_MANIFOLD;i++)
         {
 			manifold.contacts[manifold.contactCount].position=buf1[i];
 			manifold.contacts[manifold.contactCount].normal=normal;
-			manifold.contacts[manifold.contactCount].penetration=refFaceDist-d;
+        manifold.contacts[manifold.contactCount].penetration=fmaxf(refFaceDist-Vec3_Dot(buf1[i], refFaceNormal), 0.0f);
 			manifold.contactCount++;
         }
-    }
+
+	ReduceManifoldContacts(&manifold);
 
 	return manifold;
 }

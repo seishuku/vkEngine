@@ -4,7 +4,7 @@
 #include "../math/math.h"
 
 // Define constants
-#define WORLD_SCALE 80.0f
+#define WORLD_SCALE 10.0f
 #define EXPLOSION_POWER (50.0f*WORLD_SCALE)
 
 typedef enum
