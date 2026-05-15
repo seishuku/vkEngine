@@ -1,213 +1,209 @@
+#include <stdbool.h>
+#include <stdint.h>
+#include <float.h>
+#include <assert.h>
 #include "bvh.h"
 #include "../system/system.h"
 #include "../math/math.h"
-#include <float.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include "../entitylist.h"
 
-void BVH_Build(BVH_t *bvh, const void *AABBs, const uint32_t numAABBs, const uint32_t stride, const uint32_t offset)
+static int32_t indices[MAX_ENTITY];
+
+typedef struct
 {
-	typedef struct
-	{
-		int32_t nodeIndex;
-		uint32_t first;
-		uint32_t count;
-	} BVHBuildStackObj_t;
+    int32_t nodeIndex, start, count;
+} BVHBuildStackObj_t;
 
-	BVHBuildStackObj_t stack[BVH_MAX_NODES];
-	uint32_t stackTop=0;
-	uint32_t numIndices=numAABBs;
+#define BUILD_STACK_MAX 64
+static BVHBuildStackObj_t buildStack[BUILD_STACK_MAX];
 
-	if(numIndices>=BVH_MAX_OBJECTS)
-	{
-		numIndices=BVH_MAX_OBJECTS;
-		DBGPRINTF(DEBUG_WARNING, "BVH: numAABBs (%d) > MAX OBJECTS\n", numAABBs);
-	}
+void BVH_Build(BVH_t *bvh, EntityList_t *entityList)
+{
+	bvh->numNodes=0;
 
-	// Initialize object index list
-	for(uint32_t i=0;i<numIndices;i++)
-		bvh->objectIndices[i]=i;
+	if(entityList->entityCount==0)
+		return;
 
-	bvh->nodeCount=1;
+	for(uint32_t i=0;i<entityList->entityCount;i++)
+		indices[i]=(int32_t)i;
 
-	stack[stackTop++]=(BVHBuildStackObj_t)
-	{
-		.nodeIndex=0,
-	    .first=0, .count=numIndices
-	};
+	bvh->numNodes=1;
+
+	int32_t stackTop=0;
+	BVHBuildStackObj_t initialWork={ 0, 0, (int32_t)entityList->entityCount };
+	buildStack[stackTop++]=initialWork;
 
 	while(stackTop>0)
 	{
-		BVHBuildStackObj_t stackObj=stack[--stackTop];
-		BVHNode_t *node=&bvh->nodes[stackObj.nodeIndex];
+		BVHBuildStackObj_t work=buildStack[--stackTop];
+		BVHNode_t *node=&bvh->nodes[work.nodeIndex];
+		aabb nodeBounds=entityList->entities[indices[work.start]].bounds;
 
-		node->first=stackObj.first;
-		node->count=stackObj.count;
-		node->left=-1;
-		node->right=-1;
-
-		// Compute bounds
-		node->bounds.min=Vec3b(FLT_MAX);
-		node->bounds.max=Vec3b(-FLT_MAX);
-
-		for(uint32_t i=0;i<stackObj.count;i++)
+		for(int32_t i=1;i<work.count;i++)
 		{
-			uint32_t index=bvh->objectIndices[stackObj.first+i];
-			aabb *bounds=(aabb *)((uint8_t *)AABBs+index*stride+offset);;
-
-			node->bounds.min.x=fminf(node->bounds.min.x, bounds->min.x);
-			node->bounds.min.y=fminf(node->bounds.min.y, bounds->min.y);
-			node->bounds.min.z=fminf(node->bounds.min.z, bounds->min.z);
-			node->bounds.max.x=fmaxf(node->bounds.max.x, bounds->max.x);
-			node->bounds.max.y=fmaxf(node->bounds.max.y, bounds->max.y);
-			node->bounds.max.z=fmaxf(node->bounds.max.z, bounds->max.z);
+			const aabb *b=&entityList->entities[indices[work.start+i]].bounds;
+			nodeBounds=(aabb) {
+				nodeBounds.min.x<b->min.x?nodeBounds.min.x:b->min.x,
+				nodeBounds.min.y<b->min.y?nodeBounds.min.y:b->min.y,
+				nodeBounds.min.z<b->min.z?nodeBounds.min.z:b->min.z,
+				nodeBounds.max.x>b->max.x?nodeBounds.max.x:b->max.x,
+				nodeBounds.max.y>b->max.y?nodeBounds.max.y:b->max.y,
+				nodeBounds.max.z>b->max.z?nodeBounds.max.z:b->max.z,
+			};
 		}
 
-		// Leaf
-		if(stackObj.count<=BVH_MAX_OBJECTS_PER_LEAF)
+		node->bounds=nodeBounds;
+
+		if(work.count==1)
+		{
+			node->left=-1;
+			node->right=-1;
+			node->objectIndex=indices[work.start];
 			continue;
+		}
 
-		// Choose split axis (largest extent)
-		vec3 extent=
+		vec3 extent=Vec3_Subv(nodeBounds.max, nodeBounds.min);
+		uint32_t axis=(extent.x>=extent.y&&extent.x>=extent.z)?0:(extent.y>=extent.z)?1:2;
+
+		float centroidMin, centroidMax;
+		centroidMin=centroidMax=0.5f*(entityList->entities[indices[work.start]].bounds.min.v[axis]+entityList->entities[indices[work.start]].bounds.max.v[axis]);
+
+		for(int32_t i=1;i<work.count;i++)
 		{
-		    node->bounds.max.x-node->bounds.min.x,
-		    node->bounds.max.y-node->bounds.min.y,
-		    node->bounds.max.z-node->bounds.min.z
-		};
+			float c=0.5f*(entityList->entities[indices[work.start+i]].bounds.min.v[axis]+entityList->entities[indices[work.start+i]].bounds.max.v[axis]);
 
-		int axis=(extent.x>=extent.y&&extent.x>=extent.z)?0:(extent.y>=extent.z)?1:2;
+			if(c<centroidMin)
+				centroidMin=c;
 
-		float splitPos;
-		if(axis==0)			splitPos=0.5f*(node->bounds.min.x+node->bounds.max.x);
-		else if(axis==1)	splitPos=0.5f*(node->bounds.min.y+node->bounds.max.y);
-		else				splitPos=0.5f*(node->bounds.min.z+node->bounds.max.z);
+			if(c>centroidMax)
+				centroidMax=c;
+		}
 
-		// Partition objects
-		uint32_t mid=stackObj.first;
-		uint32_t end=stackObj.first+stackObj.count;
+		float splitPos=0.5f*(centroidMin+centroidMax);
 
-		for(uint32_t i=stackObj.first;i<end;i++)
+		int32_t lo=work.start;
+		int32_t hi=work.start+work.count-1;
+
+		while(lo<=hi)
 		{
-			const uint32_t index=bvh->objectIndices[i];
-			aabb *bounds=(aabb *)((uint8_t *)AABBs+index*stride+offset);
-			vec3 centroid=(vec3)
-			{
-				0.5f*(bounds->min.x+bounds->max.x),
-				0.5f*(bounds->min.y+bounds->max.y),
-				0.5f*(bounds->min.z+bounds->max.z)
-			};
-			float v=(axis==0)?centroid.x:(axis==1)?centroid.y:centroid.z;
+			float c=0.5f*(entityList->entities[indices[lo]].bounds.min.v[axis]+entityList->entities[indices[lo]].bounds.max.v[axis]);;
 
-			if(v<splitPos)
+			if(c<splitPos)
+				lo++;
+			else
 			{
-				uint32_t tmp=bvh->objectIndices[i];
-				bvh->objectIndices[i]=bvh->objectIndices[mid];
-				bvh->objectIndices[mid]=tmp;
-				mid++;
+				int32_t tmp=indices[lo];
+				indices[lo]=indices[hi];
+				indices[hi]=tmp;
+				hi--;
 			}
 		}
 
-		// Fallback split
-		if(mid==stackObj.first||mid==end)
-			mid=stackObj.first+stackObj.count/2;
+		int32_t leftCount=lo-work.start;
+		int32_t rightCount=work.count-leftCount;
 
-		// Create children
-		if(bvh->nodeCount+2>BVH_MAX_NODES)
+		if(leftCount==0||rightCount==0)
 		{
-			DBGPRINTF(DEBUG_ERROR, "BVH: out of nodes\n");
-			node->left=node->right=-1;
-			continue;
+			leftCount=work.count/2;
+			rightCount=work.count-leftCount;
 		}
 
-		node->left=bvh->nodeCount++;
-		node->right=bvh->nodeCount++;
+		assert((uint32_t)(bvh->numNodes+2)<=BVH_MAX_NODES&&"BVH node pool exhausted");
 
-		if(stackTop+2>BVH_MAX_NODES)
-		{
-			DBGPRINTF(DEBUG_ERROR, "BVH: build stack out of space\n");
-			continue;
-		}
+		int32_t leftIndex=(int32_t)bvh->numNodes++;
+		int32_t rightIndex=(int32_t)bvh->numNodes++;
 
-		stack[stackTop++]=(BVHBuildStackObj_t) { node->right, mid, end-mid};
-		stack[stackTop++]=(BVHBuildStackObj_t) { node->left, stackObj.first, mid-stackObj.first };
+		bvh->nodes[work.nodeIndex].left=leftIndex;
+		bvh->nodes[work.nodeIndex].right=rightIndex;
+		bvh->nodes[work.nodeIndex].objectIndex=-1;
+
+		assert(stackTop+2<=BUILD_STACK_MAX&&"BVH build stack overflow");
+
+		buildStack[stackTop++]=(BVHBuildStackObj_t) { leftIndex, work.start, leftCount };
+		buildStack[stackTop++]=(BVHBuildStackObj_t) { rightIndex, work.start+leftCount, rightCount };
 	}
 }
 
-void BVH_Test(const BVH_t *bvh, void *objects, const uint32_t stride, void (*testFunc)(void *a, void *b))
+typedef struct
 {
-	typedef struct
-	{
-		int32_t a, b;
-	} BVHPairStackObj_t;
+	int32_t a;
+	int32_t b;
+} BVHPairStackObj_t;
 
-	BVHPairStackObj_t stack[BVH_MAX_NODES*2];
-	uint32_t stackTop=0;
+#define TEST_STACK_MAX (MAX_ENTITY*4)
+static BVHPairStackObj_t testStack[TEST_STACK_MAX];
 
-	// Start with root vs root
-	stack[stackTop++]=(BVHPairStackObj_t) { 0, 0};
+void BVH_Test(BVH_t *bvh, EntityList_t *entityList, BVHLeafCallback_t callback)
+{
+	if(bvh->numNodes==0||entityList->entityCount==0)
+		return;
+
+	int32_t stackTop=0;
+
+	testStack[stackTop++]=(BVHPairStackObj_t) { 0, 0 };
 
 	while(stackTop>0)
 	{
-		BVHPairStackObj_t stackObj=stack[--stackTop];
-		const BVHNode_t *a=&bvh->nodes[stackObj.a];
-		const BVHNode_t *b=&bvh->nodes[stackObj.b];
+		BVHPairStackObj_t pair=testStack[--stackTop];
 
-		// Avoid duplicate and symmetric tests
-		if(stackObj.a>stackObj.b)
+		const BVHNode_t *a=&bvh->nodes[pair.a];
+		const BVHNode_t *b=&bvh->nodes[pair.b];
+
+		if(!((a->bounds.min.x<=b->bounds.max.x)&
+			 (a->bounds.max.x>=b->bounds.min.x)&
+			 (a->bounds.min.y<=b->bounds.max.y)&
+			 (a->bounds.max.y>=b->bounds.min.y)&
+			 (a->bounds.min.z<=b->bounds.max.z)&
+			 (a->bounds.max.z>=b->bounds.min.z)))
 			continue;
 
-		// Test for overlap
-		if(!(
-			(a->bounds.min.x<=b->bounds.max.x&&a->bounds.max.x>=b->bounds.min.x)&&
-	     	(a->bounds.min.y<=b->bounds.max.y&&a->bounds.max.y>=b->bounds.min.y)&&
-	     	(a->bounds.min.z<=b->bounds.max.z&&a->bounds.max.z>=b->bounds.min.z))
-		)
-		 	continue;
+		int leafA=(a->left==-1);
+		int leafB=(b->left==-1);
 
-		int32_t aLeaf=(a->left==-1);
-		int32_t bLeaf=(b->left==-1);
-
-		// Leaf–leaf test
-		if(aLeaf&&bLeaf)
+		if(leafA&&leafB)
 		{
-			for(uint32_t i=0;i<a->count;i++)
-			{
-				uint32_t ia=bvh->objectIndices[a->first+i];
-				void *objA=objects+ia*stride;
-
-				for(uint32_t j=0;j<b->count;j++)
-				{
-					uint32_t ib=bvh->objectIndices[b->first+j];
-					void *objB=objects+ib*stride;
-
-					/// Avoid self
-					if(ia==ib)
-						continue;
-
-					testFunc(objA, objB);
-				}
-			}
-
-			continue;
+			if(a->objectIndex!=b->objectIndex)
+				callback(&entityList->entities[a->objectIndex], &entityList->entities[b->objectIndex]);
 		}
+		else if(pair.a==pair.b)
+		{
+			int32_t l=a->left;
+			int32_t r=a->right;
 
-		// Descend
-		if(aLeaf)
-		{
-			stack[stackTop++]=(BVHPairStackObj_t){stackObj.a, b->left};
-			stack[stackTop++]=(BVHPairStackObj_t){stackObj.a, b->right};
+			assert(stackTop+3<=TEST_STACK_MAX&&"BVH test stack overflow");
+
+			testStack[stackTop++]=(BVHPairStackObj_t) { l, l };
+			testStack[stackTop++]=(BVHPairStackObj_t) { r, r };
+			testStack[stackTop++]=(BVHPairStackObj_t) { l, r };
 		}
-		else if(bLeaf)
+		else if(leafA)
 		{
-			stack[stackTop++]=(BVHPairStackObj_t){a->left, stackObj.b};
-			stack[stackTop++]=(BVHPairStackObj_t){a->right, stackObj.b};
+			assert(stackTop+2<=TEST_STACK_MAX&&"BVH test stack overflow");
+
+			testStack[stackTop++]=(BVHPairStackObj_t) { pair.a, b->left };
+			testStack[stackTop++]=(BVHPairStackObj_t) { pair.a, b->right };
+		}
+		else if(leafB)
+		{
+			assert(stackTop+2<=TEST_STACK_MAX&&"BVH test stack overflow");
+
+			testStack[stackTop++]=(BVHPairStackObj_t) { a->left, pair.b };
+			testStack[stackTop++]=(BVHPairStackObj_t) { a->right, pair.b };
 		}
 		else
 		{
-			stack[stackTop++]=(BVHPairStackObj_t){a->left, b->left};
-			stack[stackTop++]=(BVHPairStackObj_t){a->left, b->right};
-			stack[stackTop++]=(BVHPairStackObj_t){a->right, b->left};
-			stack[stackTop++]=(BVHPairStackObj_t){a->right, b->right};
+			assert(stackTop+2<=TEST_STACK_MAX&&"BVH test stack overflow – increase TEST_STACK_MAX");
+
+			if((2.0f*Vec3_LengthSq(Vec3_Subv(a->bounds.max, a->bounds.min)))>=(2.0f*Vec3_LengthSq(Vec3_Subv(b->bounds.max, b->bounds.min))))
+			{
+				testStack[stackTop++]=(BVHPairStackObj_t) { a->left, pair.b };
+				testStack[stackTop++]=(BVHPairStackObj_t) { a->right, pair.b };
+			}
+			else
+			{
+				testStack[stackTop++]=(BVHPairStackObj_t) { pair.a, b->left };
+				testStack[stackTop++]=(BVHPairStackObj_t) { pair.a, b->right };
+			}
 		}
 	}
 }

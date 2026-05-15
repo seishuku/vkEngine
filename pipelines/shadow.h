@@ -3,6 +3,7 @@
 
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
+#include "../entitylist.h"
 
 #ifndef NUM_CASCADES
 #define NUM_CASCADES 4
@@ -14,7 +15,7 @@ extern VkuImage_t shadowDepth;
 
 void CreateShadowMap(void);
 bool CreateShadowPipeline(void);
-void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex);
+void ShadowUpdateMap(VkCommandBuffer commandBuffer, const EntityList_t *entityList, uint32_t frameIndex);
 void DestroyShadow(void);
 
 #endif

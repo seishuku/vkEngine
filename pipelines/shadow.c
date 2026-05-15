@@ -10,6 +10,7 @@
 #include "../utils/pipeline.h"
 #include "../assetmanager.h"
 #include "../perframe.h"
+#include "../entitylist.h"
 #include "skybox.h"
 #include "shadow.h"
 
@@ -253,7 +254,7 @@ bool CreateShadowPipeline(void)
 	return true;
 }
 
-void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
+void ShadowUpdateMap(VkCommandBuffer commandBuffer, const EntityList_t *entityList, uint32_t frameIndex)
 {
 	for(uint32_t cascade=0;cascade<NUM_CASCADES;cascade++)
 	{
@@ -286,48 +287,24 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 
 		vkCmdPushConstants(commandBuffer, shadowPipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(matrix), &shadowMVP[cascade]);
 
-		vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[frameIndex].asteroidInstance.buffer, &(VkDeviceSize) { 0 });
-
-		// Draw the models
-		for(uint32_t i=0;i<4;i++)
+		// Draw entity batches
+		for(uint32_t b=0;b<entityList->batchCount;b++)
 		{
-			const BModel_t *model=&AssetManager_GetAsset(assets, MODEL_ASTEROID1+i)->model;
+			const EntityBatch_t *batch=&entityList->batches[b];
+			const BModel_t *model=&AssetManager_GetAsset(assets, batch->modelID)->model;
 
-			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &model->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &model->vertexBuffer.buffer, &(VkDeviceSize){0});
 
-			for(uint32_t j=0;j<model->numMesh;j++)
+			// Offset the instance buffer binding to the start of this batch
+			VkDeviceSize instanceOffset=sizeof(matrix)*batch->instanceOffset;
+			vkCmdBindVertexBuffers(commandBuffer, 1, 1, &entityList->perFrame[frameIndex].instanceBuffer.buffer, &instanceOffset);
+
+			for(uint32_t m=0;m<model->numMesh;m++)
 			{
-				vkCmdBindIndexBuffer(commandBuffer, model->mesh[j].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-				vkCmdDrawIndexed(commandBuffer, model->mesh[j].numFace*3, NUM_ASTEROIDS/4, 0, 0, (NUM_ASTEROIDS/4)*i);
+				vkCmdBindIndexBuffer(commandBuffer, model->mesh[m].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+				vkCmdDrawIndexed(commandBuffer, model->mesh[m].numFace*3, batch->instanceCount, 0, 0, 0);
 			}
 		}
-		//////
-
-		// Fighters
-		const BModel_t *fighterModel=&AssetManager_GetAsset(assets, MODEL_FIGHTER)->model;
-
-		vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[frameIndex].fighterInstance.buffer, &(VkDeviceSize) { 0 });
-		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &fighterModel->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
-
-		for(uint32_t i=0;i<fighterModel->numMesh;i++)
-		{
-			vkCmdBindIndexBuffer(commandBuffer, fighterModel->mesh[i].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(commandBuffer, fighterModel->mesh[i].numFace*3, 2, 0, 0, 0);
-		}
-		//////
-
-		// Cubes
-		const BModel_t *cubeModel=&AssetManager_GetAsset(assets, MODEL_CUBE)->model;
-
-		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &cubeModel->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
-		vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[frameIndex].cubeInstance.buffer, &(VkDeviceSize) { 0 });
-
-		for(uint32_t i=0;i<cubeModel->numMesh;i++)
-		{
-			vkCmdBindIndexBuffer(commandBuffer, cubeModel->mesh[i].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(commandBuffer, cubeModel->mesh[i].numFace*3, NUM_CUBE, 0, 0, 0);
-		}
-		///////
 
 		vkCmdEndRenderPass(commandBuffer);
 	}

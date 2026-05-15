@@ -4,12 +4,13 @@
 #include <stdint.h>
 #include "../vulkan/vulkan.h"
 #include "../utils/pipeline.h"
+#include "../entitylist.h"
 
 extern VkRenderPass renderPass;
 extern Pipeline_t mainPipeline;
 
 bool CreateLightingPipeline(void);
 void DestroyLighting(void);
-void DrawLighting(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool);
+void DrawLighting(VkCommandBuffer commandBuffer, const EntityList_t *entityList, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool);
 
 #endif

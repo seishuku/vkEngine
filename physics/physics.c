@@ -65,13 +65,17 @@ static vec4 IntegrateAngularVelocity(const vec4 q, const vec3 w, const float dt)
 	return result;
 }
 
+#include "../camera/camera.h"
+extern Camera_t camera;
+
 void PhysicsIntegrate(RigidBody_t *body, const float dt)
 {
 	// const vec3 gravity=Vec3(0.0f, -9.81f*WORLD_SCALE, 0.0f);
 	const vec3 gravity=Vec3b(0.0f);
 
 	// Apply gravity
-	body->force=Vec3_Addv(body->force, Vec3_Muls(gravity, body->mass));
+	if(body!=&camera.body)
+		body->force=Vec3_Addv(body->force, Vec3_Muls(gravity, body->mass));
 
 	// Implicit Euler integration of position and velocity
 	// Velocity+=Force/Mass*dt
@@ -121,7 +125,7 @@ void PhysicsApplyImpulse(RigidBody_t *body, const vec3 impulse, const vec3 point
 
 float PhysicsResolveCollision(RigidBody_t *a, RigidBody_t *b, ContactPoint_t contact)
 {
-    // Torque arms
+	// Torque arms
 	const vec3 r1=Vec3_Subv(contact.position, a->position);
 	const vec3 r2=Vec3_Subv(contact.position, b->position);
 
@@ -136,9 +140,9 @@ float PhysicsResolveCollision(RigidBody_t *a, RigidBody_t *b, ContactPoint_t con
 	const float relativeSpeed=Vec3_Dot(relativeVel, contact.normal);
 
 	if(relativeSpeed>0.0f)
-        return 0.0f;
+		return 0.0f;
 
-    // Masses
+	// Masses
 	const vec3 d1=Vec3_Cross(Vec3_Muls(Vec3_Cross(r1, contact.normal), a->invInertia), r1);
 	const vec3 d2=Vec3_Cross(Vec3_Muls(Vec3_Cross(r2, contact.normal), b->invInertia), r2);
 	const float invMassSum=a->invMass+b->invMass;
@@ -288,14 +292,14 @@ static uint32_t ClipPolygon(const vec3 *in, uint32_t inCount, vec3 *out, uint32_
     uint32_t outCount=0;
 
 	if(inCount==0)
-		return 0;
+        return 0;
 
     for(uint32_t i=0;i<inCount;i++)
     {
         const vec3  curr=in[i];
         const vec3  next=in[(i+1)%inCount];
-		const float dc=Vec3_Dot(curr, planeNormal)-planeDist;
-		const float dn=Vec3_Dot(next, planeNormal)-planeDist;
+        const float dc=Vec3_Dot(curr, planeNormal)-planeDist;
+        const float dn=Vec3_Dot(next, planeNormal)-planeDist;
         const bool insideC=(dc<=0.0f);
         const bool insideN=(dn<=0.0f);
 
@@ -303,10 +307,10 @@ static uint32_t ClipPolygon(const vec3 *in, uint32_t inCount, vec3 *out, uint32_
             out[outCount++] = curr;
 
 		if(insideC!=insideN&&outCount<maxOut)
-			out[outCount++]=Vec3_Addv(curr, Vec3_Muls(Vec3_Subv(next, curr), dc/(dc-dn)));
-	}
+            out[outCount++]=Vec3_Addv(curr, Vec3_Muls(Vec3_Subv(next, curr), dc/(dc-dn)));
+    }
 
-	return outCount;
+    return outCount;
 }
 
 static bool TestSATAxis(vec3 axis, const vec3 axesA[3], vec3 sA, const vec3 axesB[3], vec3 sB, vec3 relPos, uint32_t axisIndex, float *penetration, vec3 *normal, uint32_t *minAxisIndex)
@@ -401,7 +405,7 @@ static void ReduceManifoldContacts(CollisionManifold_t *m)
 
 static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 {
-	// Extract axes
+    // Extract axes
     vec3 axesA[3], axesB[3];
     QuatAxes(a->orientation, axesA);
     QuatAxes(b->orientation, axesB);
@@ -433,13 +437,13 @@ static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 
 	// Ensure the collision normal points from A to B
     if(Vec3_Dot(normal, relPos)<0.0f)
-		normal=Vec3_Muls(normal, -1.0f);
+        normal=Vec3_Muls(normal, -1.0f);
 
 	Vec3_Normalize(&normal);
 
     // Edge to edge contact
-	if(minAxisIndex>=6)
-	{
+    if(minAxisIndex>=6)
+    {
         const vec3 pA=Vec3_Addv(
 			Vec3_Addv(
 				Vec3_Addv(a->position,
@@ -455,16 +459,16 @@ static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
 					Vec3_Muls(axesB[2], (Vec3_Dot(normal, axesB[2])<=0.0f)?b->size.z:-b->size.z)
 		);
 
-		CollisionManifold_t manifold;
-		manifold.a=a;
-		manifold.b=b;
+        CollisionManifold_t manifold;
+        manifold.a=a;
+        manifold.b=b;
         manifold.contacts[0].position=Vec3_Muls(Vec3_Addv(pA, pB), 0.5f);
-		manifold.contacts[0].normal=normal;
-		manifold.contacts[0].penetration=penetration;
-		manifold.contactCount=1;
+        manifold.contacts[0].normal=normal;
+        manifold.contacts[0].penetration=penetration;
+        manifold.contactCount=1;
 
 		return manifold;
-	}
+    }
 
     // Face contact
     const bool refIsA=(minAxisIndex<3);
@@ -476,33 +480,33 @@ static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
     const uint32_t refFaceAxis=refIsA?minAxisIndex:minAxisIndex-3;
     const vec3 refFaceNormal=refIsA?normal:Vec3_Muls(normal, -1.0f);
 
-    uint32_t incFaceAxis=0;
-    float incFaceSign=1.0f;
+	uint32_t incFaceAxis=0;
+	float incFaceSign=1.0f;
 
 	const float di0=Vec3_Dot(incAxes[0], refFaceNormal), adi0=fabsf(di0);
 	const float di1=Vec3_Dot(incAxes[1], refFaceNormal), adi1=fabsf(di1);
 	const float di2=Vec3_Dot(incAxes[2], refFaceNormal), adi2=fabsf(di2);
 
 	if(adi0>=adi1&&adi0>=adi2)
-		{
+	{
 		incFaceAxis=0;
 		incFaceSign=di0<=0.0f?1.0f:-1.0f;
-		}
+	}
 	else if(adi1>=adi2)
-		{
+	{
 		incFaceAxis=1;
 		incFaceSign=di1<=0.0f?1.0f:-1.0f;
-		}
+	}
 	else
 	{
 		incFaceAxis=2;
 		incFaceSign=di2<=0.0f?1.0f:-1.0f;
-    }
+	}
 
     // Build the corners of the face
-    const vec3 incFaceCenter=Vec3_Addv(inc->position, Vec3_Muls(incAxes[incFaceAxis], incFaceSign*inc->size.v[incFaceAxis]));
+	const vec3 incFaceCenter=Vec3_Addv(inc->position, Vec3_Muls(incAxes[incFaceAxis], incFaceSign*inc->size.v[incFaceAxis]));
 
-    const uint32_t it1=(incFaceAxis+1)%3;
+	const uint32_t it1=(incFaceAxis+1)%3;
     const uint32_t it2=(incFaceAxis+2)%3;
     const vec3 ie1=Vec3_Muls(incAxes[it1], inc->size.v[it1]);
     const vec3 ie2=Vec3_Muls(incAxes[it2], inc->size.v[it2]);
@@ -534,18 +538,18 @@ static CollisionManifold_t OBBToOBBCollision(RigidBody_t *a, RigidBody_t *b)
     count=ClipPolygon(buf0, count, buf1, MAX_CLIP_VERTS, refFaceNormal, refFaceDist);
     if(!count) return (CollisionManifold_t) { 0 };
 
-	CollisionManifold_t manifold;
-	manifold.a=a;
-	manifold.b=b;
-	manifold.contactCount=0;
+    CollisionManifold_t manifold;
+    manifold.a=a;
+    manifold.b=b;
+    manifold.contactCount=0;
 
     for(uint32_t i=0;i<count&&manifold.contactCount<MAX_CONTACTS_PER_MANIFOLD;i++)
-        {
-			manifold.contacts[manifold.contactCount].position=buf1[i];
-			manifold.contacts[manifold.contactCount].normal=normal;
+    {
+		manifold.contacts[manifold.contactCount].position=buf1[i];
+        manifold.contacts[manifold.contactCount].normal=normal;
         manifold.contacts[manifold.contactCount].penetration=fmaxf(refFaceDist-Vec3_Dot(buf1[i], refFaceNormal), 0.0f);
-			manifold.contactCount++;
-        }
+        manifold.contactCount++;
+    }
 
 	ReduceManifoldContacts(&manifold);
 

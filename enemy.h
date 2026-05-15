@@ -1,6 +1,9 @@
 #ifndef __ENEMY_H__
 #define __ENEMY_H__
 
+#include "camera/camera.h"
+#include "entitylist.h"
+
 typedef enum
 {
 	PURSUING=0,
@@ -19,6 +22,6 @@ typedef struct
 } Enemy_t;
 
 void InitEnemy(Enemy_t *enemy, Camera_t *enemyCamera, const Camera_t playerCamera);
-void UpdateEnemy(Enemy_t *enemy, Camera_t player);
+void UpdateEnemy(Enemy_t *enemy, const EntityList_t *entityList, Camera_t player);
 
 #endif

@@ -2,27 +2,26 @@
 #define __BVH_H__
 
 #include "../math/math.h"
+#include "../entitylist.h"
 
-#define BVH_MAX_OBJECTS 10000
-#define BVH_MAX_OBJECTS_PER_LEAF 4
-#define BVH_MAX_NODES (BVH_MAX_OBJECTS*2)
-
+#define BVH_MAX_NODES (MAX_ENTITY*2)
+ 
 typedef struct
 {
-    aabb bounds;
+    aabb    bounds;
     int32_t left, right;
-    uint32_t first, count;
+    int32_t objectIndex;
 } BVHNode_t;
 
 typedef struct
 {
-	BVHNode_t nodes[BVH_MAX_NODES];
-    uint32_t nodeCount;
-
-	uint32_t objectIndices[BVH_MAX_OBJECTS];
+    uint32_t  numNodes;
+    BVHNode_t nodes[BVH_MAX_NODES];
 } BVH_t;
 
-void BVH_Build(BVH_t *bvh, const void *boundingBoxes, const uint32_t numObjects, const uint32_t stride, const uint32_t offset);
-void BVH_Test(const BVH_t *bvh, void *objects, const uint32_t stride, void (*testFunc)(void *a, void *b));
+typedef void (*BVHLeafCallback_t)(Entity_t *a, Entity_t *b);
+
+void BVH_Build(BVH_t *bvh, EntityList_t *entityList);
+void BVH_Test(BVH_t *bvh, EntityList_t *entityList, BVHLeafCallback_t callback);
 
 #endif

@@ -5,6 +5,7 @@
 #include "../math/math.h"
 #include "../utils/pipeline.h"
 #include "../assetmanager.h"
+#include "../entitylist.h"
 #include "../perframe.h"
 #include "shadow.h"
 
@@ -186,18 +187,17 @@ void DestroyLighting(void)
 	DestroyPipeline(&vkContext, &mainPipeline);
 }
 
-void DrawLighting(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool)
+void DrawLighting(VkCommandBuffer commandBuffer, const EntityList_t *entityList, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool)
 {
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipeline.pipeline);
 
-	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[index].asteroidInstance.buffer, &(VkDeviceSize) { 0 });
-
-	for(uint32_t i=0;i<4;i++)
+	for(uint32_t b=0;b<entityList->batchCount;b++)
 	{
-		uint32_t textureOffset=TEXTURE_ASTEROID1+2*i;
+		const EntityBatch_t *batch=&entityList->batches[b];
+		const BModel_t *model=&AssetManager_GetAsset(assets, batch->modelID)->model;
 
-		vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 0, AssetManager_GetAsset(assets, textureOffset+0)->image.sampler, AssetManager_GetAsset(assets, textureOffset+0)->image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 1, AssetManager_GetAsset(assets, textureOffset+1)->image.sampler, AssetManager_GetAsset(assets, textureOffset+1)->image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 0, AssetManager_GetAsset(assets, batch->textureIDs[0])->image.sampler, AssetManager_GetAsset(assets, batch->textureIDs[0])->image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 1, AssetManager_GetAsset(assets, batch->textureIDs[1])->image.sampler, AssetManager_GetAsset(assets, batch->textureIDs[1])->image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 2, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 3, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
 		vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 4, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
@@ -205,34 +205,16 @@ void DrawLighting(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, V
 
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipelineLayout, 0, 1, &mainPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
-		const BModel_t *model=&AssetManager_GetAsset(assets, MODEL_ASTEROID1+i)->model;
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &model->vertexBuffer.buffer, &(VkDeviceSize){0});
 
-		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &model->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
+		// Offset the instance buffer binding to the start of this batch
+		VkDeviceSize instanceOffset=sizeof(matrix)*batch->instanceOffset;
+		vkCmdBindVertexBuffers(commandBuffer, 1, 1, &entityList->perFrame[index].instanceBuffer.buffer, &instanceOffset);
 
-		for(uint32_t j=0;j<model->numMesh;j++)
+		for(uint32_t m=0;m<model->numMesh;m++)
 		{
-			vkCmdBindIndexBuffer(commandBuffer, model->mesh[j].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(commandBuffer, model->mesh[j].numFace*3, NUM_ASTEROIDS/4, 0, 0, (NUM_ASTEROIDS/4)*i);
+			vkCmdBindIndexBuffer(commandBuffer, model->mesh[m].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(commandBuffer, model->mesh[m].numFace*3, batch->instanceCount, 0, 0, 0);
 		}
-	}
-
-	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 0, AssetManager_GetAsset(assets, TEXTURE_CUBE)->image.sampler, AssetManager_GetAsset(assets, TEXTURE_CUBE)->image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 1, AssetManager_GetAsset(assets, TEXTURE_CUBE_NORMAL)->image.sampler, AssetManager_GetAsset(assets, TEXTURE_CUBE_NORMAL)->image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 2, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 3, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
-	vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 4, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
-	vkuAllocateUpdateDescriptorSet(&mainPipeline.descriptorSet, descriptorPool);
-
-	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipelineLayout, 0, 1, &mainPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
-
-	const BModel_t *cubeModel=&AssetManager_GetAsset(assets, MODEL_CUBE)->model;
-
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &cubeModel->vertexBuffer.buffer, &(VkDeviceSize) { 0 });
-	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &perFrame[index].cubeInstance.buffer, &(VkDeviceSize) { 0 });
-
-	for(uint32_t i=0;i<cubeModel->numMesh;i++)
-	{
-		vkCmdBindIndexBuffer(commandBuffer, cubeModel->mesh[i].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-		vkCmdDrawIndexed(commandBuffer, cubeModel->mesh[i].numFace*3, NUM_CUBE, 0, 0, 0);
 	}
 }

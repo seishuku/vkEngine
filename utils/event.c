@@ -69,7 +69,7 @@ void FireParticleEmitter(vec3 position, vec3 direction)
 	randVec=Vec3_Muls(randVec, 100.0f);
 
 	// Fire the emitter camera radius units away from Position in the direction of Direction, blend in some of the direction for particle vs emitter velocity for particle tails.
-	uint32_t ID=ParticleSystem_AddEmitter(&particleSystem, position, Vec3_Muls(direction, 50.0f), Vec3b(0.0f), randVec, 5.0f, 500, PARTICLE_EMITTER_CONTINOUS, emitterCallback);
+	uint32_t ID=ParticleSystem_AddEmitter(&particleSystem, position, Vec3_Muls(direction, 75.0f), Vec3b(0.0f), randVec, 5.0f, 500, PARTICLE_EMITTER_CONTINOUS, emitterCallback);
 
 	// Emitter list full?
 	if(ID==UINT32_MAX)

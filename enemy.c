@@ -4,11 +4,11 @@
 #include "math/math.h"
 #include "physics/particle.h"
 #include "physics/physics.h"
-#include "physics/physicslist.h"
 #include "camera/camera.h"
 #include "audio/audio.h"
 #include "assetmanager.h"
 #include "enemy.h"
+#include "entitylist.h"
 
 extern float fTimeStep;
 extern ParticleSystem_t particleSystem;
@@ -56,17 +56,17 @@ static bool HasLineOfSight(Enemy_t *enemy, const Camera_t player)
 	return theta>MAX_SIGHT_ANGLE;
 }
 
-static float TrackPlayer(Enemy_t *enemy, const Camera_t player)
+static float TrackPlayer(Enemy_t *enemy, const EntityList_t *entityList, const Camera_t player)
 {
 	vec3 direction=Vec3_Subv(player.body.position, enemy->camera->body.position);
 	float distance=Vec3_Normalize(&direction);
 	vec3 avoidanceDirection=Vec3b(0.0f);
 
 	// Check for obstacles in the avoidance radius
-	for(size_t i=0;i<numPhysicsObjects;i++)
+	for(size_t i=0;i<entityList->entityCount;i++)
 	{
-		const float avoidanceRadius=(enemy->camera->body.radius+physicsObjects[i].rigidBody->radius)*1.5f;
-		const vec3 cameraToObstacle=Vec3_Subv(enemy->camera->body.position, physicsObjects[i].rigidBody->position);
+		const float avoidanceRadius=(enemy->camera->body.radius+entityList->entities[i].body->radius)*1.5f;
+		const vec3 cameraToObstacle=Vec3_Subv(enemy->camera->body.position, entityList->entities[i].body->position);
 		const float cameraToObstacleDistanceSq=Vec3_Dot(cameraToObstacle, cameraToObstacle);
 
 		if(cameraToObstacleDistanceSq<avoidanceRadius*avoidanceRadius)
@@ -139,7 +139,7 @@ bool IsAlignedForAttack(Enemy_t *enemy, const Camera_t player)
 	return Vec3_Dot(enemy->camera->forward, direction)>ATTACK_ANGLE_THRESHOLD;
 }
 
-void UpdateEnemy(Enemy_t *enemy, Camera_t player)
+void UpdateEnemy(Enemy_t *enemy, const EntityList_t *entityList, Camera_t player)
 {
 	if(enemy->health<0.0f&&enemy->state!=DEAD)
 	{
@@ -162,7 +162,7 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 	{
 		case PURSUING:
 		{
-			TrackPlayer(enemy, player);
+			TrackPlayer(enemy, entityList, player);
 
 			// Switch to attacking if within range and aligned
 			if(IsInAttackRange(enemy, player)&&IsAlignedForAttack(enemy, player))
@@ -177,7 +177,7 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 
 		case SEARCHING:
 		{
-			TrackPlayer(enemy, enemy->lastKnownPlayer);
+			TrackPlayer(enemy, entityList, enemy->lastKnownPlayer);
 
 			if(HasLineOfSight(enemy, player))
 				enemy->state=PURSUING;
@@ -186,7 +186,7 @@ void UpdateEnemy(Enemy_t *enemy, Camera_t player)
 
 		case ATTACKING:
 		{
-			TrackPlayer(enemy, player);
+			TrackPlayer(enemy, entityList, player);
 			AttackPlayer(enemy, player);
 
 			// Stay in attack mode while aligned and within range

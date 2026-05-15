@@ -35,7 +35,7 @@ set(PROJECT_SOURCES
 	"network/network.c"
 	"physics/particle.c"
 	"physics/physics.c"
-	"physics/physicslist.c"
+	#"physics/physicslist.c"
 	"pipelines/composite.c"
 	"pipelines/lighting.c"
 	"pipelines/line.c"
@@ -64,7 +64,6 @@ set(PROJECT_SOURCES
 	"utils/id.c"
 	"utils/list.c"
 	"utils/pipeline.c"
-	"utils/sap.c"
 	"utils/spatialhash.c"
 	"utils/spvparse.c"
 	"utils/tokenizer.c"
@@ -83,6 +82,7 @@ set(PROJECT_SOURCES
 	"assetmanager.c"
 	"enemy.c"
 	"engine.c"
+	"entitylist.c"
 	"loadingscreen.c"
 )
 
