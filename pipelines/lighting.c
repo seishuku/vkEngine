@@ -191,9 +191,13 @@ void DrawLighting(VkCommandBuffer commandBuffer, const EntityList_t *entityList,
 {
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipeline.pipeline);
 
-	for(uint32_t b=0;b<entityList->batchCount;b++)
+	for(uint32_t b=0;b<entityList->culledBatchCount;b++)
 	{
-		const EntityBatch_t *batch=&entityList->batches[b];
+		const EntityBatch_t *batch=&entityList->culledBatches[b];
+
+		if(batch->noRender)
+			continue;
+
 		const BModel_t *model=&AssetManager_GetAsset(assets, batch->modelID)->model;
 
 		vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 0, AssetManager_GetAsset(assets, batch->textureIDs[0])->image.sampler, AssetManager_GetAsset(assets, batch->textureIDs[0])->image.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -209,7 +213,7 @@ void DrawLighting(VkCommandBuffer commandBuffer, const EntityList_t *entityList,
 
 		// Offset the instance buffer binding to the start of this batch
 		VkDeviceSize instanceOffset=sizeof(matrix)*batch->instanceOffset;
-		vkCmdBindVertexBuffers(commandBuffer, 1, 1, &entityList->perFrame[index].instanceBuffer.buffer, &instanceOffset);
+		vkCmdBindVertexBuffers(commandBuffer, 1, 1, &entityList->perFrame[index].culledInstanceBuffer.buffer, &instanceOffset);
 
 		for(uint32_t m=0;m<model->numMesh;m++)
 		{

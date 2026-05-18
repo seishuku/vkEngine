@@ -159,18 +159,18 @@ float Lerp(const float a, const float b, const float t)
 	return t*(b-a)+a;
 }
 
-float rayOBBIntersect(const vec3 rayOrigin, const vec3 rayDirection, const vec3 obbCenter, const vec3 obbHalfSize, const vec4 obbOrientation)
+float RayOBBIntersect(const vec3 origin, const vec3 direction, const vec3 center, const vec3 halfSize, const vec4 orientation)
 {
 	// Transform ray into OBB local space using inverse rotation
-	const vec4 invOrientation=QuatInverse(obbOrientation);
-	const vec3 localRayOrigin=QuatRotate(invOrientation, Vec3_Subv(rayOrigin, obbCenter));
-	const vec3 localRayDir=QuatRotate(invOrientation, rayDirection);
+	const vec4 invOrientation=QuatInverse(orientation);
+	const vec3 localRayOrigin=QuatRotate(invOrientation, Vec3_Subv(origin, center));
+	const vec3 localRayDir=QuatRotate(invOrientation, direction);
 
 	// Compute intersection of ray with all six bbox planes
 	const vec3 invR=Vec3(1.0f/localRayDir.x, 1.0f/localRayDir.y, 1.0f/localRayDir.z);
 
-	const vec3 tbot=Vec3_Mulv(Vec3_Subv(Vec3_Muls(obbHalfSize, -1.0f), localRayOrigin), invR);
-	const vec3 ttop=Vec3_Mulv(Vec3_Subv(Vec3_Muls(obbHalfSize, 1.0f), localRayOrigin), invR);
+	const vec3 tbot=Vec3_Mulv(Vec3_Subv(Vec3_Muls(halfSize, -1.0f), localRayOrigin), invR);
+	const vec3 ttop=Vec3_Mulv(Vec3_Subv(Vec3_Muls(halfSize, 1.0f), localRayOrigin), invR);
 
 	// Reorder intersections to find smallest and largest on each axis
 	const vec3 tmin=Vec3(fminf(ttop.x, tbot.x), fminf(ttop.y, tbot.y), fminf(ttop.z, tbot.z));
@@ -186,18 +186,70 @@ float rayOBBIntersect(const vec3 rayOrigin, const vec3 rayDirection, const vec3 
 	return t0;
 }
 
-float raySphereIntersect(const vec3 rayOrigin, const vec3 rayDirection, const vec3 sphereCenter, const float sphereRadius)
+float RaySphereIntersect(const vec3 origin, const vec3 direction, const vec3 center, const float radius)
 {
-	const vec3 oc=Vec3_Subv(rayOrigin, sphereCenter);
-	const float a=Vec3_Dot(rayDirection, rayDirection);
-	const float b=2.0f*Vec3_Dot(oc, rayDirection);
-	const float c=Vec3_Dot(oc, oc)-sphereRadius*sphereRadius;
+	const vec3 oc=Vec3_Subv(origin, center);
+	const float a=Vec3_Dot(direction, direction);
+	const float b=2.0f*Vec3_Dot(oc, direction);
+	const float c=Vec3_Dot(oc, oc)-radius*radius;
 	const float discriminant=b*b-4*a*c;
 
 	if(discriminant<0.0f)
 		return -1.0f;
 	else
 		return (-b-sqrtf(discriminant))/(2.0f*a);
+}
+
+float RayCapsuleIntersect(const vec3 origin, const vec3 direction, const vec3 center, const float radius, const float halfHeight, const vec4 orientation)
+{
+	// Transform ray into capsule local space using inverse rotation
+	const vec4 invOrientation=QuatInverse(orientation);
+	const vec3 localRayOrigin=QuatRotate(invOrientation, Vec3_Subv(origin, center));
+	const vec3 localRayDir=QuatRotate(invOrientation, direction);
+
+    // Ray vs infinite cylinder along Y
+    float a=localRayDir.x*localRayDir.x+localRayDir.z*localRayDir.z;
+    float b=2.0f*(localRayOrigin.x*localRayDir.x+localRayOrigin.z*localRayDir.z);
+    float c=localRayOrigin.x*localRayOrigin.x+localRayOrigin.z*localRayOrigin.z-radius*radius;
+    float disc=b*b-4.0f*a*c;
+
+    float best=FLT_MAX;
+
+    if(disc>=0.0f&&fabsf(a)>FLT_EPSILON)
+    {
+        float sqrtDisc=sqrtf(disc);
+        float t0=(-b-sqrtDisc)/(2.0f*a);
+        float t1=(-b+sqrtDisc)/(2.0f*a);
+
+        for(int k=0;k<2;k++)
+        {
+            float t=(k==0)?t0:t1;
+
+			if(t<0.0f)
+				continue;
+
+			float y=localRayOrigin.y+t*localRayDir.y;
+
+			if(y>=-halfHeight&&y<=halfHeight)
+                best=fminf(best, t);
+        }
+    }
+
+    // Ray vs top/bottom hemisphere caps
+    vec3 caps[2]={ Vec3(0, -halfHeight, 0), Vec3(0, halfHeight, 0) };
+
+	for(int k=0;k<2;k++)
+    {
+        float t=RaySphereIntersect(localRayOrigin, localRayDir, caps[k], radius);
+
+		if(t>0.0f)
+			best=fminf(best, t);
+    }
+
+    if(best==FLT_MAX)
+		return -1.0f;
+
+	return best;
 }
 
 uint32_t planeSphereIntersect(const vec4 plane, const vec3 center, const float radius, vec3 *intersectionA, vec3 *intersectionB)

@@ -37,6 +37,7 @@
 #include "vr/vr.h"
 #include "vulkan/vulkan.h"
 #include "assetmanager.h"
+#include "asteroids.h"
 #include "enemy.h"
 #include "entitylist.h"
 #include "loadingscreen.h"
@@ -56,7 +57,9 @@ PerFrame_t perFrame[FRAMES_IN_FLIGHT];
 
 // Camera data
 Camera_t camera;
+frustum cameraFrustum;
 matrix modelView, projection[2], headPose[2];
+frustum cameraFrustum;
 
 // extern timing data from system main
 extern float fps, fTimeStep, fTime, audioTime;
@@ -89,23 +92,11 @@ VkuImage_t colorImage[2];
 VkuImage_t depthImage[2];
 VkFramebuffer framebuffer[2];
 
-uint32_t fighterTexture=0;
-
 EntityList_t entityList;
 
 //#define NUM_CUBE 14
 RigidBody_t cubeBody[NUM_CUBE];
 RigidBody_t platformBody;
-
-// Asteroid data
-//#define NUM_ASTEROIDS 5000
-RigidBody_t asteroids[NUM_ASTEROIDS];
-struct
-{
-	uint32_t modelID, tex0ID, tex1ID;
-} asteroidModels[NUM_ASTEROIDS];
-
-//////
 
 // Thread stuff
 typedef struct
@@ -139,7 +130,6 @@ uint32_t currentTrack=UINT32_MAX;
 uint32_t windowID=UINT32_MAX;
 uint32_t thirdPersonID=UINT32_MAX;
 uint32_t playerHealthID=UINT32_MAX;
-uint32_t sprite=UINT32_MAX;
 
 #ifdef ANDROID
 uint32_t leftThumbstickID=UINT32_MAX;
@@ -158,6 +148,8 @@ bool pausePhysics=false;
 #define NUM_ENEMY 8
 Camera_t enemy[NUM_ENEMY];
 Enemy_t enemyAI[NUM_ENEMY];
+
+uint32_t fighterTexture[NUM_ENEMY+1]={ 0 };
 
 LineGraph_t frameTimes, audioTimes, physicsTimes;
 
@@ -381,83 +373,6 @@ void GenerateWorld(void)
 		memcpy(perFrame[i].skyboxUBO[1], &Skybox_UBO, sizeof(Skybox_UBO_t));
 	}
 
-	// Set up rigid body reps for asteroids
-	const float asteroidFieldMinRadius=100.0f;
-	const float asteroidFieldMaxRadius=2000.0f;
-	const float asteroidMinRadius=0.05f;
-	const float asteroidMaxRadius=40.0f;
-
-	uint32_t i=0, tries=0;
-
-	memset(asteroids, 0, sizeof(RigidBody_t)*NUM_ASTEROIDS);
-
-	// Randomly place asteroids in a sphere without any overlapping.
-	while(i<NUM_ASTEROIDS)
-	{
-		vec3 randomDirection=Vec3(RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f, RandFloat()*2.0f-1.0f);
-		Vec3_Normalize(&randomDirection);
-
-		RigidBody_t asteroid={ 0 };
-
-		asteroid.position=Vec3(
-			randomDirection.x*RandFloatRange(asteroidFieldMinRadius, asteroidFieldMaxRadius),
-			randomDirection.y*RandFloatRange(asteroidFieldMinRadius, asteroidFieldMaxRadius),
-			randomDirection.z*RandFloatRange(asteroidFieldMinRadius, asteroidFieldMaxRadius)
-		);
-		asteroid.radius=RandFloatRange(asteroidMinRadius, asteroidMaxRadius);
-
-		bool overlapping=false;
-
-		for(uint32_t j=0;j<i;j++)
-		{
-			if(Vec3_Distance(asteroid.position, asteroids[j].position)<asteroid.radius+asteroids[j].radius)
-				overlapping=true;
-		}
-
-		if(!overlapping)
-			asteroids[i++]=asteroid;
-
-		tries++;
-
-		if(tries>NUM_ASTEROIDS*NUM_ASTEROIDS)
-			break;
-	}
-	//////
-
-	// Set up asteroids rigid body
-	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
-	{
-		vec3 randomDirection=Vec3(
-			RandFloatRange(-1.0f, 1.0f),
-			RandFloatRange(-1.0f, 1.0f),
-			RandFloatRange(-1.0f, 1.0f)
-		);
-		Vec3_Normalize(&randomDirection);
-
-		asteroids[i].velocity=Vec3_Muls(randomDirection, RandFloat());
-		asteroids[i].force=Vec3b(0.0f);
-
-		asteroids[i].orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-		asteroids[i].angularVelocity=Vec3_Muls(randomDirection, RandFloat());
-
-		asteroids[i].mass=(1.0f/3000.0f)*(1.33333333f*PI*asteroids[i].radius);
-		asteroids[i].invMass=1.0f/asteroids[i].mass;
-
-		asteroids[i].inertia=0.4f*asteroids[i].mass*(asteroids[i].radius*asteroids[i].radius);
-		asteroids[i].invInertia=1.0f/asteroids[i].inertia;
-
-		asteroids[i].restitution=0.8f;
-		asteroids[i].friction=0.5f;
-
-		asteroids[i].type=RIGIDBODY_SPHERE;
-
-		const uint32_t randAsteroid=RandRange(0, 3);
-		asteroidModels[i].modelID=MODEL_ASTEROID1+randAsteroid;
-		asteroidModels[i].tex0ID=TEXTURE_ASTEROID1+(2*randAsteroid+0);
-		asteroidModels[i].tex1ID=TEXTURE_ASTEROID1+(2*randAsteroid+1);
-	}
-	//////
-
 	for(uint32_t i=0;i<NUM_ENEMY;i++)
 	{
 		vec3 randomDirection=Vec3(
@@ -467,13 +382,16 @@ void GenerateWorld(void)
 		);
 		Vec3_Normalize(&randomDirection);
 
-		fighterTexture=RandRange(0, 7);
+		fighterTexture[i]=RandRange(0, 7);
 
 		CameraInit(&enemy[i], Vec3_Muls(randomDirection, 1200.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 		InitEnemy(&enemyAI[i], &enemy[i], camera);
 	}
 
+	fighterTexture[NUM_ENEMY]=RandRange(0, 7);
+
 	ResetPhysicsCubes();
+	ResetAsteroids();
 
 	playerHealth=100.0f;
 
@@ -920,6 +838,7 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 		threadData[1].perFrame[index].secCommandBuffer[eye]
 	});
 
+#if 1
 	vkCmdNextSubpass(perFrame[index].commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 	vkCmdSetViewport(perFrame[index].commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0, (float)config.renderWidth, (float)config.renderHeight, 0.0f, 1.0f });
 	vkCmdSetScissor(perFrame[index].commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { config.renderWidth, config.renderHeight } });
@@ -927,6 +846,7 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	//////// Volume cloud
 	DrawVolume(perFrame[index].commandBuffer, index, eye, perFrame[index].descriptorPool);
 	////////
+#endif
 
 	vkCmdPipelineBarrier(perFrame[index].commandBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1, &(VkMemoryBarrier) { .sType=VK_STRUCTURE_TYPE_MEMORY_BARRIER, .srcAccessMask=VK_ACCESS_SHADER_READ_BIT, .dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT }, 0, NULL, 0, NULL);
 
@@ -991,7 +911,7 @@ void Thread_Physics(void *arg)
 			if(emitters[i].life>0.0f)
 			{
 				// Add particle emitter to physics list
-				EntityList_Add(&entityList, &emitters[i].body, 0, 0, 0, ENTITYOBJECTTYPE_PROJECTILE, NULL);
+				EntityList_Add(&entityList, &emitters[i].body, true, 0, 0, 0, ENTITYOBJECTTYPE_PROJECTILE, NULL);
 
 				emitters[i].life-=fTimeStep;
 
@@ -1028,9 +948,9 @@ void Thread_Physics(void *arg)
 				float distance=0.0f;
 
 				if(entityList.entities[i].body->type==RIGIDBODY_SPHERE)
-					distance=raySphereIntersect(camera.body.position, camera.forward, entityList.entities[i].body->position, entityList.entities[i].body->radius);
+					distance=RaySphereIntersect(camera.body.position, camera.forward, entityList.entities[i].body->position, entityList.entities[i].body->radius);
 				else if(entityList.entities[i].body->type==RIGIDBODY_OBB)
-					distance=rayOBBIntersect(camera.body.position, camera.forward, entityList.entities[i].body->position, entityList.entities[i].body->size, entityList.entities[i].body->orientation);
+					distance=RayOBBIntersect(camera.body.position, camera.forward, entityList.entities[i].body->position, entityList.entities[i].body->size, entityList.entities[i].body->orientation);
 
 				if(distance>0.0f)
 				{
@@ -1142,6 +1062,19 @@ void Thread_Physics(void *arg)
 							}
 						}
 
+						// If the projectile hit an asteroid, split it.
+						if(otherObject->objectType==ENTITYOBJECTTYPE_FIELD)
+						{
+							for(uint32_t k=0;k<numAsteroids;k++)
+							{
+								if(otherObject->body==&asteroids[k])
+								{
+									SplitAsteroid(k, manifold->contacts[j]);
+									break;
+								}
+							}
+						}
+
 						// It collided, kill it.
 						// Setting this directly to <0.0 seems to cause emitters that won't get removed,
 						//     so setting it to nearly 0.0 allows the natural progression kill it off.
@@ -1159,7 +1092,6 @@ void Thread_Physics(void *arg)
 						}
 
 						Audio_PlaySample(&AssetManager_GetAsset(assets, RandRange(SOUND_EXPLODE1, SOUND_EXPLODE3))->sound, false, 1.0f, whichProjectile->body->position);
-
 						ParticleSystem_AddEmitter(&particleSystem,
 												whichProjectile->body->position,	// Position
 												Vec3b(0.0f),					// Initial velocity
@@ -1184,15 +1116,15 @@ void Thread_Physics(void *arg)
 		}
 	}
 
+#if 0
 	// Update enemy player
 	if(clientSocket==-1)
 	{
 		for(uint32_t i=0;i<NUM_ENEMY;i++)
-		{
-			//UpdateEnemy(&enemyAI[i], camera);
-		}
+			UpdateEnemy(&enemyAI[i], &entityList, camera);
 	}
 	//////
+#endif
 
 	ClientNetwork_SendStatus();
 
@@ -1207,14 +1139,14 @@ void Thread_Physics(void *arg)
 	for(uint32_t i=0;i<NUM_ENEMY;i++)
 		CameraUpdate(&enemy[i], fTimeStep);
 
+#if 0
 	// View from enemy camera
-	//enemy[0].thirdPerson=true;
-	//modelView=CameraUpdate(&enemy[0], fTimeStep);
+	enemy[0].thirdPerson=true;
+	modelView=CameraUpdate(&enemy[0], fTimeStep);
 	//////
+#endif
 
 	physicsTime=(float)(GetClock()-startTime);
-
-	EntityList_UpdateInstances(&entityList, index);
 
 	// Barrier now that we're done here
 	ThreadBarrier_Wait(&physicsThreadBarrier);
@@ -1229,37 +1161,21 @@ bool rightTriggerOnce=true;
 
 static vec3 lastLeftPosition={ 0.0f, 0.0f, 0.0f };
 
-static float timer=0.0;
-
 // Render call from system main event loop
 void Render(void)
 {
 	static uint32_t index=0, imageIndex[3]={ 0, 0, 0 };
 
-	timer+=fTimeStep;
-
-	if(timer>0.15f)
-	{
-		// Get the sprite control directly, this makes incrementing frames easier.
-		UI_Control_t *control=UI_FindControlByID(&UI, sprite);
-		control->sprite.frame++;
-
-		if(control->sprite.frame>13)
-			control->sprite.frame=0;
-
-		timer=0.0f;
-	}
-
 	// Set up entities to be processed
 	EntityList_Clear(&entityList);
 
-	for(uint32_t i=0;i<NUM_ASTEROIDS;i++)
-		EntityList_Add(&entityList, &asteroids[i], asteroidModels[i].modelID, asteroidModels[i].tex0ID, asteroidModels[i].tex1ID, ENTITYOBJECTTYPE_FIELD, AsteroidTransform);
+	for(uint32_t i=0;i<numAsteroids;i++)
+		EntityList_Add(&entityList, &asteroids[i], false, asteroidModels[i].modelID, asteroidModels[i].tex0ID, asteroidModels[i].tex1ID, ENTITYOBJECTTYPE_FIELD, AsteroidTransform);
 
-	EntityList_Add(&entityList, &camera.body, MODEL_FIGHTER, TEXTURE_FIGHTER1, TEXTURE_FIGHTER1, ENTITYOBJECTTYPE_PLAYER, FighterTransform);
+	EntityList_Add(&entityList, &camera.body, !camera.thirdPerson, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+0), TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 
 	for(uint32_t i=0;i<NUM_ENEMY;i++)
-		EntityList_Add(&entityList, &enemy[i].body, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture+0), TEXTURE_FIGHTER1+(2*fighterTexture+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
+		EntityList_Add(&entityList, &enemy[i].body, false, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[i]+0), TEXTURE_FIGHTER1+(2*fighterTexture[i]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 
 	if(clientSocket!=-1)
 	{
@@ -1267,14 +1183,14 @@ void Render(void)
 		{
 			// Don't add our own net camera
 			if(i!=clientID)
-				EntityList_Add(&entityList, &netCameras[i].body, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture+0), TEXTURE_FIGHTER1+(2*fighterTexture+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
+				EntityList_Add(&entityList, &netCameras[i].body, false, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[0]+0), TEXTURE_FIGHTER1+(2*fighterTexture[0]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 		}
 	}
 
 	for(uint32_t i=0;i<NUM_CUBE;i++)
-		EntityList_Add(&entityList, &cubeBody[i], MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
+		EntityList_Add(&entityList, &cubeBody[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
 
-	EntityList_Add(&entityList, &platformBody, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
+	EntityList_Add(&entityList, &platformBody, false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
 
 	EntityList_RebuildBatches(&entityList);
 	//////
@@ -1429,6 +1345,15 @@ void Render(void)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
 	vkResetDescriptorPool(vkContext.device, perFrame[index].descriptorPool, 0);
 	vkResetCommandPool(vkContext.device, perFrame[index].commandPool, 0);
+
+	// Run frustum culling
+	// TODO: This create a slight race condition while the physics thread is still running
+	//           and the camera frustum and instance data may have a +/-1 frame delay of stale data.
+	//       Seems ok for now, but may change later.
+	matrix mvp=MatrixMult(modelView, projection[0]);
+	frustum cameraFrustum=Frustum_ExtractPlanes(mvp);
+	EntityList_FrustumCull(&entityList, cameraFrustum);
+	EntityList_UpdateInstances(&entityList, index);
 
 	// Start recording the commands
 	vkBeginCommandBuffer(perFrame[index].commandBuffer, &(VkCommandBufferBeginInfo)
@@ -1699,7 +1624,7 @@ bool Init(void)
 		emitters[i].life=-1.0f;		// No life
 
 		const float radius=5.0f;
-		const float mass=(1.0f/3000.0f)*(1.33333333f*PI*radius)*10.0f;
+		const float mass=(1.0f/3000.0f)*(1.33333333f*PI*radius)*0.5f;
 		const float inertia=0.4f*mass*(radius*radius);
 
 		emitters[i].body=(RigidBody_t)
@@ -1843,14 +1768,6 @@ bool Init(void)
 								0.0f, 100.0f, 100.0f);					// min/max/initial value
 
 	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), UI_CONTROL_HIDDEN, &AssetManager_GetAsset(assets, TEXTURE_CONSOLEBG)->image, 0.0f);
-
-	sprite=UI_AddSprite(&UI, Vec2(400.0f, 400.0f), Vec2(256.0f, 256.0f), Vec3b(1.0f), UI_CONTROL_VISIBLE, &AssetManager_GetAsset(assets, TEXTURE_FOX)->image, 0.0f);
-	// Negative crop sizes will flip the frame, useful for walking animations
-	UI_UpdateSpriteCropSize(&UI, sprite, Vec2(32.0f, 32.0f));
-	{
-		UI_Control_t *temp=UI_FindControlByID(&UI, sprite);
-		temp->zOrder=2;
-	}
 
 	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3b(1.0f), UI_CONTROL_VISIBLE);
 

@@ -5,7 +5,7 @@
 
 // Define constants
 #define WORLD_SCALE 10.0f
-#define EXPLOSION_POWER (50.0f*WORLD_SCALE)
+#define EXPLOSION_POWER (1500.0f*WORLD_SCALE)
 
 typedef enum
 {
@@ -33,8 +33,9 @@ typedef struct RigidBody_s
 	union
 	{
 		float radius;
-		vec3 size;				// OBB dimensions or radius
-	};
+		vec3 size;				
+		vec2 radiusHeight;
+	}; // Type dimensions
 } RigidBody_t;
 
 typedef struct

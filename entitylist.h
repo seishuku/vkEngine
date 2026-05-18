@@ -7,7 +7,7 @@
 #include "physics/physics.h"
 #include "vulkan/vulkan.h"
 
-#define MAX_ENTITY 10000
+#define MAX_ENTITY 50000
 
 typedef matrix (*EntityTransformFunc)(const RigidBody_t *body);
 
@@ -24,6 +24,7 @@ typedef struct
 	RigidBody_t *body;
 	EntityObjectType_e objectType;
 
+	bool noRender;
 	uint32_t modelID, textureIDs[2];
 
 	EntityTransformFunc transformFunc;
@@ -31,6 +32,7 @@ typedef struct
 
 typedef struct
 {
+	bool noRender;
 	uint32_t modelID;
 	uint32_t textureIDs[2];
 	uint32_t instanceOffset;
@@ -45,9 +47,16 @@ typedef struct
 	uint32_t sortedIndices[MAX_ENTITY];
 	uint32_t sortedCount;
 
+	uint32_t culledIndices[MAX_ENTITY];
+	uint32_t culledCount;
+
 	EntityBatch_t *batches;
 	uint32_t batchCount;
 	uint32_t batchCapacity;
+
+	EntityBatch_t *culledBatches;
+	uint32_t culledBatchCount;
+	uint32_t culledBatchCapacity;
 
 	bool dirty;
 
@@ -55,16 +64,21 @@ typedef struct
 	{
 		VkuBuffer_t instanceBuffer;
 		matrix *instancePtr;
-	} perFrame[8];
+
+		VkuBuffer_t culledInstanceBuffer;
+		matrix *culledInstancePtr;
+	} perFrame[VKU_MAX_FRAME_COUNT];
 } EntityList_t;
 
 bool EntityList_Init(EntityList_t *list);
 void EntityList_Destroy(EntityList_t *list);
 
-bool EntityList_Add(EntityList_t *list, RigidBody_t *body, uint32_t modelID, uint32_t tex0, uint32_t tex1, EntityObjectType_e objectType, EntityTransformFunc transformFunc);
+bool EntityList_Add(EntityList_t *list, RigidBody_t *body, bool noRender, uint32_t modelID, uint32_t tex0, uint32_t tex1, EntityObjectType_e objectType, EntityTransformFunc transformFunc);
 void EntityList_Clear(EntityList_t *list);
 
+void EntityList_RecalculateBounds(EntityList_t *list);
 void EntityList_RebuildBatches(EntityList_t *list);
 void EntityList_UpdateInstances(EntityList_t *list, uint32_t frameIndex);
+void EntityList_FrustumCull(EntityList_t *list, const frustum frustum);
 
 #endif

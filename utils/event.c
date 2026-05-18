@@ -14,6 +14,7 @@
 #include "../font/font.h"
 #include "../console/console.h"
 #include "../assetmanager.h"
+#include "../asteroids.h"
 #include "event.h"
 
 void GenerateWorld(void);
@@ -32,8 +33,6 @@ typedef struct
 } PhyParticleEmitter_t;
 
 extern PhyParticleEmitter_t emitters[MAX_EMITTERS];
-
-extern RigidBody_t asteroids[NUM_ASTEROIDS];
 
 extern UI_t UI;
 extern uint32_t cursorID;
@@ -226,7 +225,7 @@ bool Event_Trigger(EventID ID, void *arg)
 				case KB_LSHIFT:
 				case KB_RSHIFT:	camera.shift=true;		break;
 				case KB_Z:
-					for(int i=0;i<NUM_ASTEROIDS;i++)
+					for(int i=0;i<numAsteroids;i++)
 						PhysicsExplode(&asteroids[i]);
 					break;
 				case KB_LCTRL:

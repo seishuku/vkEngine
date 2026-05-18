@@ -30,7 +30,10 @@ bool EntityList_Init(EntityList_t *list)
 	list->batchCapacity=64;
 	list->batches=Zone_Malloc(zone, sizeof(EntityBatch_t)*list->batchCapacity);
 
-	if(!list->batches)
+	list->culledBatchCapacity=64;
+	list->culledBatches=Zone_Malloc(zone, sizeof(EntityBatch_t)*list->culledBatchCapacity);
+
+	if(!list->batches||!list->culledBatches)
 		goto fail;
 
 	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
@@ -39,6 +42,11 @@ bool EntityList_Init(EntityList_t *list)
 			goto fail;
 
 		list->perFrame[i].instancePtr=list->perFrame[i].instanceBuffer.memory->mappedPointer;
+
+		if(!vkuCreateHostBuffer(&vkContext, &list->perFrame[i].culledInstanceBuffer, sizeof(matrix)*MAX_ENTITY, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT))
+			goto fail;
+
+		list->perFrame[i].culledInstancePtr=list->perFrame[i].culledInstanceBuffer.memory->mappedPointer;
 	}
 
 	list->dirty=false;
@@ -56,14 +64,17 @@ void EntityList_Destroy(EntityList_t *list)
 	{
 		if(list->perFrame[i].instanceBuffer.buffer)
 			vkuDestroyBuffer(&vkContext, &list->perFrame[i].instanceBuffer);
+
+		if(list->perFrame[i].culledInstanceBuffer.buffer)
+			vkuDestroyBuffer(&vkContext, &list->perFrame[i].culledInstanceBuffer);
 	}
 
-
 	Zone_Free(zone, list->batches);
+	Zone_Free(zone, list->culledBatches);
 	memset(list, 0, sizeof(*list));
 }
 
-bool EntityList_Add(EntityList_t *list, RigidBody_t *body, uint32_t modelID, uint32_t tex0, uint32_t tex1, EntityObjectType_e objectType, EntityTransformFunc transformFunc)
+bool EntityList_Add(EntityList_t *list, RigidBody_t *body, bool noRender, uint32_t modelID, uint32_t tex0, uint32_t tex1, EntityObjectType_e objectType, EntityTransformFunc transformFunc)
 {
 	if(list->entityCount>=MAX_ENTITY)
 	{
@@ -74,34 +85,35 @@ bool EntityList_Add(EntityList_t *list, RigidBody_t *body, uint32_t modelID, uin
 	Entity_t entity={
 		.body=body,
 		.objectType=objectType,
+		.noRender=noRender,
 		.modelID=modelID,
 		.textureIDs[0]=tex0,
 		.textureIDs[1]=tex1,
 		.transformFunc=transformFunc,
 	};
 
-    if(body->type==RIGIDBODY_SPHERE)
-    {
-        entity.bounds.min=Vec3(body->position.x-body->radius, body->position.y-body->radius, body->position.z-body->radius);
-        entity.bounds.max=Vec3(body->position.x+body->radius, body->position.y+body->radius, body->position.z+body->radius);
-    }
-    else if(body->type==RIGIDBODY_OBB)
-    {
-        vec3 axis[3];
+	if(body->type==RIGIDBODY_SPHERE)
+	{
+		entity.bounds.min=Vec3(body->position.x-body->radius, body->position.y-body->radius, body->position.z-body->radius);
+		entity.bounds.max=Vec3(body->position.x+body->radius, body->position.y+body->radius, body->position.z+body->radius);
+	}
+	else if(body->type==RIGIDBODY_OBB)
+	{
+		vec3 axis[3];
 		QuatAxes(body->orientation, axis);
 
-        vec3 extents={
-            fabsf(axis[0].x)*body->size.x+fabsf(axis[1].x)*body->size.y+fabsf(axis[2].x)*body->size.z,
-            fabsf(axis[0].y)*body->size.x+fabsf(axis[1].y)*body->size.y+fabsf(axis[2].y)*body->size.z,
-            fabsf(axis[0].z)*body->size.x+fabsf(axis[1].z)*body->size.y+fabsf(axis[2].z)*body->size.z
-        };
+		vec3 extents={
+			fabsf(axis[0].x)*body->size.x+fabsf(axis[1].x)*body->size.y+fabsf(axis[2].x)*body->size.z,
+			fabsf(axis[0].y)*body->size.x+fabsf(axis[1].y)*body->size.y+fabsf(axis[2].y)*body->size.z,
+			fabsf(axis[0].z)*body->size.x+fabsf(axis[1].z)*body->size.y+fabsf(axis[2].z)*body->size.z
+		};
 
-        entity.bounds.min=Vec3_Subv(body->position, extents);
-        entity.bounds.max=Vec3_Addv(body->position, extents);
-    }
+		entity.bounds.min=Vec3_Subv(body->position, extents);
+		entity.bounds.max=Vec3_Addv(body->position, extents);
+	}
 	else if(body->type==RIGIDBODY_CAPSULE)
 	{
-        vec3 axis[3];
+		vec3 axis[3];
 		QuatAxes(body->orientation, axis);
 
 		vec3 offset=Vec3_Muls(axis[1], body->size.y);
@@ -134,6 +146,56 @@ void EntityList_Clear(EntityList_t *list)
 	memset(list->entities, 0, sizeof(Entity_t)*MAX_ENTITY);
 }
 
+void EntityList_RecalculateBounds(EntityList_t *list)
+{
+	for(uint32_t i=0;i<list->entityCount;i++)
+	{
+		Entity_t *entity=&list->entities[i];
+		RigidBody_t *body=entity->body;
+	
+		if(body->type==RIGIDBODY_SPHERE)
+		{
+			entity->bounds.min=Vec3(body->position.x-body->radius, body->position.y-body->radius, body->position.z-body->radius);
+			entity->bounds.max=Vec3(body->position.x+body->radius, body->position.y+body->radius, body->position.z+body->radius);
+		}
+		else if(body->type==RIGIDBODY_OBB)
+		{
+			vec3 axis[3];
+			QuatAxes(body->orientation, axis);
+
+			vec3 extents={
+				fabsf(axis[0].x)*body->size.x+fabsf(axis[1].x)*body->size.y+fabsf(axis[2].x)*body->size.z,
+				fabsf(axis[0].y)*body->size.x+fabsf(axis[1].y)*body->size.y+fabsf(axis[2].y)*body->size.z,
+				fabsf(axis[0].z)*body->size.x+fabsf(axis[1].z)*body->size.y+fabsf(axis[2].z)*body->size.z
+			};
+
+			entity->bounds.min=Vec3_Subv(body->position, extents);
+			entity->bounds.max=Vec3_Addv(body->position, extents);
+		}
+		else if(body->type==RIGIDBODY_CAPSULE)
+		{
+			vec3 axis[3];
+			QuatAxes(body->orientation, axis);
+
+			vec3 offset=Vec3_Muls(axis[1], body->size.y);
+
+			vec3 a=Vec3_Subv(body->position, offset);
+			vec3 b=Vec3_Addv(body->position, offset);
+
+			entity->bounds.min=Vec3(
+				fminf(a.x, b.x)-body->radius,
+				fminf(a.y, b.y)-body->radius,
+				fminf(a.z, b.z)-body->radius
+			);
+			entity->bounds.max=Vec3(
+				fmaxf(a.x, b.x)+body->radius,
+				fmaxf(a.y, b.y)+body->radius,
+				fmaxf(a.z, b.z)+body->radius
+			);
+		}
+	}
+}
+
 void EntityList_RebuildBatches(EntityList_t *list)
 {
 	if(!list->dirty)
@@ -153,7 +215,12 @@ void EntityList_RebuildBatches(EntityList_t *list)
 	{
 		const Entity_t *entity=&list->entities[list->sortedIndices[i]];
 
-		if((list->batchCount==0)||(entity->modelID!=list->batches[list->batchCount-1].modelID)||(entity->textureIDs[0]!=list->batches[list->batchCount-1].textureIDs[0])||(entity->textureIDs[1]!=list->batches[list->batchCount-1].textureIDs[1]))
+		if(
+			(list->batchCount==0)||
+			(entity->modelID!=list->batches[list->batchCount-1].modelID)||
+			(entity->textureIDs[0]!=list->batches[list->batchCount-1].textureIDs[0])||
+			(entity->textureIDs[1]!=list->batches[list->batchCount-1].textureIDs[1])||
+			(entity->noRender!=list->batches[list->batchCount-1].noRender))
 		{
 			if(list->batchCount==list->batchCapacity)
 			{
@@ -162,6 +229,7 @@ void EntityList_RebuildBatches(EntityList_t *list)
 			}
 
 			EntityBatch_t *b=&list->batches[list->batchCount++];
+			b->noRender=entity->noRender;
 			b->modelID=entity->modelID;
 			b->textureIDs[0]=entity->textureIDs[0];
 			b->textureIDs[1]=entity->textureIDs[1];
@@ -172,15 +240,52 @@ void EntityList_RebuildBatches(EntityList_t *list)
 		list->batches[list->batchCount-1].instanceCount++;
 	}
 
-	DBGPRINTF(DEBUG_INFO, "Batch: %d\n", list->batchCount);
-	for(uint32_t i=0;i<list->batchCount;i++)
-		DBGPRINTF(DEBUG_INFO, "Batch instance count: %d offset: %d\n", list->batches[i].instanceCount, list->batches[i].instanceOffset);
-
 	list->dirty=false;
+}
+
+void EntityList_FrustumCull(EntityList_t *list, const frustum frustum)
+{
+	list->culledCount=0;
+	list->culledBatchCount=0;
+
+	for(uint32_t b=0;b<list->batchCount;b++)
+	{
+		const EntityBatch_t *src=&list->batches[b];
+		uint32_t srcEnd=src->instanceOffset+src->instanceCount;
+		uint32_t batchStart=list->culledCount;
+
+		for(uint32_t i=src->instanceOffset;i<srcEnd;i++)
+		{
+			const Entity_t *entity=&list->entities[list->sortedIndices[i]];
+
+			if(Frustum_TestAABB(frustum, entity->bounds))
+				list->culledIndices[list->culledCount++]=list->sortedIndices[i];
+		}
+
+		uint32_t remaining=list->culledCount-batchStart;
+
+		if(remaining>0)
+		{
+			if(list->culledBatchCount==list->culledBatchCapacity)
+			{
+				list->culledBatchCapacity*=2;
+				list->culledBatches=Zone_Realloc(zone, list->culledBatches, sizeof(EntityBatch_t)*list->culledBatchCapacity);
+			}
+
+			EntityBatch_t *dst=&list->culledBatches[list->culledBatchCount++];
+			dst->noRender=src->noRender;
+			dst->modelID=src->modelID;
+			dst->textureIDs[0]=src->textureIDs[0];
+			dst->textureIDs[1]=src->textureIDs[1];
+			dst->instanceOffset=batchStart;
+			dst->instanceCount=remaining;
+		}
+	}
 }
 
 void EntityList_UpdateInstances(EntityList_t *list, uint32_t frameIndex)
 {
+	// Update all entities
 	matrix *dst=list->perFrame[frameIndex].instancePtr;
 
 	for(uint32_t i=0;i<list->sortedCount;i++)
@@ -189,5 +294,16 @@ void EntityList_UpdateInstances(EntityList_t *list, uint32_t frameIndex)
 
 		if(entity->transformFunc)
 			dst[i]=entity->transformFunc(entity->body);
+	}
+
+	// Update culled entities
+	matrix *culledDst=list->perFrame[frameIndex].culledInstancePtr;
+
+	for(uint32_t i=0;i<list->culledCount;i++)
+	{
+		const Entity_t *entity=&list->entities[list->culledIndices[i]];
+
+		if(entity->transformFunc)
+			culledDst[i]=entity->transformFunc(entity->body);
 	}
 }

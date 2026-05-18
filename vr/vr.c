@@ -291,10 +291,10 @@ matrix VR_GetEyeProjection(XruContext_t *xrContext, uint32_t Eye)
 
 	return (matrix)
 	{
-		{ 2.0f/Width, 0.0f, 0.0f, 0.0f },
-		{ 0.0f, 2.0f/Height, 0.0f, 0.0f },
-		{ (Right+Left)/Width, (Up+Down)/Height, 0.0f, -1.0f },
-		{ 0.0f, 0.0f, nearZ, 0.0f }
+		.x={ 2.0f/Width, 0.0f, 0.0f, 0.0f },
+		.y={ 0.0f, 2.0f/Height, 0.0f, 0.0f },
+		.z={ (Right+Left)/Width, (Up+Down)/Height, 0.0f, -1.0f },
+		.w={ 0.0f, 0.0f, nearZ, 0.0f }
 	};
 }
 

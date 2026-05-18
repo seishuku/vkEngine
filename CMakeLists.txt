@@ -3,7 +3,7 @@
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED True)
 
-project("vkEngine" LANGUAGES C VERSION 0.0.5)
+project("vkEngine" LANGUAGES C VERSION 0.0.6)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include("fetchDeps")
@@ -24,6 +24,7 @@ set(PROJECT_SOURCES
 	"image/image.c"
 	"image/qoi.c"
 	"image/tga.c"
+	"math/frustum.c"
 	"math/math.c"
 	"math/matrix.c"
 	"math/quat.c"
@@ -35,7 +36,6 @@ set(PROJECT_SOURCES
 	"network/network.c"
 	"physics/particle.c"
 	"physics/physics.c"
-	#"physics/physicslist.c"
 	"pipelines/composite.c"
 	"pipelines/lighting.c"
 	"pipelines/line.c"
@@ -80,6 +80,7 @@ set(PROJECT_SOURCES
 	"vulkan/vulkan_renderpass.c"
 	"vulkan/vulkan_swapchain.c"
 	"assetmanager.c"
+	"asteroids.c"
 	"enemy.c"
 	"engine.c"
 	"entitylist.c"
@@ -87,7 +88,7 @@ set(PROJECT_SOURCES
 )
 
 # change this for how many asteroids you want
-add_definitions("-DNUM_ASTEROIDS=2000")
+#add_definitions("-DNUM_ASTEROIDS=40000")
 add_definitions("-DNUM_CUBE=30")
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")

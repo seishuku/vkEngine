@@ -2,6 +2,7 @@
 #define __MATH_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <math.h>
 
 #ifdef WIN32
@@ -23,6 +24,15 @@ typedef union { struct { float x, y, z; }; float v[3]; } vec3;
 typedef union { struct { float x, y, z, w; }; float v[4]; } vec4;
 typedef union { struct { vec4 x, y, z, w; }; float m[16]; } matrix;
 typedef struct { vec3 min, max; } aabb;
+
+#define FRUSTUM_LEFT	0
+#define FRUSTUM_RIGHT	1
+#define FRUSTUM_BOTTOM	2
+#define FRUSTUM_TOP		3
+#define FRUSTUM_NEAR	4
+#define FRUSTUM_FAR		5
+
+typedef struct { vec4 planes[6]; } frustum;
 
 #define VEC_INLINE
 
@@ -179,6 +189,9 @@ vec4 Vec4_Clampv(const vec4 v, const vec4 min, const vec4 max);
 
 float Vec4_Normalize(vec4 *v);
 
+bool Frustum_TestAABB(const frustum frustum, const aabb bounds);
+frustum Frustum_ExtractPlanes(const matrix m);
+
 float fsinf(const float v);
 float fcosf(const float v);
 float ftanf(const float x);
@@ -205,9 +218,13 @@ uint32_t IsPower2(uint32_t value);
 uint32_t NextPower2(uint32_t value);
 int32_t ComputeLog(uint32_t value);
 float Lerp(const float a, const float b, const float t);
-float rayOBBIntersect(const vec3 rayOrigin, const vec3 rayDirection, const vec3 obbCenter, const vec3 obbHalfSize, const vec4 obbOrientation);
-float raySphereIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 sphereCenter, float sphereRadius);
+
+float RayOBBIntersect(const vec3 origin, const vec3 direction, const vec3 center, const vec3 halfSize, const vec4 orientation);
+float RaySphereIntersect(const vec3 origin, const vec3 direction, const vec3 center, const float radius);
+float RayCapsuleIntersect(const vec3 origin, const vec3 direction, const vec3 center, const float radius, const float halfHeight, const vec4 orientation);
+
 uint32_t planeSphereIntersect(const vec4 plane, const vec3 center, const float radius, vec3 *intersectionA, vec3 *intersectionB);
+
 vec3 ClosestPointOnTriangle(vec3 p, vec3 a, vec3 b, vec3 c);
 
 vec4 QuatAngle(const float angle, const float x, const float y, const float z);

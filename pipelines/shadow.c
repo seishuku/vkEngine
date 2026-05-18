@@ -291,6 +291,7 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, const EntityList_t *entityLi
 		for(uint32_t b=0;b<entityList->batchCount;b++)
 		{
 			const EntityBatch_t *batch=&entityList->batches[b];
+
 			const BModel_t *model=&AssetManager_GetAsset(assets, batch->modelID)->model;
 
 			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &model->vertexBuffer.buffer, &(VkDeviceSize){0});

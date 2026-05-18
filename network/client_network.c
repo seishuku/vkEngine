@@ -7,10 +7,9 @@
 #include "../math/math.h"
 #include "../physics/physics.h"
 #include "../camera/camera.h"
+#include "../asteroids.h"
 #include "network.h"
 #include "client_network.h"
-
-extern RigidBody_t asteroids[NUM_ASTEROIDS];
 
 extern Camera_t camera;
 
@@ -114,9 +113,9 @@ static void NetUpdate(void *arg)
 			{
 				uint32_t asteroidCount=Deserialize_uint32(&pBuffer);
 
-				if(asteroidCount>NUM_ASTEROIDS)
+				if(asteroidCount>numAsteroids)
 				{
-					DBGPRINTF(DEBUG_ERROR, "Mangled field packet: asteroid count field > NUM_ASTEROIDS (got %d, max %d).\n", asteroidCount, NUM_ASTEROIDS);
+					DBGPRINTF(DEBUG_ERROR, "Mangled field packet: asteroid count field > NUM_ASTEROIDS (got %d, max %d).\n", asteroidCount, numAsteroids);
 					goto error;
 				}
 
