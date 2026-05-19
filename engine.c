@@ -1069,7 +1069,7 @@ void Thread_Physics(void *arg)
 							{
 								if(otherObject->body==&asteroids[k])
 								{
-									SplitAsteroid(k, manifold->contacts[j]);
+									SplitAsteroid(k, manifold->contacts[j], impactSpeed);
 									break;
 								}
 							}
@@ -1165,6 +1165,8 @@ static vec3 lastLeftPosition={ 0.0f, 0.0f, 0.0f };
 void Render(void)
 {
 	static uint32_t index=0, imageIndex[3]={ 0, 0, 0 };
+
+	DBGPRINTF(DEBUG_INFO, "Number of asteroids: %d            \r", numAsteroids);
 
 	// Set up entities to be processed
 	EntityList_Clear(&entityList);

@@ -137,7 +137,7 @@ void AddAsteroid(vec3 position, vec3 velocity, float radius, uint32_t variant)
 
 #define MIN_SPLIT_RADIUS 2.0f
 
-void SplitAsteroid(uint32_t index, ContactPoint_t contact)
+void SplitAsteroid(uint32_t index, ContactPoint_t contact, float impactSpeed)
 {
 	if(index>=numAsteroids)
 		return;
@@ -154,23 +154,24 @@ void SplitAsteroid(uint32_t index, ContactPoint_t contact)
 	if(hostRadius*0.5f<MIN_SPLIT_RADIUS)
 		return;
  
-	const uint32_t numFragments=RandRange(2, 4);
+	const uint32_t numFragments=RandRange(2, 40);
  
-	float weights[4];
+	const float volumeTransfer=RandFloatRange(0.15f, 0.35f);
+ 
+	float weights[40];
 	float totalWeight=0.0f;
- 
 	for(uint32_t i=0;i<numFragments;i++)
 	{
-		weights[i]=RandFloatRange(0.0625f, 0.25f);
+		const float r=RandFloat();
+		weights[i]=r*r;
 		totalWeight+=weights[i];
 	}
  
-	const float spread=0.75f;
+	const float spread=1.5f/(1.0f+impactSpeed*0.1f);
  
-	// TODO: "split" fragments need to split more naturally along the collision contact point, this is just a "get it done" setup
 	for(uint32_t i=0;i<numFragments;i++)
 	{
-		const float volumeFraction=weights[i]/totalWeight;
+		const float volumeFraction=(weights[i]/totalWeight)*volumeTransfer;
 		const float fragmentRadius=cbrtf(volumeFraction)*hostRadius;
  
 		if(fragmentRadius<MIN_SPLIT_RADIUS)
@@ -181,17 +182,23 @@ void SplitAsteroid(uint32_t index, ContactPoint_t contact)
 			RandFloatRange(-1.0f, 1.0f),
 			RandFloatRange(-1.0f, 1.0f)
 		);
-
 		vec3 perp=Vec3_Subv(randVec, Vec3_Muls(contact.normal, Vec3_Dot(randVec, contact.normal)));
 		Vec3_Normalize(&perp);
  
 		vec3 ejectDir=Vec3_Addv(contact.normal, Vec3_Muls(perp, spread));
 		Vec3_Normalize(&ejectDir);
  
-		vec3 spawnPos=Vec3_Addv(contact.position, Vec3_Muls(ejectDir, fragmentRadius*2.0f));
- 		vec3 spawnVel=Vec3_Addv(hostVelocity, Vec3_Muls(ejectDir, RandFloatRange(2.0f, 10.0f)));
+		// v ∝ 1/r: smaller fragments travel faster for the same impulse.
+		const float ejectionSpeed=impactSpeed*(hostRadius/fragmentRadius);
+		vec3 spawnVel=Vec3_Addv(hostVelocity, Vec3_Muls(ejectDir, ejectionSpeed));
+		vec3 spawnPos=Vec3_Addv(contact.position, Vec3_Muls(ejectDir, fragmentRadius*1.0f));
  
 		// Spawn new asteroids, keeping parent model variant
 		AddAsteroid(spawnPos, spawnVel, fragmentRadius, asteroidModels[index].modelID-MODEL_ASTEROID1);
+ 
+		vec3 tumbleAxis=Vec3_Cross(ejectDir, contact.normal);
+		Vec3_Normalize(&tumbleAxis);
+		const float tumbleRate=impactSpeed*(hostRadius*hostRadius/(fragmentRadius*fragmentRadius));
+		asteroids[numAsteroids-1].angularVelocity=Vec3_Muls(tumbleAxis, tumbleRate*0.05f);
 	}
 }

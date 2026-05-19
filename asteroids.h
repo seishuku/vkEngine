@@ -11,6 +11,6 @@ extern AsteroidModel_t asteroidModels[MAX_ASTEROIDS];
 
 void ResetAsteroids(void);
 void AddAsteroid(vec3 position, vec3 velocity, float radius, uint32_t variant);
-void SplitAsteroid(uint32_t index, ContactPoint_t contact);
+void SplitAsteroid(uint32_t index, ContactPoint_t contact, float impactSpeed);
 
 #endif
