@@ -5,6 +5,7 @@
 #include <audioclient.h>
 #include <mmdeviceapi.h>
 #include <guiddef.h>
+#include <avrt.h>
 #include "../../system/system.h"
 #include "../audio.h"
 
@@ -27,6 +28,10 @@ static WAVEFORMATEXTENSIBLE *mixFormat=NULL;
 
 static DWORD WINAPI AudioThreadProc(LPVOID arg)
 {
+	DWORD taskIndex=0;
+	HANDLE mmcssHandle=AvSetMmThreadCharacteristics("Pro Audio", &taskIndex);
+	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+
 	UINT32 bufferFrameCount=0;
 	IAudioClient2_GetBufferSize(audioClient, &bufferFrameCount);
 
@@ -133,7 +138,7 @@ bool AudioWASAPI_Init(void)
 
 	audioEvent=CreateEvent(NULL, FALSE, FALSE, NULL);
 
-	if(FAILED(hr=IAudioClient2_Initialize(audioClient, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, minimumPeriod, 0, (WAVEFORMATEX *)mixFormat, NULL)))
+	if(FAILED(hr=IAudioClient2_Initialize(audioClient, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, bufferDuration, 0, (WAVEFORMATEX *)mixFormat, NULL)))
 		return false;
 	
 	DBGPRINTF(DEBUG_INFO, "WASAPI Mix Format:\n"
@@ -158,6 +163,9 @@ bool AudioWASAPI_Init(void)
 void AudioWASAPI_Destroy(void)
 {
 	audioThreadRunning=false;
+
+	if(audioEvent)
+        SetEvent(audioEvent);
 
 	if(audioThread)
 	{

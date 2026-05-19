@@ -28,6 +28,7 @@ function("buildWindows")
 	    Vulkan::Vulkan
 	    OpenXR::openxr_loader
 	    Vorbis::vorbisfile
+        avrt
         ole32
         ws2_32
         xinput
