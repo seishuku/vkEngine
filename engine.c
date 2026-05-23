@@ -145,7 +145,6 @@ bool isControlPressed=false;
 
 bool pausePhysics=false;
 
-#define NUM_ENEMY 8
 Camera_t enemy[NUM_ENEMY];
 Enemy_t enemyAI[NUM_ENEMY];
 
@@ -1051,7 +1050,7 @@ void Thread_Physics(void *arg)
 							{
 								if(&enemyAI[i].camera->body==otherObject->body)
 								{
-									enemyAI[i].health-=impactSpeed*0.5f;
+									DamageEnemy(&enemyAI[i], impactSpeed*0.5f);
 									break;
 								}
 								else if(&camera.body==otherObject->body)
@@ -1116,7 +1115,7 @@ void Thread_Physics(void *arg)
 		}
 	}
 
-#if 0
+#if 1
 	// Update enemy player
 	if(clientSocket==-1)
 	{
