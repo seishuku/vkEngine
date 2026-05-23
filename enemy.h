@@ -4,7 +4,7 @@
 #include "camera/camera.h"
 #include "entitylist.h"
 
-#define NUM_ENEMY 20
+#define NUM_ENEMY 8
 
 #define ENEMY_SIGHT_DISTANCE 1000.0f
 #define ENEMY_SIGHT_ANGLE 0.5f
@@ -22,7 +22,7 @@
 #define ENEMY_ATTACK_ANGLE 0.5f
 #define ENEMY_ATTACK_RANGE 100.0f
 #define ENEMY_FIRE_COOLDOWN_MIN 0.25f
-#define ENEMY_FIRE_COOLDOWN_MAX 2.0f
+#define ENEMY_FIRE_COOLDOWN_MAX 1.0f
 
 #define ENEMY_SEARCH_TIMEOUT 8.0f
 
@@ -37,6 +37,8 @@
 #define ENEMY_RETREAT_SAFE_DIST 200.0f
 
 #define ENEMY_STUN_DURATION 0.8f
+
+#define ENEMY_AVOIDANCE_FORCE 1.5f
 
 typedef enum
 {

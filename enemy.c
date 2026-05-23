@@ -16,30 +16,25 @@ extern ParticleSystem_t particleSystem;
 void FireParticleEmitter(vec3 position, vec3 direction);
 void ExplodeEmitterCallback(uint32_t index, uint32_t numParticles, Particle_t *particle);
 
-static void ThrustToward(Enemy_t *enemy, const EntityList_t *list, vec3 target, float force)
+static void ApplyAvoidance(Enemy_t *enemy, const EntityList_t *list)
 {
-    vec3 avoidance=Vec3b(0.0f);
+	for(size_t i=0;i<list->entityCount;i++)
+	{
+		vec3 away=Vec3_Subv(enemy->camera->body.position, list->entities[i].body->position);
+		float distSq=Vec3_Dot(away, away);
+		float radSum=(enemy->camera->body.radius+list->entities[i].body->radius)*2.0f;
 
-    for(size_t i=0;i<list->entityCount;i++)
-    {
-        float radSum=(enemy->camera->body.radius+list->entities[i].body->radius)*1.5f;
-        vec3 away=Vec3_Subv(enemy->camera->body.position, list->entities[i].body->position);
-        float distSq=Vec3_Dot(away, away);
-
-        if(distSq>0.0f&&distSq<radSum*radSum)
-			avoidance=Vec3_Addv(avoidance, Vec3_Muls(away, 1.0f/sqrtf(distSq)));
-    }
-
-	vec3 dir=Vec3_Subv(target, enemy->camera->body.position);
-	vec3 steer=Vec3_Addv(dir, avoidance);
-	Vec3_Normalize(&steer);
-
-	enemy->camera->body.force=Vec3_Addv(enemy->camera->body.force, Vec3_Muls(steer, force));
+		if(distSq>0.0f&&distSq<radSum*radSum&&list->entities[i].objectType!=ENTITYOBJECTTYPE_PROJECTILE)
+		{
+			float dist=sqrtf(distSq);
+			enemy->camera->body.force=Vec3_Addv(enemy->camera->body.force, Vec3_Muls(away, ((radSum-dist)/dist)*ENEMY_AVOIDANCE_FORCE));
+		}
+	}
 }
 
-static void ThrustAway(Enemy_t *enemy, vec3 from, float force)
+static void ApplyThrust(Enemy_t *enemy, vec3 target, float force)
 {
-	vec3 dir=Vec3_Subv(enemy->camera->body.position, from);
+	vec3 dir=Vec3_Subv(target, enemy->camera->body.position);
 	Vec3_Normalize(&dir);
 
 	enemy->camera->body.force=Vec3_Addv(enemy->camera->body.force, Vec3_Muls(dir, force));
@@ -110,12 +105,13 @@ static BTStatus_t CondIsAlerted(Enemy_t *enemy, const EntityList_t *list, const 
 
 static BTStatus_t CondInAttackRange(Enemy_t *enemy, const EntityList_t *list, const Camera_t *player)
 {
-	return (Vec3_Distance(enemy->camera->body.position, player->body.position)<ENEMY_ATTACK_RANGE)?BT_SUCCESS:BT_FAILURE;
+	return (Vec3_DistanceSq(enemy->camera->body.position, player->body.position)<ENEMY_ATTACK_RANGE*ENEMY_ATTACK_RANGE)?BT_SUCCESS:BT_FAILURE;
 }
 
 static BTStatus_t CondAlignedToAttack(Enemy_t *enemy, const EntityList_t *list, const Camera_t *player)
 {
     vec3 dir=Vec3_Subv(player->body.position, enemy->camera->body.position);
+	Vec3_Normalize(&dir);
 	return (Vec3_Dot(enemy->camera->forward, dir)>ENEMY_ATTACK_ANGLE)?BT_SUCCESS:BT_FAILURE;
 }
 
@@ -155,11 +151,11 @@ static BTStatus_t ActCoastStunned(Enemy_t *enemy, const EntityList_t *list, cons
 
 static BTStatus_t ActRetreat(Enemy_t *enemy, const EntityList_t *list, const Camera_t *player)
 {
-	float dist=Vec3_Distance(enemy->camera->body.position, player->body.position);
+	float dist=Vec3_DistanceSq(enemy->camera->body.position, player->body.position);
 
-	if(dist<ENEMY_RETREAT_SAFE_DIST)
+	if(dist<ENEMY_RETREAT_SAFE_DIST*ENEMY_RETREAT_SAFE_DIST)
 	{
-		ThrustAway(enemy, player->body.position, ENEMY_RETREAT_FORCE);
+		ApplyThrust(enemy, player->body.position, -ENEMY_RETREAT_FORCE);
 		FaceTarget(enemy, player->body.position);
 	}
 
@@ -175,9 +171,9 @@ static BTStatus_t ActAttack(Enemy_t *enemy, const EntityList_t *list, const Came
 	float theta=Vec3_Dot(enemy->camera->forward, dir);
 
 	if(dist<ENEMY_ATTACK_RANGE*0.7f)
-		ThrustToward(enemy, list, player->body.position, ENEMY_TRACK_FORCE*0.3f);
+		ApplyThrust(enemy, player->body.position, ENEMY_TRACK_FORCE*0.3f);
 	else if(dist>ENEMY_ATTACK_RANGE*0.3f)
-		ThrustAway(enemy, player->body.position, ENEMY_TRACK_FORCE*0.3f);
+		ApplyThrust(enemy, player->body.position, -ENEMY_TRACK_FORCE*0.3f);
 	
 	FaceTarget(enemy, player->body.position);
 	ApplyStrafe(enemy);
@@ -202,7 +198,7 @@ static BTStatus_t ActAttack(Enemy_t *enemy, const EntityList_t *list, const Came
 
 static BTStatus_t ActPursue(Enemy_t *enemy, const EntityList_t *list, const Camera_t *player)
 {
-	ThrustToward(enemy, list, player->body.position, ENEMY_TRACK_FORCE);
+	ApplyThrust(enemy, player->body.position, ENEMY_TRACK_FORCE);
 	FaceTarget(enemy, player->body.position);
 
 	enemy->state=ENEMY_STATE_PURSUING;
@@ -214,7 +210,7 @@ static BTStatus_t ActSearch(Enemy_t *enemy, const EntityList_t *list, const Came
 {
 	float speedScale=0.4f+0.4f*(enemy->alertLevel/ENEMY_ALERT_PURSUING);
 
-	ThrustToward(enemy, list, enemy->lastKnownPlayer.body.position, ENEMY_TRACK_FORCE*speedScale);
+	ApplyThrust(enemy, enemy->lastKnownPlayer.body.position, ENEMY_TRACK_FORCE*speedScale);
 	FaceTarget(enemy, enemy->lastKnownPlayer.body.position);
 
 	enemy->searchTimer+=fTimeStep;
@@ -242,7 +238,7 @@ static BTStatus_t ActPatrol(Enemy_t *enemy, const EntityList_t *list, const Came
 	}
 	else
 	{
-		ThrustToward(enemy, list, enemy->patrolTarget, ENEMY_TRACK_FORCE*0.5f);
+		ApplyThrust(enemy, enemy->patrolTarget, ENEMY_TRACK_FORCE*0.5f);
 		FaceTarget(enemy, enemy->patrolTarget);
 	}
 
@@ -441,5 +437,6 @@ void DamageEnemy(Enemy_t *enemy, float damage)
 void UpdateEnemy(Enemy_t *enemy, const EntityList_t *entityList, Camera_t player)
 {
 	UpdateSensors(enemy, &player);
+	ApplyAvoidance(enemy, entityList);
 	BT_Tick(enemy->btRoot, enemy, entityList, &player);
 }
