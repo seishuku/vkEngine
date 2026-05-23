@@ -74,8 +74,8 @@ const float Font_CharacterBaseWidth(const char ch)
 		case 47:	return 0.375f;	// /
 			
 		case 48:    return 0.375f;	// 0
-		case 50:    return 0.375f;	// 2
 		case 49:    return 0.375f;	// 1
+		case 50:    return 0.375f;	// 2
 		case 51:    return 0.375f;	// 3
 		case 52:    return 0.375f;	// 4
 		case 53:    return 0.375f;	// 5
@@ -246,8 +246,9 @@ void Font_Print(Font_t *font, float size, float x, float y, const char *string, 
 			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='5'&&*(ptr+3)=='m')	{ r=1.0f; g=0.0f; b=1.0f; } // MAGENTA
 			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='6'&&*(ptr+3)=='m')	{ r=0.0f; g=1.0f; b=1.0f; } // CYAN
 			else if(*(ptr+0)=='['&&*(ptr+1)=='9'&&*(ptr+2)=='7'&&*(ptr+3)=='m')	{ r=1.0f; g=1.0f; b=1.0f; } // WHITE
-			ptr+=4;
+			ptr+=3;
 			font->numChar-=5;
+			continue;
 		}
 
 		// Advance one character
