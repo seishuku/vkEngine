@@ -472,19 +472,47 @@ int main(int argc, char **argv)
 	ShowWindow(vkContext.hWnd, SW_SHOW);
 	SetForegroundWindow(vkContext.hWnd);
 
-	DBGPRINTF(DEBUG_INFO, "Creating Vulkan instance...\n");
-	if(!vkuCreateInstance(&vkInstance))
+	DBGPRINTF(DEBUG_INFO, "Initializing VR system...\n");
+	if(!VR_InitSystem(&xrContext, XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY, NULL))
 	{
-		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "...failed, disabling VR support.\n");
+		config.isVR=false;
+	}
+	else
+		config.isVR=true;
+
+	const char *instanceExtensions[]={
+		VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME,
+		VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME,
+		VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME,
+		VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
+	};
+
+	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Instance...\n");
+	if(!vkuCreateInstance(&vkInstance, instanceExtensions, sizeof(instanceExtensions)/sizeof(*instanceExtensions)))
+	{
+		DBGPRINTF(DEBUG_ERROR, "...failed.\n");
 		return -1;
 	}
 
-	vkContext.deviceIndex=config.deviceIndex;
+	const char *contextExtensions[]={
+		VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME,
+		VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
+		VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME,
+		VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME,
+		VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME,
+		VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
+		VK_KHR_WIN32_KEYED_MUTEX_EXTENSION_NAME,		
+		VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
+		VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME
+	};
 
-	DBGPRINTF(DEBUG_INFO, "Creating Vulkan context...\n");
-	if(!vkuCreateContext(vkInstance, &vkContext))
+    vkContext.deviceIndex=config.deviceIndex;
+   
+    DBGPRINTF(DEBUG_INFO, "Creating Vulkan Context...\n");
+	if(!vkuCreateContext(vkInstance, &vkContext, contextExtensions, sizeof(contextExtensions)/sizeof(*contextExtensions)))
 	{
-		DBGPRINTF(DEBUG_ERROR, "\t...failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "...failed.\n");
 		return -1;
 	}
 
@@ -500,20 +528,22 @@ int main(int argc, char **argv)
 		config.renderHeight=swapchain.extent.height;
 	}
 
-	DBGPRINTF(DEBUG_INFO, "Initializing VR...\n");
-	if(!VR_Init(&xrContext, vkInstance, &vkContext))
+	if(config.isVR)
 	{
-		DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
-		config.isVR=false;
-	}
-	else
-	{
-		config.renderWidth=xrContext.swapchain[0].extent.width;
-		config.renderHeight=xrContext.swapchain[0].extent.height;
-		config.windowWidth=config.renderWidth;
-		config.windowHeight=config.renderHeight;
-		MoveWindow(vkContext.hWnd, 0, 0, config.windowWidth/2, config.windowHeight/2, TRUE);
-		config.isVR=true;
+		DBGPRINTF(DEBUG_INFO, "Initializing VR...\n");
+		if(!VR_Init(&xrContext, vkInstance, &vkContext))
+		{
+			DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
+			config.isVR=false;
+		}
+		else
+		{
+			config.renderWidth=xrContext.swapchain[0].extent.width;
+			config.renderHeight=xrContext.swapchain[0].extent.height;
+			config.windowWidth=config.renderWidth;
+			config.windowHeight=config.renderHeight;
+			MoveWindow(vkContext.hWnd, 0, 0, config.windowWidth/2, config.windowHeight/2, TRUE);
+		}
 	}
 
 	DBGPRINTF(DEBUG_INFO, "Initializing Vulkan resources...\n");

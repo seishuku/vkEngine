@@ -30,17 +30,17 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 #endif
 
 // Create Vulkan Instance
-VkBool32 vkuCreateInstance(VkInstance *instance)
+VkBool32 vkuCreateInstance(VkInstance *instance, const char *extensions[], const uint32_t extensionCount)
 {
-	uint32_t extensionCount=0;
+	uint32_t numExtensionsProperties=0;
 
-	if(vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, NULL)!=VK_SUCCESS)
+	if(vkEnumerateInstanceExtensionProperties(NULL, &numExtensionsProperties, NULL)!=VK_SUCCESS)
 	{
 		DBGPRINTF(DEBUG_ERROR, "vkEnumerateInstanceExtensionProperties failed.\n");
 		return VK_FALSE;
 	}
 
-	VkExtensionProperties *extensionProperties=(VkExtensionProperties *)Zone_Malloc(zone, sizeof(VkExtensionProperties)*extensionCount);
+	VkExtensionProperties *extensionProperties=(VkExtensionProperties *)Zone_Malloc(zone, sizeof(VkExtensionProperties)*numExtensionsProperties);
 
 	if(extensionProperties==VK_NULL_HANDLE)
 	{
@@ -48,27 +48,27 @@ VkBool32 vkuCreateInstance(VkInstance *instance)
 		return VK_FALSE;
 	}
 
-	if(vkEnumerateInstanceExtensionProperties(VK_NULL_HANDLE, &extensionCount, extensionProperties)!=VK_SUCCESS)
+	if(vkEnumerateInstanceExtensionProperties(VK_NULL_HANDLE, &numExtensionsProperties, extensionProperties)!=VK_SUCCESS)
 	{
 		Zone_Free(zone, extensionProperties);
 		DBGPRINTF(DEBUG_ERROR, "vkEnumerateInstanceExtensionProperties failed.\n");
 		return VK_FALSE;
 	}
 
-	//DBGPRINTF(DEBUG_INFO, "Instance extensions:\n");
-	//for(uint32_t i=0;i<extensionCount;i++)
-	//	DBGPRINTF(DEBUG_INFO, "\t%s\n", extensionProperties[i].extensionName);
-
 	VkBool32 surfaceOSExtension=VK_FALSE;
 	VkBool32 surfaceExtension=VK_FALSE;
 	VkBool32 debugExtension=VK_FALSE;
 
-	for(uint32_t i=0;i<extensionCount;i++)
+	const char **enabledExtensions=(const char **)Zone_Malloc(zone, sizeof(const char *)*(extensionCount+3));
+	uint32_t numEnabledExtensions=0;
+
+	for(uint32_t i=0;i<numExtensionsProperties;i++)
 	{
 #ifdef WIN32
 		if(strcmp(extensionProperties[i].extensionName, VK_KHR_WIN32_SURFACE_EXTENSION_NAME)==0)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_KHR_WIN32_SURFACE_EXTENSION_NAME" extension is supported!\n");
+			enabledExtensions[numEnabledExtensions++]=VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
 			surfaceOSExtension=VK_TRUE;
 		}
 #elif LINUX
@@ -76,39 +76,78 @@ VkBool32 vkuCreateInstance(VkInstance *instance)
 		if(strcmp(extensionProperties[i].extensionName, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME)==0)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME" extension is supported!\n");
+			enabledExtensions[numEnabledExtensions++]=VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME;
 			surfaceOSExtension=VK_TRUE;
+			continue;
 		}
 #else
 		if(strcmp(extensionProperties[i].extensionName, VK_KHR_XLIB_SURFACE_EXTENSION_NAME)==0)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_KHR_XLIB_SURFACE_EXTENSION_NAME" extension is supported!\n");
+			enabledExtensions[numEnabledExtensions++]=VK_KHR_XLIB_SURFACE_EXTENSION_NAME;
 			surfaceOSExtension=VK_TRUE;
+			continue;
 		}
 #endif
 #elif ANDROID
 		if(strcmp(extensionProperties[i].extensionName, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME)==0)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME" extension is supported!\n");
+			enabledExtensions[numEnabledExtensions++]=VK_KHR_ANDROID_SURFACE_EXTENSION_NAME;
 			surfaceOSExtension=VK_TRUE;
+			continue;
 		}
 #endif
-		else if(strcmp(extensionProperties[i].extensionName, VK_KHR_SURFACE_EXTENSION_NAME)==0)
+		if(strcmp(extensionProperties[i].extensionName, VK_KHR_SURFACE_EXTENSION_NAME)==0)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_KHR_SURFACE_EXTENSION_NAME" extension is supported!\n");
+			enabledExtensions[numEnabledExtensions++]=VK_KHR_SURFACE_EXTENSION_NAME;
 			surfaceExtension=VK_TRUE;
+			continue;
 		}
-		else if(strcmp(extensionProperties[i].extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)==0)
+
+		if(strcmp(extensionProperties[i].extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)==0)
 		{
 			DBGPRINTF(DEBUG_INFO, VK_EXT_DEBUG_UTILS_EXTENSION_NAME" extension is supported!\n");
+			enabledExtensions[numEnabledExtensions++]=VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 			debugExtension=VK_TRUE;
+			continue;
+		}
+
+		for(uint32_t j=0;j<extensionCount;j++)
+		{
+			if(strcmp(extensionProperties[i].extensionName, extensions[j])==0)
+			{
+				DBGPRINTF(DEBUG_INFO, "%s extension is supported!\n", extensions[j]);
+				enabledExtensions[numEnabledExtensions++]=extensions[j];
+				break;
+			}
 		}
 	}
 
+	// Report missing external extensions
+	for(uint32_t i=0;i<extensionCount;i++)
+	{
+		VkBool32 found=VK_FALSE;
+		for(uint32_t j=0;j<numEnabledExtensions;j++)
+		{
+			if(strcmp(enabledExtensions[j], extensions[i])==0)
+			{
+				found=VK_TRUE;
+				break;
+			}
+		}
+
+		if(!found)
+			DBGPRINTF(DEBUG_WARNING, "%s extension not supported!\n", extensions[i]);
+	}
+
+	// Done with extension properties
 	Zone_Free(zone, extensionProperties);
 
 	if(!surfaceExtension||!surfaceOSExtension)
 	{
-		DBGPRINTF(DEBUG_ERROR, "Missing required instance surface extension!\n");
+		DBGPRINTF(DEBUG_ERROR, "Missing required instance surface extensions!\n");
 		return VK_FALSE;
 	}
 
@@ -122,46 +161,12 @@ VkBool32 vkuCreateInstance(VkInstance *instance)
 		.apiVersion=VK_API_VERSION_1_1
 	};
 
-	const char *extensions[100];
-	uint32_t numExtensions=0;
-
-	if(surfaceOSExtension)
-	{
-#ifdef WIN32
-		extensions[numExtensions++]=VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
-#elif LINUX
-#ifdef WAYLAND
-		extensions[numExtensions++]=VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME;
-#else
-		extensions[numExtensions++]=VK_KHR_XLIB_SURFACE_EXTENSION_NAME;
-#endif
-#elif ANDROID
-		extensions[numExtensions++]=VK_KHR_ANDROID_SURFACE_EXTENSION_NAME;
-#endif
-	}
-
-	if(surfaceExtension)
-		extensions[numExtensions++]=VK_KHR_SURFACE_EXTENSION_NAME;
-
-	if(debugExtension)
-		extensions[numExtensions++]=VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
-
-	extensions[numExtensions++]=VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME;
-	extensions[numExtensions++]=VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME;
-	extensions[numExtensions++]=VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME;
-	extensions[numExtensions++]=VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME;
-	//VK_KHR_external_memory_capabilities
-	//VK_KHR_get_physical_device_properties2
-	//VK_KHR_surface
-	//VK_KHR_win32_surface
-	//VK_NV_external_memory_capabilities
-
 	VkInstanceCreateInfo instanceInfo=
 	{
 		.sType=VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
 		.pApplicationInfo=&AppInfo,
-		.enabledExtensionCount=numExtensions,
-		.ppEnabledExtensionNames=extensions,
+		.enabledExtensionCount=numEnabledExtensions,
+		.ppEnabledExtensionNames=enabledExtensions,
 		.ppEnabledLayerNames=(const char *[]) { "VK_LAYER_KHRONOS_validation" },
 	};
 
@@ -173,6 +178,9 @@ VkBool32 vkuCreateInstance(VkInstance *instance)
 		DBGPRINTF(DEBUG_ERROR, "vkCreateInstance failed.\n");
 		return VK_FALSE;
 	}
+
+	// Done with enabled extension list
+	Zone_Free(zone, enabledExtensions);
 
 #ifdef _DEBUG
 	if(debugExtension)

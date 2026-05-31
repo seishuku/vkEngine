@@ -71,23 +71,6 @@ typedef struct
 	VkBool32 depthStencilResolveExtension;
 	VkBool32 createRenderPass2Extension;
 
-	VkBool32 externalMemoryExtension;
-	VkBool32 externalFenceExtension;
-	VkBool32 externalSemaphoreExtension;
-	VkBool32 getMemoryRequirements2Extension;
-	VkBool32 dedicatedAllocationExtension;
-
-#ifdef WIN32
-	VkBool32 externalMemoryWIN32Extension;
-	VkBool32 externalFenceWIN32Extension;
-	VkBool32 externalSemaphoreWIN32Extension;
-	VkBool32 win32KeyedMutexExtension;
-#else
-	VkBool32 externalMemoryFDExtension;
-	VkBool32 externalFenceFDExtension;
-	VkBool32 externalSemaphoreFDExtension;
-#endif
-
 	VkPhysicalDeviceProperties2 deviceProperties;
 	VkPhysicalDeviceMaintenance3Properties deviceProperties2;
 
@@ -351,10 +334,10 @@ void vkuMem_Free(VkuMemZone_t *vkZone, VkuMemBlock_t *ptr);
 VkuMemBlock_t *vkuMem_Malloc(VkuMemZone_t *vkZone, VkMemoryRequirements requirements);
 void vkuMem_Print(VkuMemZone_t *vkZone);
 
-VkBool32 vkuCreateInstance(VkInstance *instance);
+VkBool32 vkuCreateInstance(VkInstance *instance, const char *extensions[], const uint32_t extensionCount);
 void vkuDestroyInstance(VkInstance instance);
 
-VkBool32 vkuCreateContext(VkInstance instance, VkuContext_t *context);
+VkBool32 vkuCreateContext(VkInstance instance, VkuContext_t *context, const char *extensions[], const uint32_t extensionCount);
 void vkuDestroyContext(VkInstance instance, VkuContext_t *context);
 
 VkBool32 vkuCreateSwapchain(VkuContext_t *context, VkuSwapchain_t *swapchain, VkBool32 vSync);

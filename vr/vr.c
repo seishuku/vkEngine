@@ -317,8 +317,11 @@ matrix VR_GetHeadPose(XruContext_t *xrContext, uint32_t Eye)
 	return MatrixInverse(PoseMat);
 }
 
-static bool VR_InitSystem(XruContext_t *xrContext, const XrFormFactor formFactor)
+bool VR_InitSystem(XruContext_t *xrContext, const XrFormFactor formFactor, XruExtensionRequirements_t *requiredExtensions)
 {
+	xrContext->instance=XR_NULL_HANDLE;
+	xrContext->systemID=XR_NULL_SYSTEM_ID;
+
 	int extensionCount=0;
 	const char *enabledExtensions[10];
 
@@ -332,8 +335,8 @@ static bool VR_InitSystem(XruContext_t *xrContext, const XrFormFactor formFactor
 		.enabledExtensionNames=enabledExtensions,
 		.applicationInfo=
 		{
-			.applicationName="vkEngine",
-			.engineName="vkEngine",
+			.applicationName="Engine",
+			.engineName="Engine",
 			.applicationVersion=1,
 			.engineVersion=0,
 			.apiVersion=XR_CURRENT_API_VERSION,
@@ -398,53 +401,56 @@ static bool VR_InitSystem(XruContext_t *xrContext, const XrFormFactor formFactor
 
 	DBGPRINTF(DEBUG_INFO, "VR: Successfully got system with ID %llu for HMD form factor.\n", xrContext->systemID);
 
-	uint32_t instanceExtensionNamesSize=0;
-	if(!xruCheck(xrContext->instance, xrGetVulkanInstanceExtensionsKHR(xrContext->instance, xrContext->systemID, 0, &instanceExtensionNamesSize, XR_NULL_HANDLE)))
+	// Get required Vulkan extensions
+	// NOTE: This must be freed when done.
+	if(requiredExtensions)
 	{
-		DBGPRINTF(DEBUG_ERROR, "VR: Failed to get Vulkan Device Extensions.\n");
-		return false;
+		// Vulkan instance extensions
+		if(!xruCheck(xrContext->instance, xrGetVulkanInstanceExtensionsKHR(xrContext->instance, xrContext->systemID, 0, &requiredExtensions->instanceExtensionCount, XR_NULL_HANDLE)))
+		{
+			DBGPRINTF(DEBUG_ERROR, "VR: Failed to get Vulkan Device Extensions.\n");
+			return false;
+		}
+
+		requiredExtensions->instanceExtensions=(char *)Zone_Malloc(zone, requiredExtensions->instanceExtensionCount);
+
+		if(requiredExtensions->instanceExtensions==NULL)
+		{
+			DBGPRINTF(DEBUG_ERROR, "VR: Failed to allocate memory for extension names.\n");
+			return false;
+		}
+
+		if(!xruCheck(xrContext->instance, xrGetVulkanInstanceExtensionsKHR(xrContext->instance, xrContext->systemID, requiredExtensions->instanceExtensionCount, &requiredExtensions->instanceExtensionCount, requiredExtensions->instanceExtensions)))
+		{
+			DBGPRINTF(DEBUG_ERROR, "VR: Failed to get Vulkan Device Extensions.\n");
+			return false;
+		}
+
+		DBGPRINTF(DEBUG_INFO, "VR: Instance extension requirements: %s\n", requiredExtensions->instanceExtensions);
+
+		// Vulkan device extensions
+		if(!xruCheck(xrContext->instance, xrGetVulkanDeviceExtensionsKHR(xrContext->instance, xrContext->systemID, 0, &requiredExtensions->contextExtensionCount, XR_NULL_HANDLE)))
+		{
+			DBGPRINTF(DEBUG_ERROR, "VR: Failed to get Vulkan Device Extensions.\n");
+			return false;
+		}
+
+		requiredExtensions->contextExtensions=(char *)Zone_Malloc(zone, requiredExtensions->contextExtensionCount);
+
+		if(requiredExtensions->contextExtensions==NULL)
+		{
+			DBGPRINTF(DEBUG_ERROR, "VR: Failed to allocate memory for extension names.\n");
+			return false;
+		}
+
+		if(!xruCheck(xrContext->instance, xrGetVulkanDeviceExtensionsKHR(xrContext->instance, xrContext->systemID, requiredExtensions->contextExtensionCount, &requiredExtensions->contextExtensionCount, requiredExtensions->contextExtensions)))
+		{
+			DBGPRINTF(DEBUG_ERROR, "VR: Failed to get Vulkan Device Extensions.\n");
+			return false;
+		}
+
+		DBGPRINTF(DEBUG_INFO, "VR: Extension requirements: %s\n", requiredExtensions->contextExtensions);
 	}
-
-	char *instanceExtensionNames=Zone_Malloc(zone, instanceExtensionNamesSize);
-
-	if(instanceExtensionNames==NULL)
-	{
-		DBGPRINTF(DEBUG_ERROR, "VR: Failed to allocate memory for extension names.\n");
-		return false;
-	}
-
-	if(!xruCheck(xrContext->instance, xrGetVulkanInstanceExtensionsKHR(xrContext->instance, xrContext->systemID, instanceExtensionNamesSize, &instanceExtensionNamesSize, instanceExtensionNames)))
-	{
-		DBGPRINTF(DEBUG_ERROR, "VR: Failed to get Vulkan Device Extensions.\n");
-		return false;
-	}
-
-	DBGPRINTF(DEBUG_INFO, "VR: Instance extension requirements: %s\n", instanceExtensionNames);
-	Zone_Free(zone, instanceExtensionNames);
-
-	uint32_t extensionNamesSize=0;
-	if(!xruCheck(xrContext->instance, xrGetVulkanDeviceExtensionsKHR(xrContext->instance, xrContext->systemID, 0, &extensionNamesSize, XR_NULL_HANDLE)))
-	{
-		DBGPRINTF(DEBUG_ERROR, "VR: Failed to get Vulkan Device Extensions.\n");
-		return false;
-	}
-
-	char *extensionNames=Zone_Malloc(zone, extensionNamesSize);
-
-	if(extensionNames==NULL)
-	{
-		DBGPRINTF(DEBUG_ERROR, "VR: Failed to allocate memory for extension names.\n");
-		return false;
-	}
-
-	if(!xruCheck(xrContext->instance, xrGetVulkanDeviceExtensionsKHR(xrContext->instance, xrContext->systemID, extensionNamesSize, &extensionNamesSize, extensionNames)))
-	{
-		DBGPRINTF(DEBUG_ERROR, "VR: Failed to get Vulkan Device Extensions.\n");
-		return false;
-	}
-
-	DBGPRINTF(DEBUG_INFO, "VR: Extension requirements: %s\n", extensionNames);
-	Zone_Free(zone, extensionNames);
 
 	XrSystemProperties systemProps={ .type=XR_TYPE_SYSTEM_PROPERTIES };
 
@@ -511,10 +517,6 @@ static bool VR_GetViewConfig(XruContext_t *xrContext, const XrViewConfigurationT
 
 static bool VR_InitSession(XruContext_t *xrContext, VkInstance instance, VkuContext_t *context)
 {
-	// Check required Vulkan extensions
-	if(!(context->externalMemoryExtension&&context->externalFenceExtension&&context->externalSemaphoreExtension&&context->getMemoryRequirements2Extension&&context->dedicatedAllocationExtension))
-		return false;
-
 	XrGraphicsRequirementsVulkanKHR graphicsRequirements={ .type=XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN_KHR };
 
 	if(!xruCheck(xrContext->instance, xrGetVulkanGraphicsRequirementsKHR(xrContext->instance, xrContext->systemID, &graphicsRequirements)))
@@ -946,10 +948,6 @@ vec2 VR_GetActionVec2(XruContext_t *xrContext, XrAction action, uint32_t hand)
 
 bool VR_Init(XruContext_t *xrContext, VkInstance instance, VkuContext_t *context)
 {
-	xrContext->instance=XR_NULL_HANDLE;
-
-	xrContext->systemID=XR_NULL_SYSTEM_ID;
-
 	xrContext->viewCount=0;
 
 	xrContext->viewConfigViews[0].type=XR_TYPE_VIEW_CONFIGURATION_VIEW;
@@ -981,12 +979,6 @@ bool VR_Init(XruContext_t *xrContext, VkInstance instance, VkuContext_t *context
 
 	xrContext->leftHandSpace=XR_NULL_HANDLE;
 	xrContext->rightHandSpace=XR_NULL_HANDLE;
-
-	if(!VR_InitSystem(xrContext, XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY))
-	{
-		DBGPRINTF(DEBUG_ERROR, "VR: VR_InitSystem failed.\n");
-		return false;
-	}
 
 	if(!VR_GetViewConfig(xrContext, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO))
 	{

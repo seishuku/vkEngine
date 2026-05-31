@@ -86,6 +86,15 @@ typedef struct
 	XrSpace leftHandSpace, rightHandSpace;
 } XruContext_t;
 
+typedef struct
+{
+	char *instanceExtensions;
+	uint32_t instanceExtensionCount;
+
+	char *contextExtensions;
+	uint32_t contextExtensionCount;
+} XruExtensionRequirements_t;
+
 bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex);
 bool VR_EndFrame(XruContext_t *xrContext);
 matrix VR_GetEyeProjection(XruContext_t *xrContext, uint32_t eye);
@@ -94,6 +103,7 @@ XrPosef VR_GetActionPose(XruContext_t *xrContext, const XrAction action, const X
 bool VR_GetActionBoolean(XruContext_t *xrContext, XrAction action, uint32_t hand);
 float VR_GetActionFloat(XruContext_t *xrContext, XrAction action, uint32_t hand);
 vec2 VR_GetActionVec2(XruContext_t *xrContext, XrAction action, uint32_t hand);
+bool VR_InitSystem(XruContext_t *xrContext, const XrFormFactor formFactor, XruExtensionRequirements_t *requiredExtensions);
 bool VR_Init(XruContext_t *xrContext, VkInstance instance, VkuContext_t *context);
 void VR_Destroy(XruContext_t *xrContext);
 

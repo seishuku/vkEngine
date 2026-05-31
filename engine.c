@@ -1351,7 +1351,7 @@ void Render(void)
 	// TODO: This create a slight race condition while the physics thread is still running
 	//           and the camera frustum and instance data may have a +/-1 frame delay of stale data.
 	//       Seems ok for now, but may change later.
-	matrix mvp=MatrixMult(modelView, projection[0]);
+	matrix mvp=MatrixMult(MatrixMult(modelView, headPose[0]), projection[0]);
 	frustum cameraFrustum=Frustum_ExtractPlanes(mvp);
 	EntityList_FrustumCull(&entityList, cameraFrustum);
 	EntityList_UpdateInstances(&entityList, index);
