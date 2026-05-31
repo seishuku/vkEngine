@@ -1214,9 +1214,9 @@ void Render(void)
 			return;
 		}
 
-		if(!VR_StartFrame(&xrContext, imageIndex))
+		if(!xruStartFrame(&xrContext, imageIndex))
 		{
-			VR_EndFrame(&xrContext);
+			xruEndFrame(&xrContext);
 
 			// Wait for physics to finish, then dump the frame and start over
 			ThreadBarrier_Wait(&physicsThreadBarrier);
@@ -1226,11 +1226,11 @@ void Render(void)
 			return;
 		}
 
-		projection[0]=VR_GetEyeProjection(&xrContext, 0);
-		projection[1]=VR_GetEyeProjection(&xrContext, 1);
+		projection[0]=xruGetEyeProjection(&xrContext, 0);
+		projection[1]=xruGetEyeProjection(&xrContext, 1);
 
-		headPose[0]=VR_GetHeadPose(&xrContext, 0);
-		headPose[1]=VR_GetHeadPose(&xrContext, 1);
+		headPose[0]=xruGetHeadPose(&xrContext, 0);
+		headPose[1]=xruGetHeadPose(&xrContext, 1);
 
 		vec4 leftHandOrientation=Input_GetVRHandOrientation(0);
 		vec3 leftHandPosition=Input_GetVRHandPosition(0);
@@ -1445,7 +1445,7 @@ void Render(void)
 	// Handle VR frame end
 	if(config.isVR)
 	{
-		VR_EndFrame(&xrContext);
+		xruEndFrame(&xrContext);
 	}
 	else
 	// Handle non-VR frame end
@@ -1992,7 +1992,7 @@ void Destroy(void)
 
 
 	if(config.isVR)
-		VR_Destroy(&xrContext);
+		xruDestroy(&xrContext);
 
 	for(uint32_t i=0;i<NUM_THREADS;i++)
 		Thread_Destroy(&thread[i]);

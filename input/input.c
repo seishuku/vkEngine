@@ -40,20 +40,20 @@ void Input_Update(void)
 	input_state.vr.connected=true;
 
 	// Poll left hand
-	XrPosef leftHandPose=VR_GetActionPose(&xrContext, xrContext.handPose, xrContext.leftHandSpace, 0);
+	XrPosef leftHandPose=xruGetActionPose(&xrContext, xrContext.handPose, xrContext.leftHandSpace, 0);
 	input_state.vr.hand[0].orientation=Vec4(leftHandPose.orientation.x, leftHandPose.orientation.y, leftHandPose.orientation.z, leftHandPose.orientation.w);
 	input_state.vr.hand[0].position=Vec3(leftHandPose.position.x, leftHandPose.position.y, leftHandPose.position.z);
-	input_state.vr.hand[0].trigger=VR_GetActionFloat(&xrContext, xrContext.handTrigger, 0);
-	input_state.vr.hand[0].grip=VR_GetActionFloat(&xrContext, xrContext.handGrip, 0);
-	input_state.vr.hand[0].thumbstick=VR_GetActionVec2(&xrContext, xrContext.handThumbstick, 0);
+	input_state.vr.hand[0].trigger=xruGetActionFloat(&xrContext, xrContext.handTrigger, 0);
+	input_state.vr.hand[0].grip=xruGetActionFloat(&xrContext, xrContext.handGrip, 0);
+	input_state.vr.hand[0].thumbstick=xruGetActionVec2(&xrContext, xrContext.handThumbstick, 0);
 
 	// Poll right hand
-	XrPosef rightHandPose=VR_GetActionPose(&xrContext, xrContext.handPose, xrContext.rightHandSpace, 1);
+	XrPosef rightHandPose=xruGetActionPose(&xrContext, xrContext.handPose, xrContext.rightHandSpace, 1);
 	input_state.vr.hand[1].orientation=Vec4(rightHandPose.orientation.x, rightHandPose.orientation.y, rightHandPose.orientation.z, rightHandPose.orientation.w);
 	input_state.vr.hand[1].position=Vec3(rightHandPose.position.x, rightHandPose.position.y, rightHandPose.position.z);
-	input_state.vr.hand[1].trigger=VR_GetActionFloat(&xrContext, xrContext.handTrigger, 1);
-	input_state.vr.hand[1].grip=VR_GetActionFloat(&xrContext, xrContext.handGrip, 1);
-	input_state.vr.hand[1].thumbstick=VR_GetActionVec2(&xrContext, xrContext.handThumbstick, 1);
+	input_state.vr.hand[1].trigger=xruGetActionFloat(&xrContext, xrContext.handTrigger, 1);
+	input_state.vr.hand[1].grip=xruGetActionFloat(&xrContext, xrContext.handGrip, 1);
+	input_state.vr.hand[1].thumbstick=xruGetActionVec2(&xrContext, xrContext.handThumbstick, 1);
 
 	if(!input_state.vr.connected)
 		return;

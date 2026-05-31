@@ -409,8 +409,10 @@ int main(int argc, char** argv)
 	struct zwp_locked_pointer_v1 *lockedPointer=zwp_pointer_constraints_v1_lock_pointer(pointerConstraints, vkContext.wlSurface, pointer, NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
 	zwp_locked_pointer_v1_add_listener(lockedPointer, &lockedPointerListener, NULL);
 
+	XruExtensionRequirements_t extensionRequirements;
+
 	DBGPRINTF(DEBUG_INFO, "Initializing VR system...\n");
-	if(!VR_InitSystem(&xrContext, XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY, NULL))
+	if(!xruInitSystem(&xrContext, XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY, &extensionRequirements))
 	{
 		DBGPRINTF(DEBUG_ERROR, "...failed, disabling VR support.\n");
 		config.isVR=false;
@@ -418,39 +420,39 @@ int main(int argc, char** argv)
 	else
 		config.isVR=true;
 
-	const char *instanceExtensions[]={
-		VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME,
-		VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME,
-		VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME,
-		VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
-	};
+	uint32_t instanceExtensionCount=0;
+	const char **instanceExtensions=xruSplitExtensionString(extensionRequirements.instanceExtensions, &instanceExtensionCount);
 
 	DBGPRINTF(DEBUG_INFO, "Creating Vulkan Instance...\n");
-	if(!vkuCreateInstance(&vkInstance, instanceExtensions, sizeof(instanceExtensions)/sizeof(*instanceExtensions)))
+	if(!vkuCreateInstance(&vkInstance, instanceExtensions, instanceExtensionCount))
 	{
 		DBGPRINTF(DEBUG_ERROR, "...failed.\n");
 		return -1;
 	}
 
-	const char *contextExtensions[]={
-		VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
-		VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
-		VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME,
-		VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME,
-		VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME,
-		VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
-		VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
-		VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME
-	};
+	uint32_t deviceExtensionCount=0;
+	const char **deviceExtensions=xruSplitExtensionString(extensionRequirements.deviceExtensions, &deviceExtensionCount);
 
     vkContext.deviceIndex=config.deviceIndex;
    
     DBGPRINTF(DEBUG_INFO, "Creating Vulkan Context...\n");
-	if(!vkuCreateContext(vkInstance, &vkContext, contextExtensions, sizeof(contextExtensions)/sizeof(*contextExtensions)))
+	if(!vkuCreateContext(vkInstance, &vkContext, deviceExtensions, deviceExtensionCount))
 	{
 		DBGPRINTF(DEBUG_ERROR, "...failed.\n");
 		return -1;
 	}
+
+	if(extensionRequirements.instanceExtensions)
+		Zone_Free(zone, extensionRequirements.instanceExtensions);
+
+	if(instanceExtensions)
+		Zone_Free(zone, instanceExtensions);
+
+	if(extensionRequirements.deviceExtensions)
+		Zone_Free(zone, extensionRequirements.deviceExtensions);
+
+	if(deviceExtensions)
+		Zone_Free(zone, deviceExtensions);
 
     swapchain.extent.width=config.windowWidth;
     swapchain.extent.height=config.windowHeight;
@@ -470,7 +472,7 @@ int main(int argc, char** argv)
 	if(config.isVR)
 	{
 		DBGPRINTF(DEBUG_INFO, "Initializing VR...\n");
-		if(!VR_Init(&xrContext, vkInstance, &vkContext))
+		if(!xruInit(&xrContext, vkInstance, &vkContext))
 		{
 			DBGPRINTF(DEBUG_ERROR, "\t...failed, turning off VR support.\n");
 			config.isVR=false;

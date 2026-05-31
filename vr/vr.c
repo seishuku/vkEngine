@@ -12,6 +12,44 @@ PFN_xrGetVulkanDeviceExtensionsKHR xrGetVulkanDeviceExtensionsKHR=XR_NULL_HANDLE
 PFN_xrGetVulkanGraphicsDeviceKHR xrGetVulkanGraphicsDeviceKHR=XR_NULL_HANDLE;
 PFN_xrGetVulkanGraphicsRequirementsKHR xrGetVulkanGraphicsRequirementsKHR=XR_NULL_HANDLE;
 
+const char **xruSplitExtensionString(char *str, uint32_t *outCount)
+{
+	if(!outCount||!str||*str=='\0')
+		return NULL;
+
+	*outCount=0;
+
+	uint32_t count=1;
+
+	for(char *c=str;*c;c++)
+	{
+		if(*c==' ')
+			count++;
+	}
+
+	const char **list=(const char **)Zone_Malloc(zone, sizeof(const char *)*count);
+
+	if(!list)
+		return NULL;
+
+	uint32_t i=0;
+
+	list[i++]=str;
+
+	for(char *c=str;*c;c++)
+	{
+		if(*c==' ')
+		{
+			*c='\0';
+			list[i++]=c+1;
+		}
+	}
+
+	*outCount=count;
+
+	return list;
+}
+
 static bool xruCheck(XrInstance xrInstance, XrResult Result)
 {
 	if(XR_SUCCEEDED(Result))
@@ -98,7 +136,7 @@ static void xruPollEvents(XruContext_t *xrContext)
 	}
 }
 
-bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex)
+bool xruStartFrame(XruContext_t *xrContext, uint32_t *imageIndex)
 {
 	xruPollEvents(xrContext);
 
@@ -206,7 +244,7 @@ bool VR_StartFrame(XruContext_t *xrContext, uint32_t *imageIndex)
 	return true;
 }
 
-bool VR_EndFrame(XruContext_t *xrContext)
+bool xruEndFrame(XruContext_t *xrContext)
 {
 	if(!xrContext->sessionRunning)
 		return false;
@@ -279,7 +317,7 @@ bool VR_EndFrame(XruContext_t *xrContext)
 	return true;
 }
 
-matrix VR_GetEyeProjection(XruContext_t *xrContext, uint32_t Eye)
+matrix xruGetEyeProjection(XruContext_t *xrContext, uint32_t Eye)
 {
 	const float Left=tanf(xrContext->projViews[Eye].fov.angleLeft);
 	const float Right=tanf(xrContext->projViews[Eye].fov.angleRight);
@@ -299,7 +337,7 @@ matrix VR_GetEyeProjection(XruContext_t *xrContext, uint32_t Eye)
 }
 
 // Get current inverse head pose matrix
-matrix VR_GetHeadPose(XruContext_t *xrContext, uint32_t Eye)
+matrix xruGetHeadPose(XruContext_t *xrContext, uint32_t Eye)
 {
 	XrPosef Pose=xrContext->projViews[Eye].pose;
 
@@ -317,15 +355,18 @@ matrix VR_GetHeadPose(XruContext_t *xrContext, uint32_t Eye)
 	return MatrixInverse(PoseMat);
 }
 
-bool VR_InitSystem(XruContext_t *xrContext, const XrFormFactor formFactor, XruExtensionRequirements_t *requiredExtensions)
+bool xruInitSystem(XruContext_t *xrContext, const XrFormFactor formFactor, XruExtensionRequirements_t *requiredExtensions)
 {
-	xrContext->instance=XR_NULL_HANDLE;
-	xrContext->systemID=XR_NULL_SYSTEM_ID;
+	if(!xrContext)
+		return false;
 
-	int extensionCount=0;
-	const char *enabledExtensions[10];
+	memset(xrContext, 0, sizeof(XruContext_t));
 
-	enabledExtensions[extensionCount++]=XR_KHR_VULKAN_ENABLE_EXTENSION_NAME;
+	if(requiredExtensions)
+		memset(requiredExtensions, 0, sizeof(XruExtensionRequirements_t));
+
+	uint32_t extensionCount=1;
+	const char *enabledExtensions[]={ XR_KHR_VULKAN_ENABLE_EXTENSION_NAME };
 
 	XrInstanceCreateInfo instanceCreateInfo=
 	{
@@ -345,7 +386,7 @@ bool VR_InitSystem(XruContext_t *xrContext, const XrFormFactor formFactor, XruEx
 
 	if(!xruCheck(xrContext->instance, xrCreateInstance(&instanceCreateInfo, &xrContext->instance)))
 	{
-		DBGPRINTF(DEBUG_ERROR, "VR_Init: Failed to create OpenXR instance.\n");
+		DBGPRINTF(DEBUG_ERROR, "xruInit: Failed to create OpenXR instance.\n");
 		return false;
 	}
 
@@ -402,17 +443,18 @@ bool VR_InitSystem(XruContext_t *xrContext, const XrFormFactor formFactor, XruEx
 	DBGPRINTF(DEBUG_INFO, "VR: Successfully got system with ID %llu for HMD form factor.\n", xrContext->systemID);
 
 	// Get required Vulkan extensions
-	// NOTE: This must be freed when done.
+	// NOTE: These strings must be freed when done.
 	if(requiredExtensions)
 	{
 		// Vulkan instance extensions
-		if(!xruCheck(xrContext->instance, xrGetVulkanInstanceExtensionsKHR(xrContext->instance, xrContext->systemID, 0, &requiredExtensions->instanceExtensionCount, XR_NULL_HANDLE)))
+		uint32_t instanceExtensionSize=0;
+		if(!xruCheck(xrContext->instance, xrGetVulkanInstanceExtensionsKHR(xrContext->instance, xrContext->systemID, 0, &instanceExtensionSize, XR_NULL_HANDLE)))
 		{
 			DBGPRINTF(DEBUG_ERROR, "VR: Failed to get Vulkan Device Extensions.\n");
 			return false;
 		}
 
-		requiredExtensions->instanceExtensions=(char *)Zone_Malloc(zone, requiredExtensions->instanceExtensionCount);
+		requiredExtensions->instanceExtensions=(char *)Zone_Malloc(zone, instanceExtensionSize);
 
 		if(requiredExtensions->instanceExtensions==NULL)
 		{
@@ -420,7 +462,7 @@ bool VR_InitSystem(XruContext_t *xrContext, const XrFormFactor formFactor, XruEx
 			return false;
 		}
 
-		if(!xruCheck(xrContext->instance, xrGetVulkanInstanceExtensionsKHR(xrContext->instance, xrContext->systemID, requiredExtensions->instanceExtensionCount, &requiredExtensions->instanceExtensionCount, requiredExtensions->instanceExtensions)))
+		if(!xruCheck(xrContext->instance, xrGetVulkanInstanceExtensionsKHR(xrContext->instance, xrContext->systemID, instanceExtensionSize, &instanceExtensionSize, requiredExtensions->instanceExtensions)))
 		{
 			DBGPRINTF(DEBUG_ERROR, "VR: Failed to get Vulkan Device Extensions.\n");
 			return false;
@@ -429,27 +471,28 @@ bool VR_InitSystem(XruContext_t *xrContext, const XrFormFactor formFactor, XruEx
 		DBGPRINTF(DEBUG_INFO, "VR: Instance extension requirements: %s\n", requiredExtensions->instanceExtensions);
 
 		// Vulkan device extensions
-		if(!xruCheck(xrContext->instance, xrGetVulkanDeviceExtensionsKHR(xrContext->instance, xrContext->systemID, 0, &requiredExtensions->contextExtensionCount, XR_NULL_HANDLE)))
+		uint32_t deviceExtensionSize=0;
+		if(!xruCheck(xrContext->instance, xrGetVulkanDeviceExtensionsKHR(xrContext->instance, xrContext->systemID, 0, &deviceExtensionSize, XR_NULL_HANDLE)))
 		{
 			DBGPRINTF(DEBUG_ERROR, "VR: Failed to get Vulkan Device Extensions.\n");
 			return false;
 		}
 
-		requiredExtensions->contextExtensions=(char *)Zone_Malloc(zone, requiredExtensions->contextExtensionCount);
+		requiredExtensions->deviceExtensions=(char *)Zone_Malloc(zone, deviceExtensionSize);
 
-		if(requiredExtensions->contextExtensions==NULL)
+		if(requiredExtensions->deviceExtensions==NULL)
 		{
 			DBGPRINTF(DEBUG_ERROR, "VR: Failed to allocate memory for extension names.\n");
 			return false;
 		}
 
-		if(!xruCheck(xrContext->instance, xrGetVulkanDeviceExtensionsKHR(xrContext->instance, xrContext->systemID, requiredExtensions->contextExtensionCount, &requiredExtensions->contextExtensionCount, requiredExtensions->contextExtensions)))
+		if(!xruCheck(xrContext->instance, xrGetVulkanDeviceExtensionsKHR(xrContext->instance, xrContext->systemID, deviceExtensionSize, &deviceExtensionSize, requiredExtensions->deviceExtensions)))
 		{
 			DBGPRINTF(DEBUG_ERROR, "VR: Failed to get Vulkan Device Extensions.\n");
 			return false;
 		}
 
-		DBGPRINTF(DEBUG_INFO, "VR: Extension requirements: %s\n", requiredExtensions->contextExtensions);
+		DBGPRINTF(DEBUG_INFO, "VR: Extension requirements: %s\n", requiredExtensions->deviceExtensions);
 	}
 
 	XrSystemProperties systemProps={ .type=XR_TYPE_SYSTEM_PROPERTIES };
@@ -470,7 +513,7 @@ bool VR_InitSystem(XruContext_t *xrContext, const XrFormFactor formFactor, XruEx
 	return true;
 }
 
-static bool VR_GetViewConfig(XruContext_t *xrContext, const XrViewConfigurationType viewType)
+static bool xruGetViewConfig(XruContext_t *xrContext, const XrViewConfigurationType viewType)
 {
 	if(xrEnumerateViewConfigurationViews(xrContext->instance, xrContext->systemID, viewType, 0, &xrContext->viewCount, NULL)!=XR_SUCCESS)
 	{
@@ -515,7 +558,7 @@ static bool VR_GetViewConfig(XruContext_t *xrContext, const XrViewConfigurationT
 	return true;
 }
 
-static bool VR_InitSession(XruContext_t *xrContext, VkInstance instance, VkuContext_t *context)
+static bool xruInitSession(XruContext_t *xrContext, VkInstance instance, VkuContext_t *context)
 {
 	XrGraphicsRequirementsVulkanKHR graphicsRequirements={ .type=XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN_KHR };
 
@@ -563,7 +606,7 @@ static bool VR_InitSession(XruContext_t *xrContext, VkInstance instance, VkuCont
 	return true;
 }
 
-static bool VR_InitReferenceSpace(XruContext_t *xrContext, XrReferenceSpaceType spaceType)
+static bool xruInitReferenceSpace(XruContext_t *xrContext, XrReferenceSpaceType spaceType)
 {
 	XrReferenceSpaceCreateInfo refSpaceCreateInfo=
 	{
@@ -584,7 +627,7 @@ static bool VR_InitReferenceSpace(XruContext_t *xrContext, XrReferenceSpaceType 
 	return true;
 }
 
-static bool VR_InitSwapchain(XruContext_t *xrContext, VkuContext_t *context)
+static bool xruInitSwapchain(XruContext_t *xrContext, VkuContext_t *context)
 {
 	uint32_t swapchainFormatCount;
 	if(!xruCheck(xrContext->instance, xrEnumerateSwapchainFormats(xrContext->session, 0, &swapchainFormatCount, NULL)))
@@ -749,7 +792,7 @@ static bool VR_InitSwapchain(XruContext_t *xrContext, VkuContext_t *context)
 	return true;
 }
 
-static XrAction VR_CreateAction(XruContext_t *xrContext, const char *name, XrActionType type, const uint32_t numSubPaths, XrPath *subPaths)
+static XrAction xruCreateAction(XruContext_t *xrContext, const char *name, XrActionType type, const uint32_t numSubPaths, XrPath *subPaths)
 {
 	XrActionCreateInfo actionCreateInfo={ .type=XR_TYPE_ACTION_CREATE_INFO, .actionType=type };
 
@@ -766,7 +809,7 @@ static XrAction VR_CreateAction(XruContext_t *xrContext, const char *name, XrAct
 	return action;
 }
 
-static XrActionSet VR_CreateActionSet(XruContext_t *xrContext, const char *name)
+static XrActionSet xruCreateActionSet(XruContext_t *xrContext, const char *name)
 {
 	XrActionSetCreateInfo actionSetCreateInfo={ .type=XR_TYPE_ACTION_SET_CREATE_INFO, .priority=0 };
 
@@ -780,7 +823,7 @@ static XrActionSet VR_CreateActionSet(XruContext_t *xrContext, const char *name)
 	return actionSet;
 }
 
-static XrSpace VR_CreateActionSpace(XruContext_t *xrContext, XrAction action, uint32_t hand)
+static XrSpace xruCreateActionSpace(XruContext_t *xrContext, XrAction action, uint32_t hand)
 {
 	XrActionSpaceCreateInfo actionSpaceCreateInfo=
 	{
@@ -806,7 +849,7 @@ static XrPath xruGetPath(XrInstance instance, const char *path)
 	return xrPath;
 }
 
-static void VR_SuggestBindings(XruContext_t *xrContext)
+static void xruSuggestBindings(XruContext_t *xrContext)
 {
 	XrActionSuggestedBinding suggestedBindings[]=
 	{
@@ -841,7 +884,7 @@ static void VR_SuggestBindings(XruContext_t *xrContext)
 		DBGPRINTF(DEBUG_ERROR, "VR: Failed to suggest bindings for KHRONOS simple controller.\n");
 }
 
-static void VR_AttachActionSet(XruContext_t *xrContext, XrActionSet actionSet)
+static void xruAttachActionSet(XruContext_t *xrContext, XrActionSet actionSet)
 {
 	XrSessionActionSetsAttachInfo actionSetsAttachInfo=
 	{
@@ -853,7 +896,7 @@ static void VR_AttachActionSet(XruContext_t *xrContext, XrActionSet actionSet)
 		DBGPRINTF(DEBUG_ERROR, "VR: Failed to attach action set.\n");
 }
 
-XrPosef VR_GetActionPose(XruContext_t *xrContext, const XrAction action, const XrSpace actionSpace, uint32_t hand)
+XrPosef xruGetActionPose(XruContext_t *xrContext, const XrAction action, const XrSpace actionSpace, uint32_t hand)
 {
 	const XrPosef defaultPose={ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 0.0f } };
 	XrActionStateGetInfo getInfo=
@@ -889,7 +932,7 @@ XrPosef VR_GetActionPose(XruContext_t *xrContext, const XrAction action, const X
 	return defaultPose;
 }
 
-bool VR_GetActionBoolean(XruContext_t *xrContext, XrAction action, uint32_t hand)
+bool xruGetActionBoolean(XruContext_t *xrContext, XrAction action, uint32_t hand)
 {
 	XrActionStateGetInfo getInfo=
 	{
@@ -908,7 +951,7 @@ bool VR_GetActionBoolean(XruContext_t *xrContext, XrAction action, uint32_t hand
 	return state.currentState;
 }
 
-float VR_GetActionFloat(XruContext_t *xrContext, XrAction action, uint32_t hand)
+float xruGetActionFloat(XruContext_t *xrContext, XrAction action, uint32_t hand)
 {
 	XrActionStateGetInfo getInfo=
 	{
@@ -927,7 +970,7 @@ float VR_GetActionFloat(XruContext_t *xrContext, XrAction action, uint32_t hand)
 	return state.currentState;
 }
 
-vec2 VR_GetActionVec2(XruContext_t *xrContext, XrAction action, uint32_t hand)
+vec2 xruGetActionVec2(XruContext_t *xrContext, XrAction action, uint32_t hand)
 {
 	XrActionStateGetInfo getInfo=
 	{
@@ -946,7 +989,7 @@ vec2 VR_GetActionVec2(XruContext_t *xrContext, XrAction action, uint32_t hand)
 	return Vec2(state.currentState.x, state.currentState.y);
 }
 
-bool VR_Init(XruContext_t *xrContext, VkInstance instance, VkuContext_t *context)
+bool xruInit(XruContext_t *xrContext, VkInstance instance, VkuContext_t *context)
 {
 	xrContext->viewCount=0;
 
@@ -980,46 +1023,46 @@ bool VR_Init(XruContext_t *xrContext, VkInstance instance, VkuContext_t *context
 	xrContext->leftHandSpace=XR_NULL_HANDLE;
 	xrContext->rightHandSpace=XR_NULL_HANDLE;
 
-	if(!VR_GetViewConfig(xrContext, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO))
+	if(!xruGetViewConfig(xrContext, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO))
 	{
-		DBGPRINTF(DEBUG_ERROR, "VR: VR_GetViewConfig failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "VR: xruGetViewConfig failed.\n");
 		return false;
 	}
 
-	if(!VR_InitSession(xrContext, instance, context))
+	if(!xruInitSession(xrContext, instance, context))
 	{
-		DBGPRINTF(DEBUG_ERROR, "VR: VR_InitSession failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "VR: xruInitSession failed.\n");
 		return false;
 	}
 
-	if(!VR_InitReferenceSpace(xrContext, XR_REFERENCE_SPACE_TYPE_LOCAL))
+	if(!xruInitReferenceSpace(xrContext, XR_REFERENCE_SPACE_TYPE_LOCAL))
 	{
-		DBGPRINTF(DEBUG_ERROR, "VR: VR_InitReferenceSpace failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "VR: xruInitReferenceSpace failed.\n");
 		return false;
 	}
 
-	if(!VR_InitSwapchain(xrContext, context))
+	if(!xruInitSwapchain(xrContext, context))
 	{
-		DBGPRINTF(DEBUG_ERROR, "VR: VR_InitSwapchain failed.\n");
+		DBGPRINTF(DEBUG_ERROR, "VR: xruInitSwapchain failed.\n");
 		return false;
 	}
 
-	xrContext->actionSet=VR_CreateActionSet(xrContext, "vkengine_actions");
+	xrContext->actionSet=xruCreateActionSet(xrContext, "vkengine_actions");
 
 	xrContext->handPath[0]=xruGetPath(xrContext->instance, "/user/hand/left");
 	xrContext->handPath[1]=xruGetPath(xrContext->instance, "/user/hand/right");
 
-	xrContext->handPose=VR_CreateAction(xrContext, "pose", XR_ACTION_TYPE_POSE_INPUT, 2, xrContext->handPath);
-	xrContext->leftHandSpace=VR_CreateActionSpace(xrContext, xrContext->handPose, 0);
-	xrContext->rightHandSpace=VR_CreateActionSpace(xrContext, xrContext->handPose, 1);
+	xrContext->handPose=xruCreateAction(xrContext, "pose", XR_ACTION_TYPE_POSE_INPUT, 2, xrContext->handPath);
+	xrContext->leftHandSpace=xruCreateActionSpace(xrContext, xrContext->handPose, 0);
+	xrContext->rightHandSpace=xruCreateActionSpace(xrContext, xrContext->handPose, 1);
 
-	xrContext->handTrigger=VR_CreateAction(xrContext, "trigger", XR_ACTION_TYPE_FLOAT_INPUT, 2, xrContext->handPath);
-	xrContext->handGrip=VR_CreateAction(xrContext, "squeeze", XR_ACTION_TYPE_FLOAT_INPUT, 2, xrContext->handPath);
-	xrContext->handThumbstick=VR_CreateAction(xrContext, "thumbstick", XR_ACTION_TYPE_VECTOR2F_INPUT, 2, xrContext->handPath);
+	xrContext->handTrigger=xruCreateAction(xrContext, "trigger", XR_ACTION_TYPE_FLOAT_INPUT, 2, xrContext->handPath);
+	xrContext->handGrip=xruCreateAction(xrContext, "squeeze", XR_ACTION_TYPE_FLOAT_INPUT, 2, xrContext->handPath);
+	xrContext->handThumbstick=xruCreateAction(xrContext, "thumbstick", XR_ACTION_TYPE_VECTOR2F_INPUT, 2, xrContext->handPath);
 
-	VR_SuggestBindings(xrContext);
+	xruSuggestBindings(xrContext);
 
-	VR_AttachActionSet(xrContext, xrContext->actionSet);
+	xruAttachActionSet(xrContext, xrContext->actionSet);
 
 	vkCreateRenderPass(context->device, &(VkRenderPassCreateInfo)
 	{
@@ -1081,7 +1124,7 @@ bool VR_Init(XruContext_t *xrContext, VkInstance instance, VkuContext_t *context
 	return true;
 }
 
-void VR_Destroy(XruContext_t *xrContext)
+void xruDestroy(XruContext_t *xrContext)
 {
 	if(xrContext->session)
 	{
