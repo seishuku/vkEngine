@@ -15,20 +15,25 @@
 #include "../console/console.h"
 #include "../assetmanager.h"
 #include "../asteroids.h"
+#include "../enemy.h"
+#include "../entitylist.h"
 #include "event.h"
 
 void GenerateWorld(void);
 void ResetPhysicsCubes(void);
 
 extern Camera_t camera;
+extern uint32_t enemyView;
 
 extern ParticleSystem_t particleSystem;
+
+extern EntityList_t entityList;
 
 #define MAX_EMITTERS 1000
 typedef struct
 {
 	RigidBody_t body;
-	uint32_t ID;
+	uint32_t emitterID, entityID;
 	float life;
 } PhyParticleEmitter_t;
 
@@ -80,14 +85,16 @@ void FireParticleEmitter(vec3 position, vec3 direction)
 		// When found, assign the new emitter ID to that particle, set position/direction/life and break out
 		if(emitters[i].life<0.0f)
 		{
-			emitters[i].ID=ID;
+			emitters[i].emitterID=ID;
 			emitters[i].body.position=position;
 
 			Vec3_Normalize(&direction);
 
 			emitters[i].body.velocity=Vec3_Muls(direction, 100.0f);
-
 			emitters[i].life=15.0f;
+
+			// Add particle emitter to physics list
+			emitters[i].entityID=EntityList_Add(&entityList, &emitters[i].body, true, 0, 0, 0, ENTITYOBJECTTYPE_PROJECTILE, NULL);
 
 			break;
 		}
@@ -230,6 +237,8 @@ bool Event_Trigger(EventID ID, void *arg)
 					break;
 				case KB_LCTRL:
 				case KB_RCTRL:	isControlPressed=true;	break;
+				case KB_PERIOD: enemyView=min(NUM_ENEMY-1, enemyView+1); break;
+				case KB_COMMA: enemyView=max(-1, enemyView-1); break;
 				default:		break;
 			}
 

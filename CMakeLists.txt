@@ -87,10 +87,6 @@ set(PROJECT_SOURCES
 	"loadingscreen.c"
 )
 
-# change this for how many asteroids you want
-#add_definitions("-DNUM_ASTEROIDS=40000")
-add_definitions("-DNUM_CUBE=30")
-
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
 	add_definitions(-D_DEBUG)
 endif()

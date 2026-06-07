@@ -3,9 +3,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <threads.h>
 #include "math/math.h"
 #include "physics/physics.h"
 #include "vulkan/vulkan.h"
+#include "utils/id.h"
 
 #define MAX_ENTITY 50000
 
@@ -20,6 +22,8 @@ typedef enum
 
 typedef struct
 {
+	uint32_t ID;
+
 	aabb bounds;
 	RigidBody_t *body;
 	EntityObjectType_e objectType;
@@ -28,6 +32,8 @@ typedef struct
 	uint32_t modelID, textureIDs[2];
 
 	EntityTransformFunc transformFunc;
+
+	bool remove;
 } Entity_t;
 
 typedef struct
@@ -58,6 +64,8 @@ typedef struct
 	uint32_t culledBatchCount;
 	uint32_t culledBatchCapacity;
 
+	ID_t IDPool;
+
 	bool dirty;
 
 	struct
@@ -73,11 +81,12 @@ typedef struct
 bool EntityList_Init(EntityList_t *list);
 void EntityList_Destroy(EntityList_t *list);
 
-bool EntityList_Add(EntityList_t *list, RigidBody_t *body, bool noRender, uint32_t modelID, uint32_t tex0, uint32_t tex1, EntityObjectType_e objectType, EntityTransformFunc transformFunc);
+uint32_t EntityList_Add(EntityList_t *list, RigidBody_t *body, bool noRender, uint32_t modelID, uint32_t tex0, uint32_t tex1, EntityObjectType_e objectType, EntityTransformFunc transformFunc);
+bool EntityList_Remove(EntityList_t *list, uint32_t ID);
 void EntityList_Clear(EntityList_t *list);
 
 void EntityList_RecalculateBounds(EntityList_t *list);
-void EntityList_RebuildBatches(EntityList_t *list);
+void EntityList_Rebuild(EntityList_t *list);
 void EntityList_UpdateInstances(EntityList_t *list, uint32_t frameIndex);
 void EntityList_FrustumCull(EntityList_t *list, const frustum frustum);
 

@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #ifndef ID_MAX
-#define ID_MAX 8192
+#define ID_MAX 10240
 #endif
 
 #ifndef ID_BITS

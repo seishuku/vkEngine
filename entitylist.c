@@ -51,6 +51,8 @@ bool EntityList_Init(EntityList_t *list)
 
 	list->dirty=false;
 
+	ID_Init(list->IDPool);
+
 	return true;
 
 fail:
@@ -74,15 +76,16 @@ void EntityList_Destroy(EntityList_t *list)
 	memset(list, 0, sizeof(*list));
 }
 
-bool EntityList_Add(EntityList_t *list, RigidBody_t *body, bool noRender, uint32_t modelID, uint32_t tex0, uint32_t tex1, EntityObjectType_e objectType, EntityTransformFunc transformFunc)
+uint32_t EntityList_Add(EntityList_t *list, RigidBody_t *body, bool noRender, uint32_t modelID, uint32_t tex0, uint32_t tex1, EntityObjectType_e objectType, EntityTransformFunc transformFunc)
 {
 	if(list->entityCount>=MAX_ENTITY)
 	{
 		DBGPRINTF(DEBUG_ERROR, "Ran out of entity space.\n");
-		return false;
+		return UINT32_MAX;
 	}
 
 	Entity_t entity={
+		.ID=ID_Generate(list->IDPool),
 		.body=body,
 		.objectType=objectType,
 		.noRender=noRender,
@@ -137,7 +140,27 @@ bool EntityList_Add(EntityList_t *list, RigidBody_t *body, bool noRender, uint32
 
 	list->dirty=true;
 
-	return true;
+	return entity.ID;
+}
+
+bool EntityList_Remove(EntityList_t *list, uint32_t ID)
+{
+	for(uint32_t i=0;i<list->entityCount;i++)
+	{
+		Entity_t *entity=&list->entities[i];
+
+		if(entity->ID!=ID)
+			continue;
+
+		// Flag entity to be removed and signal for a rebuild
+		entity->remove=true;
+		list->dirty=true;
+
+		return true;
+	}
+
+	DBGPRINTF(DEBUG_ERROR, "Entity not found.\n");
+	return false;
 }
 
 void EntityList_Clear(EntityList_t *list)
@@ -196,10 +219,26 @@ void EntityList_RecalculateBounds(EntityList_t *list)
 	}
 }
 
-void EntityList_RebuildBatches(EntityList_t *list)
+void EntityList_Rebuild(EntityList_t *list)
 {
 	if(!list->dirty)
 		return;
+
+	uint32_t i=0;
+	while(i<list->entityCount)
+	{
+		Entity_t *entity=&list->entities[i];
+
+		if(entity->remove)
+		{
+			ID_Remove(list->IDPool, entity->ID);
+
+			list->entities[i]=list->entities[--list->entityCount];
+			memset(&list->entities[list->entityCount], 0, sizeof(Entity_t));
+		}
+		else
+			i++;
+	}
 
 	list->sortedCount=0;
 

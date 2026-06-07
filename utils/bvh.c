@@ -207,3 +207,61 @@ void BVH_Test(BVH_t *bvh, EntityList_t *entityList, BVHLeafCallback_t callback)
 		}
 	}
 }
+
+#define QUERY_STACK_MAX 64
+static int32_t BVHQueryStackObj[QUERY_STACK_MAX];
+
+static inline bool SphereAABBOverlap(vec3 point, float radius, aabb bounds)
+{
+	float distSq=0.0f;
+
+	for(uint32_t i=0;i<3;i++)
+	{
+		float v=point.v[i];
+
+		if(v<bounds.min.v[i])
+		{
+			float d=bounds.min.v[i]-v;
+			distSq+=d*d;
+		}
+		else if(v>bounds.max.v[i])
+		{
+			float d=v-bounds.max.v[i];
+			distSq+=d*d;
+		}
+	}
+
+	return distSq<=(radius*radius);
+}
+
+void BVH_Query(BVH_t *bvh, EntityList_t *entityList, vec3 point, float radius, BVHQueryCallback_t callback, void *userdata)
+{
+	if(bvh->numNodes == 0 || entityList->entityCount == 0)
+		return;
+
+	int32_t stackTop = 0;
+	BVHQueryStackObj[stackTop++] = 0; // Start at root
+
+	while(stackTop > 0)
+	{
+		int32_t nodeIndex = BVHQueryStackObj[--stackTop];
+		const BVHNode_t *node = &bvh->nodes[nodeIndex];
+
+		// Cull this node if query sphere doesn't overlap its bounds
+		if(!SphereAABBOverlap(point, radius, node->bounds))
+			continue;
+
+		if(node->left == -1)
+		{
+			// Leaf node - entity overlaps query sphere, fire callback
+			callback(&entityList->entities[node->objectIndex], userdata);
+		}
+		else
+		{
+			// Internal node - descend into children
+			assert(stackTop + 2 <= QUERY_STACK_MAX && "BVH query stack overflow");
+			BVHQueryStackObj[stackTop++] = node->left;
+			BVHQueryStackObj[stackTop++] = node->right;
+		}
+	}
+}

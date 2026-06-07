@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "../math/math.h"
 #include "../physics/physics.h"
 
@@ -16,7 +17,7 @@ typedef struct Camera_s
 	float trackSpeed;
 	vec3 targetPosition;
 
-	// Orientation vectors, updated by body orientation
+	// Orientation vectors, updated by body orientation (read only)
 	union
 	{
 		struct

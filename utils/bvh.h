@@ -20,8 +20,10 @@ typedef struct
 } BVH_t;
 
 typedef void (*BVHLeafCallback_t)(Entity_t *a, Entity_t *b);
+typedef void (*BVHQueryCallback_t)(Entity_t *entity, void *userdata);
 
 void BVH_Build(BVH_t *bvh, EntityList_t *entityList);
 void BVH_Test(BVH_t *bvh, EntityList_t *entityList, BVHLeafCallback_t callback);
+void BVH_Query(BVH_t *bvh, EntityList_t *entityList, vec3 point, float radius, BVHQueryCallback_t callback, void *userdata);
 
 #endif

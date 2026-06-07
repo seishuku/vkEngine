@@ -329,6 +329,11 @@ void ParticleSystem_Step(ParticleSystem_t *system, float dt)
 
 			emitter->emissionTime+=dt;
 
+			// Velocity decay needs too match physics system's, otherwise it looks weird.
+			const float lambda=0.1f;
+			const float decay=expf(-lambda*dt);
+			emitter->velocity=Vec3_Muls(emitter->velocity, decay);
+
 			while(emitter->emissionTime>emitter->emissionInterval)
 			{
 				emitter->emissionTime-=emitter->emissionInterval;
