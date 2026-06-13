@@ -390,8 +390,11 @@ void GenerateWorld(void)
 
 	fighterTexture[NUM_ENEMY]=RandRange(0, 7);
 
+	if(!ClientNetwork_IsConnected())
+	{
 		ResetPhysicsCubes();
 		ResetAsteroids();
+	}
 
 	playerHealth=100.0f;
 
@@ -400,7 +403,7 @@ void GenerateWorld(void)
 
 	EntityList_Clear(&entityList);
 
-	if(clientSocket==-1)
+	if(!ClientNetwork_IsConnected())
 	{
 		// Set up entities to be processed
 		numAsteroids=1000;
@@ -414,22 +417,13 @@ void GenerateWorld(void)
 	for(uint32_t i=0;i<NUM_ENEMY;i++)
 		EntityList_Add(&entityList, &enemy[i].body, false, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[i]+0), TEXTURE_FIGHTER1+(2*fighterTexture[i]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 
-#if 0
 	if(!ClientNetwork_IsConnected())
 	{
-		for(uint32_t i=0;i<netPlayerCount;i++)
-		{
-			// Don't add our own net camera
-			if(i!=localClientID)
-				EntityList_Add(&entityList, &netPlayers[i].body, false, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[0]+0), TEXTURE_FIGHTER1+(2*fighterTexture[0]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
-		}
+		for(uint32_t i=0;i<NUM_CUBE;i++)
+			EntityList_Add(&entityList, &cubeBody[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
+
+		EntityList_Add(&entityList, &platformBody, false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
 	}
-#endif
-
-	for(uint32_t i=0;i<NUM_CUBE;i++)
-		EntityList_Add(&entityList, &cubeBody[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
-
-	EntityList_Add(&entityList, &platformBody, false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
 }
 //////
 
@@ -931,6 +925,9 @@ void Thread_Physics(void *arg)
 	const uint32_t index=*((uint32_t *)arg);
 	double startTime=GetClock();
 
+	// Server runs physics, if connected
+	if(!ClientNetwork_IsConnected())
+	{
 		if(!pausePhysics)
 		{
 			// Run particle system simlation
@@ -972,7 +969,7 @@ void Thread_Physics(void *arg)
 			for(uint32_t i=0;i<entityList.entityCount;i++)
 			{
 				PhysicsIntegrate(entityList.entities[i].body, fTimeStep);
-	#if 1
+#if 1
 				// Fire "laser beam"
 				if(isControlPressed)
 				{
@@ -1018,7 +1015,7 @@ void Thread_Physics(void *arg)
 						}
 					}
 				}
-	#endif
+#endif
 			}
 
 			// Run broadphase collision with BVH
@@ -1145,11 +1142,12 @@ void Thread_Physics(void *arg)
 				for(uint32_t j=0;j<manifold->contactCount;j++)
 					PhysicsPositionCorrection(manifold->a, manifold->b, manifold->contacts[j]);
 			}
+		}
 	}
 
 #if 1
 	// Update enemy player
-	if(clientSocket==-1)
+	if(!ClientNetwork_IsConnected())
 	{
 		for(uint32_t i=0;i<NUM_ENEMY;i++)
 			UpdateEnemy(&enemyAI[i], &entityList, camera);
@@ -1157,10 +1155,8 @@ void Thread_Physics(void *arg)
 	//////
 #endif
 
-	ClientNetwork_SendStatus();
-
 	// Always run physics on the camera's body
-	if(pausePhysics)
+	if(pausePhysics||ClientNetwork_IsConnected())
 		PhysicsIntegrate(&camera.body, fTimeStep);
 
 	// Update camera and modelview matrix
@@ -1217,6 +1213,8 @@ static void PrintEnemyStats(const Enemy_t *enemy, float x, float y)
 void Render(void)
 {
 	static uint32_t index=0, imageIndex[3]={ 0, 0, 0 };
+
+	ClientNetwork_Update(GetClock(), fTimeStep);
 
 	DBGPRINTF(DEBUG_INFO, "Number of entities: %d            \r", entityList.entityCount);
 
@@ -1540,8 +1538,10 @@ void Console_CmdConnect(Console_t *console, const char *param)
 			}
 		}
 
-		if(!ClientNetwork_Init(NETWORK_ADDRESS(a, b, c, d)))
+		if(!ClientNetwork_Init(NETWORK_ADDRESS(a, b, c, d), 4545, &camera))
 			ConsolePrint(console, "Connect failed.");
+		else
+			GenerateWorld();
 	}
 }
 

@@ -1,258 +1,478 @@
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
-#include "../system/system.h"
-#include "../system/threads.h"
-#include "../utils/serial.h"
-#include "../math/math.h"
-#include "../physics/physics.h"
 #include "../camera/camera.h"
+#include "../entitylist.h"
+#include "../math/math.h"
+#include "../network/network.h"
+#include "../system/system.h"
+#include "../utils/serial.h"
+#include "../utils/id.h"
 #include "../asteroids.h"
-#include "network.h"
+#include "../assetmanager.h"
 #include "client_network.h"
+#include "net_protocol.h"
 
-extern Camera_t camera;
+// External symbols
+extern EntityList_t entityList;
+extern matrix FighterTransform(const RigidBody_t *body);
 
-// Network stuff
-static const uint32_t CONNECT_PACKETMAGIC   ='C'|'o'<<8|'n'<<16|'n'<<24; // "Conn"
-static const uint32_t DISCONNECT_PACKETMAGIC='D'|'i'<<8|'s'<<16|'C'<<24; // "DisC"
-static const uint32_t STATUS_PACKETMAGIC    ='S'|'t'<<8|'a'<<16|'t'<<24; // "Stat"
-static const uint32_t FIELD_PACKETMAGIC     ='F'|'e'<<8|'l'<<16|'d'<<24; // "Feld"
+// Public state
+NetPlayerState_t    netPlayers[NET_MAX_CLIENTS];
+uint32_t            netPlayerCount=0;
+uint32_t            localClientID=NET_INVALID_ID;
 
-#define MAX_CLIENTS 16
+// Internal state
+static Camera_t     remotePlayers[NET_MAX_CLIENTS];
+static bool         remotePlayerActive[NET_MAX_CLIENTS];
 
-// PacketMagic determines packet type:
-//
-// Connect:
-//		Client only needs to send connect magic.
-//		Server responds back with connect magic and current random seed and client ID.
-// Disconnect:
-//		Client sends disconnect magic and client ID.
-//		Server closes socket and removes client from list.
-// Status:
-//		Client sends status magic and current camera data, also serves as a keep-alive to the server.
-//		Server sends status magic and *all* current connected client cameras.
-// Field:
-//		Server sends current play field (as it sees it) to all connected clients at a regular interval.
-//
-//
-// THIS IS ALL VERY INSECURE AND DANGERUS
+static Socket_t     clientSocket=-1;
+static uint32_t     serverAddress=0;
+static uint16_t     serverPort=0;
+static Camera_t     *localCamera=NULL;
+static bool         connected=false;
 
-uint32_t serverAddress;
-const uint16_t serverPort=4545;
+static uint8_t      sendBuffer[65536];
+static uint8_t      recvBuffer[65536];
 
-uint32_t clientID=0;
+static uint32_t     lastServerTick=0;
+static uint32_t     lastAckedEventSeq=0;
+static uint32_t     pendingAckSeq=0;
+static bool         hasPendingAck=false;
 
-Socket_t clientSocket=-1;
+static double       lastStatusSend=0.0;
 
-uint32_t connectedClients=0;
-Camera_t netCameras[MAX_CLIENTS];
-
-uint32_t currentSeed=0;
-
-static ThreadWorker_t threadNetUpdate;
-static bool netUpdateRun=true;
-static uint8_t netBuffer[65536]={ 0 };
-static uint8_t statusBuffer[1024]={ 0 };
-
-static void NetUpdate(void *arg)
+static Entity_t *FindEntityByID(uint32_t id)
 {
-	memset(netCameras, 0, sizeof(Camera_t)*MAX_CLIENTS);
+    for(uint32_t i=0;i<entityList.entityCount;i++)
+    {
+        if(entityList.entities[i].ID==id)
+            return &entityList.entities[i];
+    }
 
-	if(clientSocket==-1)
-	{
-		netUpdateRun=false;
-		return;
-	}
-
-	while(netUpdateRun)
-	{
-		uint8_t *pBuffer=NULL;
-		uint32_t address=0;
-		uint16_t port=0;
-
-		memset(netBuffer, 0, sizeof(netBuffer));
-		pBuffer=netBuffer;
-
-		int32_t bytesRec=Network_SocketReceive(clientSocket, netBuffer, sizeof(netBuffer), &address, &port);
-
-		if(bytesRec>0)
-		{
-			uint32_t magic=Deserialize_uint32(&pBuffer);
-
-			if(magic==STATUS_PACKETMAGIC)
-			{
-				connectedClients=Deserialize_uint32(&pBuffer);
-
-				if(connectedClients>MAX_CLIENTS)
-				{
-					DBGPRINTF(DEBUG_ERROR, "Mangled status packet: connected clients field > max clients (got %d, max %d).\n", connectedClients, MAX_CLIENTS);
-					goto error;
-				}
-
-				for(uint32_t i=0;i<connectedClients;i++)
-				{
-					uint32_t clientID=Deserialize_uint32(&pBuffer);
-
-					if(clientID>MAX_CLIENTS)
-					{
-						DBGPRINTF(DEBUG_ERROR, "Mangled status packet: client ID field > MAX_CLIENTS (got %d, max %d).\n", clientID, MAX_CLIENTS);
-						goto error;
-					}
-
-					CameraInit(&netCameras[clientID], Vec3b(0.0f), Vec3b(0.0f), Vec3b(0.0f));
-
-					netCameras[clientID].body.position=Deserialize_vec3(&pBuffer);
-					netCameras[clientID].body.velocity=Deserialize_vec3(&pBuffer);
-					netCameras[clientID].body.orientation=Deserialize_vec4(&pBuffer);
-
-					//DBGPRINTF(DEBUG_INFO, "\033[%d;0H\033[KID %d Pos: %0.1f %0.1f %0.1f", clientID+1, clientID, NetCameras[clientID].position.x, NetCameras[clientID].position.y, NetCameras[clientID].position.z);
-				}
-			}
-			else if(magic==FIELD_PACKETMAGIC)
-			{
-				uint32_t asteroidCount=Deserialize_uint32(&pBuffer);
-
-				if(asteroidCount>numAsteroids)
-				{
-					DBGPRINTF(DEBUG_ERROR, "Mangled field packet: asteroid count field > NUM_ASTEROIDS (got %d, max %d).\n", asteroidCount, numAsteroids);
-					goto error;
-				}
-
-				for(uint32_t i=0;i<asteroidCount;i++)
-				{
-					asteroids[i].position=Deserialize_vec3(&pBuffer);
-					asteroids[i].velocity=Deserialize_vec3(&pBuffer);
-					asteroids[i].orientation=Deserialize_vec4(&pBuffer);
-					asteroids[i].radius=Deserialize_float(&pBuffer);
-				}
-			}
-			else if(magic==DISCONNECT_PACKETMAGIC)
-				ClientNetwork_Destroy();
-		}
-
-error:
-		continue;
-	}
+    return NULL;
 }
 
-bool ClientNetwork_Init(uint32_t address)
+static void SpawnEntity(uint32_t serverID, EntityObjectType_e objectType, uint32_t extra, vec3 position, vec3 velocity, vec4 orientation, float radius)
 {
-	// Initialize the network API (mainly for winsock)
-	Network_Init();
+    switch(objectType)
+    {
+        case ENTITYOBJECTTYPE_FIELD:
+        {
+            AddAsteroid(position, velocity, radius, extra);
 
-	// Create a new socket
-	clientSocket=Network_CreateSocket();
+            // Fix up ID to match server
+            Entity_t *entity=&entityList.entities[entityList.entityCount-1];
+            ID_Remove(entityList.IDPool, entity->ID);
+            entity->ID=serverID;
+            break;
+        }
 
-	if(clientSocket==-1)
-		return false;
+        case ENTITYOBJECTTYPE_PLAYER:
+        {
+            // extra carries clientID for remote players
+            uint32_t clientID=extra;
 
-	serverAddress=address;
+            // Skip local player
+            if(clientID==localClientID)
+                break;
 
-	// Send connect magic to initiate connection
-	uint32_t magic=CONNECT_PACKETMAGIC;
-	if(!Network_SocketSend(clientSocket, (uint8_t *)&magic, sizeof(uint32_t), serverAddress, serverPort))
-		return false;
+            if(clientID>=NET_MAX_CLIENTS)
+                break;
 
-	double timeout=GetClock()+5.0; // Current time +5 seconds
-	bool response=false;
+            CameraInit(&remotePlayers[clientID], position, Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, -1.0f));
 
-	while(!response)
-	{
-		uint8_t *pBuffer=NULL;
-		uint32_t address=0;
-		uint16_t port=0;
+            remotePlayers[clientID].body.orientation=orientation;
+            remotePlayerActive[clientID]=true;
 
-		memset(&statusBuffer, 0, sizeof(statusBuffer));
-		pBuffer=statusBuffer;
+            uint32_t id=EntityList_Add(&entityList, &remotePlayers[clientID].body, false, MODEL_FIGHTER, TEXTURE_FIGHTER1, TEXTURE_FIGHTER1_NORMAL, ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 
-		int32_t bytesRec=Network_SocketReceive(clientSocket, statusBuffer, sizeof(statusBuffer), &address, &port);
+            // Fix up ID to match server
+            Entity_t *entity=&entityList.entities[entityList.entityCount-1];
+            ID_Remove(entityList.IDPool, entity->ID);
+            entity->ID=serverID;
+            break;
+        }
 
-		if(bytesRec>0)
-		{
-			uint32_t magic=Deserialize_uint32(&pBuffer);
+        case ENTITYOBJECTTYPE_PROJECTILE:
+            // TODO
+            break;
+    }
+}
 
-			if(magic==CONNECT_PACKETMAGIC)
-			{
-				clientID=Deserialize_uint32(&pBuffer);
+// Packet handlers
+static void HandleUpdate(uint8_t **pBuffer, float dt)
+{
+    uint32_t tick=Deserialize_uint32(pBuffer);
 
-				if(clientID>MAX_CLIENTS)
-				{
-					DBGPRINTF(DEBUG_ERROR, "Mangled connect packet: client ID field > max clients (got %d, max %d).\n", clientID, MAX_CLIENTS);
-					Network_SocketClose(clientSocket);
+    // Drop stale packets
+    if(tick<lastServerTick)
+        return;
 
-					return false;
-				}
+    lastServerTick=tick;
 
-				currentSeed=Deserialize_uint32(&pBuffer);
-				RandomSeed(currentSeed);
+    uint32_t count=Deserialize_uint32(pBuffer);
 
-				response=true;
+    for(uint32_t i=0;i<count;i++)
+    {
+        NetEntityUpdate_t u;
+        NetEntityUpdate_Deserialize(pBuffer, &u);
 
-				DBGPRINTF(DEBUG_INFO, "Response from server - ID: %d Seed: %d Address: 0x%X Port: %d\n",
-						  clientID, currentSeed, address, port);
-			}
-		}
+        Entity_t *entity=FindEntityByID(u.id);
 
-		if(GetClock()>timeout)
-		{
-			DBGPRINTF(DEBUG_WARNING, "Connection timed out...\n");
+        if(!entity||!entity->body)
+            continue;
 
-			Network_SocketClose(clientSocket);
-			clientSocket=-1;
+        // Skip local player
+        if(entity->objectType==ENTITYOBJECTTYPE_PLAYER&&entity->body==&localCamera->body)
+            continue;
 
-			return false;
-		}
-	}
+		entity->body->position=u.position;
+        entity->body->velocity=u.velocity;
+        entity->body->orientation=u.orientation;
+    }
+}
 
-	Thread_Init(&threadNetUpdate);
-	Thread_Start(&threadNetUpdate);
-	Thread_AddJob(&threadNetUpdate, NetUpdate, NULL);
+static void HandleSnapshot(uint8_t **pBuffer)
+{
+    uint32_t count=Deserialize_uint32(pBuffer);
 
-	return true;
+    for(uint32_t i=0;i<count;i++)
+    {
+        NetSnapshotEntry_t e;
+        NetSnapshotEntry_Deserialize(pBuffer, &e);
+
+        // Skip if already exists
+        if(FindEntityByID(e.id))
+            continue;
+
+        SpawnEntity(e.id, e.objectType, e.variant, e.position, e.velocity, e.orientation, e.radius);
+    }
+}
+
+static void HandleEvent(uint8_t **pBuffer)
+{
+    NetEvent_t ev;
+ 
+    if(!NetEvent_Deserialize(pBuffer, &ev))
+    {
+        DBGPRINTF(DEBUG_ERROR, "ClientNetwork: failed to deserialize event.\n");
+        return;
+    }
+ 
+    if(ev.seq<=lastAckedEventSeq&&lastAckedEventSeq!=0)
+        return;
+ 
+    switch(ev.type)
+    {
+        case NETEVENT_SPAWN:
+        {
+            if(FindEntityByID(ev.spawn.id))
+                break;
+ 
+            SpawnEntity(ev.spawn.id, ev.spawn.objectType, ev.spawn.variant, ev.spawn.position, ev.spawn.velocity, ev.spawn.orientation, ev.spawn.radius);
+            break;
+        }
+ 
+        case NETEVENT_DESTROY:
+        {
+            Entity_t *entity=FindEntityByID(ev.destroy.id);
+ 
+            if(!entity)
+            {
+                DBGPRINTF(DEBUG_WARNING, "ClientNetwork: DESTROY for unknown entity %d\n", ev.destroy.id);
+                break;
+            }
+ 
+            for(uint32_t i=0;i<NET_MAX_CLIENTS;i++)
+            {
+                if(remotePlayerActive[i]&&entity->body==&remotePlayers[i].body)
+                {
+                    remotePlayerActive[i]=false;
+                    break;
+                }
+            }
+ 
+            EntityList_Remove(&entityList, ev.destroy.id);
+            break;
+        }
+ 
+        case NETEVENT_IMPULSE:
+        {
+            localCamera->body.velocity=ev.impulse.velocity;
+ 
+            // Correct position if it's too far from the server's position
+            vec3 error=Vec3_Subv(ev.impulse.position, localCamera->body.position);
+			const float posThreshold=5.0f;
+
+			if(Vec3_LengthSq(error)>posThreshold*posThreshold)
+                localCamera->body.position=ev.impulse.position;
+ 
+            break;
+        }
+ 
+        case NETEVENT_SPLIT:
+        {
+            Entity_t *parent=FindEntityByID(ev.split.parentID);
+ 
+            if(!parent)
+            {
+                DBGPRINTF(DEBUG_WARNING, "ClientNetwork: SPLIT for unknown entity %d\n", ev.split.parentID);
+                break;
+            }
+ 
+            // Find asteroid index by body pointer
+            uint32_t asteroidIndex=UINT32_MAX;
+ 
+            for(uint32_t i=0;i<numAsteroids;i++)
+            {
+                if(parent->body==&asteroids[i])
+                {
+                    asteroidIndex=i;
+                    break;
+                }
+            }
+ 
+            if(asteroidIndex==UINT32_MAX)
+            {
+                DBGPRINTF(DEBUG_WARNING, "ClientNetwork: SPLIT body not found for entity %d\n", ev.split.parentID);
+                break;
+            }
+ 
+            // Restore RNG state and replay split deterministically
+            RandomSeed(ev.split.rngSnapshot);
+            SplitAsteroid(asteroidIndex, (ContactPoint_t){ .position=ev.split.contactPoint, .normal=ev.split.contactNormal, }, ev.split.impactSpeed);
+ 
+            break;
+        }
+    }
+ 
+    lastAckedEventSeq=ev.seq;
+    pendingAckSeq=ev.seq;
+    hasPendingAck=true;
+}
+
+static void HandleStatus(uint8_t **pBuffer)
+{
+    netPlayerCount=Deserialize_uint32(pBuffer);
+
+    if(netPlayerCount>NET_MAX_CLIENTS)
+    {
+        DBGPRINTF(DEBUG_ERROR, "ClientNetwork: mangled STATUS - player count %d > max %d\n", netPlayerCount, NET_MAX_CLIENTS);
+        return;
+    }
+
+    for(uint32_t i=0;i<netPlayerCount;i++)
+    {
+        NetPlayerState_t p;
+        NetPlayerState_Deserialize(pBuffer, &p);
+
+        if(p.clientID<NET_MAX_CLIENTS)
+            netPlayers[p.clientID]=p;
+    }
+}
+
+static void HandleDisconnect(void)
+{
+    DBGPRINTF(DEBUG_INFO, "ClientNetwork: server disconnected.\n");
+    ClientNetwork_Destroy();
+}
+
+static void SendStatus(double now)
+{
+    if(now-lastStatusSend<CLIENT_STATUS_RATE)
+        return;
+
+    lastStatusSend=now;
+
+    uint8_t *pBuffer=sendBuffer;
+    uint32_t ackSeq=hasPendingAck?pendingAckSeq:lastAckedEventSeq;
+
+    Serialize_uint32(&pBuffer, NETMAGIC_STATUS);
+    Serialize_uint32(&pBuffer, localClientID);
+    Serialize_uint32(&pBuffer, ackSeq);
+    Serialize_vec3(&pBuffer, localCamera->body.position);
+    Serialize_vec3(&pBuffer, localCamera->body.velocity);
+    Serialize_vec4(&pBuffer, localCamera->body.orientation);
+
+    Network_SocketSend(clientSocket, sendBuffer, (uint32_t)(pBuffer-sendBuffer), serverAddress, serverPort);
+
+    hasPendingAck=false;
+}
+
+// Public API
+bool ClientNetwork_Init(uint32_t address, uint16_t port, Camera_t *camera)
+{
+    Network_Init();
+
+    clientSocket=Network_CreateSocket();
+
+    if(clientSocket==-1)
+        return false;
+
+    serverAddress=address;
+    serverPort=port;
+    localCamera=camera;
+
+    memset(netPlayers, 0, sizeof(netPlayers));
+    memset(remotePlayers, 0, sizeof(remotePlayers));
+    memset(remotePlayerActive, 0, sizeof(remotePlayerActive));
+    netPlayerCount=0;
+    lastServerTick=0;
+    lastAckedEventSeq=0;
+    hasPendingAck=false;
+
+    // Send connect request
+    uint8_t *pBuffer=sendBuffer;
+
+    Serialize_uint32(&pBuffer, NETMAGIC_CONNECT);
+
+    Network_SocketSend(clientSocket, sendBuffer, (uint32_t)(pBuffer-sendBuffer), serverAddress, serverPort);
+
+    // Wait for connect response
+    double timeout=GetClock()+5.0;
+
+    while(GetClock()<timeout)
+    {
+        uint8_t *pRecv=recvBuffer;
+        uint32_t fromAddress=0;
+        uint16_t fromPort=0;
+
+        memset(recvBuffer, 0, sizeof(recvBuffer));
+
+        int32_t bytes=Network_SocketReceive(clientSocket, recvBuffer, sizeof(recvBuffer), &fromAddress, &fromPort);
+
+        if(bytes<=0)
+            continue;
+
+        uint32_t magic=Deserialize_uint32(&pRecv);
+
+        if(magic!=NETMAGIC_CONNECT)
+            continue;
+
+        localClientID=Deserialize_uint32(&pRecv);
+
+        if(localClientID>=NET_MAX_CLIENTS)
+        {
+            DBGPRINTF(DEBUG_ERROR, "ClientNetwork_Init: invalid client ID %d.\n", localClientID);
+            Network_SocketClose(clientSocket);
+            clientSocket=-1;
+            return false;
+        }
+
+        uint32_t seed=Deserialize_uint32(&pRecv);
+        RandomSeed(seed);
+
+        DBGPRINTF(DEBUG_INFO, "ClientNetwork_Init: connected, ID=%d seed=%d\n", localClientID, seed);
+
+        connected=true;
+        return true;
+    }
+
+    DBGPRINTF(DEBUG_WARNING, "ClientNetwork_Init: connection timed out.\n");
+
+    Network_SocketClose(clientSocket);
+    clientSocket=-1;
+
+    return false;
 }
 
 void ClientNetwork_Destroy(void)
 {
-	// Only disconnect if there was already a connected socket
-	if(clientSocket!=-1)
-	{
-		netUpdateRun=false;
-		Thread_Destroy(&threadNetUpdate);
+    if(clientSocket==-1)
+        return;
 
-		// Send disconnect message to server and close/destroy network stuff
-		uint8_t *pBuffer=statusBuffer;
-		size_t iota=0;
-		memset(&statusBuffer, 0, sizeof(statusBuffer));
+    uint8_t *pBuffer=sendBuffer;
 
-		Serialize_uint32(&pBuffer, DISCONNECT_PACKETMAGIC);	iota+=sizeof(uint32_t);
-		Serialize_uint32(&pBuffer, clientID);				iota+=sizeof(uint32_t);
+    Serialize_uint32(&pBuffer, NETMAGIC_DISCONNECT);
+    Serialize_uint32(&pBuffer, localClientID);
 
-		Network_SocketSend(clientSocket, statusBuffer, iota, serverAddress, serverPort);
-		Network_SocketClose(clientSocket);
+    Network_SocketSend(clientSocket, sendBuffer, (uint32_t)(pBuffer-sendBuffer), serverAddress, serverPort);
 
-		clientSocket=-1;
-		connectedClients=0;
-	}
+    // Clean up remote player entities
+    for(uint32_t i=0;i<NET_MAX_CLIENTS;i++)
+    {
+        if(!remotePlayerActive[i])
+            continue;
 
-	Network_Destroy();
+        for(uint32_t j=0;j<entityList.entityCount;j++)
+        {
+            if(entityList.entities[j].body==&remotePlayers[i].body)
+            {
+                EntityList_Remove(&entityList, entityList.entities[j].ID);
+                break;
+            }
+        }
+
+        remotePlayerActive[i]=false;
+    }
+
+    Network_SocketClose(clientSocket);
+    clientSocket=-1;
+    connected=false;
+
+    Network_Destroy();
+
+    localClientID=NET_INVALID_ID;
+    netPlayerCount=0;
 }
 
-// Network status packet
-void ClientNetwork_SendStatus(void)
+void ClientNetwork_Update(double now, float dt)
 {
-	if(clientSocket!=-1)
-	{
-		uint8_t *pBuffer=statusBuffer;
-		size_t iota=0;
-		memset(&netBuffer, 0, sizeof(statusBuffer));
+    if(!ClientNetwork_IsConnected())
+        return;
 
-		Serialize_uint32(&pBuffer, STATUS_PACKETMAGIC);		iota+=sizeof(uint32_t);
-		Serialize_uint32(&pBuffer, clientID);				iota+=sizeof(uint32_t);
-		Serialize_vec3(&pBuffer, camera.body.position);		iota+=sizeof(vec3);
-		Serialize_vec3(&pBuffer, camera.body.velocity);		iota+=sizeof(vec3);
-		Serialize_vec4(&pBuffer, camera.body.orientation);	iota+=sizeof(vec4);
+    while(true)
+    {
+        memset(recvBuffer, 0, sizeof(recvBuffer));
+        uint8_t *pBuffer=recvBuffer;
 
-		Network_SocketSend(clientSocket, statusBuffer, iota, serverAddress, serverPort);
-	}
+        uint32_t fromAddress=0;
+        uint16_t fromPort=0;
+
+        int32_t bytes=Network_SocketReceive(clientSocket, recvBuffer, sizeof(recvBuffer),
+            &fromAddress, &fromPort);
+
+        if(bytes<=0)
+            break;
+
+        if(fromAddress!=serverAddress||fromPort!=serverPort)
+            continue;
+
+        uint32_t magic=Deserialize_uint32(&pBuffer);
+
+        switch(magic)
+        {
+            case NETMAGIC_UPDATE:
+                HandleUpdate(&pBuffer, dt);
+                break;
+
+            case NETMAGIC_SNAPSHOT:
+                HandleSnapshot(&pBuffer);
+                break;
+
+            case NETMAGIC_EVENT:
+                HandleEvent(&pBuffer);
+                break;
+
+            case NETMAGIC_STATUS:
+                HandleStatus(&pBuffer);
+                break;
+
+            case NETMAGIC_DISCONNECT:
+                HandleDisconnect();
+                return;
+
+            default:
+                DBGPRINTF(DEBUG_WARNING, "ClientNetwork_Update: unknown magic 0x%X\n", magic);
+                break;
+        }
+    }
+
+    SendStatus(now);
+}
+
+bool ClientNetwork_IsConnected(void)
+{
+    return clientSocket!=-1&&connected;
 }

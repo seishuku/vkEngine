@@ -16,9 +16,9 @@ This is an on-going learning experience for me and for anyone else that can lear
 
 ## To-do (in no particular order):
 - Improve audio (needs pops/clicks fixed)
-- Improve physics (more collision object support?)
+- Improve physics (needs more refining, it doesn't pass a box stack very well)
 - Streamline post processing effects (it's kind of tacked on right now)
-- Improve networking (this *kind of* works, but physics system is a problem as is security, [server here](https://github.com/seishuku/vkEngineServer))
+- Improve networking (this is better now, [server here](https://github.com/seishuku/vkEngineServer))
 - 3D model animation?
 - ???
 - Profit?
@@ -59,3 +59,11 @@ or use a preset:<br>
 ```cmake -S. --preset "Android Release"```
 
 > <b>Note:</b> Android building has only been tested on Windows. It should work on Linux, I just don't have the Android SDK installed there.
+
+---
+
+## Network:
+To connect to a server, just bring up the console in game with '~'/'`' and type:<br>
+```connect XXX.XXX.XXX.XXX```<br>
+Where XXX.XXX.XXX.XXX is the remote IP.
+> <b>Note:</b> Networking is very much a WIP.

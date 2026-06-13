@@ -3,18 +3,19 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "network.h"
+#include "../entitylist.h"
 #include "../camera/camera.h"
+#include "net_protocol.h"
 
-#define MAX_CLIENTS 16
+#define CLIENT_STATUS_RATE		(1.0/30.0)
 
-extern uint32_t clientID;
-extern Socket_t clientSocket;
-extern uint32_t connectedClients;
-extern Camera_t netCameras[MAX_CLIENTS];
-
-bool ClientNetwork_Init(uint32_t address);
+bool ClientNetwork_Init(uint32_t address, uint16_t port, Camera_t *camera);
 void ClientNetwork_Destroy(void);
-void ClientNetwork_SendStatus(void);
+void ClientNetwork_Update(double now, float dt);
+bool ClientNetwork_IsConnected(void);
+
+extern NetPlayerState_t netPlayers[NET_MAX_CLIENTS];
+extern uint32_t         netPlayerCount;
+extern uint32_t         localClientID;
 
 #endif
