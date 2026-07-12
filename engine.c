@@ -42,6 +42,7 @@
 #include "entitylist.h"
 #include "loadingscreen.h"
 #include "perframe.h"
+#include "precorder.h"
 
 extern bool isDone;
 
@@ -924,6 +925,7 @@ void Thread_Physics(void *arg)
 {
 	const uint32_t index=*((uint32_t *)arg);
 	double startTime=GetClock();
+	static uint32_t frameCounter=0;
 
 	// Server runs physics, if connected
 	if(!ClientNetwork_IsConnected())
@@ -965,9 +967,23 @@ void Thread_Physics(void *arg)
 				}
 			}
 
+			PhysicsRecorder_BeginFrame(frameCounter++);
+
 			// Run through the physics object list, run integration step and check for collisions against all other objects
 			for(uint32_t i=0;i<entityList.entityCount;i++)
 			{
+				RigidBody_t *body=entityList.entities[i].body;
+				vec3 dims;
+
+				if(body->type==RIGIDBODY_SPHERE)
+					dims=Vec3(body->radius, 0.0f, 0.0f);
+				else if(body->type==RIGIDBODY_CAPSULE)
+					dims=Vec3(body->radius, body->size.y, 0.0f); // radius aliases size.x via the union
+				else
+					dims=body->size;
+
+				PhysicsRecorder_LogEntity(entityList.entities[i].ID, (uint8_t)entityList.entities[i].objectType, body->type, body->position, body->orientation, dims, body->angularVelocity);
+
 				PhysicsIntegrate(entityList.entities[i].body, fTimeStep);
 #if 1
 				// Fire "laser beam"
@@ -1033,6 +1049,7 @@ void Thread_Physics(void *arg)
 
 				for(uint32_t j=0;j<manifold->contactCount;j++)
 				{
+					PhysicsRecorder_LogContact(manifoldList[i].objA->ID, manifoldList[i].objB->ID, manifold->contacts[j].position, manifold->contacts[j].normal, manifold->contacts[j].penetration);
 					float impactSpeed=PhysicsResolveCollision(manifold->a, manifold->b, manifold->contacts[j]);
 
 					// Run "game logic"
@@ -1142,6 +1159,8 @@ void Thread_Physics(void *arg)
 				for(uint32_t j=0;j<manifold->contactCount;j++)
 					PhysicsPositionCorrection(manifold->a, manifold->b, manifold->contacts[j]);
 			}
+
+			PhysicsRecorder_EndFrame();
 		}
 	}
 
@@ -1565,6 +1584,29 @@ void Console_CmdExplode(Console_t *console, const char *param)
 	ParticleSystem_ResetEmitter(&particleSystem, em);
 }
 
+void Console_CmdPhysicsRecord(Console_t *console, const char *param)
+{
+	if(param==NULL)
+	{
+		ConsolePrint(console, "Missing parameter.");
+		return;
+	}
+
+	if(strcmp(param, "start")==0)
+	{
+		if(!PhysicsRecorder_Init("physics_session.bin", 1.0f/60.0f))
+			ConsolePrint(console, "Failed to start recording.");
+		else
+			ConsolePrint(console, "Started recording physics.");
+	}
+	else if(strcmp(param, "stop")==0)
+	{
+		PhysicsRecorder_Shutdown();
+	}
+	else
+		ConsolePrint(console, "Invalid parameter. Use 'start' or 'stop'.");
+}
+
 // Initialization call from system main
 bool Init(void)
 {
@@ -1587,6 +1629,7 @@ bool Init(void)
 	ConsoleRegisterCommand(&console, "connect", Console_CmdConnect);
 	ConsoleRegisterCommand(&console, "disconnect", Console_CmdDisconnect);
 	ConsoleRegisterCommand(&console, "explode", Console_CmdExplode);
+	ConsoleRegisterCommand(&console, "physics_record", Console_CmdPhysicsRecord);
 
 	CameraInit(&camera, Vec3(0.0f, 0.0f, -100.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 
@@ -1665,9 +1708,9 @@ bool Init(void)
 		emitters[i].emitterID=UINT32_MAX;	// No assigned particle emitterID
 		emitters[i].life=-1.0f;		// No life
 
-		const float radius=10.0f;
-		const float mass=(1.0f/3000.0f)*(1.33333333f*PI*radius)*10.0f;
-		const float inertia=0.4f*mass*(radius*radius);
+		const float radius=0.5f;
+		const float mass=(1.0f/3000.0f)*(1.33333333f*PI*10.0f)*10.0f;
+		const float inertia=0.4f*mass*(10.0f*10.0f);
 
 		emitters[i].body=(RigidBody_t)
 		{
@@ -1809,7 +1852,7 @@ bool Init(void)
 								UI_CONTROL_HORIZONTAL,					// Bar is horizontal
 								0.0f, 100.0f, 100.0f);					// min/max/initial value
 
-	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-16.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), UI_CONTROL_HIDDEN, &AssetManager_GetAsset(assets, TEXTURE_CONSOLEBG)->image, 0.0f);
+	consoleBackground=UI_AddSprite(&UI, Vec2(UI.size.x/2.0f, 100.0f-24.0f+(16.0f*6.0f/2.0f)), Vec2(UI.size.x, 16.0f*6.0f), Vec3b(1.0f), UI_CONTROL_HIDDEN, &AssetManager_GetAsset(assets, TEXTURE_CONSOLEBG)->image, 0.0f);
 
 	cursorID=UI_AddCursor(&UI, Vec2(0.0f, 0.0f), 16.0f, Vec3b(1.0f), UI_CONTROL_VISIBLE);
 
@@ -2022,6 +2065,8 @@ void RecreateSwapchain(void)
 void Destroy(void)
 {
 	vkDeviceWaitIdle(vkContext.device);
+
+	PhysicsRecorder_Shutdown();
 
 	ClientNetwork_Destroy();
 

@@ -85,6 +85,7 @@ set(PROJECT_SOURCES
 	"engine.c"
 	"entitylist.c"
 	"loadingscreen.c"
+	"precorder.c"
 )
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
