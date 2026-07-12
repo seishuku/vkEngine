@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdbool.h>
 #include "id.h"
 
 void ID_Init(ID_t pool)
@@ -30,6 +31,22 @@ uint32_t ID_Generate(ID_t pool)
     }
 
     return UINT32_MAX;
+}
+
+bool ID_Claim(ID_t pool, uint32_t id)
+{
+	if(id>=ID_MAX)
+		return false;
+
+	uint32_t word=id/ID_BITS;
+	uint32_t bit=id%ID_BITS;
+
+	if(pool[word]&(1U<<bit))
+		return false;
+
+	pool[word]|=(1U<<bit);
+
+	return true;
 }
 
 void ID_Remove(ID_t pool, int id)

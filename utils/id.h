@@ -19,6 +19,7 @@ typedef uint32_t ID_t[ID_WORDS];
 
 void ID_Init(ID_t pool);
 uint32_t ID_Generate(ID_t pool);
+bool ID_Claim(ID_t pool, uint32_t id);
 void ID_Remove(ID_t pool, int id);
 
 #endif

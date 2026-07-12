@@ -374,25 +374,25 @@ void GenerateWorld(void)
 		memcpy(perFrame[i].skyboxUBO[1], &Skybox_UBO, sizeof(Skybox_UBO_t));
 	}
 
-	for(uint32_t i=0;i<NUM_ENEMY;i++)
-	{
-		vec3 randomDirection=Vec3(
-			RandFloatRange(-1.0f, 1.0f),
-			RandFloatRange(-1.0f, 1.0f),
-			RandFloatRange(-1.0f, 1.0f)
-		);
-		Vec3_Normalize(&randomDirection);
-
-		fighterTexture[i]=RandRange(0, 7);
-
-		CameraInit(&enemy[i], Vec3_Muls(randomDirection, 1200.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
-		InitEnemy(&enemyAI[i], &enemy[i], camera);
-	}
-
-	fighterTexture[NUM_ENEMY]=RandRange(0, 7);
-
 	if(!ClientNetwork_IsConnected())
 	{
+		for(uint32_t i=0;i<NUM_ENEMY;i++)
+		{
+			vec3 randomDirection=Vec3(
+				RandFloatRange(-1.0f, 1.0f),
+				RandFloatRange(-1.0f, 1.0f),
+				RandFloatRange(-1.0f, 1.0f)
+			);
+			Vec3_Normalize(&randomDirection);
+
+			fighterTexture[i]=RandRange(0, 7);
+
+			CameraInit(&enemy[i], Vec3_Muls(randomDirection, 1200.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
+			InitEnemy(&enemyAI[i], &enemy[i], camera);
+		}
+
+		fighterTexture[NUM_ENEMY]=RandRange(0, 7);
+
 		ResetPhysicsCubes();
 		ResetAsteroids();
 	}
@@ -415,11 +415,11 @@ void GenerateWorld(void)
 
 	EntityList_Add(&entityList, &camera.body, !camera.thirdPerson, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+0), TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 
-	for(uint32_t i=0;i<NUM_ENEMY;i++)
-		EntityList_Add(&entityList, &enemy[i].body, false, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[i]+0), TEXTURE_FIGHTER1+(2*fighterTexture[i]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
-
 	if(!ClientNetwork_IsConnected())
 	{
+		for(uint32_t i=0;i<NUM_ENEMY;i++)
+			EntityList_Add(&entityList, &enemy[i].body, false, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[i]+0), TEXTURE_FIGHTER1+(2*fighterTexture[i]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
+
 		for(uint32_t i=0;i<NUM_CUBE;i++)
 			EntityList_Add(&entityList, &cubeBody[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
 
@@ -1153,6 +1153,44 @@ void Thread_Physics(void *arg)
 			PhysicsRecorder_EndFrame();
 		}
 	}
+	else
+	{
+		ParticleSystem_Step(&particleSystem, fTimeStep);
+
+		// Run lifetime check for particle emitter objects
+		for(uint32_t i=0;i<MAX_EMITTERS;i++)
+		{
+			// If it's alive reduce the life and integrate,
+			// otherwise if it's dead and still has an ID assigned, delete/unassign it.
+			if(emitters[i].life>0.0f)
+			{
+				PhysicsIntegrate(&emitters[i].body, fTimeStep);
+				emitters[i].life-=fTimeStep;
+
+				for(uint32_t j=0;j<List_GetCount(&particleSystem.emitters);j++)
+				{
+					ParticleEmitter_t *emitter=(ParticleEmitter_t *)List_GetPointer(&particleSystem.emitters, j);
+
+					if(emitter->ID==emitters[i].emitterID)
+					{
+						emitter->position=emitters[i].body.position;
+
+						if(emitters[i].life<5.0f)
+							emitter->particleSize*=fmaxf(0.0f, fminf(1.0f, emitters[i].life/5.0f));
+
+						break;
+					}
+				}
+			}
+			else if(emitters[i].emitterID!=UINT32_MAX)
+			{
+				ParticleSystem_DeleteEmitter(&particleSystem, emitters[i].emitterID);
+				EntityList_Remove(&entityList, emitters[i].entityID);
+				emitters[i].emitterID=UINT32_MAX;
+			}
+		}
+	}
+
 
 #if 1
 	// Update enemy player

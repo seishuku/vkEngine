@@ -9,6 +9,7 @@
 #include "../camera/camera.h"
 #include "../physics/physics.h"
 #include "../physics/particle.h"
+#include "../network/client_network.h"
 #include "../audio/audio.h"
 #include "../ui/ui.h"
 #include "../font/font.h"
@@ -211,7 +212,23 @@ bool Event_Trigger(EventID ID, void *arg)
 					break;
 
 				case KB_SPACE:
-					FireParticleEmitter(Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, camera.body.radius)), camera.forward);
+					if(ClientNetwork_IsConnected())
+			        {
+				        NetEvent_t ev=
+						{
+							.type=NETEVENT_SPAWN,
+				            .spawn=
+							{
+				                .objectType=ENTITYOBJECTTYPE_PROJECTILE,
+				                .position=camera.body.position,
+				                .velocity=Vec3_Addv(camera.body.velocity, Vec3_Muls(camera.forward, 100.0f)),
+				                .radius=15.0f, // life in seconds
+				            },
+				        };
+				        ClientNetwork_SendEvent(&ev);
+			        }
+			        else
+						FireParticleEmitter(Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, camera.body.radius)), camera.forward);
 					break;
 				case KB_I:
 					ResetPhysicsCubes();				break;
