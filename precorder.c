@@ -1,53 +1,27 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "entitylist.h"
 #include "precorder.h"
 
-// Adjust these to comfortably cover your MAX_ENTITY / MAX_MANIFOLDS*MAX_CONTACTS_PER_MANIFOLD
-// bounds. Kept independent of those macros so this file doesn't need to pull in entitylist.h.
 #define MAX_RECORD_ENTITIES 4096
 #define MAX_RECORD_CONTACTS 8192
 
-// A large stdio buffer means most EndFrame calls just memcpy into libc's own buffer rather
-// than hitting the OS. If profiling ever shows the physics thread stalling on I/O during a
-// flush, the next step is a lock-free queue handing frames to a dedicated writer thread —
-// not needed until you can actually measure it costing something.
 #define STDIO_BUFFER_SIZE (1u<<20) // 1MB
-
-typedef struct
-{
-	uint32_t id;
-	uint8_t objType;
-	uint8_t type;
-	vec3 position;
-	vec4 orientation;
-	vec3 dims;
-	vec3 angularVelocity;
-} ScratchEntity_t;
-
-typedef struct
-{
-	uint32_t idA, idB;
-	vec3 position;
-	vec3 normal;
-	float penetration;
-} ScratchContact_t;
 
 static FILE *recordFile=NULL;
 static bool enabled=false;
 static char stdioBuffer[STDIO_BUFFER_SIZE];
 
 static uint32_t curFrameIndex=0;
-static ScratchEntity_t scratchEntities[MAX_RECORD_ENTITIES];
+static Entity_t scratchEntities[MAX_RECORD_ENTITIES];
 static uint32_t scratchEntityCount=0;
-static ScratchContact_t scratchContacts[MAX_RECORD_CONTACTS];
+static ContactPoint_t scratchContacts[MAX_RECORD_CONTACTS];
 static uint32_t scratchContactCount=0;
 
 static uint64_t *frameOffsets=NULL;
 static uint32_t frameOffsetCount=0;
 static uint32_t frameOffsetCapacity=0;
-
-// --- low-level explicit-field writers (avoids struct padding/ABI issues entirely) ---
 
 static inline void WriteU8(uint8_t v)   { fwrite(&v, sizeof(v), 1, recordFile); }
 static inline void WriteU32(uint32_t v) { fwrite(&v, sizeof(v), 1, recordFile); }
@@ -69,7 +43,7 @@ bool PhysicsRecorder_Init(const char *path, float fixedTimestep)
 	setvbuf(recordFile, stdioBuffer, _IOFBF, STDIO_BUFFER_SIZE);
 
 	fwrite("PREC", 1, 4, recordFile);
-	WriteU32(2); // version
+	WriteU32(3); // version
 	WriteF32(fixedTimestep);
 
 	frameOffsetCount=0;
@@ -100,32 +74,22 @@ void PhysicsRecorder_BeginFrame(uint32_t frameIndex)
 	frameOffsets[frameOffsetCount++]=(uint64_t)ftell(recordFile);
 }
 
-void PhysicsRecorder_LogEntity(uint32_t id, uint8_t objType, RigidBodyType_e type, vec3 position, vec4 orientation, vec3 dims, vec3 angularVelocity)
+void PhysicsRecorder_LogEntity(Entity_t *entity)
 {
 	if(!PhysicsRecorder_IsEnabled()||scratchEntityCount>=MAX_RECORD_ENTITIES)
 		return;
 
-	ScratchEntity_t *e=&scratchEntities[scratchEntityCount++];
-	e->id=id;
-	e->objType=objType;
-	e->type=(uint8_t)type;
-	e->position=position;
-	e->orientation=orientation;
-	e->dims=dims;
-	e->angularVelocity=angularVelocity;
+	Entity_t *e=&scratchEntities[scratchEntityCount++];
+	*e=*entity;
 }
 
-void PhysicsRecorder_LogContact(uint32_t idA, uint32_t idB, vec3 position, vec3 normal, float penetration)
+void PhysicsRecorder_LogContact(ContactPoint_t *contact)
 {
 	if(!PhysicsRecorder_IsEnabled()||scratchContactCount>=MAX_RECORD_CONTACTS)
 		return;
 
-	ScratchContact_t *c=&scratchContacts[scratchContactCount++];
-	c->idA=idA;
-	c->idB=idB;
-	c->position=position;
-	c->normal=normal;
-	c->penetration=penetration;
+	ContactPoint_t *c=&scratchContacts[scratchContactCount++];
+	*c=*contact;
 }
 
 void PhysicsRecorder_EndFrame(void)
@@ -138,22 +102,20 @@ void PhysicsRecorder_EndFrame(void)
 	WriteU32(scratchEntityCount);
 	for(uint32_t i=0;i<scratchEntityCount;i++)
 	{
-		ScratchEntity_t *e=&scratchEntities[i];
-		WriteU32(e->id);
-		WriteU8(e->objType);
-		WriteU8(e->type);
-		WriteVec3(e->position);
-		WriteVec4(e->orientation);
-		WriteVec3(e->dims);
-		WriteVec3(e->angularVelocity);
+		Entity_t *e=&scratchEntities[i];
+		WriteU32(e->ID);
+		WriteU8(e->objectType);
+		WriteU8(e->body->type);
+		WriteVec3(e->body->position);
+		WriteVec4(e->body->orientation);
+		WriteVec3(e->body->size);
+		WriteVec3(e->body->angularVelocity);
 	}
 
 	WriteU32(scratchContactCount);
 	for(uint32_t i=0;i<scratchContactCount;i++)
 	{
-		ScratchContact_t *c=&scratchContacts[i];
-		WriteU32(c->idA);
-		WriteU32(c->idB);
+		ContactPoint_t *c=&scratchContacts[i];
 		WriteVec3(c->position);
 		WriteVec3(c->normal);
 		WriteF32(c->penetration);

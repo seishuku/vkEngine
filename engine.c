@@ -972,17 +972,7 @@ void Thread_Physics(void *arg)
 			// Run through the physics object list, run integration step and check for collisions against all other objects
 			for(uint32_t i=0;i<entityList.entityCount;i++)
 			{
-				RigidBody_t *body=entityList.entities[i].body;
-				vec3 dims;
-
-				if(body->type==RIGIDBODY_SPHERE)
-					dims=Vec3(body->radius, 0.0f, 0.0f);
-				else if(body->type==RIGIDBODY_CAPSULE)
-					dims=Vec3(body->radius, body->size.y, 0.0f); // radius aliases size.x via the union
-				else
-					dims=body->size;
-
-				PhysicsRecorder_LogEntity(entityList.entities[i].ID, (uint8_t)entityList.entities[i].objectType, body->type, body->position, body->orientation, dims, body->angularVelocity);
+				PhysicsRecorder_LogEntity(&entityList.entities[i]);
 
 				PhysicsIntegrate(entityList.entities[i].body, fTimeStep);
 #if 1
@@ -1049,7 +1039,7 @@ void Thread_Physics(void *arg)
 
 				for(uint32_t j=0;j<manifold->contactCount;j++)
 				{
-					PhysicsRecorder_LogContact(manifoldList[i].objA->ID, manifoldList[i].objB->ID, manifold->contacts[j].position, manifold->contacts[j].normal, manifold->contacts[j].penetration);
+					PhysicsRecorder_LogContact(&manifold->contacts[j]);
 					float impactSpeed=PhysicsResolveCollision(manifold->a, manifold->b, manifold->contacts[j]);
 
 					// Run "game logic"

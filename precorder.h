@@ -44,8 +44,8 @@ bool PhysicsRecorder_Init(const char *path, float fixedTimestep);
 // All calls are no-ops if recording is disabled (see SetEnabled), so they're
 // cheap to leave in place at the call sites permanently.
 void PhysicsRecorder_BeginFrame(uint32_t frameIndex);
-void PhysicsRecorder_LogEntity(uint32_t id, uint8_t objType, RigidBodyType_e type, vec3 position, vec4 orientation, vec3 dims, vec3 angularVelocity);
-void PhysicsRecorder_LogContact(uint32_t idA, uint32_t idB, vec3 position, vec3 normal, float penetration);
+void PhysicsRecorder_LogEntity(Entity_t *entity);
+void PhysicsRecorder_LogContact(ContactPoint_t *contact);
 void PhysicsRecorder_EndFrame(void);
 
 // Flushes remaining data, writes the seek index/trailer, and closes the file.
