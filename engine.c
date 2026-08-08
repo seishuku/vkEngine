@@ -151,6 +151,7 @@ Enemy_t enemyAI[NUM_ENEMY];
 
 uint32_t fighterTexture[NUM_ENEMY+1]={ 0 };
 int32_t enemyView=-1;
+uint32_t playerID=UINT32_MAX;
 
 LineGraph_t frameTimes, audioTimes, physicsTimes;
 
@@ -222,6 +223,25 @@ bool PopPoint(vec3 *point, uint32_t *index)
 
 void RecreateSwapchain(void);
 bool CreateFramebuffers(uint32_t eye);
+
+bool EntityList_ChangeRender(EntityList_t *list, uint32_t ID, bool noRender)
+{
+	for(uint32_t i=0;i<list->entityCount;i++)
+	{
+		Entity_t *entity=&list->entities[i];
+
+		if(entity->ID!=ID)
+			continue;
+
+		entity->noRender=noRender;
+		list->dirty=true;
+
+		return true;
+	}
+
+	DBGPRINTF(DEBUG_ERROR, "Entity not found.\n");
+	return false;
+}
 
 matrix CubeTransform(const RigidBody_t *body)
 {
@@ -413,7 +433,7 @@ void GenerateWorld(void)
 			EntityList_Add(&entityList, &asteroids[i], false, asteroidModels[i].modelID, asteroidModels[i].tex0ID, asteroidModels[i].tex1ID, ENTITYOBJECTTYPE_FIELD, AsteroidTransform);
 	}
 
-	EntityList_Add(&entityList, &camera.body, !camera.thirdPerson, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+0), TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
+	playerID=EntityList_Add(&entityList, &camera.body, !camera.thirdPerson, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+0), TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 
 	if(!ClientNetwork_IsConnected())
 	{
@@ -423,7 +443,18 @@ void GenerateWorld(void)
 		for(uint32_t i=0;i<NUM_CUBE;i++)
 			EntityList_Add(&entityList, &cubeBody[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
 
-		EntityList_Add(&entityList, &platformBody, false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
+		uint32_t platformID=EntityList_Add(&entityList, &platformBody, false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
+		for(uint32_t i=0;i<entityList.entityCount;i++)
+		{
+			Entity_t *entity=&entityList.entities[i];
+			if(entity->ID==platformID)
+			{
+				entity->isAttractor=true;
+				entity->influenceRadius=100.0f;
+				entity->baseGravity=9.81f*WORLD_SCALE;
+				break;
+			}
+		}
 	}
 }
 //////
@@ -920,6 +951,36 @@ void TestCollision(Entity_t *objA, Entity_t *objB)
 	}
 }
 
+static aabb PadAABB(const aabb bounds, float influenceRadius)
+{
+	return (aabb) { Vec3_Subs(bounds.min, influenceRadius), Vec3_Adds(bounds.max, influenceRadius) };
+}
+
+void AttractorQuery(Entity_t *entity, void *userdata)
+{
+	Entity_t *attractor=(Entity_t *)userdata;
+
+	// Don't calculate against self
+	if(entity==attractor)
+		return;
+
+	if(attractor->body->type==RIGIDBODY_SPHERE)
+	{
+		vec3 gravity=AttractorSphereComputeGravity(entity->body->position, attractor->body->position, attractor->body->radius, attractor->baseGravity, attractor->influenceRadius);
+		entity->body->force=Vec3_Addv(entity->body->force, Vec3_Muls(gravity, fTimeStep));
+	}
+	else if(attractor->body->type==RIGIDBODY_OBB)
+	{
+		vec3 gravity=AttractorOBBComputeGravity(entity->body->position, attractor->body->position, attractor->body->size, attractor->body->orientation, attractor->baseGravity, attractor->influenceRadius);
+		entity->body->force=Vec3_Addv(entity->body->force, Vec3_Muls(gravity, fTimeStep));
+	}
+	else if(attractor->body->type==RIGIDBODY_CAPSULE)
+	{
+		vec3 gravity=AttractorCapsuleComputeGravity(entity->body->position, attractor->body->position, attractor->body->orientation, attractor->body->radiusHeight.x, attractor->body->radiusHeight.y, attractor->baseGravity, attractor->influenceRadius);
+		entity->body->force=Vec3_Addv(entity->body->force, Vec3_Muls(gravity, fTimeStep));
+	}
+}
+
 // Runs anything physics related
 void Thread_Physics(void *arg)
 {
@@ -969,7 +1030,7 @@ void Thread_Physics(void *arg)
 
 			PhysicsRecorder_BeginFrame(frameCounter++);
 
-			// Run through the physics object list, run integration step and check for collisions against all other objects
+			// Run through the physics object list, run integration step
 			for(uint32_t i=0;i<entityList.entityCount;i++)
 			{
 				PhysicsRecorder_LogEntity(&entityList.entities[i]);
@@ -1029,6 +1090,14 @@ void Thread_Physics(void *arg)
 			numManifolds=0;
 
 			BVH_Build(&bvh, &entityList);
+
+			// Attractors need to be done after the BVH is built, which means they come after integration is already done. So it's delayed by a frame.
+			for(uint32_t i=0;i<entityList.entityCount;i++)
+			{
+				if(entityList.entities[i].isAttractor)
+					BVH_QueryAABB(&bvh, &entityList, PadAABB(entityList.entities[i].bounds, entityList.entities[i].influenceRadius), AttractorQuery, &entityList.entities[i]);
+			}
+
 			BVH_Test(&bvh, &entityList, TestCollision);
 
 			// From the manifold collection, do narrow phase collision and response
@@ -1192,7 +1261,7 @@ void Thread_Physics(void *arg)
 	}
 
 
-#if 1
+#if 0
 	// Update enemy player
 	if(!ClientNetwork_IsConnected())
 	{
@@ -1208,14 +1277,12 @@ void Thread_Physics(void *arg)
 
 	// Update camera and modelview matrix
 	if(playerHealth>0.0f)
-		CameraUpdate(&camera, fTimeStep);
+		modelView=CameraUpdate(&camera, fTimeStep);
 
 	for(uint32_t i=0;i<NUM_ENEMY;i++)
 		CameraUpdate(&enemy[i], fTimeStep);
 
-	if(enemyView<0)
-		modelView=MatrixLookAt(camera.body.position, Vec3_Addv(camera.body.position, camera.forward), camera.up);
-	else
+	if(enemyView>=0)
 		modelView=MatrixLookAt(enemy[enemyView].body.position, Vec3_Addv(enemy[enemyView].body.position, enemy[enemyView].forward), enemy[enemyView].up);
 
 	physicsTime=(float)(GetClock()-startTime);
@@ -1413,6 +1480,9 @@ void Render(void)
 	UI_UpdateTextTitleTextf(&UI, currentTrack, "Current track: %s", GetCurrentMusicTrack());
 
 	camera.thirdPerson=UI_GetCheckBoxValue(&UI, thirdPersonID);
+	if(camera.thirdPerson)
+		EntityList_ChangeRender(&entityList, playerID, !camera.thirdPerson);
+	
 	UI_UpdateBarGraphValue(&UI, playerHealthID, playerHealth);
 
 	for(uint32_t i=0;i<NUM_ENEMY;i++)

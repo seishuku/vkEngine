@@ -24,6 +24,7 @@ typedef void (*BVHQueryCallback_t)(Entity_t *entity, void *userdata);
 
 void BVH_Build(BVH_t *bvh, EntityList_t *entityList);
 void BVH_Test(BVH_t *bvh, EntityList_t *entityList, BVHLeafCallback_t callback);
-void BVH_Query(BVH_t *bvh, EntityList_t *entityList, vec3 point, float radius, BVHQueryCallback_t callback, void *userdata);
+void BVH_QuerySphere(BVH_t *bvh, EntityList_t *entityList, vec3 point, float radius, BVHQueryCallback_t callback, void *userdata);
+void BVH_QueryAABB(BVH_t *bvh, EntityList_t *entityList, aabb bounds, BVHQueryCallback_t callback, void *userdata);
 
 #endif

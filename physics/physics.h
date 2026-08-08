@@ -72,4 +72,8 @@ typedef struct
 
 void SpringIntegrate(Spring_t *spring, vec3 target, float dt);
 
+vec3 AttractorOBBComputeGravity(vec3 position, vec3 center, vec3 halfExtents, vec4 orientation, float baseGravity, float influenceRadius);
+vec3 AttractorCapsuleComputeGravity(vec3 position, vec3 center, vec4 orientation, float radius, float halfHeight, float baseGravity, float influenceRadius);
+vec3 AttractorSphereComputeGravity(vec3 position, vec3 center, float radius, float baseGravity, float influenceRadius);
+
 #endif

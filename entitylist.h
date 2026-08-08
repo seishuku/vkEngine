@@ -28,6 +28,10 @@ typedef struct
 	RigidBody_t *body;
 	EntityObjectType_e objectType;
 
+	bool isAttractor;
+	float influenceRadius;
+	float baseGravity;
+
 	bool noRender;
 	uint32_t modelID, textureIDs[2];
 
