@@ -144,7 +144,6 @@ static Keycodes_t ConvertKeymap(uint32_t keysym)
 static void EventLoop(void)
 {
 	static MouseEvent_t mouseEvent={ 0, 0, 0, 0 };
-	uint32_t code;
 	XEvent event;
 
 	while(!isDone)
@@ -182,7 +181,7 @@ static void EventLoop(void)
 							if(XIMaskIsSet(re->valuators.mask, 1))
 								mouseEvent.dy=-*values++;
 
-							Input_OnMouseEvent(&mouseEvent, Vec2(mouseEvent.dx, mouseEvent.dy));
+							Input_OnMouseEvent(&mouseEvent);
 
 							XWarpPointer(vkContext.display, None, vkContext.window, 0, 0, 0, 0, config.windowWidth/2, config.windowHeight/2);
 							XFlush(vkContext.display);
@@ -205,21 +204,12 @@ static void EventLoop(void)
 					{
 						XIDeviceEvent *de=(XIDeviceEvent *)event.xcookie.data;
 
-						Mousecodes_t button=0;
-						if(de->detail==1)
-							button=MOUSE_BUTTON_1;
-						else if(de->detail==2)
-							button=MOUSE_BUTTON_3;
-						else if(de->detail==3)
-							button=MOUSE_BUTTON_2;
-
-						if(button)
-							Input_OnMouseButtonEvent(button, true);
-
 						// Keep button state accumulated for movement events
 						mouseEvent.button|=(de->detail==1?MOUSE_BUTTON_1:0);
 						mouseEvent.button|=(de->detail==2?MOUSE_BUTTON_3:0);
 						mouseEvent.button|=(de->detail==3?MOUSE_BUTTON_2:0);
+
+						Input_OnMouseButtonEvent(&mouseEvent, true);
 						break;
 					}
 
@@ -227,21 +217,12 @@ static void EventLoop(void)
 					{
 						XIDeviceEvent *de=(XIDeviceEvent *)event.xcookie.data;
 
-						Mousecodes_t button=0;
-						if(de->detail==1)
-							button=MOUSE_BUTTON_1;
-						else if(de->detail==2)
-							button=MOUSE_BUTTON_3;
-						else if(de->detail==3)
-							button=MOUSE_BUTTON_2;
-
-						if(button)
-							Input_OnMouseButtonEvent(button, false);
-
 						// Keep button state accumulated for movement events
 						mouseEvent.button&=~(de->detail==1?MOUSE_BUTTON_1:0);
 						mouseEvent.button&=~(de->detail==2?MOUSE_BUTTON_3:0);
 						mouseEvent.button&=~(de->detail==3?MOUSE_BUTTON_2:0);
+
+						Input_OnMouseButtonEvent(&mouseEvent, false);
 						break;
 					}
 

@@ -17,7 +17,7 @@ int Thread_Worker(void *data)
 	{
 		mtx_lock(&worker->mutex);
 
-		if(!(worker->stop||worker->numJobs>0)||worker->pause)
+		while(!(worker->stop||worker->numJobs>0)||worker->pause)
 			cnd_wait(&worker->condition, &worker->mutex);
 
 		if(worker->numJobs>0)
@@ -68,10 +68,11 @@ bool Thread_AddJob(ThreadWorker_t *worker, ThreadFunction_t jobFunc, void *arg)
 {
 	if(worker)
 	{
+		mtx_lock(&worker->mutex);
+
 		if(worker->numJobs>=THREAD_MAXJOBS)
 			return false;
 
-		mtx_lock(&worker->mutex);
 		worker->jobs[worker->numJobs++]=(ThreadJob_t){ jobFunc, arg };
 		cnd_signal(&worker->condition);
 		mtx_unlock(&worker->mutex);
@@ -199,7 +200,6 @@ bool Thread_Destroy(ThreadWorker_t *worker)
 		thrd_join(worker->thread, NULL);
 
 	// Destroy the mutex and condition variable
-	mtx_lock(&worker->mutex);
 	mtx_destroy(&worker->mutex);
 	cnd_destroy(&worker->condition);
 
