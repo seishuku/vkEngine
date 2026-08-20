@@ -34,6 +34,7 @@ void ConsolePrint(Console_t *console, const char *text)
     {
         // Add text to the next available line (which should be at the bottom)
         strncpy(console->lines[console->numLine].buffer, text, CONSOLE_LINE_LENGTH-1);
+		console->lines[console->numLine].buffer[CONSOLE_LINE_LENGTH-1]='\0';
         console->numLine++;
     }
 }
@@ -122,7 +123,7 @@ void ConsoleScroll(Console_t *console, const bool up)
     {
         if(console->numLine>0)
         {
-            if(console->scrollbackOffset<console->numLine-1)
+            if(console->numLine>0&&console->scrollbackOffset<console->numLine-1)
                 console->scrollbackOffset++;
         }
     }
@@ -231,7 +232,7 @@ void ConsoleHistory(Console_t *console, const bool up)
             strncpy(console->input, console->history[console->historyIndex], CONSOLE_LINE_LENGTH-1);
             console->inputLength=strlen(console->input);
         }
-        else if(console->historyIndex==console->numHistory-1)
+        else if(console->numHistory>0&&console->historyIndex==console->numHistory-1)
         {
             console->historyIndex=console->numHistory;
             memset(console->input, 0, sizeof(console->input));
@@ -344,17 +345,17 @@ void ConsoleDraw(Console_t *console)
         UI_UpdateSpriteVisibility(&UI, consoleBackground, false);
 
     const int maxLines=5;
-    uint32_t startLine=(console->numLine>maxLines+console->scrollbackOffset)?console->numLine-maxLines-console->scrollbackOffset:0;
-    uint32_t endLine=console->numLine-console->scrollbackOffset;
+    int32_t startLine=(console->numLine>maxLines+console->scrollbackOffset)?console->numLine-maxLines-console->scrollbackOffset:0;
+    int32_t endLine=console->numLine-console->scrollbackOffset;
 
     if(startLine<0)
         startLine=0;
 
     if(endLine>console->numLine)
-        endLine=console->numLine;
+        endLine=(int32_t)console->numLine;
 
     // Print window of maxLines, y position is such that the most recent entry is near the prompt
-    for(uint32_t i=startLine;i<endLine;i++)
+    for(int32_t i=startLine;i<endLine;i++)
         Font_Print(&font, 16.0f, 0.0f, (float)(endLine-i-1)*16.0f+100.0f, "%s", console->lines[i].buffer);
 
     // Print prompt

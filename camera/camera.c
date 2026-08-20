@@ -20,7 +20,7 @@ void CameraCalculateFrustumPlanes(const Camera_t camera, vec4 *frustumPlanes, co
 
 	vec3 forward_far=Vec3_Muls(camera.forward, farPlane);
 
-	// Top, bottom, right, left, far, near
+	// Near, far, top, bottom, right, left
 	frustumPlanes[0]=CalculatePlane(Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, nearPlane)), camera.forward);
 	frustumPlanes[1]=CalculatePlane(Vec3_Addv(camera.body.position, forward_far), Vec3_Muls(camera.forward, -1.0f));
 
@@ -169,10 +169,13 @@ void CameraInit(Camera_t *camera, const vec3 position, const vec3 up, const vec3
 	camera->moveRight=false;
 	camera->moveUp=false;
 	camera->moveDown=false;
-	camera->yawLeft=false;
-	camera->yawRight=false;
+	camera->rollLeft=false;
+	camera->rollRight=false;
 	camera->pitchUp=false;
 	camera->pitchDown=false;
+	camera->yawLeft=false;
+	camera->yawRight=false;
+	camera->shift=false;
 }
 
 matrix CameraUpdate(Camera_t *camera, float dt)

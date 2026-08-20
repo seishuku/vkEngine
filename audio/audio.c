@@ -54,7 +54,7 @@ typedef struct
 static Channel_t channels[MAX_CHANNELS];
 
 // Temp audio buffers for HRTF convolve
-static int16_t preConvolve[MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES];
+static int16_t preConvolve[MAX_AUDIO_SAMPLES+(MAX_HRIR_SAMPLES*2)];
 static int16_t postConvole[2*(MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES)];
 
 // Streaming audio
