@@ -71,7 +71,10 @@ bool Thread_AddJob(ThreadWorker_t *worker, ThreadFunction_t jobFunc, void *arg)
 		mtx_lock(&worker->mutex);
 
 		if(worker->numJobs>=THREAD_MAXJOBS)
+		{
+			mtx_unlock(&worker->mutex);
 			return false;
+		}
 
 		worker->jobs[worker->numJobs++]=(ThreadJob_t){ jobFunc, arg };
 		cnd_signal(&worker->condition);
