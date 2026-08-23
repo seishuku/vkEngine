@@ -98,6 +98,7 @@ EntityList_t entityList;
 #define NUM_CUBE 30
 RigidBody_t cubeBody[NUM_CUBE];
 RigidBody_t platformBody;
+RigidBody_t capsuleBody;
 
 // Thread stuff
 typedef struct
@@ -272,6 +273,14 @@ matrix FighterTransform(const RigidBody_t *body)
 	return MatrixMult(local, MatrixTranslatev(body->position));
 }
 
+matrix CapsuleTransform(const RigidBody_t *body)
+{
+	const float scale=body->radiusHeight.x;
+	matrix local=MatrixScale(scale, scale, scale);
+	local=MatrixMult(local, QuatToMatrix(body->orientation));
+	return MatrixMult(local, MatrixTranslatev(body->position));
+}
+
 void ResetPhysicsCubes(void)
 {
 	const float radius=20.0f;
@@ -415,6 +424,31 @@ void GenerateWorld(void)
 
 		ResetPhysicsCubes();
 		ResetAsteroids();
+
+		const vec2 size=Vec2(10.0f, 10.0f);
+		const float mass=(1.0f/100000.0f)*(1.33333333f*PI*size.x*size.x*size.y);
+		const float inertia=(1.0f/12.0f)*mass*(size.x*size.x+size.y*size.y);
+
+		capsuleBody=(RigidBody_t)
+		{
+		    .position=Vec3(0.0f, 25.0f, 0.0f),
+
+		    .velocity=Vec3b(0.0f),
+		    .force=Vec3b(0.0f),
+		    .mass=mass,
+		    .invMass=1.0f/mass,
+
+		    .orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
+		    .angularVelocity=Vec3b(0.0f),
+		    .inertia=inertia,
+		    .invInertia=1.0f/inertia,
+
+			.restitution=0.1f,
+			.friction=0.8f,
+
+		    .type=RIGIDBODY_CAPSULE,
+		    .radiusHeight=size,
+		};
 	}
 
 	playerHealth=100.0f;
@@ -437,6 +471,8 @@ void GenerateWorld(void)
 
 	if(!ClientNetwork_IsConnected())
 	{
+		EntityList_Add(&entityList, &capsuleBody, true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, CapsuleTransform);
+
 		for(uint32_t i=0;i<NUM_ENEMY;i++)
 			EntityList_Add(&entityList, &enemy[i].body, false, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[i]+0), TEXTURE_FIGHTER1+(2*fighterTexture[i]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 
@@ -701,7 +737,7 @@ void Thread_Main(void *arg)
 			vec4 color;
 		} spherePC;
 
-		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 0.0f);
 
 		vec4 leftHandOrientation=Input_GetVRHandOrientation(0), rightHandOrientation=Input_GetVRHandOrientation(1);
 		vec3 leftHandPosition=Input_GetVRHandPosition(0), rightHandPosition=Input_GetVRHandPosition(1);
@@ -805,6 +841,24 @@ void Thread_Main(void *arg)
 		DrawCameraAxes( data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, enemy[i]);
 
 	// BVH_DrawDebug(&bvh, data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye);
+
+	// Draw capsule rigid body
+	{
+		struct
+		{
+			matrix mvp;
+			vec4 color;
+		} spherePC;
+
+		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, (capsuleBody.radiusHeight.y/2)/(capsuleBody.radiusHeight.x/2.0f));
+
+		matrix local=CapsuleTransform(&capsuleBody);
+		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
+		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
+
+		DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
+	}
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
@@ -1479,10 +1533,14 @@ void Render(void)
 
 	UI_UpdateTextTitleTextf(&UI, currentTrack, "Current track: %s", GetCurrentMusicTrack());
 
+	static bool oldThirdPerson=false;
 	camera.thirdPerson=UI_GetCheckBoxValue(&UI, thirdPersonID);
-	if(camera.thirdPerson)
+	if(camera.thirdPerson!=oldThirdPerson)
+	{
 		EntityList_ChangeRender(&entityList, playerID, !camera.thirdPerson);
-	
+		oldThirdPerson=camera.thirdPerson;
+	}
+
 	UI_UpdateBarGraphValue(&UI, playerHealthID, playerHealth);
 
 	for(uint32_t i=0;i<NUM_ENEMY;i++)
@@ -1806,7 +1864,7 @@ bool Init(void)
 		emitters[i].emitterID=UINT32_MAX;	// No assigned particle emitterID
 		emitters[i].life=-1.0f;		// No life
 
-		const float radius=0.5f;
+		const float radius=1.0f;
 		const float mass=(1.0f/3000.0f)*(1.33333333f*PI*10.0f)*10.0f;
 		const float inertia=0.4f*mass*(10.0f*10.0f);
 
