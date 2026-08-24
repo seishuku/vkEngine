@@ -17,7 +17,7 @@ This is an on-going learning experience for me and for anyone else that can lear
 ## To-do (in no particular order):
 - Improve audio (needs pops/clicks fixed)
 - Improve physics (needs more refining, it doesn't pass a box stack very well)
-- Streamline post processing effects (it's kind of tacked on right now)
+- Streamline post processing effects (WIP)
 - Improve networking (this is better now, [server here](https://github.com/seishuku/vkEngineServer))
 - 3D model animation?
 - ???
@@ -42,6 +42,7 @@ External dependencies for building this (versions as of this writing, newer *sho
 - `Left/Right arrows` Yaw
 - `Space` Fire projectile
 - `Control` Fire "laser"
+- `` ~/` `` Opens console
 - `Z` "Explode" asteroid field (used for testing physics)
 - `O` Generate new random play area
 - `P` Pauses all physics except for camera
@@ -54,11 +55,11 @@ External dependencies for building this (versions as of this writing, newer *sho
 Should be pretty straightforward cmake:<br>
 ```cmake -S. -B out -GNinja```<br>
 or use a preset:<br>
-```cmake -S. --preset "Linux x64 Release"```<br>
-```cmake -S. --preset "Windows x64 Release"```<br>
-```cmake -S. --preset "Android Release"```
+```cmake -S. --preset "linux_x64_release"```<br>
+```cmake -S. --preset "windows_x64_release"```<br>
+```cmake -S. --preset "android_arm64_release"```
 
-> <b>Note:</b> Android building has only been tested on Windows. It should work on Linux, I just don't have the Android SDK installed there.
+> <b>Note:</b> Android building requires the SDK with NDK properly set up with ANDROID_HOME set correctly. This also currently targets a specific NDK version, edit presets file to the version you have installed.
 
 ---
 
