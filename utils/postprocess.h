@@ -19,10 +19,10 @@ struct PostProcessEffect_s
 	bool (*CreateFramebuffers)(PostProcessEffect_t *self, uint32_t width, uint32_t height);
 	void (*DestroyFramebuffers)(PostProcessEffect_t *self);
 
-	void (*Draw)(PostProcessEffect_t *self, VkCommandBuffer commandBuffer, uint32_t frameIndex, uint32_t eye, VkImageView inputView, VkSampler inputSampler);
+	void (*Draw)(PostProcessEffect_t *self, VkCommandBuffer commandBuffer, uint32_t frameIndex, uint32_t eye);
 
-	VkImageView (*GetOutputView)(PostProcessEffect_t *self, uint32_t eye);
-	VkSampler (*GetOutputSampler)(PostProcessEffect_t *self, uint32_t eye);
+	void (*SetInput)(PostProcessEffect_t *self, const VkuImage_t *inputImage, uint32_t eye);
+	const VkuImage_t *(*GetOutput)(PostProcessEffect_t *self, uint32_t eye);
 
 	bool enabled;
 	void *data;
@@ -36,7 +36,7 @@ void PostProcess_DestroyAll(void);
 bool PostProcess_CreateFramebuffers(uint32_t width, uint32_t height);
 void PostProcess_DestroyFramebuffers(void);
 
-void PostProcess_Draw(VkCommandBuffer commandBuffer, uint32_t frameIndex, uint32_t eye, VkImageView sourceView, VkSampler sourceSampler, VkImageView *outView, VkSampler *outSampler);
+void PostProcess_Draw(VkCommandBuffer commandBuffer, uint32_t frameIndex, uint32_t eye);
 
 uint32_t PostProcess_GetCount(void);
 PostProcessEffect_t *PostProcess_GetByIndex(uint32_t index);

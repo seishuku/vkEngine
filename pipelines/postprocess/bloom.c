@@ -22,6 +22,7 @@ typedef struct
 	VkFramebuffer gaussianFramebufferTemp[2];
 	VkFramebuffer gaussianFramebufferBlur[2];
 
+	const VkuImage_t *inputImage[2];
 	VkuImage_t colorTemp[2];
 	VkuImage_t colorBlur[2];
 
@@ -185,12 +186,12 @@ static void Bloom_DestroyFramebuffers(PostProcessEffect_t *self)
 	}
 }
 
-static void Bloom_Draw(PostProcessEffect_t *self, VkCommandBuffer commandBuffer, uint32_t frameIndex, uint32_t eye, VkImageView inputView, VkSampler inputSampler)
+static void Bloom_Draw(PostProcessEffect_t *self, VkCommandBuffer commandBuffer, uint32_t frameIndex, uint32_t eye)
 {
 	BloomData_t *bloom=(BloomData_t *)self->data;
 
 	// Threshold and downsample
-	// Input = inputView (whatever feeds this effect - colorResolve, or a prior effect's output)
+	// Input = input image
 	// Output = colorBlur
 	vkCmdBeginRenderPass(commandBuffer, &(VkRenderPassBeginInfo)
 	{
@@ -205,7 +206,7 @@ static void Bloom_Draw(PostProcessEffect_t *self, VkCommandBuffer commandBuffer,
 
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, bloom->thresholdPipeline.pipeline.pipeline);
 
-	vkuDescriptorSet_UpdateBindingImageInfo(&bloom->thresholdPipeline.descriptorSet, 0, inputSampler, inputView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&bloom->thresholdPipeline.descriptorSet, 0, bloom->inputImage[eye]->sampler, bloom->inputImage[eye]->imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuAllocateUpdateDescriptorSet(&bloom->thresholdPipeline.descriptorSet, perFrame[frameIndex].descriptorPool);
 	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, bloom->thresholdPipeline.pipelineLayout, 0, 1, &bloom->thresholdPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
@@ -274,18 +275,18 @@ static void Bloom_Draw(PostProcessEffect_t *self, VkCommandBuffer commandBuffer,
 	//////
 }
 
-static VkImageView Bloom_GetOutputView(PostProcessEffect_t *self, uint32_t eye)
+static void Bloom_SetInput(PostProcessEffect_t *self, const VkuImage_t *image, uint32_t eye)
 {
 	BloomData_t *bloom=(BloomData_t *)self->data;
-
-	return bloom->colorBlur[eye].imageView;
+ 
+	bloom->inputImage[eye]=image;
 }
 
-static VkSampler Bloom_GetOutputSampler(PostProcessEffect_t *self, uint32_t eye)
+static const VkuImage_t *Bloom_GetOutput(PostProcessEffect_t *self, uint32_t eye)
 {
 	BloomData_t *bloom=(BloomData_t *)self->data;
 
-	return bloom->colorBlur[eye].sampler;
+	return &bloom->colorBlur[eye];
 }
 
 PostProcessEffect_t bloomEffect=
@@ -296,8 +297,8 @@ PostProcessEffect_t bloomEffect=
 	.CreateFramebuffers=Bloom_CreateFramebuffers,
 	.DestroyFramebuffers=Bloom_DestroyFramebuffers,
 	.Draw=Bloom_Draw,
-	.GetOutputView=Bloom_GetOutputView,
-	.GetOutputSampler=Bloom_GetOutputSampler,
+	.SetInput=Bloom_SetInput,
+	.GetOutput=Bloom_GetOutput,
 	.enabled=true,
 	.data=&bloomData,
 };

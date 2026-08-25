@@ -46,11 +46,8 @@ void PostProcess_DestroyFramebuffers(void)
 		effectChain[i]->DestroyFramebuffers(effectChain[i]);
 }
 
-void PostProcess_Draw(VkCommandBuffer commandBuffer, uint32_t frameIndex, uint32_t eye, VkImageView sourceView, VkSampler sourceSampler, VkImageView *outView, VkSampler *outSampler)
+void PostProcess_Draw(VkCommandBuffer commandBuffer, uint32_t frameIndex, uint32_t eye)
 {
-	VkImageView curView=sourceView;
-	VkSampler curSampler=sourceSampler;
-
 	for(uint32_t i=0;i<numEffects;i++)
 	{
 		PostProcessEffect_t *effect=effectChain[i];
@@ -58,14 +55,8 @@ void PostProcess_Draw(VkCommandBuffer commandBuffer, uint32_t frameIndex, uint32
 		if(!effect->enabled)
 			continue;
 
-		effect->Draw(effect, commandBuffer, frameIndex, eye, curView, curSampler);
-
-		curView=effect->GetOutputView(effect, eye);
-		curSampler=effect->GetOutputSampler(effect, eye);
+		effect->Draw(effect, commandBuffer, frameIndex, eye);
 	}
-
-	*outView=curView;
-	*outSampler=curSampler;
 }
 
 uint32_t PostProcess_GetCount(void)

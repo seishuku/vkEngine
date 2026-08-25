@@ -157,6 +157,9 @@ bool CreateCompositePipeline(void)
 	if(!PostProcess_CreateAll())
 		return false;
 
+	bloomEffect.SetInput(&bloomEffect, &colorResolve[0], 0);
+	bloomEffect.SetInput(&bloomEffect, &colorResolve[1], 1);
+
 	return true;
 }
 
@@ -192,9 +195,7 @@ void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye)
 	static uint32_t uFrame=0;
 
 	// Run the post-process chain
-	VkImageView postProcessView;
-	VkSampler postProcessSampler;
-	PostProcess_Draw(perFrame[frameIndex].commandBuffer, frameIndex, eye, colorResolve[eye].imageView, colorResolve[eye].sampler, &postProcessView, &postProcessSampler);
+	PostProcess_Draw(perFrame[frameIndex].commandBuffer, frameIndex, eye);
 
 	// Draw final composited image
 	// Input = colorResolve, post-process chain output
@@ -216,7 +217,7 @@ void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye)
 	vkCmdBindPipeline(perFrame[frameIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipeline.pipeline.pipeline);
 
 	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 0, colorResolve[eye].sampler, colorResolve[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 1, postProcessSampler, postProcessView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 1, bloomEffect.GetOutput(&bloomEffect, eye)->sampler, bloomEffect.GetOutput(&bloomEffect, eye)->imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 2, depthImage[eye].sampler, depthImage[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 3, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingBufferInfo(&compositePipeline.descriptorSet, 4, perFrame[frameIndex].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
