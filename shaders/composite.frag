@@ -100,14 +100,21 @@ float volumetricLightScattering(const float viewDepth, const vec3 lightPos, cons
 	return L*fNumSteps;
 }
 
+float resolveDepth()
+{
+	float d=texelFetch(depthTex, ivec2(UV*textureSize(depthTex)), 0).x;
+
+	for(int i=1;i<uSamples;i++)
+		d=max(d, texelFetch(depthTex, ivec2(UV*textureSize(depthTex)), i).x);
+
+	return d;
+}
+
 vec4 depth2World()
 {
-	const float invSamples=1.0f/float(uSamples);
-	float depth=0.0;
-
-	for(int i=0;i<uSamples;i++)
-		depth+=texelFetch(depthTex, ivec2(UV*textureSize(depthTex)), i).x*invSamples;
-
+	const float depth=resolveDepth();
+	// The skybox at infinity means we need to clamp depth to avoid division by zero.
+	// (should actually be zNear/"world scale", but whatever)
 	const float viewZ=max(depth, 0.00009);
 
 	const vec4 clipPosition=inverse(projection)*vec4(vec3(UV*2-1, viewZ), 1.0);

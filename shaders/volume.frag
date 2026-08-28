@@ -51,13 +51,19 @@ layout(push_constant) uniform PC
 
 layout(location=0) out vec4 Output;
 
+float resolveDepth()
+{
+	float d=texelFetch(depthTex, ivec2(gl_FragCoord.xy), 0).x;
+
+	for(int i=1;i<uSamples;i++)
+		d=max(d, texelFetch(depthTex, ivec2(gl_FragCoord.xy), i).x);
+
+	return d;
+}
+
 vec4 depth2Eye()
 {
-	const float invSamples=1.0/float(uSamples);
-	float depth=0.0;
-
-	for(int i=0;i<uSamples;i++)
-		depth+=texelFetch(depthTex, ivec2(gl_FragCoord.xy), i).x*invSamples;
+	float depth=resolveDepth();
 
 	const vec4 clipPosition=inverse(projection)*vec4(vec3((gl_FragCoord.xy/vec2(uWidth, uHeight))*2-1, depth), 1.0);
 	return clipPosition/clipPosition.w;
