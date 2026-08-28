@@ -70,6 +70,8 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 		return false;
 
 	fread(buffer, 1, length, stream);
+	fclose(stream);
+
 	buffer[length]='\0';
 
 	memset(pipeline, 0, sizeof(Pipeline_t));
@@ -972,9 +974,9 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 							if(token->type==TOKEN_STRING)
 							{
 								if(strcmp(token->string, "ccw")==0)
-									pipeline->pipeline.cullMode=VK_FRONT_FACE_COUNTER_CLOCKWISE;
+									pipeline->pipeline.frontFace=VK_FRONT_FACE_COUNTER_CLOCKWISE;
 								else if(strcmp(token->string, "cw")==0)
-									pipeline->pipeline.cullMode=VK_FRONT_FACE_CLOCKWISE;
+									pipeline->pipeline.frontFace=VK_FRONT_FACE_CLOCKWISE;
 								else
 								{
 									Tokenizer_PrintToken("Unknown parameter ", token);
