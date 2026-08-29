@@ -7,7 +7,6 @@
 #include "../vr/vr.h"
 #include "../model/bmodel.h"
 #include "../utils/pipeline.h"
-#include "../models.h"
 #include "../perframe.h"
 #include "skybox.h"
 
