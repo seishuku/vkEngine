@@ -521,7 +521,7 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 									format=VK_FORMAT_B8G8R8A8_SINT;
 								else if(strcmp(token->string, "abgr8_unorm")==0&&param==2)
 									format=VK_FORMAT_A8B8G8R8_UNORM_PACK32;
-								else if(strcmp(token->string, "abgr8_uint")==0&&param==2)
+								else if(strcmp(token->string, "abgr8_snorm")==0&&param==2)
 									format=VK_FORMAT_A8B8G8R8_SNORM_PACK32;
 								else if(strcmp(token->string, "abgr8_uint")==0&&param==2)
 									format=VK_FORMAT_A8B8G8R8_UINT_PACK32;
