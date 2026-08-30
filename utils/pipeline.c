@@ -5,6 +5,7 @@
 #include "../system/system.h"
 #include "../vulkan/vulkan.h"
 #include "tokenizer.h"
+#include "parser.h"
 #include "base64.h"
 #include "pipeline.h"
 
@@ -78,2834 +79,1813 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 
 	Tokenizer_t tokenizer;
 	Tokenizer_Init(&tokenizer, length, buffer, sizeof(keywords)/sizeof(keywords[0]), keywords);
+	
+	Parser_t parser;
+	Parser_Init(&parser, &tokenizer);
 
-	Token_t *token=NULL;
-
-	while(1)
+	while(!Parser_IsEnd(&parser))
 	{
-		token=Tokenizer_GetNext(&tokenizer);
-
-		if(token==NULL)
-			break;
-
-		if(token->type==TOKEN_KEYWORD)
+		// Start building up descriptor set layout ("descriptorSet { }")
+		if(Parser_MatchKeyword(&parser, "descriptorSet"))
 		{
-			// Start building up descriptor set layout ("descriptorSet { }")
-			if(strcmp(token->string, "descriptorSet")==0)
+			if(!vkuInitDescriptorSet(&pipeline->descriptorSet, context->device))
 			{
-				if(!vkuInitDescriptorSet(&pipeline->descriptorSet, context->device))
-				{
-					DBGPRINTF(DEBUG_ERROR, "Unable to initialize descriptor set.\n");
-					return false;
-				}
-
-				// Next token must be a left brace '{'
-				Zone_Free(zone, token);
-				token=Tokenizer_GetNext(&tokenizer);
-
-				if(token->type!=TOKEN_DELIMITER&&token->string[0]!='{')
-				{
-					Tokenizer_PrintToken("Unexpected token ", token);
-					return false;
-				}
-
-				// Loop through until closing right brace '}'
-				while(!(token->type==TOKEN_DELIMITER&&token->string[0]=='}'))
-				{
-					// Look for keyword tokens
-					Zone_Free(zone, token);
-					token=Tokenizer_GetNext(&tokenizer);
-
-					if(token->type==TOKEN_KEYWORD)
-					{
-						// Handle "addBinding" keyword
-						if(strcmp(token->string, "addBinding")==0)
-						{
-							int32_t param=0;
-							uint32_t binding=0;
-							VkDescriptorType type=0;
-							VkShaderStageFlags stage=0;
-
-							// First token should be a left parenthesis '('
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type!=TOKEN_DELIMITER&&token->string[0]!='(')
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-							else
-							{
-								// Loop until right parenthesis ')' or until break condition
-								while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-								{
-									Zone_Free(zone, token);
-									token=Tokenizer_GetNext(&tokenizer);
-
-									if(token->type==TOKEN_INT&&param==0)
-										binding=(uint32_t)token->ival;
-									else if(token->type==TOKEN_STRING)
-									{
-										// Type parameter
-										if(strcmp(token->string, "sampler")==0&&param==1)
-											type=VK_DESCRIPTOR_TYPE_SAMPLER;
-										else if(strcmp(token->string, "combinedSampler")==0&&param==1)
-											type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-										else if(strcmp(token->string, "sampledImage")==0&&param==1)
-											type=VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-										else if(strcmp(token->string, "storageImage")==0&&param==1)
-											type=VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-										else if(strcmp(token->string, "uniformTexelBuffer")==0&&param==1)
-											type=VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-										else if(strcmp(token->string, "storageTexelBuffer")==0&&param==1)
-											type=VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
-										else if(strcmp(token->string, "uniformBuffer")==0&&param==1)
-											type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-										else if(strcmp(token->string, "storageBuffer")==0&&param==1)
-											type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-										else if(strcmp(token->string, "uniformBufferDynamic")==0&&param==1)
-											type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-										else if(strcmp(token->string, "storageBufferDynamic")==0&&param==1)
-											type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-										else if(strcmp(token->string, "inputAttachment")==0&&param==1)
-											type=VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-
-										// Stage parameter
-										else if(strcmp(token->string, "vertex")==0&&param==2)
-											stage|=VK_SHADER_STAGE_VERTEX_BIT;
-										else if(strcmp(token->string, "tessellationControl")==0&&param==2)
-											stage|=VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-										else if(strcmp(token->string, "tessellationEvaluation")==0&&param==2)
-											stage|=VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
-										else if(strcmp(token->string, "geometry")==0&&param==2)
-											stage|=VK_SHADER_STAGE_GEOMETRY_BIT;
-										else if(strcmp(token->string, "fragment")==0&&param==2)
-											stage|=VK_SHADER_STAGE_FRAGMENT_BIT;
-										else if(strcmp(token->string, "compute")==0&&param==2)
-											stage|=VK_SHADER_STAGE_COMPUTE_BIT;
-										else
-										{
-											Tokenizer_PrintToken("Unknown parameter ", token);
-											return false;
-										}
-									}
-									else
-									{
-										Tokenizer_PrintToken("Unexpected token ", token);
-										return false;
-									}
-
-									Zone_Free(zone, token);
-									token=Tokenizer_GetNext(&tokenizer);
-
-									if(token->type==TOKEN_DELIMITER)
-									{
-										// Still expecting more parameters, error.
-										if(token->string[0]!=','&&param<2)
-										{
-											DBGPRINTF(DEBUG_ERROR, "Missing comma\n");
-											return false;
-										}
-										// End of expected parameters, end.
-										else if(token->string[0]==')'&&param==2)
-											break;
-										// Special case for 3rd parameter, because multiple stages can be specified.
-										else if(token->string[0]!='|'&&param<2)
-											param++;
-									}
-
-									if(param>2)
-									{
-										DBGPRINTF(DEBUG_ERROR, "Too many params addBinding(binding, type, stage)\n");
-										return false;
-									}
-								}
-
-								if(!vkuDescriptorSet_AddBinding(&pipeline->descriptorSet, binding, type, stage))
-								{
-									DBGPRINTF(DEBUG_ERROR, "Unable to add binding.\n");
-									return false;
-								}
-							}
-						}
-						else
-						{
-							Tokenizer_PrintToken("Unknown token ", token);
-							return false;
-						}
-					}
-				}
-
-				if(!vkuAssembleDescriptorSetLayout(&pipeline->descriptorSet))
-				{
-					DBGPRINTF(DEBUG_ERROR, "Unable to assemble descriptor set layout.\n");
-					return false;
-				}
+				DBGPRINTF(DEBUG_ERROR, "Unable to initialize descriptor set.\n");
+				return false;
 			}
-			// Start building up pipeline ("pipeline { }")
-			else if(strcmp(token->string, "pipeline")==0)
+
+			if(!Parser_Expect(&parser, TOKEN_DELIMITER, '{'))
+				return false;
+
+			// Next token must be a left brace '{'
+			while(!Parser_Match(&parser, TOKEN_DELIMITER, '}'))
 			{
-				if(!vkuInitPipeline(&pipeline->pipeline, context->device, context->pipelineCache))
+				// Look for keyword tokens
+				// Handle "addBinding" keyword
+				if(Parser_ExpectKeyword(&parser, "addBinding"))
 				{
-					DBGPRINTF(DEBUG_ERROR, "Unable to initialize pipeline.\n");
-					return false;
-				}
+					int64_t binding=0;
+					VkDescriptorType type=0;
+					char typeString[32]={ 0 };
+					VkShaderStageFlags stage=0;
+					char stageString[32]={ 0 };
 
-				Zone_Free(zone, token);
-				token=Tokenizer_GetNext(&tokenizer);
-
-				if(token->type!=TOKEN_DELIMITER&&token->string[0]!='{')
-				{
-					Tokenizer_PrintToken("Unexpected token ", token);
-					return false;
-				}
-
-				while(!(token->type==TOKEN_DELIMITER&&token->string[0]=='}'))
-				{
-					Zone_Free(zone, token);
-					token=Tokenizer_GetNext(&tokenizer);
-
-					// Pipeline attribute keywords: "addStage", "addVertexBinding", "addVertexAttribute",
-					// Pipeline state keywords:
-					// subpass
-					// Input assembly state: "topology", "primitiveRestart",
-					// Rasterization state: "depthClamp", "rasterizerDiscard", "polygonMode", "cullMode", "frontFace",
-					//						"depthBias", "depthBiasConstantFactor", "depthBiasClamp", "depthBiasSlopeFactor", "lineWidth",
-					// Depth/stencil state: "depthTest", "depthWrite", "depthCompareOp", "depthBoundsTest", "stencilTest", "minDepthBounds", "maxDepthBounds",
-					// Front face stencil functions: "frontStencilFailOp", "frontStencilPassOp", "frontStencilDepthFailOp", "frontStencilCompareOp",
-					//								 "frontStencilCompareMask", "frontStencilWriteMask", "frontStencilReference",
-					// Back face stencil functions: "backStencilFailOp", "backStencilPassOp", "backStencilDepthFailOp", "backStencilCompareOp",
-					//								"backStencilCompareMask", "backStencilWriteMask", "backStencilReference",
-					// Multisample state: "rasterizationSamples", "sampleShading", "minSampleShading", "sampleMask", "alphaToCoverage", "alphaToOne",
-					// blend state: "blendLogicOp", "blendLogicOpState", "blend", "srcColorBlendFactor", "dstColorBlendFactor", "colorBlendOp",
-					//				"srcAlphaBlendFactor", "dstAlphaBlendFactor", "alphaBlendOp", "colorWriteMask"
-					// Pipeline push constants: pushConstant
-
-					if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "addStage")==0)
+					// First token should be a left parenthesis '('
+					if(Parser_Expect(&parser, TOKEN_DELIMITER, '('))
 					{
-						uint32_t param=0;
-						char shaderFilename[1025]={ 0 };
-						uint8_t *shaderData=NULL;
-						uint32_t shaderSize=0;
-						VkShaderStageFlagBits stage=0;
+						if(!Parser_Integer(&parser, &binding))
+							return false;
 
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
+						if(!Parser_Expect(&parser, TOKEN_DELIMITER, ','))
+							return false;
 
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
+						if(!Parser_String(&parser, typeString, sizeof(typeString)))
+							return false;
+
+						// Type parameter
+						if(strcmp(typeString, "sampler")==0)
+							type=VK_DESCRIPTOR_TYPE_SAMPLER;
+						else if(strcmp(typeString, "combinedSampler")==0)
+							type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+						else if(strcmp(typeString, "sampledImage")==0)
+							type=VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+						else if(strcmp(typeString, "storageImage")==0)
+							type=VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+						else if(strcmp(typeString, "uniformTexelBuffer")==0)
+							type=VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+						else if(strcmp(typeString, "storageTexelBuffer")==0)
+							type=VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+						else if(strcmp(typeString, "uniformBuffer")==0)
+							type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+						else if(strcmp(typeString, "storageBuffer")==0)
+							type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+						else if(strcmp(typeString, "uniformBufferDynamic")==0)
+							type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+						else if(strcmp(typeString, "storageBufferDynamic")==0)
+							type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+						else if(strcmp(typeString, "inputAttachment")==0)
+							type=VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+
+						if(!Parser_Expect(&parser, TOKEN_DELIMITER, ','))
+							return false;
+
+						for(;;)
 						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
+							if(!Parser_String(&parser, stageString, sizeof(stageString)))
+								return false;
 
-							if(token->type==TOKEN_QUOTED&&param==0)
-								strncpy(shaderFilename, token->string, 1024);
-							else if(token->type==TOKEN_KEYWORD)
-							{
-								if(strcmp(token->string, "base64")==0&&param==0)
-								{
-									Zone_Free(zone, token);
-									token=Tokenizer_GetNext(&tokenizer);
-
-									shaderData=Zone_Malloc(zone, strlen(token->string));
-
-									if(shaderData==NULL)
-										return false;
-
-									shaderSize=base64Decode(token->string, shaderData);
-								}
-							}
-							else if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "vertex")==0&&param==1)
-									stage=VK_SHADER_STAGE_VERTEX_BIT;
-								else if(strcmp(token->string, "tessellationControl")==0&&param==1)
-									stage=VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-								else if(strcmp(token->string, "tessellationEvaluation")==0&&param==1)
-									stage=VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
-								else if(strcmp(token->string, "geometry")==0&&param==1)
-									stage=VK_SHADER_STAGE_GEOMETRY_BIT;
-								else if(strcmp(token->string, "fragment")==0&&param==1)
-									stage=VK_SHADER_STAGE_FRAGMENT_BIT;
-								else if(strcmp(token->string, "compute")==0&&param==1)
-									stage=VK_SHADER_STAGE_COMPUTE_BIT;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
+							if(strcmp(stageString, "vertex")==0)
+								stage|=VK_SHADER_STAGE_VERTEX_BIT;
+							else if(strcmp(stageString, "tessellationControl")==0)
+								stage|=VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+							else if(strcmp(stageString, "tessellationEvaluation")==0)
+								stage|=VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+							else if(strcmp(stageString, "geometry")==0)
+								stage|=VK_SHADER_STAGE_GEOMETRY_BIT;
+							else if(strcmp(stageString, "fragment")==0)
+								stage|=VK_SHADER_STAGE_FRAGMENT_BIT;
+							else if(strcmp(stageString, "compute")==0)
+								stage|=VK_SHADER_STAGE_COMPUTE_BIT;
 							else
 							{
-								Tokenizer_PrintToken("Unexpected token ", token);
+								DBGPRINTF(DEBUG_ERROR, "Unknown shader stage '%s'.\n", stageString);
 								return false;
 							}
 
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER)
-							{
-								if(token->string[0]!=','&&param<1)
-								{
-									DBGPRINTF(DEBUG_ERROR, "Missing comma\n");
-									return false;
-								}
-								else if(token->string[0]==')'&&param==1)
-									break;
-								else
-									param++;
-							}
-
-							if(param>1)
-							{
-								DBGPRINTF(DEBUG_ERROR, "Too many params addStage(\"shader filename\", stage)\n");
-								return false;
-							}
+							if(!Parser_Match(&parser, TOKEN_DELIMITER, '|'))
+								break;
 						}
 
-						if(shaderData)
+						if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+							return false;
+
+						if(!vkuDescriptorSet_AddBinding(&pipeline->descriptorSet, (uint32_t)binding, type, stage))
 						{
-							if(!vkuPipeline_AddStageMemory(&pipeline->pipeline, (uint32_t *)shaderData, shaderSize, stage))
-							{
-								DBGPRINTF(DEBUG_ERROR, "Unable to add shader stage to pipeline: %s\n", shaderFilename);
-								return false;
-							}
-
-							Zone_Free(zone, shaderData);
+							DBGPRINTF(DEBUG_ERROR, "Unable to add binding.\n");
+							return false;
 						}
+					}
+					else
+						return false;
+				}
+				else
+					return false;
+			}
+
+			if(!vkuAssembleDescriptorSetLayout(&pipeline->descriptorSet))
+			{
+				DBGPRINTF(DEBUG_ERROR, "Unable to assemble descriptor set layout.\n");
+				return false;
+			}
+		}
+		// Start building up pipeline ("pipeline { }")
+		else if(Parser_MatchKeyword(&parser, "pipeline"))
+		{
+			if(!vkuInitPipeline(&pipeline->pipeline, context->device, context->pipelineCache))
+			{
+				DBGPRINTF(DEBUG_ERROR, "Unable to initialize pipeline.\n");
+				return false;
+			}
+
+			if(!Parser_Expect(&parser, TOKEN_DELIMITER, '{'))
+				return false;
+
+			while(!Parser_Match(&parser, TOKEN_DELIMITER, '}'))
+			{
+				// Pipeline attribute keywords: "addStage", "addVertexBinding", "addVertexAttribute",
+				// Pipeline state keywords:
+				// subpass
+				// Input assembly state: "topology", "primitiveRestart",
+				// Rasterization state: "depthClamp", "rasterizerDiscard", "polygonMode", "cullMode", "frontFace",
+				//						"depthBias", "depthBiasConstantFactor", "depthBiasClamp", "depthBiasSlopeFactor", "lineWidth",
+				// Depth/stencil state: "depthTest", "depthWrite", "depthCompareOp", "depthBoundsTest", "stencilTest", "minDepthBounds", "maxDepthBounds",
+				// Front face stencil functions: "frontStencilFailOp", "frontStencilPassOp", "frontStencilDepthFailOp", "frontStencilCompareOp",
+				//								 "frontStencilCompareMask", "frontStencilWriteMask", "frontStencilReference",
+				// Back face stencil functions: "backStencilFailOp", "backStencilPassOp", "backStencilDepthFailOp", "backStencilCompareOp",
+				//								"backStencilCompareMask", "backStencilWriteMask", "backStencilReference",
+				// Multisample state: "rasterizationSamples", "sampleShading", "minSampleShading", "sampleMask", "alphaToCoverage", "alphaToOne",
+				// blend state: "blendLogicOp", "blendLogicOpState", "blend", "srcColorBlendFactor", "dstColorBlendFactor", "colorBlendOp",
+				//				"srcAlphaBlendFactor", "dstAlphaBlendFactor", "alphaBlendOp", "colorWriteMask"
+				// Pipeline push constants: pushConstant
+
+				if(Parser_MatchKeyword(&parser, "addStage"))
+				{
+					char shaderFilename[1025]={ 0 };
+					uint8_t *shaderData=NULL;
+					uint32_t shaderSize=0;
+					char stageString[32]={ 0 };
+					VkShaderStageFlagBits stage=0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(Parser_MatchKeyword(&parser, "base64"))
+					{
+						Token_t *token=Tokenizer_GetNext(&tokenizer);
+
+						if(token->type!=TOKEN_QUOTED)
+						{
+							Tokenizer_PrintToken("Unexpected token ", token);
+							return false;
+						}
+
+						shaderData=Zone_Malloc(zone, strlen(token->string));
+
+						if(shaderData==NULL)
+							return false;
+
+						shaderSize=base64Decode(token->string, shaderData);
+
+						Zone_Free(zone, token);
+					}
+					else if(!Parser_String(&parser, shaderFilename, sizeof(shaderFilename)))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ','))
+						return false;
+			
+					if(Parser_String(&parser, stageString, sizeof(stageString)))
+					{
+						if(strcmp(stageString, "vertex")==0)
+							stage=VK_SHADER_STAGE_VERTEX_BIT;
+						else if(strcmp(stageString, "tessellationControl")==0)
+							stage=VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+						else if(strcmp(stageString, "tessellationEvaluation")==0)
+							stage=VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+						else if(strcmp(stageString, "geometry")==0)
+							stage=VK_SHADER_STAGE_GEOMETRY_BIT;
+						else if(strcmp(stageString, "fragment")==0)
+							stage=VK_SHADER_STAGE_FRAGMENT_BIT;
+						else if(strcmp(stageString, "compute")==0)
+							stage=VK_SHADER_STAGE_COMPUTE_BIT;
 						else
 						{
-							if(!vkuPipeline_AddStage(&pipeline->pipeline, shaderFilename, stage))
-							{
-								DBGPRINTF(DEBUG_ERROR, "Unable to add shader stage to pipeline: %s\n", shaderFilename);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "addVertexBinding")==0)
-					{
-						uint32_t param=0;
-						uint32_t binding=0;
-						uint32_t stride=0;
-						VkVertexInputRate inputRate=VK_VERTEX_INPUT_RATE_VERTEX;
-
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_INT&&param==0)
-								binding=(uint32_t)token->ival;
-							else if(token->type==TOKEN_INT&&param==1)
-								stride=(uint32_t)token->ival;
-							else if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "perVertex")==0&&param==2)
-									inputRate=VK_VERTEX_INPUT_RATE_VERTEX;
-								else if(strcmp(token->string, "perInstance")==0&&param==2)
-									inputRate=VK_VERTEX_INPUT_RATE_INSTANCE;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER)
-							{
-								if(token->string[0]!=','&&param<2)
-								{
-									DBGPRINTF(DEBUG_ERROR, "Missing comma\n");
-									return false;
-								}
-								else if(token->string[0]==')'&&param==2)
-									break;
-								else
-									param++;
-							}
-
-							if(param>2)
-							{
-								DBGPRINTF(DEBUG_ERROR, "Too many params addVertexBinding(binding, stride, inputRate)\n");
-								return false;
-							}
-						}
-
-						if(!vkuPipeline_AddVertexBinding(&pipeline->pipeline, binding, stride, inputRate))
-						{
-							DBGPRINTF(DEBUG_ERROR, "Unable to add vertex binding.\n");
+							DBGPRINTF(DEBUG_ERROR, "Unknown shader stage '%s'.\n", stageString);
 							return false;
 						}
 					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "addVertexAttribute")==0)
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					if(shaderData)
 					{
-						uint32_t param=0;
-						uint32_t location=0;
-						uint32_t binding=0;
-						VkFormat format=VK_FORMAT_UNDEFINED;
-						uint32_t offset=0;
-
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
+						if(!vkuPipeline_AddStageMemory(&pipeline->pipeline, (uint32_t *)shaderData, shaderSize, stage))
 						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_INT&&param==0)
-								location=(uint32_t)token->ival;
-							else if(token->type==TOKEN_INT&&param==1)
-								binding=(uint32_t)token->ival;
-							else if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "r8_unorm")==0&&param==2)
-									format=VK_FORMAT_R8_UNORM;
-								else if(strcmp(token->string, "r8_snorm")==0&&param==2)
-									format=VK_FORMAT_R8_SNORM;
-								else if(strcmp(token->string, "r8_uint")==0&&param==2)
-									format=VK_FORMAT_R8_UINT;
-								else if(strcmp(token->string, "r8_sint")==0&&param==2)
-									format=VK_FORMAT_R8_SINT;
-								else if(strcmp(token->string, "rg8_unorm")==0&&param==2)
-									format=VK_FORMAT_R8G8_UNORM;
-								else if(strcmp(token->string, "rg8_snorm")==0&&param==2)
-									format=VK_FORMAT_R8G8_SNORM;
-								else if(strcmp(token->string, "rg8_uint")==0&&param==2)
-									format=VK_FORMAT_R8G8_UINT;
-								else if(strcmp(token->string, "rg8_sint")==0&&param==2)
-									format=VK_FORMAT_R8G8_SINT;
-								else if(strcmp(token->string, "rgb8_unorm")==0&&param==2)
-									format=VK_FORMAT_R8G8B8_UNORM;
-								else if(strcmp(token->string, "rgb8_snorm")==0&&param==2)
-									format=VK_FORMAT_R8G8B8_SNORM;
-								else if(strcmp(token->string, "rgb8_uint")==0&&param==2)
-									format=VK_FORMAT_R8G8B8_UINT;
-								else if(strcmp(token->string, "rgb8_sint")==0&&param==2)
-									format=VK_FORMAT_R8G8B8_SINT;
-								else if(strcmp(token->string, "bgr8_unorm")==0&&param==2)
-									format=VK_FORMAT_B8G8R8_UNORM;
-								else if(strcmp(token->string, "bgr8_snorm")==0&&param==2)
-									format=VK_FORMAT_B8G8R8_SNORM;
-								else if(strcmp(token->string, "bgr8_uint")==0&&param==2)
-									format=VK_FORMAT_B8G8R8_UINT;
-								else if(strcmp(token->string, "bgr8_sint")==0&&param==2)
-									format=VK_FORMAT_B8G8R8_SINT;
-								else if(strcmp(token->string, "rgba8_unorm")==0&&param==2)
-									format=VK_FORMAT_R8G8B8A8_UNORM;
-								else if(strcmp(token->string, "rgba8_snorm")==0&&param==2)
-									format=VK_FORMAT_R8G8B8A8_SNORM;
-								else if(strcmp(token->string, "rgba8_uint")==0&&param==2)
-									format=VK_FORMAT_R8G8B8A8_UINT;
-								else if(strcmp(token->string, "rgba8_sint")==0&&param==2)
-									format=VK_FORMAT_R8G8B8A8_SINT;
-								else if(strcmp(token->string, "bgra8_unorm")==0&&param==2)
-									format=VK_FORMAT_B8G8R8A8_UNORM;
-								else if(strcmp(token->string, "bgra8_snorm")==0&&param==2)
-									format=VK_FORMAT_B8G8R8A8_SNORM;
-								else if(strcmp(token->string, "bgra8_uint")==0&&param==2)
-									format=VK_FORMAT_B8G8R8A8_UINT;
-								else if(strcmp(token->string, "bgra8_sint")==0&&param==2)
-									format=VK_FORMAT_B8G8R8A8_SINT;
-								else if(strcmp(token->string, "abgr8_unorm")==0&&param==2)
-									format=VK_FORMAT_A8B8G8R8_UNORM_PACK32;
-								else if(strcmp(token->string, "abgr8_snorm")==0&&param==2)
-									format=VK_FORMAT_A8B8G8R8_SNORM_PACK32;
-								else if(strcmp(token->string, "abgr8_uint")==0&&param==2)
-									format=VK_FORMAT_A8B8G8R8_UINT_PACK32;
-								else if(strcmp(token->string, "abgr8_sint")==0&&param==2)
-									format=VK_FORMAT_A8B8G8R8_SINT_PACK32;
-								else if(strcmp(token->string, "a2r10g10b10_unorm")==0&&param==2)
-									format=VK_FORMAT_A2R10G10B10_UNORM_PACK32;
-								else if(strcmp(token->string, "a2r10g10b10_snorm")==0&&param==2)
-									format=VK_FORMAT_A2R10G10B10_SNORM_PACK32;
-								else if(strcmp(token->string, "a2r10g10b10_uint")==0&&param==2)
-									format=VK_FORMAT_A2R10G10B10_UINT_PACK32;
-								else if(strcmp(token->string, "a2r10g10b10_sint")==0&&param==2)
-									format=VK_FORMAT_A2R10G10B10_SINT_PACK32;
-								else if(strcmp(token->string, "a2b10g10r10_unorm")==0&&param==2)
-									format=VK_FORMAT_A2B10G10R10_UNORM_PACK32;
-								else if(strcmp(token->string, "a2b10g10r10_snorm")==0&&param==2)
-									format=VK_FORMAT_A2B10G10R10_SNORM_PACK32;
-								else if(strcmp(token->string, "a2b10g10r10_uint")==0&&param==2)
-									format=VK_FORMAT_A2B10G10R10_UINT_PACK32;
-								else if(strcmp(token->string, "a2b10g10r10_sint")==0&&param==2)
-									format=VK_FORMAT_A2B10G10R10_SINT_PACK32;
-								else if(strcmp(token->string, "r16_unorm")==0&&param==2)
-									format=VK_FORMAT_R16_UNORM;
-								else if(strcmp(token->string, "r16_snorm")==0&&param==2)
-									format=VK_FORMAT_R16_SNORM;
-								else if(strcmp(token->string, "r16_uint")==0&&param==2)
-									format=VK_FORMAT_R16_UINT;
-								else if(strcmp(token->string, "r16_sint")==0&&param==2)
-									format=VK_FORMAT_R16_SINT;
-								else if(strcmp(token->string, "r16_sfloat")==0&&param==2)
-									format=VK_FORMAT_R16_SFLOAT;
-								else if(strcmp(token->string, "rg16_unorm")==0&&param==2)
-									format=VK_FORMAT_R16G16_UNORM;
-								else if(strcmp(token->string, "rg16_snorm")==0&&param==2)
-									format=VK_FORMAT_R16G16_SNORM;
-								else if(strcmp(token->string, "rg16_uint")==0&&param==2)
-									format=VK_FORMAT_R16G16_UINT;
-								else if(strcmp(token->string, "rg16_sint")==0&&param==2)
-									format=VK_FORMAT_R16G16_SINT;
-								else if(strcmp(token->string, "rg16_sfloat")==0&&param==2)
-									format=VK_FORMAT_R16G16_SFLOAT;
-								else if(strcmp(token->string, "rgb16_unorm")==0&&param==2)
-									format=VK_FORMAT_R16G16B16_UNORM;
-								else if(strcmp(token->string, "rgb16_snorm")==0&&param==2)
-									format=VK_FORMAT_R16G16B16_SNORM;
-								else if(strcmp(token->string, "rgb16_uint")==0&&param==2)
-									format=VK_FORMAT_R16G16B16_UINT;
-								else if(strcmp(token->string, "rgb16_sint")==0&&param==2)
-									format=VK_FORMAT_R16G16B16_SINT;
-								else if(strcmp(token->string, "rgb16_sfloat")==0&&param==2)
-									format=VK_FORMAT_R16G16B16_SFLOAT;
-								else if(strcmp(token->string, "rgba16_unorm")==0&&param==2)
-									format=VK_FORMAT_R16G16B16A16_UNORM;
-								else if(strcmp(token->string, "rgba16_snorm")==0&&param==2)
-									format=VK_FORMAT_R16G16B16A16_SNORM;
-								else if(strcmp(token->string, "rgba16_uint")==0&&param==2)
-									format=VK_FORMAT_R16G16B16A16_UINT;
-								else if(strcmp(token->string, "rgba16_sint")==0&&param==2)
-									format=VK_FORMAT_R16G16B16A16_SINT;
-								else if(strcmp(token->string, "rgba16_sfloat")==0&&param==2)
-									format=VK_FORMAT_R16G16B16A16_SFLOAT;
-								else if(strcmp(token->string, "r32_uint")==0&&param==2)
-									format=VK_FORMAT_R32_UINT;
-								else if(strcmp(token->string, "r32_sint")==0&&param==2)
-									format=VK_FORMAT_R32_SINT;
-								else if(strcmp(token->string, "r32_sfloat")==0&&param==2)
-									format=VK_FORMAT_R32_SFLOAT;
-								else if(strcmp(token->string, "rg32_uint")==0&&param==2)
-									format=VK_FORMAT_R32G32_UINT;
-								else if(strcmp(token->string, "rg32_sint")==0&&param==2)
-									format=VK_FORMAT_R32G32_SINT;
-								else if(strcmp(token->string, "rg32_sfloat")==0&&param==2)
-									format=VK_FORMAT_R32G32_SFLOAT;
-								else if(strcmp(token->string, "rgb32_uint")==0&&param==2)
-									format=VK_FORMAT_R32G32B32_UINT;
-								else if(strcmp(token->string, "rgb32_sint")==0&&param==2)
-									format=VK_FORMAT_R32G32B32_SINT;
-								else if(strcmp(token->string, "rgb32_sfloat")==0&&param==2)
-									format=VK_FORMAT_R32G32B32_SFLOAT;
-								else if(strcmp(token->string, "rgba32_uint")==0&&param==2)
-									format=VK_FORMAT_R32G32B32A32_UINT;
-								else if(strcmp(token->string, "rgba32_sint")==0&&param==2)
-									format=VK_FORMAT_R32G32B32A32_SINT;
-								else if(strcmp(token->string, "rgba32_sfloat")==0&&param==2)
-									format=VK_FORMAT_R32G32B32A32_SFLOAT;
-								else if(strcmp(token->string, "r64_uint")==0&&param==2)
-									format=VK_FORMAT_R64_UINT;
-								else if(strcmp(token->string, "r64_sint")==0&&param==2)
-									format=VK_FORMAT_R64_SINT;
-								else if(strcmp(token->string, "r64_sfloat")==0&&param==2)
-									format=VK_FORMAT_R64_SFLOAT;
-								else if(strcmp(token->string, "rg64_uint")==0&&param==2)
-									format=VK_FORMAT_R64G64_UINT;
-								else if(strcmp(token->string, "rg64_sint")==0&&param==2)
-									format=VK_FORMAT_R64G64_SINT;
-								else if(strcmp(token->string, "rg64_sfloat")==0&&param==2)
-									format=VK_FORMAT_R64G64_SFLOAT;
-								else if(strcmp(token->string, "rgb64_uint")==0&&param==2)
-									format=VK_FORMAT_R64G64B64_UINT;
-								else if(strcmp(token->string, "rgb64_sint")==0&&param==2)
-									format=VK_FORMAT_R64G64B64_SINT;
-								else if(strcmp(token->string, "rgb64_sfloat")==0&&param==2)
-									format=VK_FORMAT_R64G64B64_SFLOAT;
-								else if(strcmp(token->string, "rgba64_uint")==0&&param==2)
-									format=VK_FORMAT_R64G64B64A64_UINT;
-								else if(strcmp(token->string, "rgba64_sint")==0&&param==2)
-									format=VK_FORMAT_R64G64B64A64_SINT;
-								else if(strcmp(token->string, "rgba64_sfloat")==0&&param==2)
-									format=VK_FORMAT_R64G64B64A64_SFLOAT;
-								else
-								{
-									Tokenizer_PrintToken("Unknown format parameter ", token);
-									return false;
-								}
-							}
-							else if(token->type==TOKEN_INT&&param==3)
-								offset=(uint32_t)token->ival;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER)
-							{
-								if(token->string[0]!=','&&param<3)
-								{
-									DBGPRINTF(DEBUG_ERROR, "Missing comma\n");
-									return false;
-								}
-								else if(token->string[0]==')'&&param==3)
-									break;
-								else
-									param++;
-							}
-
-							if(param>3)
-							{
-								DBGPRINTF(DEBUG_ERROR, "Too many params addVertexAttribute(location, binding, format, offset)\n");
-								return false;
-							}
+							DBGPRINTF(DEBUG_ERROR, "Unable to add shader stage to pipeline: %s\n", shaderFilename);
+							return false;
 						}
 
-						if(!vkuPipeline_AddVertexAttribute(&pipeline->pipeline, location, binding, format, offset))
+						Zone_Free(zone, shaderData);
+					}
+					else
+					{
+						if(!vkuPipeline_AddStage(&pipeline->pipeline, shaderFilename, stage))
 						{
-							DBGPRINTF(DEBUG_ERROR, "Unable to add vertex binding.\n");
+							DBGPRINTF(DEBUG_ERROR, "Unable to add shader stage to pipeline: %s\n", shaderFilename);
 							return false;
 						}
 					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "subpass")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
+				}
+				else if(Parser_MatchKeyword(&parser, "addVertexBinding"))
+				{
+					int64_t binding=0;
+					int64_t stride=0;
+					char inputRateString[32]={ 0 };
+					VkVertexInputRate inputRate=VK_VERTEX_INPUT_RATE_VERTEX;
 
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Integer(&parser, &binding))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ','))
+						return false;
+
+					if(!Parser_Integer(&parser, &stride))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ','))
+						return false;
+
+					if(!Parser_String(&parser, inputRateString, sizeof(inputRateString)))
+						return false;
+
+					if(strcmp(inputRateString, "perVertex")==0)
+						inputRate=VK_VERTEX_INPUT_RATE_VERTEX;
+					else if(strcmp(inputRateString, "perInstance")==0)
+						inputRate=VK_VERTEX_INPUT_RATE_INSTANCE;
+					else
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unknown vertex input rate '%s'.\n", inputRateString);
+						return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					if(!vkuPipeline_AddVertexBinding(&pipeline->pipeline, binding, stride, inputRate))
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unable to add vertex binding.\n");
+						return false;
+					}
+				}
+				else if(Parser_MatchKeyword(&parser, "addVertexAttribute"))
+				{
+					int64_t location=0;
+					int64_t binding=0;
+					char formatString[32]={ 0 };
+					VkFormat format=VK_FORMAT_UNDEFINED;
+					int64_t offset=0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Integer(&parser, &location))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ','))
+						return false;
+
+					if(!Parser_Integer(&parser, &binding))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ','))
+						return false;
+
+					if(!Parser_String(&parser, formatString, sizeof(formatString)))
+						return false;
+
+					if(strcmp(formatString, "r8_unorm")==0)
+						format=VK_FORMAT_R8_UNORM;
+					else if(strcmp(formatString, "r8_snorm")==0)
+						format=VK_FORMAT_R8_SNORM;
+					else if(strcmp(formatString, "r8_uint")==0)
+						format=VK_FORMAT_R8_UINT;
+					else if(strcmp(formatString, "r8_sint")==0)
+						format=VK_FORMAT_R8_SINT;
+					else if(strcmp(formatString, "rg8_unorm")==0)
+						format=VK_FORMAT_R8G8_UNORM;
+					else if(strcmp(formatString, "rg8_snorm")==0)
+						format=VK_FORMAT_R8G8_SNORM;
+					else if(strcmp(formatString, "rg8_uint")==0)
+						format=VK_FORMAT_R8G8_UINT;
+					else if(strcmp(formatString, "rg8_sint")==0)
+						format=VK_FORMAT_R8G8_SINT;
+					else if(strcmp(formatString, "rgb8_unorm")==0)
+						format=VK_FORMAT_R8G8B8_UNORM;
+					else if(strcmp(formatString, "rgb8_snorm")==0)
+						format=VK_FORMAT_R8G8B8_SNORM;
+					else if(strcmp(formatString, "rgb8_uint")==0)
+						format=VK_FORMAT_R8G8B8_UINT;
+					else if(strcmp(formatString, "rgb8_sint")==0)
+						format=VK_FORMAT_R8G8B8_SINT;
+					else if(strcmp(formatString, "bgr8_unorm")==0)
+						format=VK_FORMAT_B8G8R8_UNORM;
+					else if(strcmp(formatString, "bgr8_snorm")==0)
+						format=VK_FORMAT_B8G8R8_SNORM;
+					else if(strcmp(formatString, "bgr8_uint")==0)
+						format=VK_FORMAT_B8G8R8_UINT;
+					else if(strcmp(formatString, "bgr8_sint")==0)
+						format=VK_FORMAT_B8G8R8_SINT;
+					else if(strcmp(formatString, "rgba8_unorm")==0)
+						format=VK_FORMAT_R8G8B8A8_UNORM;
+					else if(strcmp(formatString, "rgba8_snorm")==0)
+						format=VK_FORMAT_R8G8B8A8_SNORM;
+					else if(strcmp(formatString, "rgba8_uint")==0)
+						format=VK_FORMAT_R8G8B8A8_UINT;
+					else if(strcmp(formatString, "rgba8_sint")==0)
+						format=VK_FORMAT_R8G8B8A8_SINT;
+					else if(strcmp(formatString, "bgra8_unorm")==0)
+						format=VK_FORMAT_B8G8R8A8_UNORM;
+					else if(strcmp(formatString, "bgra8_snorm")==0)
+						format=VK_FORMAT_B8G8R8A8_SNORM;
+					else if(strcmp(formatString, "bgra8_uint")==0)
+						format=VK_FORMAT_B8G8R8A8_UINT;
+					else if(strcmp(formatString, "bgra8_sint")==0)
+						format=VK_FORMAT_B8G8R8A8_SINT;
+					else if(strcmp(formatString, "abgr8_unorm")==0)
+						format=VK_FORMAT_A8B8G8R8_UNORM_PACK32;
+					else if(strcmp(formatString, "abgr8_snorm")==0)
+						format=VK_FORMAT_A8B8G8R8_SNORM_PACK32;
+					else if(strcmp(formatString, "abgr8_uint")==0)
+						format=VK_FORMAT_A8B8G8R8_UINT_PACK32;
+					else if(strcmp(formatString, "abgr8_sint")==0)
+						format=VK_FORMAT_A8B8G8R8_SINT_PACK32;
+					else if(strcmp(formatString, "a2r10g10b10_unorm")==0)
+						format=VK_FORMAT_A2R10G10B10_UNORM_PACK32;
+					else if(strcmp(formatString, "a2r10g10b10_snorm")==0)
+						format=VK_FORMAT_A2R10G10B10_SNORM_PACK32;
+					else if(strcmp(formatString, "a2r10g10b10_uint")==0)
+						format=VK_FORMAT_A2R10G10B10_UINT_PACK32;
+					else if(strcmp(formatString, "a2r10g10b10_sint")==0)
+						format=VK_FORMAT_A2R10G10B10_SINT_PACK32;
+					else if(strcmp(formatString, "a2b10g10r10_unorm")==0)
+						format=VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+					else if(strcmp(formatString, "a2b10g10r10_snorm")==0)
+						format=VK_FORMAT_A2B10G10R10_SNORM_PACK32;
+					else if(strcmp(formatString, "a2b10g10r10_uint")==0)
+						format=VK_FORMAT_A2B10G10R10_UINT_PACK32;
+					else if(strcmp(formatString, "a2b10g10r10_sint")==0)
+						format=VK_FORMAT_A2B10G10R10_SINT_PACK32;
+					else if(strcmp(formatString, "r16_unorm")==0)
+						format=VK_FORMAT_R16_UNORM;
+					else if(strcmp(formatString, "r16_snorm")==0)
+						format=VK_FORMAT_R16_SNORM;
+					else if(strcmp(formatString, "r16_uint")==0)
+						format=VK_FORMAT_R16_UINT;
+					else if(strcmp(formatString, "r16_sint")==0)
+						format=VK_FORMAT_R16_SINT;
+					else if(strcmp(formatString, "r16_sfloat")==0)
+						format=VK_FORMAT_R16_SFLOAT;
+					else if(strcmp(formatString, "rg16_unorm")==0)
+						format=VK_FORMAT_R16G16_UNORM;
+					else if(strcmp(formatString, "rg16_snorm")==0)
+						format=VK_FORMAT_R16G16_SNORM;
+					else if(strcmp(formatString, "rg16_uint")==0)
+						format=VK_FORMAT_R16G16_UINT;
+					else if(strcmp(formatString, "rg16_sint")==0)
+						format=VK_FORMAT_R16G16_SINT;
+					else if(strcmp(formatString, "rg16_sfloat")==0)
+						format=VK_FORMAT_R16G16_SFLOAT;
+					else if(strcmp(formatString, "rgb16_unorm")==0)
+						format=VK_FORMAT_R16G16B16_UNORM;
+					else if(strcmp(formatString, "rgb16_snorm")==0)
+						format=VK_FORMAT_R16G16B16_SNORM;
+					else if(strcmp(formatString, "rgb16_uint")==0)
+						format=VK_FORMAT_R16G16B16_UINT;
+					else if(strcmp(formatString, "rgb16_sint")==0)
+						format=VK_FORMAT_R16G16B16_SINT;
+					else if(strcmp(formatString, "rgb16_sfloat")==0)
+						format=VK_FORMAT_R16G16B16_SFLOAT;
+					else if(strcmp(formatString, "rgba16_unorm")==0)
+						format=VK_FORMAT_R16G16B16A16_UNORM;
+					else if(strcmp(formatString, "rgba16_snorm")==0)
+						format=VK_FORMAT_R16G16B16A16_SNORM;
+					else if(strcmp(formatString, "rgba16_uint")==0)
+						format=VK_FORMAT_R16G16B16A16_UINT;
+					else if(strcmp(formatString, "rgba16_sint")==0)
+						format=VK_FORMAT_R16G16B16A16_SINT;
+					else if(strcmp(formatString, "rgba16_sfloat")==0)
+						format=VK_FORMAT_R16G16B16A16_SFLOAT;
+					else if(strcmp(formatString, "r32_uint")==0)
+						format=VK_FORMAT_R32_UINT;
+					else if(strcmp(formatString, "r32_sint")==0)
+						format=VK_FORMAT_R32_SINT;
+					else if(strcmp(formatString, "r32_sfloat")==0)
+						format=VK_FORMAT_R32_SFLOAT;
+					else if(strcmp(formatString, "rg32_uint")==0)
+						format=VK_FORMAT_R32G32_UINT;
+					else if(strcmp(formatString, "rg32_sint")==0)
+						format=VK_FORMAT_R32G32_SINT;
+					else if(strcmp(formatString, "rg32_sfloat")==0)
+						format=VK_FORMAT_R32G32_SFLOAT;
+					else if(strcmp(formatString, "rgb32_uint")==0)
+						format=VK_FORMAT_R32G32B32_UINT;
+					else if(strcmp(formatString, "rgb32_sint")==0)
+						format=VK_FORMAT_R32G32B32_SINT;
+					else if(strcmp(formatString, "rgb32_sfloat")==0)
+						format=VK_FORMAT_R32G32B32_SFLOAT;
+					else if(strcmp(formatString, "rgba32_uint")==0)
+						format=VK_FORMAT_R32G32B32A32_UINT;
+					else if(strcmp(formatString, "rgba32_sint")==0)
+						format=VK_FORMAT_R32G32B32A32_SINT;
+					else if(strcmp(formatString, "rgba32_sfloat")==0)
+						format=VK_FORMAT_R32G32B32A32_SFLOAT;
+					else if(strcmp(formatString, "r64_uint")==0)
+						format=VK_FORMAT_R64_UINT;
+					else if(strcmp(formatString, "r64_sint")==0)
+						format=VK_FORMAT_R64_SINT;
+					else if(strcmp(formatString, "r64_sfloat")==0)
+						format=VK_FORMAT_R64_SFLOAT;
+					else if(strcmp(formatString, "rg64_uint")==0)
+						format=VK_FORMAT_R64G64_UINT;
+					else if(strcmp(formatString, "rg64_sint")==0)
+						format=VK_FORMAT_R64G64_SINT;
+					else if(strcmp(formatString, "rg64_sfloat")==0)
+						format=VK_FORMAT_R64G64_SFLOAT;
+					else if(strcmp(formatString, "rgb64_uint")==0)
+						format=VK_FORMAT_R64G64B64_UINT;
+					else if(strcmp(formatString, "rgb64_sint")==0)
+						format=VK_FORMAT_R64G64B64_SINT;
+					else if(strcmp(formatString, "rgb64_sfloat")==0)
+						format=VK_FORMAT_R64G64B64_SFLOAT;
+					else if(strcmp(formatString, "rgba64_uint")==0)
+						format=VK_FORMAT_R64G64B64A64_UINT;
+					else if(strcmp(formatString, "rgba64_sint")==0)
+						format=VK_FORMAT_R64G64B64A64_SINT;
+					else if(strcmp(formatString, "rgba64_sfloat")==0)
+						format=VK_FORMAT_R64G64B64A64_SFLOAT;
+					else
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unknown vertex attribute format '%s'.\n", formatString);
+						return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ','))
+						return false;
+
+
+					if(!Parser_Integer(&parser, &offset))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					if(!vkuPipeline_AddVertexAttribute(&pipeline->pipeline, location, binding, format, offset))
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unable to add vertex binding.\n");
+						return false;
+					}
+				}
+				else if(Parser_MatchKeyword(&parser, "subpass"))
+				{
+					int64_t subpass=0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Integer(&parser, &subpass))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					pipeline->pipeline.subpass=(uint32_t)subpass;
+				}
+				else if(Parser_MatchKeyword(&parser, "topology"))
+				{
+					char topologyString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, topologyString, sizeof(topologyString)))
+						return false;
+
+					if(strcmp(topologyString, "pointList")==0)
+						pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+					else if(strcmp(topologyString, "lineList")==0)
+						pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+					else if(strcmp(topologyString, "lineStrip")==0)
+						pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+					else if(strcmp(topologyString, "triangleList")==0)
+						pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+					else if(strcmp(topologyString, "triangleStrip")==0)
+						pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+					else if(strcmp(topologyString, "triangleFan")==0)
+						pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+					else if(strcmp(topologyString, "listListAdjacency")==0)
+						pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY;
+					else if(strcmp(topologyString, "listStripAdjacency")==0)
+						pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY;
+					else if(strcmp(topologyString, "triangleListAdjacency")==0)
+						pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY;
+					else if(strcmp(topologyString, "triangleStripAdjacency")==0)
+						pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY;
+					else if(strcmp(topologyString, "patchList")==0)
+						pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+					else
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unknown topology '%s'.\n", topologyString);
+						return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "primitiveRestart"))
+				{
+					bool primitiveRestart=false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(Parser_Boolean(&parser, &primitiveRestart))
+						pipeline->pipeline.primitiveRestart=primitiveRestart?VK_TRUE:VK_FALSE;
+					else
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "depthClamp"))
+				{
+					bool depthClamp=false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Boolean(&parser, &depthClamp))
+						return false;
+					else
+						pipeline->pipeline.depthClamp=depthClamp?VK_TRUE:VK_FALSE;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "rasterizerDiscard"))
+				{
+					bool rasterizerDiscard=false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Boolean(&parser, &rasterizerDiscard))
+						return false;
+					else
+						pipeline->pipeline.rasterizerDiscard=rasterizerDiscard?VK_TRUE:VK_FALSE;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "polygonMode"))
+				{
+					char polygonModeString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, polygonModeString, sizeof(polygonModeString)))
+						return false;
+
+					if(strcmp(polygonModeString, "fill")==0)
+						pipeline->pipeline.polygonMode=VK_POLYGON_MODE_FILL;
+					else if(strcmp(polygonModeString, "line")==0)
+						pipeline->pipeline.polygonMode=VK_POLYGON_MODE_LINE;
+					else if(strcmp(polygonModeString, "point")==0)
+						pipeline->pipeline.polygonMode=VK_POLYGON_MODE_POINT;
+					else
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unknown polygonMode '%s'.\n", polygonModeString);
+						return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "cullMode"))
+				{
+					char cullModeString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, cullModeString, sizeof(cullModeString)))
+						return false;
+
+					if(strcmp(cullModeString, "none")==0)
+						pipeline->pipeline.cullMode=VK_CULL_MODE_NONE;
+					else if(strcmp(cullModeString, "front")==0)
+						pipeline->pipeline.cullMode=VK_CULL_MODE_FRONT_BIT;
+					else if(strcmp(cullModeString, "back")==0)
+						pipeline->pipeline.cullMode=VK_CULL_MODE_BACK_BIT;
+					else if(strcmp(cullModeString, "frontAndBack")==0)
+						pipeline->pipeline.cullMode=VK_CULL_MODE_FRONT_AND_BACK;
+					else
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unknown cullMode '%s'.\n", cullModeString);
+						return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "frontFace"))
+				{
+					char frontFaceString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, frontFaceString, sizeof(frontFaceString)))
+						return false;
+
+					if(strcmp(frontFaceString, "ccw")==0)
+						pipeline->pipeline.frontFace=VK_FRONT_FACE_COUNTER_CLOCKWISE;
+					else if(strcmp(frontFaceString, "cw")==0)
+						pipeline->pipeline.frontFace=VK_FRONT_FACE_CLOCKWISE;
+					else
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unknown frontFace '%s'.\n", frontFaceString);
+						return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "depthBias"))
+				{
+					bool depthBias=false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(Parser_Boolean(&parser, &depthBias))
+						pipeline->pipeline.depthBias=depthBias?VK_TRUE:VK_FALSE;
+					else
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "depthBiasConstantFactor"))
+				{
+					double depthBiasConstantFactor=0.0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Float(&parser, &depthBiasConstantFactor))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					pipeline->pipeline.depthBiasConstantFactor=(float)depthBiasConstantFactor;
+				}
+				else if(Parser_MatchKeyword(&parser, "depthBiasClamp"))
+				{
+					double depthBiasClamp=0.0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Float(&parser, &depthBiasClamp))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					pipeline->pipeline.depthBiasClamp=(float)depthBiasClamp;
+				}
+				else if(Parser_MatchKeyword(&parser, "depthBiasSlopeFactor"))
+				{
+					double depthBiasSlopeFactor=0.0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Float(&parser, &depthBiasSlopeFactor))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					pipeline->pipeline.depthBiasSlopeFactor=(float)depthBiasSlopeFactor;
+				}
+				else if(Parser_MatchKeyword(&parser, "lineWidth"))
+				{
+					double lineWidth=0.0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Float(&parser, &lineWidth))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					pipeline->pipeline.lineWidth=(float)lineWidth;
+				}
+				else if(Parser_MatchKeyword(&parser, "depthTest"))
+				{
+					bool depthTest=false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(Parser_Boolean(&parser, &depthTest))
+						pipeline->pipeline.depthTest=depthTest?VK_TRUE:VK_FALSE;
+					else
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "depthWrite"))
+				{
+					bool depthWrite=false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(Parser_Boolean(&parser, &depthWrite))
+						pipeline->pipeline.depthWrite=depthWrite?VK_TRUE:VK_FALSE;
+					else
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "depthCompareOp"))
+				{
+					char depthCompareOpString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, depthCompareOpString, sizeof(depthCompareOpString)))
+						return false;
+
+					if(strcmp(depthCompareOpString, "never")==0)
+						pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_NEVER;
+					else if(strcmp(depthCompareOpString, "less")==0)
+						pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_LESS;
+					else if(strcmp(depthCompareOpString, "equal")==0)
+						pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_EQUAL;
+					else if(strcmp(depthCompareOpString, "lessOrEqual")==0)
+						pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_LESS_OR_EQUAL;
+					else if(strcmp(depthCompareOpString, "greater")==0)
+						pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_GREATER;
+					else if(strcmp(depthCompareOpString, "notEqual")==0)
+						pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_NOT_EQUAL;
+					else if(strcmp(depthCompareOpString, "greaterOrEqual")==0)
+						pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
+					else if(strcmp(depthCompareOpString, "always")==0)
+						pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_ALWAYS;
+					else
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unknown depthCompareOp '%s'.\n", depthCompareOpString);
+						return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "depthBoundsTest"))
+				{
+					bool depthBoundsTest=false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(Parser_Boolean(&parser, &depthBoundsTest))
+						pipeline->pipeline.depthBoundsTest=depthBoundsTest?VK_TRUE:VK_FALSE;
+					else
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "stencilTest"))
+				{
+					bool stencilTest=false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(Parser_Boolean(&parser, &stencilTest))
+						pipeline->pipeline.stencilTest=stencilTest?VK_TRUE:VK_FALSE;
+					else
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "minDepthBounds"))
+				{
+					double minDepthBounds=0.0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Float(&parser, &minDepthBounds))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					pipeline->pipeline.minDepthBounds=(float)minDepthBounds;
+				}
+				else if(Parser_MatchKeyword(&parser, "maxDepthBounds"))
+				{
+					double maxDepthBounds=0.0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Float(&parser, &maxDepthBounds))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					pipeline->pipeline.maxDepthBounds=(float)maxDepthBounds;
+				}
+				else if(Parser_MatchKeyword(&parser, "frontStencilFailOp"))
+				{
+					char frontStencilFailOpString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, frontStencilFailOpString, sizeof(frontStencilFailOpString)))
+						return false;
+
+					if(strcmp(frontStencilFailOpString, "keep")==0)
+						pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_KEEP;
+					else if(strcmp(frontStencilFailOpString, "zero")==0)
+						pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_ZERO;
+					else if(strcmp(frontStencilFailOpString, "replace")==0)
+						pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_REPLACE;
+					else if(strcmp(frontStencilFailOpString, "incrementAndClamp")==0)
+						pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+					else if(strcmp(frontStencilFailOpString, "decrementAndClamp")==0)
+						pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+					else if(strcmp(frontStencilFailOpString, "invert")==0)
+						pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_INVERT;
+					else if(strcmp(frontStencilFailOpString, "invcrementAndWrap")==0)
+						pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_INCREMENT_AND_WRAP;
+					else if(strcmp(frontStencilFailOpString, "decrementAndWrap")==0)
+						pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
+					else
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unknown frontStencilFailOp '%s'.\n", frontStencilFailOpString);
+						return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "frontStencilPassOp"))
+				{
+					char frontStencilPassOpString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, frontStencilPassOpString, sizeof(frontStencilPassOpString)))
+						return false;
+
+					if(strcmp(frontStencilPassOpString, "keep")==0)
+						pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_KEEP;
+					else if(strcmp(frontStencilPassOpString, "zero")==0)
+						pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_ZERO;
+					else if(strcmp(frontStencilPassOpString, "replace")==0)
+						pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_REPLACE;
+					else if(strcmp(frontStencilPassOpString, "incrementAndClamp")==0)
+						pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+					else if(strcmp(frontStencilPassOpString, "decrementAndClamp")==0)
+						pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+					else if(strcmp(frontStencilPassOpString, "invert")==0)
+						pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_INVERT;
+					else if(strcmp(frontStencilPassOpString, "invcrementAndWrap")==0)
+						pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_INCREMENT_AND_WRAP;
+					else if(strcmp(frontStencilPassOpString, "decrementAndWrap")==0)
+						pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
+					else
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unknown frontStencilPassOp '%s'.\n", frontStencilPassOpString);
+						return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "frontStencilDepthFailOp"))
+				{
+					char frontStencilDepthFailOpString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, frontStencilDepthFailOpString, sizeof(frontStencilDepthFailOpString)))
+						return false;
+
+					if(strcmp(frontStencilDepthFailOpString, "keep")==0)
+						pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_KEEP;
+					else if(strcmp(frontStencilDepthFailOpString, "zero")==0)
+						pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_ZERO;
+					else if(strcmp(frontStencilDepthFailOpString, "replace")==0)
+						pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_REPLACE;
+					else if(strcmp(frontStencilDepthFailOpString, "incrementAndClamp")==0)
+						pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+					else if(strcmp(frontStencilDepthFailOpString, "decrementAndClamp")==0)
+						pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+					else if(strcmp(frontStencilDepthFailOpString, "invert")==0)
+						pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_INVERT;
+					else if(strcmp(frontStencilDepthFailOpString, "invcrementAndWrap")==0)
+						pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_INCREMENT_AND_WRAP;
+					else if(strcmp(frontStencilDepthFailOpString, "decrementAndWrap")==0)
+						pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
+					else
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unknown frontStencilDepthFailOp '%s'.\n", frontStencilDepthFailOpString);
+						return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "frontStencilCompareOp"))
+				{
+					char frontStencilCompareOpString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, frontStencilCompareOpString, sizeof(frontStencilCompareOpString)))
+						return false;
+
+					if(strcmp(frontStencilCompareOpString, "never")==0)
+						pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_NEVER;
+					else if(strcmp(frontStencilCompareOpString, "less")==0)
+						pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_LESS;
+					else if(strcmp(frontStencilCompareOpString, "equal")==0)
+						pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_EQUAL;
+					else if(strcmp(frontStencilCompareOpString, "lessOrEqual")==0)
+						pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_LESS_OR_EQUAL;
+					else if(strcmp(frontStencilCompareOpString, "greater")==0)
+						pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_GREATER;
+					else if(strcmp(frontStencilCompareOpString, "notEqual")==0)
+						pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_NOT_EQUAL;
+					else if(strcmp(frontStencilCompareOpString, "greaterOrEqual")==0)
+						pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
+					else if(strcmp(frontStencilCompareOpString, "always")==0)
+						pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_ALWAYS;
+					else
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unknown frontStencilCompareOp '%s'.\n", frontStencilCompareOpString);
+						return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "frontStencilCompareMask"))
+				{
+					int64_t frontStencilCompareMask=0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Integer(&parser, &frontStencilCompareMask))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					pipeline->pipeline.frontStencilCompareMask=(uint32_t)frontStencilCompareMask;
+				}
+				else if(Parser_MatchKeyword(&parser, "frontStencilWriteMask"))
+				{
+					int64_t frontStencilWriteMask=0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Integer(&parser, &frontStencilWriteMask))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					pipeline->pipeline.frontStencilWriteMask=(uint32_t)frontStencilWriteMask;
+				}
+				else if(Parser_MatchKeyword(&parser, "frontStencilReference"))
+				{
+					int64_t frontStencilReference=0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Integer(&parser, &frontStencilReference))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					pipeline->pipeline.frontStencilReference=(uint32_t)frontStencilReference;
+				}
+				else if(Parser_MatchKeyword(&parser, "backStencilFailOp"))
+				{
+					char backStencilFailOpString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, backStencilFailOpString, sizeof(backStencilFailOpString)))
+						return false;
+
+					if(strcmp(backStencilFailOpString, "keep")==0)
+						pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_KEEP;
+					else if(strcmp(backStencilFailOpString, "zero")==0)
+						pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_ZERO;
+					else if(strcmp(backStencilFailOpString, "replace")==0)
+						pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_REPLACE;
+					else if(strcmp(backStencilFailOpString, "incrementAndClamp")==0)
+						pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+					else if(strcmp(backStencilFailOpString, "decrementAndClamp")==0)
+						pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+					else if(strcmp(backStencilFailOpString, "invert")==0)
+						pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_INVERT;
+					else if(strcmp(backStencilFailOpString, "invcrementAndWrap")==0)
+						pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_INCREMENT_AND_WRAP;
+					else if(strcmp(backStencilFailOpString, "decrementAndWrap")==0)
+						pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
+					else
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unknown backStencilFailOp '%s'.\n", backStencilFailOpString);
+						return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "backStencilPassOp"))
+				{
+					char backStencilPassOpString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, backStencilPassOpString, sizeof(backStencilPassOpString)))
+						return false;
+
+					if(strcmp(backStencilPassOpString, "keep")==0)
+						pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_KEEP;
+					else if(strcmp(backStencilPassOpString, "zero")==0)
+						pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_ZERO;
+					else if(strcmp(backStencilPassOpString, "replace")==0)
+						pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_REPLACE;
+					else if(strcmp(backStencilPassOpString, "incrementAndClamp")==0)
+						pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+					else if(strcmp(backStencilPassOpString, "decrementAndClamp")==0)
+						pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+					else if(strcmp(backStencilPassOpString, "invert")==0)
+						pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_INVERT;
+					else if(strcmp(backStencilPassOpString, "invcrementAndWrap")==0)
+						pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_INCREMENT_AND_WRAP;
+					else if(strcmp(backStencilPassOpString, "decrementAndWrap")==0)
+						pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
+					else
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unknown backStencilPassOp '%s'.\n", backStencilPassOpString);
+						return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "backStencilDepthFailOp"))
+				{
+					char backStencilDepthFailOpString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, backStencilDepthFailOpString, sizeof(backStencilDepthFailOpString)))
+						return false;
+
+					if(strcmp(backStencilDepthFailOpString, "keep")==0)
+						pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_KEEP;
+					else if(strcmp(backStencilDepthFailOpString, "zero")==0)
+						pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_ZERO;
+					else if(strcmp(backStencilDepthFailOpString, "replace")==0)
+						pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_REPLACE;
+					else if(strcmp(backStencilDepthFailOpString, "incrementAndClamp")==0)
+						pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+					else if(strcmp(backStencilDepthFailOpString, "decrementAndClamp")==0)
+						pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+					else if(strcmp(backStencilDepthFailOpString, "invert")==0)
+						pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_INVERT;
+					else if(strcmp(backStencilDepthFailOpString, "invcrementAndWrap")==0)
+						pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_INCREMENT_AND_WRAP;
+					else if(strcmp(backStencilDepthFailOpString, "decrementAndWrap")==0)
+						pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
+					else
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unknown backStencilDepthFailOp '%s'.\n", backStencilDepthFailOpString);
+						return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "backStencilCompareOp"))
+				{
+					char backStencilCompareOpString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, backStencilCompareOpString, sizeof(backStencilCompareOpString)))
+						return false;
+
+					if(strcmp(backStencilCompareOpString, "never")==0)
+						pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_NEVER;
+					else if(strcmp(backStencilCompareOpString, "less")==0)
+						pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_LESS;
+					else if(strcmp(backStencilCompareOpString, "equal")==0)
+						pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_EQUAL;
+					else if(strcmp(backStencilCompareOpString, "lessOrEqual")==0)
+						pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_LESS_OR_EQUAL;
+					else if(strcmp(backStencilCompareOpString, "greater")==0)
+						pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_GREATER;
+					else if(strcmp(backStencilCompareOpString, "notEqual")==0)
+						pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_NOT_EQUAL;
+					else if(strcmp(backStencilCompareOpString, "greaterOrEqual")==0)
+						pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
+					else if(strcmp(backStencilCompareOpString, "always")==0)
+						pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_ALWAYS;
+					else
+					{
+						DBGPRINTF(DEBUG_ERROR, "Unknown backStencilCompareOp '%s'.\n", backStencilCompareOpString);
+						return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "backStencilCompareMask"))
+				{
+					int64_t backStencilCompareMask=0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Integer(&parser, &backStencilCompareMask))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					pipeline->pipeline.backStencilCompareMask=(uint32_t)backStencilCompareMask;
+				}
+				else if(Parser_MatchKeyword(&parser, "backStencilWriteMask"))
+				{
+					int64_t backStencilWriteMask=0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Integer(&parser, &backStencilWriteMask))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					pipeline->pipeline.backStencilWriteMask=(uint32_t)backStencilWriteMask;
+				}
+				else if(Parser_MatchKeyword(&parser, "backStencilReference"))
+				{
+					int64_t backStencilReference=0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Integer(&parser, &backStencilReference))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					pipeline->pipeline.backStencilReference=(uint32_t)backStencilReference;
+				}
+				else if(Parser_MatchKeyword(&parser, "rasterizationSamples"))
+				{
+					int64_t rasterizationSamples=1;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Integer(&parser, &rasterizationSamples))
+						return false;
+
+					switch(rasterizationSamples)
+					{
+						case 1:  pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;  break;
+						case 2:  pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_2_BIT;  break;
+						case 4:  pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_4_BIT;  break;
+						case 8:  pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_8_BIT;  break;
+						case 16: pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_16_BIT; break;
+						case 32: pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_32_BIT; break;
+						case 64: pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_64_BIT; break;
+
+						default:
+							DBGPRINTF(DEBUG_ERROR, "Unknown rasterizationSamples value %lld.\n", (long long)rasterizationSamples);
+							return false;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "sampleShading"))
+				{
+					bool sampleShading=false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(Parser_Boolean(&parser, &sampleShading))
+						pipeline->pipeline.sampleShading=sampleShading?VK_TRUE:VK_FALSE;
+					else
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "minSampleShading"))
+				{
+					double minSampleShading=0.0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Float(&parser, &minSampleShading))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					pipeline->pipeline.minSampleShading=(float)minSampleShading;
+				}
+				else if(Parser_MatchKeyword(&parser, "sampleMask"))
+				{
+					DBGPRINTF(DEBUG_ERROR, "sampleMask not implemented, skipping.\n");
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					// TODO: not implemented yet -- just consume tokens up to the closing ')'
+					// so the rest of the file still parses correctly instead of desyncing.
+					while(!Parser_Match(&parser, TOKEN_DELIMITER, ')'))
+					{
+						Token_t *skip=Tokenizer_GetNext(&tokenizer);
+
+						if(skip==NULL)
 						{
-							pipeline->pipeline.subpass=0;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_INT)
-								pipeline->pipeline.subpass=(uint32_t)token->ival;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
+							DBGPRINTF(DEBUG_ERROR, "Unexpected end of file inside sampleMask(...).\n");
+							return false;
 						}
+
+						Zone_Free(zone, skip);
 					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "topology")==0)
+				}
+				else if(Parser_MatchKeyword(&parser, "alphaToCoverage"))
+				{
+					bool alphaToCoverage=false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(Parser_Boolean(&parser, &alphaToCoverage))
+						pipeline->pipeline.alphaToCoverage=alphaToCoverage?VK_TRUE:VK_FALSE;
+					else
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "alphaToOne"))
+				{
+					bool alphaToOne=false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(Parser_Boolean(&parser, &alphaToOne))
+						pipeline->pipeline.alphaToOne=alphaToOne?VK_TRUE:VK_FALSE;
+					else
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "blendLogicOp"))
+				{
+					bool blendLogicOp=false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(Parser_Boolean(&parser, &blendLogicOp))
+						pipeline->pipeline.blendLogicOp=blendLogicOp?VK_TRUE:VK_FALSE;
+					else
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "blendLogicOpState"))
+				{
+					char blendLogicOpStateString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, blendLogicOpStateString, sizeof(blendLogicOpStateString)))
+						return false;
+
+					if(strcmp(blendLogicOpStateString, "clear")==0)
+						pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_CLEAR;
+					else if(strcmp(blendLogicOpStateString, "and")==0)
+						pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_AND;
+					else if(strcmp(blendLogicOpStateString, "andReverse")==0)
+						pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_AND_REVERSE;
+					else if(strcmp(blendLogicOpStateString, "copy")==0)
+						pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_COPY;
+					else if(strcmp(blendLogicOpStateString, "andInverted")==0)
+						pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_AND_INVERTED;
+					else if(strcmp(blendLogicOpStateString, "nop")==0)
+						pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_NO_OP;
+					else if(strcmp(blendLogicOpStateString, "or")==0)
+						pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_OR;
+					else if(strcmp(blendLogicOpStateString, "nor")==0)
+						pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_NOR;
+					else if(strcmp(blendLogicOpStateString, "equivalent")==0)
+						pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_EQUIVALENT;
+					else if(strcmp(blendLogicOpStateString, "invert")==0)
+						pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_INVERT;
+					else if(strcmp(blendLogicOpStateString, "orReverse")==0)
+						pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_OR_REVERSE;
+					else if(strcmp(blendLogicOpStateString, "copyInverted")==0)
+						pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_COPY_INVERTED;
+					else if(strcmp(blendLogicOpStateString, "orInverted")==0)
+						pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_OR_INVERTED;
+					else if(strcmp(blendLogicOpStateString, "nand")==0)
+						pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_NAND;
+					else if(strcmp(blendLogicOpStateString, "set")==0)
+						pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_SET;
+					else
 					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "pointList")==0)
-									pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-								else if(strcmp(token->string, "lineList")==0)
-									pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-								else if(strcmp(token->string, "lineStrip")==0)
-									pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
-								else if(strcmp(token->string, "triangleList")==0)
-									pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-								else if(strcmp(token->string, "triangleStrip")==0)
-									pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-								else if(strcmp(token->string, "triangleFan")==0)
-									pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
-								else if(strcmp(token->string, "listListAdjacency")==0)
-									pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY;
-								else if(strcmp(token->string, "listStripAdjacency")==0)
-									pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY;
-								else if(strcmp(token->string, "triangleListAdjacency")==0)
-									pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY;
-								else if(strcmp(token->string, "triangleStripAdjacency")==0)
-									pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY;
-								else if(strcmp(token->string, "patchList")==0)
-									pipeline->pipeline.topology=VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-									break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
+						DBGPRINTF(DEBUG_ERROR, "Unknown blendLogicOpState '%s'.\n", blendLogicOpStateString);
+						return false;
 					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "primitiveRestart")==0)
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "blend"))
+				{
+					bool blend=false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(Parser_Boolean(&parser, &blend))
+						pipeline->pipeline.blend=blend?VK_TRUE:VK_FALSE;
+					else
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "srcColorBlendFactor"))
+				{
+					char srcColorBlendFactorString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, srcColorBlendFactorString, sizeof(srcColorBlendFactorString)))
+						return false;
+
+					if(strcmp(srcColorBlendFactorString, "zero")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ZERO;
+					else if(strcmp(srcColorBlendFactorString, "one")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE;
+					else if(strcmp(srcColorBlendFactorString, "srcColor")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC_COLOR;
+					else if(strcmp(srcColorBlendFactorString, "oneMinusSrcColor")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+					else if(strcmp(srcColorBlendFactorString, "dstColor")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_DST_COLOR;
+					else if(strcmp(srcColorBlendFactorString, "oneMinusDstColor")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+					else if(strcmp(srcColorBlendFactorString, "srcAlpha")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
+					else if(strcmp(srcColorBlendFactorString, "oneMinusSrcAlpha")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+					else if(strcmp(srcColorBlendFactorString, "dstAlpha")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_DST_ALPHA;
+					else if(strcmp(srcColorBlendFactorString, "oneMinusDstAlpha")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+					else if(strcmp(srcColorBlendFactorString, "constantColor")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_CONSTANT_COLOR;
+					else if(strcmp(srcColorBlendFactorString, "oneMinusConstantColor")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
+					else if(strcmp(srcColorBlendFactorString, "constantAlpha")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_CONSTANT_ALPHA;
+					else if(strcmp(srcColorBlendFactorString, "oneMinusConstantAlpha")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
+					else if(strcmp(srcColorBlendFactorString, "srcAlphaSaturate")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
+					else if(strcmp(srcColorBlendFactorString, "src1Color")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC1_COLOR;
+					else if(strcmp(srcColorBlendFactorString, "oneMinusSrc1Color")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR;
+					else if(strcmp(srcColorBlendFactorString, "src1Alpha")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC1_ALPHA;
+					else if(strcmp(srcColorBlendFactorString, "oneMinusSrc1Alpha")==0)
+						pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
+					else
 					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_BOOLEAN)
-							{
-								if(token->boolean)
-									pipeline->pipeline.primitiveRestart=VK_TRUE;
-								else
-									pipeline->pipeline.primitiveRestart=VK_FALSE;
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
+						DBGPRINTF(DEBUG_ERROR, "Unknown srcColorBlendFactor '%s'.\n", srcColorBlendFactorString);
+						return false;
 					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "depthClamp")==0)
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "dstColorBlendFactor"))
+				{
+					char dstColorBlendFactorString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, dstColorBlendFactorString, sizeof(dstColorBlendFactorString)))
+						return false;
+
+					if(strcmp(dstColorBlendFactorString, "zero")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ZERO;
+					else if(strcmp(dstColorBlendFactorString, "one")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE;
+					else if(strcmp(dstColorBlendFactorString, "srcColor")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_SRC_COLOR;
+					else if(strcmp(dstColorBlendFactorString, "oneMinusSrcColor")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+					else if(strcmp(dstColorBlendFactorString, "dstColor")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_DST_COLOR;
+					else if(strcmp(dstColorBlendFactorString, "oneMinusDstColor")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+					else if(strcmp(dstColorBlendFactorString, "srcAlpha")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
+					else if(strcmp(dstColorBlendFactorString, "oneMinusSrcAlpha")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+					else if(strcmp(dstColorBlendFactorString, "dstAlpha")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_DST_ALPHA;
+					else if(strcmp(dstColorBlendFactorString, "oneMinusDstAlpha")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+					else if(strcmp(dstColorBlendFactorString, "constantColor")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_CONSTANT_COLOR;
+					else if(strcmp(dstColorBlendFactorString, "oneMinusConstantColor")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
+					else if(strcmp(dstColorBlendFactorString, "constantAlpha")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_CONSTANT_ALPHA;
+					else if(strcmp(dstColorBlendFactorString, "oneMinusConstantAlpha")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
+					else if(strcmp(dstColorBlendFactorString, "srcAlphaSaturate")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
+					else if(strcmp(dstColorBlendFactorString, "src1Color")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_SRC1_COLOR;
+					else if(strcmp(dstColorBlendFactorString, "oneMinusSrc1Color")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR;
+					else if(strcmp(dstColorBlendFactorString, "src1Alpha")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_SRC1_ALPHA;
+					else if(strcmp(dstColorBlendFactorString, "oneMinusSrc1Alpha")==0)
+						pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
+					else
 					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_BOOLEAN)
-							{
-								if(token->boolean)
-									pipeline->pipeline.depthClamp=VK_TRUE;
-								else
-									pipeline->pipeline.depthClamp=VK_FALSE;
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
+						DBGPRINTF(DEBUG_ERROR, "Unknown dstColorBlendFactor '%s'.\n", dstColorBlendFactorString);
+						return false;
 					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "rasterizerDiscard")==0)
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "colorBlendOp"))
+				{
+					char colorBlendOpString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, colorBlendOpString, sizeof(colorBlendOpString)))
+						return false;
+
+					if(strcmp(colorBlendOpString, "add")==0)
+						pipeline->pipeline.colorBlendOp=VK_BLEND_OP_ADD;
+					else if(strcmp(colorBlendOpString, "subtract")==0)
+						pipeline->pipeline.colorBlendOp=VK_BLEND_OP_SUBTRACT;
+					else if(strcmp(colorBlendOpString, "reverseSubtract")==0)
+						pipeline->pipeline.colorBlendOp=VK_BLEND_OP_REVERSE_SUBTRACT;
+					else if(strcmp(colorBlendOpString, "min")==0)
+						pipeline->pipeline.colorBlendOp=VK_BLEND_OP_MIN;
+					else if(strcmp(colorBlendOpString, "max")==0)
+						pipeline->pipeline.colorBlendOp=VK_BLEND_OP_MAX;
+					else
 					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_BOOLEAN)
-							{
-								if(token->boolean)
-									pipeline->pipeline.rasterizerDiscard=VK_TRUE;
-								else
-									pipeline->pipeline.rasterizerDiscard=VK_FALSE;
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
+						DBGPRINTF(DEBUG_ERROR, "Unknown colorBlendOp '%s'.\n", colorBlendOpString);
+						return false;
 					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "polygonMode")==0)
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "srcAlphaBlendFactor"))
+				{
+					char srcAlphaBlendFactorString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, srcAlphaBlendFactorString, sizeof(srcAlphaBlendFactorString)))
+						return false;
+
+					if(strcmp(srcAlphaBlendFactorString, "zero")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ZERO;
+					else if(strcmp(srcAlphaBlendFactorString, "one")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE;
+					else if(strcmp(srcAlphaBlendFactorString, "srcColor")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_COLOR;
+					else if(strcmp(srcAlphaBlendFactorString, "oneMinusSrcColor")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+					else if(strcmp(srcAlphaBlendFactorString, "dstColor")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_DST_COLOR;
+					else if(strcmp(srcAlphaBlendFactorString, "oneMinusDstColor")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+					else if(strcmp(srcAlphaBlendFactorString, "srcAlpha")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
+					else if(strcmp(srcAlphaBlendFactorString, "oneMinusSrcAlpha")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+					else if(strcmp(srcAlphaBlendFactorString, "dstAlpha")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_DST_ALPHA;
+					else if(strcmp(srcAlphaBlendFactorString, "oneMinusDstAlpha")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+					else if(strcmp(srcAlphaBlendFactorString, "constantColor")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_CONSTANT_COLOR;
+					else if(strcmp(srcAlphaBlendFactorString, "oneMinusConstantColor")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
+					else if(strcmp(srcAlphaBlendFactorString, "constantAlpha")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_CONSTANT_ALPHA;
+					else if(strcmp(srcAlphaBlendFactorString, "oneMinusConstantAlpha")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
+					else if(strcmp(srcAlphaBlendFactorString, "srcAlphaSaturate")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
+					else if(strcmp(srcAlphaBlendFactorString, "src1Color")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC1_COLOR;
+					else if(strcmp(srcAlphaBlendFactorString, "oneMinusSrc1Color")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR;
+					else if(strcmp(srcAlphaBlendFactorString, "src1Alpha")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC1_ALPHA;
+					else if(strcmp(srcAlphaBlendFactorString, "oneMinusSrc1Alpha")==0)
+						pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
+					else
 					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.polygonMode=VK_POLYGON_MODE_FILL;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-								
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "fill")==0)
-									pipeline->pipeline.polygonMode=VK_POLYGON_MODE_FILL;
-								else if(strcmp(token->string, "line")==0)
-									pipeline->pipeline.polygonMode=VK_POLYGON_MODE_LINE;
-								else if(strcmp(token->string, "point")==0)
-									pipeline->pipeline.polygonMode=VK_POLYGON_MODE_POINT;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
+						DBGPRINTF(DEBUG_ERROR, "Unknown srcAlphaBlendFactor '%s'.\n", srcAlphaBlendFactorString);
+						return false;
 					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "cullMode")==0)
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "dstAlphaBlendFactor"))
+				{
+					char dstAlphaBlendFactorString[32]={ 0 };
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_String(&parser, dstAlphaBlendFactorString, sizeof(dstAlphaBlendFactorString)))
+						return false;
+
+					if(strcmp(dstAlphaBlendFactorString, "zero")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ZERO;
+					else if(strcmp(dstAlphaBlendFactorString, "one")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE;
+					else if(strcmp(dstAlphaBlendFactorString, "srcColor")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_SRC_COLOR;
+					else if(strcmp(dstAlphaBlendFactorString, "oneMinusSrcColor")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+					else if(strcmp(dstAlphaBlendFactorString, "dstColor")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_DST_COLOR;
+					else if(strcmp(dstAlphaBlendFactorString, "oneMinusDstColor")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+					else if(strcmp(dstAlphaBlendFactorString, "srcAlpha")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
+					else if(strcmp(dstAlphaBlendFactorString, "oneMinusSrcAlpha")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+					else if(strcmp(dstAlphaBlendFactorString, "dstAlpha")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_DST_ALPHA;
+					else if(strcmp(dstAlphaBlendFactorString, "oneMinusDstAlpha")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+					else if(strcmp(dstAlphaBlendFactorString, "constantColor")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_CONSTANT_COLOR;
+					else if(strcmp(dstAlphaBlendFactorString, "oneMinusConstantColor")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
+					else if(strcmp(dstAlphaBlendFactorString, "constantAlpha")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_CONSTANT_ALPHA;
+					else if(strcmp(dstAlphaBlendFactorString, "oneMinusConstantAlpha")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
+					else if(strcmp(dstAlphaBlendFactorString, "srcAlphaSaturate")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
+					else if(strcmp(dstAlphaBlendFactorString, "src1Color")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_SRC1_COLOR;
+					else if(strcmp(dstAlphaBlendFactorString, "oneMinusSrc1Color")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR;
+					else if(strcmp(dstAlphaBlendFactorString, "src1Alpha")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_SRC1_ALPHA;
+					else if(strcmp(dstAlphaBlendFactorString, "oneMinusSrc1Alpha")==0)
+						pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
+					else
 					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.cullMode=VK_CULL_MODE_NONE;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "none")==0)
-									pipeline->pipeline.cullMode=VK_CULL_MODE_NONE;
-								else if(strcmp(token->string, "front")==0)
-									pipeline->pipeline.cullMode=VK_CULL_MODE_FRONT_BIT;
-								else if(strcmp(token->string, "back")==0)
-									pipeline->pipeline.cullMode=VK_CULL_MODE_BACK_BIT;
-								else if(strcmp(token->string, "frontAndBack")==0)
-									pipeline->pipeline.cullMode=VK_CULL_MODE_FRONT_AND_BACK;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
+						DBGPRINTF(DEBUG_ERROR, "Unknown dstAlphaBlendFactor '%s'.\n", dstAlphaBlendFactorString);
+						return false;
 					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "frontFace")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
 
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.frontFace=VK_FRONT_FACE_COUNTER_CLOCKWISE;
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "alphaBlendOp"))
+				{
+					char alphaBlendOpString[32]={ 0 };
 
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
 
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "ccw")==0)
-									pipeline->pipeline.frontFace=VK_FRONT_FACE_COUNTER_CLOCKWISE;
-								else if(strcmp(token->string, "cw")==0)
-									pipeline->pipeline.frontFace=VK_FRONT_FACE_CLOCKWISE;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
+					if(!Parser_String(&parser, alphaBlendOpString, sizeof(alphaBlendOpString)))
+						return false;
 
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "depthBias")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_BOOLEAN)
-							{
-								if(token->boolean)
-									pipeline->pipeline.depthBias=VK_TRUE;
-								else
-									pipeline->pipeline.depthBias=VK_FALSE;
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "depthBiasConstantFactor")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.depthBiasConstantFactor=0.0f;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_FLOAT)
-								pipeline->pipeline.depthBiasConstantFactor=(float)token->fval;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "depthBiasClamp")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.depthBiasClamp=0.0f;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_FLOAT)
-								pipeline->pipeline.depthBiasClamp=(float)token->fval;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "depthBiasSlopeFactor")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.depthBiasSlopeFactor=0.0f;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_FLOAT)
-								pipeline->pipeline.depthBiasSlopeFactor=(float)token->fval;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "lineWidth")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.lineWidth=0.0f;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_FLOAT)
-								pipeline->pipeline.lineWidth=(float)token->fval;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "depthTest")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_BOOLEAN)
-							{
-								if(token->boolean)
-									pipeline->pipeline.depthTest=VK_TRUE;
-								else
-									pipeline->pipeline.depthTest=VK_FALSE;
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "depthWrite")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_BOOLEAN)
-							{
-								if(token->boolean)
-									pipeline->pipeline.depthWrite=VK_TRUE;
-								else
-									pipeline->pipeline.depthWrite=VK_FALSE;
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "depthCompareOp")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_NEVER;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "never")==0)
-									pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_NEVER;
-								else if(strcmp(token->string, "less")==0)
-									pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_LESS;
-								else if(strcmp(token->string, "equal")==0)
-									pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_EQUAL;
-								else if(strcmp(token->string, "lessOrEqual")==0)
-									pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_LESS_OR_EQUAL;
-								else if(strcmp(token->string, "greater")==0)
-									pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_GREATER;
-								else if(strcmp(token->string, "notEqual")==0)
-									pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_NOT_EQUAL;
-								else if(strcmp(token->string, "greaterOrEqual")==0)
-									pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
-								else if(strcmp(token->string, "always")==0)
-									pipeline->pipeline.depthCompareOp=VK_COMPARE_OP_ALWAYS;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "depthBoundsTest")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_BOOLEAN)
-							{
-								if(token->boolean)
-									pipeline->pipeline.depthBoundsTest=VK_TRUE;
-								else
-									pipeline->pipeline.depthBoundsTest=VK_FALSE;
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "stencilTest")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_BOOLEAN)
-							{
-								if(token->boolean)
-									pipeline->pipeline.stencilTest=VK_TRUE;
-								else
-									pipeline->pipeline.stencilTest=VK_FALSE;
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "minDepthBounds")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.minDepthBounds=0.0f;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_FLOAT)
-								pipeline->pipeline.minDepthBounds=(float)token->fval;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "maxDepthBounds")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.maxDepthBounds=0.0f;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_FLOAT)
-								pipeline->pipeline.maxDepthBounds=(float)token->fval;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "frontStencilFailOp")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_KEEP;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "keep")==0)
-									pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_KEEP;
-								else if(strcmp(token->string, "zero")==0)
-									pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_ZERO;
-								else if(strcmp(token->string, "replace")==0)
-									pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_REPLACE;
-								else if(strcmp(token->string, "incrementAndClamp")==0)
-									pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_INCREMENT_AND_CLAMP;
-								else if(strcmp(token->string, "decrementAndClamp")==0)
-									pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_DECREMENT_AND_CLAMP;
-								else if(strcmp(token->string, "invert")==0)
-									pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_INVERT;
-								else if(strcmp(token->string, "invcrementAndWrap")==0)
-									pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_INCREMENT_AND_WRAP;
-								else if(strcmp(token->string, "decrementAndWrap")==0)
-									pipeline->pipeline.frontStencilFailOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "frontStencilPassOp")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_KEEP;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "keep")==0)
-									pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_KEEP;
-								else if(strcmp(token->string, "zero")==0)
-									pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_ZERO;
-								else if(strcmp(token->string, "replace")==0)
-									pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_REPLACE;
-								else if(strcmp(token->string, "incrementAndClamp")==0)
-									pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_INCREMENT_AND_CLAMP;
-								else if(strcmp(token->string, "decrementAndClamp")==0)
-									pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_DECREMENT_AND_CLAMP;
-								else if(strcmp(token->string, "invert")==0)
-									pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_INVERT;
-								else if(strcmp(token->string, "invcrementAndWrap")==0)
-									pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_INCREMENT_AND_WRAP;
-								else if(strcmp(token->string, "decrementAndWrap")==0)
-									pipeline->pipeline.frontStencilPassOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "frontStencilDepthFailOp")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_KEEP;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "keep")==0)
-									pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_KEEP;
-								else if(strcmp(token->string, "zero")==0)
-									pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_ZERO;
-								else if(strcmp(token->string, "replace")==0)
-									pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_REPLACE;
-								else if(strcmp(token->string, "incrementAndClamp")==0)
-									pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_INCREMENT_AND_CLAMP;
-								else if(strcmp(token->string, "decrementAndClamp")==0)
-									pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_DECREMENT_AND_CLAMP;
-								else if(strcmp(token->string, "invert")==0)
-									pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_INVERT;
-								else if(strcmp(token->string, "invcrementAndWrap")==0)
-									pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_INCREMENT_AND_WRAP;
-								else if(strcmp(token->string, "decrementAndWrap")==0)
-									pipeline->pipeline.frontStencilDepthFailOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "frontStencilCompareOp")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_NEVER;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "never")==0)
-									pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_NEVER;
-								else if(strcmp(token->string, "less")==0)
-									pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_LESS;
-								else if(strcmp(token->string, "equal")==0)
-									pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_EQUAL;
-								else if(strcmp(token->string, "lessOrEqual")==0)
-									pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_LESS_OR_EQUAL;
-								else if(strcmp(token->string, "greater")==0)
-									pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_GREATER;
-								else if(strcmp(token->string, "notEqual")==0)
-									pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_NOT_EQUAL;
-								else if(strcmp(token->string, "greaterOrEqual")==0)
-									pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
-								else if(strcmp(token->string, "always")==0)
-									pipeline->pipeline.frontStencilCompareOp=VK_COMPARE_OP_ALWAYS;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "frontStencilCompareMask")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.frontStencilCompareMask=0;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_INT)
-								pipeline->pipeline.frontStencilCompareMask=(uint32_t)token->ival;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "frontStencilWriteMask")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.frontStencilWriteMask=0;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_INT)
-								pipeline->pipeline.frontStencilWriteMask=(uint32_t)token->ival;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "frontStencilReference")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.frontStencilReference=0;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_INT)
-								pipeline->pipeline.frontStencilReference=(uint32_t)token->ival;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "backStencilFailOp")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_KEEP;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "keep")==0)
-									pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_KEEP;
-								else if(strcmp(token->string, "zero")==0)
-									pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_ZERO;
-								else if(strcmp(token->string, "replace")==0)
-									pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_REPLACE;
-								else if(strcmp(token->string, "incrementAndClamp")==0)
-									pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_INCREMENT_AND_CLAMP;
-								else if(strcmp(token->string, "decrementAndClamp")==0)
-									pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_DECREMENT_AND_CLAMP;
-								else if(strcmp(token->string, "invert")==0)
-									pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_INVERT;
-								else if(strcmp(token->string, "invcrementAndWrap")==0)
-									pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_INCREMENT_AND_WRAP;
-								else if(strcmp(token->string, "decrementAndWrap")==0)
-									pipeline->pipeline.backStencilFailOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "backStencilPassOp")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_KEEP;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "keep")==0)
-									pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_KEEP;
-								else if(strcmp(token->string, "zero")==0)
-									pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_ZERO;
-								else if(strcmp(token->string, "replace")==0)
-									pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_REPLACE;
-								else if(strcmp(token->string, "incrementAndClamp")==0)
-									pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_INCREMENT_AND_CLAMP;
-								else if(strcmp(token->string, "decrementAndClamp")==0)
-									pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_DECREMENT_AND_CLAMP;
-								else if(strcmp(token->string, "invert")==0)
-									pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_INVERT;
-								else if(strcmp(token->string, "invcrementAndWrap")==0)
-									pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_INCREMENT_AND_WRAP;
-								else if(strcmp(token->string, "decrementAndWrap")==0)
-									pipeline->pipeline.backStencilPassOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "backStencilDepthFailOp")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_KEEP;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "keep")==0)
-									pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_KEEP;
-								else if(strcmp(token->string, "zero")==0)
-									pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_ZERO;
-								else if(strcmp(token->string, "replace")==0)
-									pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_REPLACE;
-								else if(strcmp(token->string, "incrementAndClamp")==0)
-									pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_INCREMENT_AND_CLAMP;
-								else if(strcmp(token->string, "decrementAndClamp")==0)
-									pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_DECREMENT_AND_CLAMP;
-								else if(strcmp(token->string, "invert")==0)
-									pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_INVERT;
-								else if(strcmp(token->string, "invcrementAndWrap")==0)
-									pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_INCREMENT_AND_WRAP;
-								else if(strcmp(token->string, "decrementAndWrap")==0)
-									pipeline->pipeline.backStencilDepthFailOp=VK_STENCIL_OP_DECREMENT_AND_WRAP;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "backStencilCompareOp")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_NEVER;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "never")==0)
-									pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_NEVER;
-								else if(strcmp(token->string, "less")==0)
-									pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_LESS;
-								else if(strcmp(token->string, "equal")==0)
-									pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_EQUAL;
-								else if(strcmp(token->string, "lessOrEqual")==0)
-									pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_LESS_OR_EQUAL;
-								else if(strcmp(token->string, "greater")==0)
-									pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_GREATER;
-								else if(strcmp(token->string, "notEqual")==0)
-									pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_NOT_EQUAL;
-								else if(strcmp(token->string, "greaterOrEqual")==0)
-									pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_GREATER_OR_EQUAL;
-								else if(strcmp(token->string, "always")==0)
-									pipeline->pipeline.backStencilCompareOp=VK_COMPARE_OP_ALWAYS;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "backStencilCompareMask")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.backStencilCompareMask=0;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_INT)
-								pipeline->pipeline.backStencilCompareMask=(uint32_t)token->ival;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "backStencilWriteMask")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.backStencilWriteMask=0;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_INT)
-								pipeline->pipeline.backStencilWriteMask=(uint32_t)token->ival;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "backStencilReference")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.backStencilReference=0;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_INT)
-								pipeline->pipeline.backStencilReference=(uint32_t)token->ival;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "rasterizationSamples")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_INT)
-							{
-								if(token->ival==1)
-									pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;
-								else if(token->ival==2)
-									pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_2_BIT;
-								else if(token->ival==4)
-									pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_4_BIT;
-								else if(token->ival==8)
-									pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_8_BIT;
-								else if(token->ival==16)
-									pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_16_BIT;
-								else if(token->ival==32)
-									pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_32_BIT;
-								else if(token->ival==64)
-									pipeline->pipeline.rasterizationSamples=VK_SAMPLE_COUNT_64_BIT;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "sampleShading")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_BOOLEAN)
-							{
-								if(token->boolean)
-									pipeline->pipeline.sampleShading=VK_TRUE;
-								else
-									pipeline->pipeline.sampleShading=VK_FALSE;
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "minSampleShading")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_FLOAT)
-								pipeline->pipeline.minSampleShading=(float)token->fval;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "sampleMask")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						Tokenizer_PrintToken("sampleMask not implemented! ", token);
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "alphaToCoverage")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_BOOLEAN)
-							{
-								if(token->boolean)
-									pipeline->pipeline.alphaToCoverage=VK_TRUE;
-								else
-									pipeline->pipeline.alphaToCoverage=VK_FALSE;
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "alphaToOne")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_BOOLEAN)
-							{
-								if(token->boolean)
-									pipeline->pipeline.alphaToOne=VK_TRUE;
-								else
-									pipeline->pipeline.alphaToOne=VK_FALSE;
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "blendLogicOp")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_BOOLEAN)
-							{
-								if(token->boolean)
-									pipeline->pipeline.blendLogicOp=VK_TRUE;
-								else
-									pipeline->pipeline.blendLogicOp=VK_FALSE;
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "blendLogicOpState")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_CLEAR;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "clear")==0)
-									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_CLEAR;
-								else if(strcmp(token->string, "and")==0)
-									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_AND;
-								else if(strcmp(token->string, "andReverse")==0)
-									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_AND_REVERSE;
-								else if(strcmp(token->string, "copy")==0)
-									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_COPY;
-								else if(strcmp(token->string, "andInverted")==0)
-									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_AND_INVERTED;
-								else if(strcmp(token->string, "nop")==0)
-									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_NO_OP;
-								else if(strcmp(token->string, "or")==0)
-									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_OR;
-								else if(strcmp(token->string, "nor")==0)
-									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_NOR;
-								else if(strcmp(token->string, "equivalent")==0)
-									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_EQUIVALENT;
-								else if(strcmp(token->string, "invert")==0)
-									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_INVERT;
-								else if(strcmp(token->string, "orReverse")==0)
-									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_OR_REVERSE;
-								else if(strcmp(token->string, "copyInverted")==0)
-									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_COPY_INVERTED;
-								else if(strcmp(token->string, "orInverted")==0)
-									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_OR_INVERTED;
-								else if(strcmp(token->string, "nand")==0)
-									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_NAND;
-								else if(strcmp(token->string, "set")==0)
-									pipeline->pipeline.blendLogicOpState=VK_LOGIC_OP_SET;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "blend")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_BOOLEAN)
-							{
-								if(token->boolean)
-									pipeline->pipeline.blend=VK_TRUE;
-								else
-									pipeline->pipeline.blend=VK_FALSE;
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "srcColorBlendFactor")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ZERO;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "zero")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ZERO;
-								else if(strcmp(token->string, "one")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE;
-								else if(strcmp(token->string, "srcColor")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC_COLOR;
-								else if(strcmp(token->string, "oneMinusSrcColor")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-								else if(strcmp(token->string, "dstColor")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_DST_COLOR;
-								else if(strcmp(token->string, "oneMinusDstColor")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
-								else if(strcmp(token->string, "srcAlpha")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-								else if(strcmp(token->string, "oneMinusSrcAlpha")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-								else if(strcmp(token->string, "dstAlpha")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_DST_ALPHA;
-								else if(strcmp(token->string, "oneMinusDstAlpha")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
-								else if(strcmp(token->string, "constantColor")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_CONSTANT_COLOR;
-								else if(strcmp(token->string, "oneMinusConstantColor")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
-								else if(strcmp(token->string, "constantAlpha")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_CONSTANT_ALPHA;
-								else if(strcmp(token->string, "oneMinusConstantAlpha")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
-								else if(strcmp(token->string, "srcAlphaSaturate")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
-								else if(strcmp(token->string, "src1Color")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC1_COLOR;
-								else if(strcmp(token->string, "oneMinusSrc1Color")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR;
-								else if(strcmp(token->string, "src1Alpha")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_SRC1_ALPHA;
-								else if(strcmp(token->string, "oneMinusSrc1Alpha")==0)
-									pipeline->pipeline.srcColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "dstColorBlendFactor")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ZERO;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "zero")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ZERO;
-								else if(strcmp(token->string, "one")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE;
-								else if(strcmp(token->string, "srcColor")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_SRC_COLOR;
-								else if(strcmp(token->string, "oneMinusSrcColor")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-								else if(strcmp(token->string, "dstColor")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_DST_COLOR;
-								else if(strcmp(token->string, "oneMinusDstColor")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
-								else if(strcmp(token->string, "srcAlpha")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-								else if(strcmp(token->string, "oneMinusSrcAlpha")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-								else if(strcmp(token->string, "dstAlpha")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_DST_ALPHA;
-								else if(strcmp(token->string, "oneMinusDstAlpha")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
-								else if(strcmp(token->string, "constantColor")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_CONSTANT_COLOR;
-								else if(strcmp(token->string, "oneMinusConstantColor")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
-								else if(strcmp(token->string, "constantAlpha")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_CONSTANT_ALPHA;
-								else if(strcmp(token->string, "oneMinusConstantAlpha")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
-								else if(strcmp(token->string, "srcAlphaSaturate")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
-								else if(strcmp(token->string, "src1Color")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_SRC1_COLOR;
-								else if(strcmp(token->string, "oneMinusSrc1Color")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR;
-								else if(strcmp(token->string, "src1Alpha")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_SRC1_ALPHA;
-								else if(strcmp(token->string, "oneMinusSrc1Alpha")==0)
-									pipeline->pipeline.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "colorBlendOp")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "add")==0)
-									pipeline->pipeline.colorBlendOp=VK_BLEND_OP_ADD;
-								else if(strcmp(token->string, "subtract")==0)
-									pipeline->pipeline.colorBlendOp=VK_BLEND_OP_SUBTRACT;
-								else if(strcmp(token->string, "reverseSubtract")==0)
-									pipeline->pipeline.colorBlendOp=VK_BLEND_OP_REVERSE_SUBTRACT;
-								else if(strcmp(token->string, "min")==0)
-									pipeline->pipeline.colorBlendOp=VK_BLEND_OP_MIN;
-								else if(strcmp(token->string, "max")==0)
-									pipeline->pipeline.colorBlendOp=VK_BLEND_OP_MAX;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "srcAlphaBlendFactor")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ZERO;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "zero")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ZERO;
-								else if(strcmp(token->string, "one")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE;
-								else if(strcmp(token->string, "srcColor")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_COLOR;
-								else if(strcmp(token->string, "oneMinusSrcColor")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-								else if(strcmp(token->string, "dstColor")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_DST_COLOR;
-								else if(strcmp(token->string, "oneMinusDstColor")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
-								else if(strcmp(token->string, "srcAlpha")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-								else if(strcmp(token->string, "oneMinusSrcAlpha")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-								else if(strcmp(token->string, "dstAlpha")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_DST_ALPHA;
-								else if(strcmp(token->string, "oneMinusDstAlpha")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
-								else if(strcmp(token->string, "constantColor")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_CONSTANT_COLOR;
-								else if(strcmp(token->string, "oneMinusConstantColor")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
-								else if(strcmp(token->string, "constantAlpha")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_CONSTANT_ALPHA;
-								else if(strcmp(token->string, "oneMinusConstantAlpha")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
-								else if(strcmp(token->string, "srcAlphaSaturate")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
-								else if(strcmp(token->string, "src1Color")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC1_COLOR;
-								else if(strcmp(token->string, "oneMinusSrc1Color")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR;
-								else if(strcmp(token->string, "src1Alpha")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_SRC1_ALPHA;
-								else if(strcmp(token->string, "oneMinusSrc1Alpha")==0)
-									pipeline->pipeline.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "dstAlphaBlendFactor")==0)
-					{
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ZERO;
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "zero")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ZERO;
-								else if(strcmp(token->string, "one")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE;
-								else if(strcmp(token->string, "srcColor")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_SRC_COLOR;
-								else if(strcmp(token->string, "oneMinusSrcColor")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-								else if(strcmp(token->string, "dstColor")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_DST_COLOR;
-								else if(strcmp(token->string, "oneMinusDstColor")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
-								else if(strcmp(token->string, "srcAlpha")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
-								else if(strcmp(token->string, "oneMinusSrcAlpha")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-								else if(strcmp(token->string, "dstAlpha")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_DST_ALPHA;
-								else if(strcmp(token->string, "oneMinusDstAlpha")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
-								else if(strcmp(token->string, "constantColor")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_CONSTANT_COLOR;
-								else if(strcmp(token->string, "oneMinusConstantColor")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
-								else if(strcmp(token->string, "constantAlpha")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_CONSTANT_ALPHA;
-								else if(strcmp(token->string, "oneMinusConstantAlpha")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
-								else if(strcmp(token->string, "srcAlphaSaturate")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
-								else if(strcmp(token->string, "src1Color")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_SRC1_COLOR;
-								else if(strcmp(token->string, "oneMinusSrc1Color")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR;
-								else if(strcmp(token->string, "src1Alpha")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_SRC1_ALPHA;
-								else if(strcmp(token->string, "oneMinusSrc1Alpha")==0)
-									pipeline->pipeline.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "alphaBlendOp")==0)
-					{
+					if(strcmp(alphaBlendOpString, "add")==0)
 						pipeline->pipeline.alphaBlendOp=VK_BLEND_OP_ADD;
-
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "add")==0)
-									pipeline->pipeline.alphaBlendOp=VK_BLEND_OP_ADD;
-								else if(strcmp(token->string, "subtract")==0)
-									pipeline->pipeline.alphaBlendOp=VK_BLEND_OP_SUBTRACT;
-								else if(strcmp(token->string, "reverseSubtract")==0)
-									pipeline->pipeline.alphaBlendOp=VK_BLEND_OP_REVERSE_SUBTRACT;
-								else if(strcmp(token->string, "min")==0)
-									pipeline->pipeline.alphaBlendOp=VK_BLEND_OP_MIN;
-								else if(strcmp(token->string, "max")==0)
-									pipeline->pipeline.alphaBlendOp=VK_BLEND_OP_MAX;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER&&token->string[0]==')')
-								break;
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
-					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "colorWriteMask")==0)
+					else if(strcmp(alphaBlendOpString, "subtract")==0)
+						pipeline->pipeline.alphaBlendOp=VK_BLEND_OP_SUBTRACT;
+					else if(strcmp(alphaBlendOpString, "reverseSubtract")==0)
+						pipeline->pipeline.alphaBlendOp=VK_BLEND_OP_REVERSE_SUBTRACT;
+					else if(strcmp(alphaBlendOpString, "min")==0)
+						pipeline->pipeline.alphaBlendOp=VK_BLEND_OP_MIN;
+					else if(strcmp(alphaBlendOpString, "max")==0)
+						pipeline->pipeline.alphaBlendOp=VK_BLEND_OP_MAX;
+					else
 					{
-						pipeline->pipeline.colorWriteMask=0;
-
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
-						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "none")==0)
-									pipeline->pipeline.colorWriteMask=0;
-								else if(strcmp(token->string, "colorR")==0)
-									pipeline->pipeline.colorWriteMask|=VK_COLOR_COMPONENT_R_BIT;
-								else if(strcmp(token->string, "colorG")==0)
-									pipeline->pipeline.colorWriteMask|=VK_COLOR_COMPONENT_G_BIT;
-								else if(strcmp(token->string, "colorB")==0)
-									pipeline->pipeline.colorWriteMask|=VK_COLOR_COMPONENT_B_BIT;
-								else if(strcmp(token->string, "colorA")==0)
-									pipeline->pipeline.colorWriteMask|=VK_COLOR_COMPONENT_A_BIT;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER)
-							{
-								if(token->string[0]==')')
-									break;
-								else if(token->string[0]=='|')
-									continue;
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-						}
+						DBGPRINTF(DEBUG_ERROR, "Unknown alphaBlendOp '%s'.\n", alphaBlendOpString);
+						return false;
 					}
-					else if(token->type==TOKEN_KEYWORD&&strcmp(token->string, "pushConstant")==0)
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "colorWriteMask"))
+				{
+					char maskString[32]={ 0 };
+					VkColorComponentFlags colorWriteMask=0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					for(;;)
 					{
-						uint32_t param=0;
-						pipeline->pushConstant.offset=0;
-						pipeline->pushConstant.size=0;
-						pipeline->pushConstant.stageFlags=0;
+						if(!Parser_String(&parser, maskString, sizeof(maskString)))
+							return false;
 
-						Zone_Free(zone, token);
-						token=Tokenizer_GetNext(&tokenizer);
-
-						while(!(token->type==TOKEN_DELIMITER&&token->string[0]==')'))
+						if(strcmp(maskString, "none")==0)
+							colorWriteMask=0;
+						else if(strcmp(maskString, "colorR")==0)
+							colorWriteMask|=VK_COLOR_COMPONENT_R_BIT;
+						else if(strcmp(maskString, "colorG")==0)
+							colorWriteMask|=VK_COLOR_COMPONENT_G_BIT;
+						else if(strcmp(maskString, "colorB")==0)
+							colorWriteMask|=VK_COLOR_COMPONENT_B_BIT;
+						else if(strcmp(maskString, "colorA")==0)
+							colorWriteMask|=VK_COLOR_COMPONENT_A_BIT;
+						else
 						{
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_INT&&param==0)
-								pipeline->pushConstant.offset=(uint32_t)token->ival;
-							else if(token->type==TOKEN_INT&&param==1)
-								pipeline->pushConstant.size=(uint32_t)token->ival;
-							else if(token->type==TOKEN_STRING)
-							{
-								if(strcmp(token->string, "vertex")==0&&param==2)
-									pipeline->pushConstant.stageFlags|=VK_SHADER_STAGE_VERTEX_BIT;
-								else if(strcmp(token->string, "tessellationControl")==0&&param==2)
-									pipeline->pushConstant.stageFlags|=VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-								else if(strcmp(token->string, "tessellationEvaluation")==0&&param==2)
-									pipeline->pushConstant.stageFlags|=VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
-								else if(strcmp(token->string, "geometry")==0&&param==2)
-									pipeline->pushConstant.stageFlags|=VK_SHADER_STAGE_GEOMETRY_BIT;
-								else if(strcmp(token->string, "fragment")==0&&param==2)
-									pipeline->pushConstant.stageFlags|=VK_SHADER_STAGE_FRAGMENT_BIT;
-								else if(strcmp(token->string, "compute")==0&&param==2)
-									pipeline->pushConstant.stageFlags|=VK_SHADER_STAGE_COMPUTE_BIT;
-								else
-								{
-									Tokenizer_PrintToken("Unknown parameter ", token);
-									return false;
-								}
-							}
-							else
-							{
-								Tokenizer_PrintToken("Unexpected token ", token);
-								return false;
-							}
-
-							Zone_Free(zone, token);
-							token=Tokenizer_GetNext(&tokenizer);
-
-							if(token->type==TOKEN_DELIMITER)
-							{
-								// Still expecting more parameters, error.
-								if(token->string[0]!=','&&param<2)
-								{
-									DBGPRINTF(DEBUG_ERROR, "Missing comma\n");
-									return false;
-								}
-								// End of expected parameters, end.
-								else if(token->string[0]==')'&&param==2)
-									break;
-								// Special case for 3rd parameter, because multiple stages can be specified.
-								else if(token->string[0]!='|'&&param<2)
-									param++;
-							}
-
-							if(param>2)
-							{
-								DBGPRINTF(DEBUG_ERROR, "Too many params pushConstant(offset, size, stage)\n");
-								return false;
-							}
+							DBGPRINTF(DEBUG_ERROR, "Unknown colorWriteMask parameter '%s'.\n", maskString);
+							return false;
 						}
+
+						if(!Parser_Match(&parser, TOKEN_DELIMITER, '|'))
+							break;
 					}
+
+					pipeline->pipeline.colorWriteMask=colorWriteMask;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+				}
+				else if(Parser_MatchKeyword(&parser, "pushConstant"))
+				{
+					int64_t offset=0;
+					int64_t size=0;
+					char stageString[32]={ 0 };
+					VkShaderStageFlags stageFlags=0;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, '('))
+						return false;
+
+					if(!Parser_Integer(&parser, &offset))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ','))
+						return false;
+
+					if(!Parser_Integer(&parser, &size))
+						return false;
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ','))
+						return false;
+
+					for(;;)
+					{
+						if(!Parser_String(&parser, stageString, sizeof(stageString)))
+							return false;
+
+						if(strcmp(stageString, "vertex")==0)
+							stageFlags|=VK_SHADER_STAGE_VERTEX_BIT;
+						else if(strcmp(stageString, "tessellationControl")==0)
+							stageFlags|=VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+						else if(strcmp(stageString, "tessellationEvaluation")==0)
+							stageFlags|=VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+						else if(strcmp(stageString, "geometry")==0)
+							stageFlags|=VK_SHADER_STAGE_GEOMETRY_BIT;
+						else if(strcmp(stageString, "fragment")==0)
+							stageFlags|=VK_SHADER_STAGE_FRAGMENT_BIT;
+						else if(strcmp(stageString, "compute")==0)
+							stageFlags|=VK_SHADER_STAGE_COMPUTE_BIT;
+						else
+						{
+							DBGPRINTF(DEBUG_ERROR, "Unknown shader stage '%s'.\n", stageString);
+							return false;
+						}
+
+						if(!Parser_Match(&parser, TOKEN_DELIMITER, '|'))
+							break;
+					}
+
+					if(!Parser_Expect(&parser, TOKEN_DELIMITER, ')'))
+						return false;
+
+					pipeline->pushConstant.offset=(uint32_t)offset;
+					pipeline->pushConstant.size=(uint32_t)size;
+					pipeline->pushConstant.stageFlags=stageFlags;
+				}
+				else
+				{
+					DBGPRINTF(DEBUG_ERROR, "Unknown statement\n");
+					break;
 				}
 			}
 		}
-
-		if(token)
-			Zone_Free(zone, token);
+		else
+		{
+			DBGPRINTF(DEBUG_ERROR, "Unknown section\n");
+			return false;
+		}
 	}
 
 	Zone_Free(zone, buffer);

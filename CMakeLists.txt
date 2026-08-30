@@ -67,6 +67,7 @@ set(PROJECT_SOURCES
 	"utils/event.c"
 	"utils/id.c"
 	"utils/list.c"
+	"utils/parser.c"
 	"utils/pipeline.c"
 	"utils/postprocess.c"
 	"utils/spatialhash.c"
