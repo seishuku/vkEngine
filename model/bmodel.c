@@ -157,7 +157,7 @@ static vec3 CalculateCenterMass(BModel_t *model)
 
 static void CalculateBounds(BModel_t *model)
 {
-	model->bBoxMin=Vec3b(FLT_MIN);
+	model->bBoxMin=Vec3b(FLT_MAX);
 	model->bBoxMax=Vec3b(-FLT_MAX);
 	model->center=CalculateCenterMass(model);
 	model->radius=0.0f;
