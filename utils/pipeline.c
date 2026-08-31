@@ -1876,14 +1876,14 @@ bool CreatePipeline(VkuContext_t *context, Pipeline_t *pipeline, VkRenderPass re
 				}
 				else
 				{
-					DBGPRINTF(DEBUG_ERROR, "Unknown statement\n");
-					break;
+					Parser_Unexpected(&parser, "Unknown statement");
+					return false;
 				}
 			}
 		}
 		else
 		{
-			DBGPRINTF(DEBUG_ERROR, "Unknown section\n");
+			Parser_Unexpected(&parser, "Unknown section");
 			return false;
 		}
 	}

@@ -26,6 +26,8 @@ bool Parser_MatchKeyword(Parser_t *parser, const char *keyword);
 
 bool Parser_IsEnd(Parser_t *parser);
 
+bool Parser_Unexpected(Parser_t *parser, const char *message);
+
 bool Parser_Integer(Parser_t *parser, int64_t *value);
 bool Parser_Float(Parser_t *parser, double *value);
 bool Parser_Boolean(Parser_t *parser, bool *value);

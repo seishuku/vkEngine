@@ -185,7 +185,7 @@ bool Config_ReadINI(Config_t *config, const char *filename)
 				}
 				else
 				{
-					DBGPRINTF(DEBUG_ERROR, "Unknown statement\n");
+					Parser_Unexpected(&parser, "Unexpected");
 					return false;
 				}
 			}

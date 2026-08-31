@@ -53,7 +53,7 @@ bool Parser_Expect(Parser_t *parser, TokenType_e type, char delimiter)
 
 	if(token->type!=type||token->string[0]!=delimiter)
 	{
-		Tokenizer_PrintToken("Unexpected token, expected delimiter ", token);
+		Tokenizer_PrintToken("Unexpected token,", token);
 		Zone_Free(zone, token);
 		return false;
 	}
@@ -74,7 +74,7 @@ bool Parser_ExpectKeyword(Parser_t *parser, const char *keyword)
 
 	if(token->type!=TOKEN_KEYWORD||strcmp(token->string, keyword)!=0)
 	{
-		Tokenizer_PrintToken("Unexpected token, expected keyword ", token);
+		Tokenizer_PrintToken("Unexpected token,", token);
 		Zone_Free(zone, token);
 		return false;
 	}
@@ -134,6 +134,21 @@ bool Parser_IsEnd(Parser_t *parser)
 	return atEnd;
 }
 
+bool Parser_Unexpected(Parser_t *parser, const char *message)
+{
+	Token_t *token=Parser_Peek(parser);
+
+	if(token)
+	{
+		Tokenizer_PrintToken(message, token);
+		Zone_Free(zone, token);
+	}
+	else
+		DBGPRINTF(DEBUG_ERROR, "%sunexpected end of file.\n", message);
+
+	return false;
+}
+
 bool Parser_Integer(Parser_t *parser, int64_t *value)
 {
 	Token_t *token=Tokenizer_GetNext(parser->tokenizer);
@@ -146,7 +161,7 @@ bool Parser_Integer(Parser_t *parser, int64_t *value)
 
 	if(token->type!=TOKEN_INT)
 	{
-		Tokenizer_PrintToken("Unexpected token, expected integer ", token);
+		Tokenizer_PrintToken("Unexpected token, expected integer, got", token);
 		Zone_Free(zone, token);
 		return false;
 	}
@@ -169,7 +184,7 @@ bool Parser_Float(Parser_t *parser, double *value)
 
 	if(token->type!=TOKEN_FLOAT)
 	{
-		Tokenizer_PrintToken("Unexpected token, expected float ", token);
+		Tokenizer_PrintToken("Unexpected token, expected float, got", token);
 		Zone_Free(zone, token);
 		return false;
 	}
@@ -192,7 +207,7 @@ bool Parser_Boolean(Parser_t *parser, bool *value)
 
 	if(token->type!=TOKEN_BOOLEAN)
 	{
-		Tokenizer_PrintToken("Unexpected token, expected boolean ", token);
+		Tokenizer_PrintToken("Unexpected token, expected boolean, got", token);
 		Zone_Free(zone, token);
 		return false;
 	}
@@ -215,7 +230,7 @@ bool Parser_String(Parser_t *parser, char *buffer, size_t bufferSize)
 
 	if(token->type!=TOKEN_STRING)
 	{
-		Tokenizer_PrintToken("Unexpected token, expected string ", token);
+		Tokenizer_PrintToken("Unexpected token, expected string, got", token);
 		Zone_Free(zone, token);
 		return false;
 	}
@@ -239,7 +254,7 @@ bool Parser_Quoted(Parser_t *parser, char *buffer, size_t bufferSize)
 
 	if(token->type!=TOKEN_STRING)
 	{
-		Tokenizer_PrintToken("Unexpected token, expected string ", token);
+		Tokenizer_PrintToken("Unexpected token, expected string, got", token);
 		Zone_Free(zone, token);
 		return false;
 	}
