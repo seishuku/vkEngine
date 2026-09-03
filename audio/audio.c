@@ -80,6 +80,7 @@ static matrix listenerModelView=
 };
 
 static vec3 listenerPosition={ 0.0f, 0.0f, 0.0f };
+static float listenerRadius=500.0f;
 
 void Audio_SetListenerModelView(matrix modelView)
 {
@@ -135,11 +136,11 @@ static void BuildTriangleCentroids(void)
 
 // Naive HRIR sample interpolation, takes world-space position as input.
 // HRIR samples are taken as float, but interpolated output is int16.
-// TODO: Optimize? Saved 4ms+ on worst case performance
+// TODO: More optimization?
 static void HRIRInterpolate(vec3 xyz, int16_t *FIRKernel)
 {
 	// Sound distance drop-off constant, this is the radius of the hearable range
-	const float invRadius=1.0f/500.0f;
+	const float invRadius=1.0f/listenerRadius;
 
 	// Calculate relative position of the sound source to the camera
 	const vec3 relPosition=Vec3_Subv(xyz, listenerPosition);
@@ -169,6 +170,7 @@ static void HRIRInterpolate(vec3 xyz, int16_t *FIRKernel)
 	if(triangleIndex<0&&(3*triangleIndex)>=HRIRSphere.numIndex)
 		return;
 
+	// Debugging, push the point into a list to visualize which triangle is being used for interpolation
 	// PushPoint(localPosition, triangleIndex);
 
 	// Calculate the barycentric coordinates and use them to interpolate the HRIR samples.
@@ -195,13 +197,15 @@ static void HRIRInterpolate(vec3 xyz, int16_t *FIRKernel)
 		const float gain=4.0f;
 		const float final=falloffDist*gain*hannWindow[i];
 
-		FIRKernel[2*i+0]=(int16_t)clampf(final*Vec3_Dot(left, coords)*INT16_MAX, INT16_MIN, INT16_MAX);
-		FIRKernel[2*i+1]=(int16_t)clampf(final*Vec3_Dot(right, coords)*INT16_MAX, INT16_MIN, INT16_MAX);
+		// Output reversed kernel
+		const uint32_t rev=HRIRSphere.sampleLength-1-i;
+		FIRKernel[2*rev+0]=(int16_t)clampf(final*Vec3_Dot(left, coords)*INT16_MAX, INT16_MIN, INT16_MAX);
+		FIRKernel[2*rev+1]=(int16_t)clampf(final*Vec3_Dot(right, coords)*INT16_MAX, INT16_MIN, INT16_MAX);
 	}
 }
 
-// Integer audio convolution
-static void Convolve(const int16_t *input, int16_t *output, const size_t length, const int16_t *kernel, const size_t kernelLength)
+// Integer audio convolution, kernel must be reversed
+static void Convolve(const int16_t *restrict input, int16_t *restrict output, const size_t length, const int16_t *restrict kernel, const size_t kernelLength)
 {
 	int16_t *outputPtr=output;
 
@@ -217,7 +221,7 @@ static void Convolve(const int16_t *input, int16_t *output, const size_t length,
 		{
 			sumL+=(int32_t)(*kernelPtr++)*(int32_t)(*inputPtr);
 			sumR+=(int32_t)(*kernelPtr++)*(int32_t)(*inputPtr);
-			inputPtr--;
+			inputPtr++;
 		}
 
 		*outputPtr++=(int16_t)(bitwiseClamp32(sumL, -0x40000000, 0x3FFFFFFF)>>15);
@@ -226,7 +230,7 @@ static void Convolve(const int16_t *input, int16_t *output, const size_t length,
 }
 
 // Additively mix source into destination
-static void MixAudio(int16_t *dst, const int16_t *src, const size_t length, const float volume)
+static void MixAudio(int16_t *restrict dst, const int16_t *restrict src, const size_t length, const float volume)
 {
 	if(volume==0)
 		return;
@@ -262,6 +266,27 @@ void Audio_FillBuffer(void *buffer, uint32_t length)
 		// If the channel is empty, skip on the to next.
 		if(channel->sample==NULL)
 			continue;
+
+		// Calculate listening distance early out
+		const vec3 relPosition=Vec3_Subv(channel->xyz, listenerPosition);
+		const float distSq=Vec3_Dot(relPosition, relPosition);
+
+		if(distSq>=(listenerRadius*listenerRadius))
+		{
+			// Sample is still technically playing, so advance normally and continue on
+			size_t remainingData=channel->sample->length-channel->position;
+			channel->position+=remainingData;
+
+			if(channel->position>=channel->sample->length)
+			{
+				if(channel->looping)
+					channel->position=0;
+				else
+					memset(channel, 0, sizeof(Channel_t));
+			}
+
+			continue;
+		}
 
 		// Interpolate HRIR samples that are closest to the sound's position.
 		HRIRInterpolate(channel->xyz, channel->FIRKernel);
@@ -756,8 +781,6 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 	}
 
 	// Covert to match primary buffer sampling rate
-	const uint32_t outputSamples=(uint32_t)(numSamples/((float)sampleRate/AUDIO_SAMPLE_RATE));
-
 #ifdef _DEBUG
 	DBGPRINTF(DEBUG_INFO, "Converting %s wave format from %dHz/%dbit to %d/16bit.\n", filename, sampleRate, bitsPerSample, AUDIO_SAMPLE_RATE);
 #endif
@@ -775,7 +798,7 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 
 	sample->data=resampledAndConverted;
 
-	sample->length=outputSamples;
+	sample->length=(uint32_t)(numSamples/((float)sampleRate/AUDIO_SAMPLE_RATE));
 	sample->channels=(uint8_t)channels;
 
 	return true;
