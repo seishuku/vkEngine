@@ -99,11 +99,13 @@ EntityList_t entityList;
 RigidBody_t cubeBody[NUM_CUBE];
 RigidBody_t platformBody;
 
-RigidBody_t cubeA, cubeB;
-DistanceConstraint_t cubeConstraint;
-DistanceConstraint_t cubeConstraintB;
-DistanceConstraint_t cubeConstraintC;
-DistanceConstraint_t cubeConstraintD;
+RigidBody_t chassis;
+RigidBody_t wheels[4];
+RigidBody_t knuckles[2];
+
+HingeConstraint_t steerHinges[2];
+HingeConstraint_t frontWheelHinges[2];
+HingeConstraint_t rearWheelHinges[2];
 
 // Thread stuff
 typedef struct
@@ -278,14 +280,6 @@ matrix FighterTransform(const RigidBody_t *body)
 	return MatrixMult(local, MatrixTranslatev(body->position));
 }
 
-matrix CapsuleTransform(const RigidBody_t *body)
-{
-	const float scale=body->radiusHeight.x;
-	matrix local=MatrixScale(scale, scale, scale);
-	local=MatrixMult(local, QuatToMatrix(body->orientation));
-	return MatrixMult(local, MatrixTranslatev(body->position));
-}
-
 void ResetPhysicsCubes(void)
 {
 	const float radius=20.0f;
@@ -430,88 +424,92 @@ void GenerateWorld(void)
 		ResetPhysicsCubes();
 		ResetAsteroids();
 
-		const vec3 size=Vec3(10.0f, 10.0f, 10.0f);
-		const float mass=(1.0f/100000.0f)*(size.x*size.y*size.z);
-		const float inertia=(1.0f/12.0f)*mass*(Vec3_LengthSq(size));
-
-		cubeA=(RigidBody_t)
+		vec3 chassisMounts[4]=
 		{
-		    .position=Vec3(-25.0f, 50.0f, 0.0f),
+			Vec3(-1.5f, -0.2f, 3.5f),  // 0: Front-Left
+			Vec3(1.5f, -0.2f, 3.5f),   // 1: Front-Right
+			Vec3(-1.5f, -0.2f, -3.5f), // 2: Rear-Left
+			Vec3(1.5f, -0.2f, -3.5f)   // 3: Rear-Right
+		};
 
-		    .velocity=Vec3b(0.0f),
-		    .force=Vec3b(0.0f),
-		    .mass=mass,
-		    .invMass=1.0f/mass,
+		float wheelOffsetOffsetX[4]={ -1.0f, 1.0f, -1.0f, 1.0f};
 
+		chassis=(RigidBody_t)
+		{
+		    .position=Vec3(0.0f, -45.0f, 0.0f),
+		    .mass=0.6f,
+		    .invMass=1.0f/0.6f,
 		    .orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
-		    .angularVelocity=Vec3b(0.0f),
-		    .inertia=inertia,
-		    .invInertia=1.0f/inertia,
-
-			.restitution=0.1f,
-			.friction=0.8f,
-
+		    .inertia=0.25f,
+		    .invInertia=1.0f / 0.25f,
+		    .restitution=0.1f,
+		    .friction=0.5f,
 		    .type=RIGIDBODY_OBB,
-		    .size=size,
-		};
+		    .size=Vec3(1.2f, 0.3f, 4.0f)};
 
-		cubeB=(RigidBody_t)
+		for(uint32_t i=0;i<4;i++)
 		{
-		    .position=Vec3(25.0f, 50.0f, 0.0f),
+			wheels[i]=(RigidBody_t)
+			{
+			    .position=Vec3_Addv(chassis.position, Vec3_Addv(chassisMounts[i], Vec3(wheelOffsetOffsetX[i], 0.0f, 0.0f))),
+			    .mass=0.05f,
+			    .invMass=1.0f/0.05f,
+			    .orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
+			    .inertia=0.005f,
+			    .invInertia=1.0f/0.005f,
+			    .restitution=0.1f,
+			    .friction=2.0f,
+			    .type=RIGIDBODY_SPHERE,
+			    .radius=0.8f};
+		}
 
-		    .velocity=Vec3b(0.0f),
-		    .force=Vec3b(0.0f),
-		    .mass=mass,
-		    .invMass=1.0f/mass,
-
-		    .orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
-		    .angularVelocity=Vec3b(0.0f),
-		    .inertia=inertia,
-		    .invInertia=1.0f/inertia,
-
-			.restitution=0.1f,
-			.friction=0.8f,
-
-		    .type=RIGIDBODY_OBB,
-		    .size=size,
-		};
-
-		cubeConstraint=(DistanceConstraint_t)
+		for(uint32_t i=0;i<2;i++)
 		{
-			.bodyA=&cubeA, .bodyB=&cubeB,
+			knuckles[i]=(RigidBody_t)
+			{
+			    .position=Vec3_Addv(chassis.position, chassisMounts[i]),
+			    .mass=0.05f,
+			    .invMass=1.0f/0.05f,
+			    .orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
+			    .inertia=0.01f,
+			    .invInertia=1.0f/0.01f,
+			    .restitution=0.1f,
+			    .friction=0.5f,
+			    .type=RIGIDBODY_OBB,
+			    .size=Vec3(0.2f, 0.2f, 0.2f)};
 
-			.localAnchorA=Vec3(0.0f, 10.0f, 0.0f),
-			.localAnchorB=Vec3(0.0f, 10.0f, 0.0f),
+			steerHinges[i]=(HingeConstraint_t)
+			{
+			    .bodyA=&chassis,
+			    .bodyB=&knuckles[i],
+			    .localAnchorA=chassisMounts[i],
+			    .localAnchorB=Vec3(0.0f, 0.0f, 0.0f),
+			    .localAxisA=Vec3(0.0f, 1.0f, 0.0f),
+			    .localAxisB=Vec3(0.0f, 1.0f, 0.0f)};
+		}
 
-			.length=50.0f,
-		};
-		cubeConstraintB=(DistanceConstraint_t)
+		for(uint32_t i=0;i<2;i++)
 		{
-			.bodyA=&cubeA, .bodyB=&cubeB,
+			frontWheelHinges[i]=(HingeConstraint_t)
+			{
+			    .bodyA=&knuckles[i],
+			    .bodyB=&wheels[i],
+			    .localAnchorA=Vec3(wheelOffsetOffsetX[i], 0.0f, 0.0f),
+			    .localAnchorB=Vec3(0.0f, 0.0f, 0.0f),
+			    .localAxisA=Vec3(1.0f, 0.0f, 0.0f),
+			    .localAxisB=Vec3(1.0f, 0.0f, 0.0f)
+			};
 
-			.localAnchorA=Vec3(0.0f, -10.0f, 0.0f),
-			.localAnchorB=Vec3(0.0f, -10.0f, 0.0f),
-
-			.length=50.0f,
-		};
-		cubeConstraintC=(DistanceConstraint_t)
-		{
-			.bodyA=&cubeA, .bodyB=&cubeB,
-
-			.localAnchorA=Vec3(0.0f, -10.0f, 0.0f),
-			.localAnchorB=Vec3(0.0f, 10.0f, 0.0f),
-
-			.length=50.0f,
-		};
-		cubeConstraintD=(DistanceConstraint_t)
-		{
-			.bodyA=&cubeA, .bodyB=&cubeB,
-
-			.localAnchorA=Vec3(0.0f, 10.0f, 0.0f),
-			.localAnchorB=Vec3(0.0f, -10.0f, 0.0f),
-
-			.length=50.0f,
-		};
+			rearWheelHinges[i]=(HingeConstraint_t)
+			{
+			    .bodyA=&chassis,
+			    .bodyB=&wheels[i+2],
+			    .localAnchorA=chassisMounts[i+2],
+			    .localAnchorB=Vec3(-wheelOffsetOffsetX[i+2], 0.0f, 0.0f),
+			    .localAxisA=Vec3(1.0f, 0.0f, 0.0f),
+			    .localAxisB=Vec3(1.0f, 0.0f, 0.0f)
+			};
+		}
 	}
 
 	playerHealth=100.0f;
@@ -534,14 +532,19 @@ void GenerateWorld(void)
 
 	if(!ClientNetwork_IsConnected())
 	{
-		EntityList_Add(&entityList, &cubeA, true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, CubeTransform);
-		EntityList_Add(&entityList, &cubeB, true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, CubeTransform);
+		EntityList_Add(&entityList, &chassis, true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
+		EntityList_Add(&entityList, &wheels[0], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
+		EntityList_Add(&entityList, &wheels[1], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
+		EntityList_Add(&entityList, &wheels[2], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
+		EntityList_Add(&entityList, &wheels[3], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
+		EntityList_Add(&entityList, &knuckles[0], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
+		EntityList_Add(&entityList, &knuckles[1], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
 
 		for(uint32_t i=0;i<NUM_ENEMY;i++)
 			EntityList_Add(&entityList, &enemy[i].body, false, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[i]+0), TEXTURE_FIGHTER1+(2*fighterTexture[i]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 
-		for(uint32_t i=0;i<NUM_CUBE;i++)
-			EntityList_Add(&entityList, &cubeBody[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
+		// for(uint32_t i=0;i<NUM_CUBE;i++)
+		// 	EntityList_Add(&entityList, &cubeBody[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
 
 		uint32_t platformID=EntityList_Add(&entityList, &platformBody, false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
 		for(uint32_t i=0;i<entityList.entityCount;i++)
@@ -549,7 +552,7 @@ void GenerateWorld(void)
 			Entity_t *entity=&entityList.entities[i];
 			if(entity->ID==platformID)
 			{
-				entity->isAttractor=false;
+				entity->isAttractor=true;
 				entity->influenceRadius=100.0f;
 				entity->baseGravity=9.81f*WORLD_SCALE;
 				break;
@@ -909,7 +912,6 @@ void Thread_Main(void *arg)
 
 	// BVH_DrawDebug(&bvh, data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye);
 
-	// Draw capsule rigid body
 	{
 		struct
 		{
@@ -919,49 +921,48 @@ void Thread_Main(void *arg)
 
 		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 0.0f);
 
-		matrix local=CubeTransform(&cubeA);
+		matrix local=MatrixScalev(chassis.size);
+		local=MatrixMult(local, QuatToMatrix(chassis.orientation));
+		local=MatrixMult(local, MatrixTranslatev(chassis.position));
 		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
 		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
 		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
 		DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
 
-		local=CubeTransform(&cubeB);
+		local=MatrixScalev(knuckles[0].size);
+		local=MatrixMult(local, QuatToMatrix(knuckles[0].orientation));
+		local=MatrixMult(local, MatrixTranslatev(knuckles[0].position));
 		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
 		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
 		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
 		DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
 
-		struct
+		local=MatrixScalev(knuckles[1].size);
+		local=MatrixMult(local, QuatToMatrix(knuckles[1].orientation));
+		local=MatrixMult(local, MatrixTranslatev(knuckles[1].position));
+		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
+		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
+
+		DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
+
+		for(int i=0;i<4;i++)
 		{
-			matrix mvp;
-			vec4 color, start, end;
-		} linePC;
+			spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 0.0f);
 
-		local=MatrixMult(perFrame[data->index].mainUBO[data->eye]->modelView, perFrame[data->index].mainUBO[data->eye]->HMD);
-		linePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
+			const float radiusScale=wheels[i].radius;
 
-		linePC.color=Vec4(1.0f, 0.0f, 0.0f, 1.0f);
-		linePC.start=Vec4_Vec3(Vec3_Addv(cubeA.position, QuatRotate(cubeA.orientation, cubeConstraint.localAnchorA)), 1.0f);
-		linePC.end=Vec4_Vec3(Vec3_Addv(cubeB.position, QuatRotate(cubeB.orientation, cubeConstraint.localAnchorB)), 1.0f);
+			matrix local=MatrixScale(radiusScale, radiusScale, radiusScale);
+			local=MatrixMult(local, QuatToMatrix(wheels[i].orientation));
+			local=MatrixMult(local, MatrixTranslatev(wheels[i].position));
+			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
+			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+			spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
-		DrawLinePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], sizeof(linePC), &linePC);
-
-		linePC.start=Vec4_Vec3(Vec3_Addv(cubeA.position, QuatRotate(cubeA.orientation, cubeConstraintB.localAnchorA)), 1.0f);
-		linePC.end=Vec4_Vec3(Vec3_Addv(cubeB.position, QuatRotate(cubeB.orientation, cubeConstraintB.localAnchorB)), 1.0f);
-
-		DrawLinePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], sizeof(linePC), &linePC);
-
-		linePC.start=Vec4_Vec3(Vec3_Addv(cubeA.position, QuatRotate(cubeA.orientation, cubeConstraintC.localAnchorA)), 1.0f);
-		linePC.end=Vec4_Vec3(Vec3_Addv(cubeB.position, QuatRotate(cubeB.orientation, cubeConstraintC.localAnchorB)), 1.0f);
-
-		DrawLinePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], sizeof(linePC), &linePC);
-
-		linePC.start=Vec4_Vec3(Vec3_Addv(cubeA.position, QuatRotate(cubeA.orientation, cubeConstraintD.localAnchorA)), 1.0f);
-		linePC.end=Vec4_Vec3(Vec3_Addv(cubeB.position, QuatRotate(cubeB.orientation, cubeConstraintD.localAnchorB)), 1.0f);
-
-		DrawLinePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], sizeof(linePC), &linePC);
+			DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
+		}
 	}
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
@@ -1119,7 +1120,7 @@ void AttractorQuery(Entity_t *entity, void *userdata)
 	Entity_t *attractor=(Entity_t *)userdata;
 
 	// Don't calculate against self
-	if(entity==attractor)
+	if(entity==attractor||entity->body==&camera.body)
 		return;
 
 	if(attractor->body->type==RIGIDBODY_SPHERE)
@@ -1151,10 +1152,42 @@ void Thread_Physics(void *arg)
 	{
 		if(!pausePhysics)
 		{
-			PhysicsSolveDistanceConstraint(&cubeA, &cubeB, &cubeConstraint);
-			PhysicsSolveDistanceConstraint(&cubeA, &cubeB, &cubeConstraintB);
-			PhysicsSolveDistanceConstraint(&cubeA, &cubeB, &cubeConstraintC);
-			PhysicsSolveDistanceConstraint(&cubeA, &cubeB, &cubeConstraintD);
+			for(uint32_t iteration=0;iteration<8;iteration++)
+			{
+				for(uint32_t i=0;i<2;i++)
+				{
+					PhysicsSolveHingeConstraint(&chassis, &knuckles[i], &steerHinges[i]);
+					PhysicsSolveHingeConstraint(&knuckles[i], &wheels[i], &frontWheelHinges[i]);
+					PhysicsSolveHingeConstraint(&chassis, &wheels[i+2], &rearWheelHinges[i]);
+				}
+			}
+
+			vec3 dirToCamWorld=Vec3_Subv(camera.body.position, chassis.position);
+			vec3 dirToCamLocal=QuatRotate(QuatInverse(chassis.orientation), dirToCamWorld);
+
+			float targetSteerAngle=clampf(atan2f(dirToCamLocal.x, dirToCamLocal.z), -0.6f, 0.6f);
+			vec3 steerAxisWorld=QuatRotate(chassis.orientation, Vec3(0.0f, 1.0f, 0.0f));
+
+			for(uint32_t i=0;i<2;i++)
+			{
+				vec3 knuckleForwardLocal=QuatRotate(QuatInverse(chassis.orientation), QuatRotate(knuckles[i].orientation, Vec3(0.0f, 0.0f, 1.0f)));
+				float currentSteerAngle=atan2f(knuckleForwardLocal.x, knuckleForwardLocal.z);
+
+				float angleError=targetSteerAngle-currentSteerAngle;
+				float steerSpeed=angleError*12.0f;
+				float maxSteerTorque=2.0f;
+
+				PhysicsSolveHingeMotor(&chassis, &knuckles[i], steerAxisWorld, steerSpeed, maxSteerTorque, fTimeStep);
+			}
+
+			float driveThrottle=10.0f;
+			float maxDriveTorque=5.0f;
+
+			for(uint32_t i=0;i<2;i++)
+			{
+				vec3 driveAxis=QuatRotate(chassis.orientation, rearWheelHinges[i].localAxisA);
+				PhysicsSolveHingeMotor(&chassis, &wheels[i+2], driveAxis, driveThrottle, maxDriveTorque, fTimeStep);
+			}
 
 			// Run particle system simlation
 			ParticleSystem_Step(&particleSystem, fTimeStep);

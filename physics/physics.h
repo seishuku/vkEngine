@@ -86,6 +86,42 @@ typedef struct
 	float length;
 } DistanceConstraint_t;
 
+typedef struct
+{
+	RigidBody_t *bodyA;
+	RigidBody_t *bodyB;
+
+	vec3 localAnchorA;
+	vec3 localAnchorB;
+} PointConstraint_t;
+
+typedef struct
+{
+	RigidBody_t *bodyA;
+	RigidBody_t *bodyB;
+
+	vec3 localAnchorA;
+	vec3 localAnchorB;
+
+	vec3 localAxisA;
+	vec3 localAxisB;
+} HingeConstraint_t;
+
+typedef struct
+{
+	RigidBody_t *bodyA;
+	RigidBody_t *bodyB;
+
+	vec3 localAnchorA;
+	vec3 localAnchorB;
+
+	vec3 localAxisA;
+} PrismaticConstraint_t;
+
 void PhysicsSolveDistanceConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const DistanceConstraint_t *constraint);
+void PhysicsSolvePointConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const PointConstraint_t *constraint);
+void PhysicsSolveHingeConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const HingeConstraint_t *constraint);
+void PhysicsSolveHingeMotor(RigidBody_t *bodyA, RigidBody_t *bodyB, const vec3 worldAxis, float targetAngularVelocity, float maxMotorTorque, float dt);
+void PhysicsSolvePrismaticConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const PrismaticConstraint_t *constraint);
 
 #endif
