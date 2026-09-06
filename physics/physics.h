@@ -76,4 +76,16 @@ vec3 AttractorOBBComputeGravity(vec3 position, vec3 center, vec3 halfExtents, ve
 vec3 AttractorCapsuleComputeGravity(vec3 position, vec3 center, vec4 orientation, float radius, float halfHeight, float baseGravity, float influenceRadius);
 vec3 AttractorSphereComputeGravity(vec3 position, vec3 center, float radius, float baseGravity, float influenceRadius);
 
+typedef struct
+{
+	RigidBody_t *bodyA;
+	RigidBody_t *bodyB;
+
+	vec3 localAnchorA;
+	vec3 localAnchorB;
+	float length;
+} DistanceConstraint_t;
+
+void PhysicsSolveDistanceConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const DistanceConstraint_t *constraint);
+
 #endif

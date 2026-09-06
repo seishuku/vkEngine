@@ -36,6 +36,7 @@ set(PROJECT_SOURCES
 	"network/network.c"
 	"physics/attractors.c"
 	"physics/collision.c"
+	"physics/constraint.c"
 	"physics/integration.c"
 	"physics/particle.c"
 	"physics/solver.c"
