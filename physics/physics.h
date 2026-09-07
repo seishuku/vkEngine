@@ -76,52 +76,48 @@ vec3 AttractorOBBComputeGravity(vec3 position, vec3 center, vec3 halfExtents, ve
 vec3 AttractorCapsuleComputeGravity(vec3 position, vec3 center, vec4 orientation, float radius, float halfHeight, float baseGravity, float influenceRadius);
 vec3 AttractorSphereComputeGravity(vec3 position, vec3 center, float radius, float baseGravity, float influenceRadius);
 
-typedef struct
+typedef enum
 {
-	RigidBody_t *bodyA;
-	RigidBody_t *bodyB;
-
-	vec3 localAnchorA;
-	vec3 localAnchorB;
-	float length;
-} DistanceConstraint_t;
-
-typedef struct
-{
-	RigidBody_t *bodyA;
-	RigidBody_t *bodyB;
-
-	vec3 localAnchorA;
-	vec3 localAnchorB;
-} PointConstraint_t;
+	CONSTRAINT_DISTANCE=0,
+	CONSTRAINT_POINT,
+	CONSTRAINT_HINGE,
+	CONSTRAINT_PRISMATIC,
+	CONSTRAINT_ANGULAR_MOTOR,
+	CONSTRAINT_LINEAR_MOTOR,
+	MAX_CONSTRAINTTYPE
+} ConstraintType_e;
 
 typedef struct
 {
+	ConstraintType_e type;
+
 	RigidBody_t *bodyA;
 	RigidBody_t *bodyB;
 
 	vec3 localAnchorA;
 	vec3 localAnchorB;
 
-	vec3 localAxisA;
-	vec3 localAxisB;
-} HingeConstraint_t;
+	union
+	{
+		float distance;
 
-typedef struct
-{
-	RigidBody_t *bodyA;
-	RigidBody_t *bodyB;
+		struct
+		{
+			vec3 localAxisA;
+			vec3 localAxisB;
+		};
 
-	vec3 localAnchorA;
-	vec3 localAnchorB;
+		struct
+		{
+			vec3 worldAxis;
 
-	vec3 localAxisA;
-} PrismaticConstraint_t;
+			bool motorEnabled;
+			float motorVelocity;
+			float maxMotorForce;
+		};
+	};
+} Constraint_t;
 
-void PhysicsSolveDistanceConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const DistanceConstraint_t *constraint);
-void PhysicsSolvePointConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const PointConstraint_t *constraint);
-void PhysicsSolveHingeConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const HingeConstraint_t *constraint);
-void PhysicsSolveHingeMotor(RigidBody_t *bodyA, RigidBody_t *bodyB, const vec3 worldAxis, float targetAngularVelocity, float maxMotorTorque, float dt);
-void PhysicsSolvePrismaticConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const PrismaticConstraint_t *constraint);
+void PhysicsSolveConstraint(Constraint_t *constraint, const float dt);
 
 #endif

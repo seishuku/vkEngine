@@ -103,9 +103,9 @@ RigidBody_t chassis;
 RigidBody_t wheels[4];
 RigidBody_t knuckles[2];
 
-HingeConstraint_t steerHinges[2];
-HingeConstraint_t frontWheelHinges[2];
-HingeConstraint_t rearWheelHinges[2];
+Constraint_t steerHinges[2];
+Constraint_t frontWheelHinges[2];
+Constraint_t rearWheelHinges[2];
 
 // Thread stuff
 typedef struct
@@ -478,8 +478,9 @@ void GenerateWorld(void)
 			    .type=RIGIDBODY_OBB,
 			    .size=Vec3(0.2f, 0.2f, 0.2f)};
 
-			steerHinges[i]=(HingeConstraint_t)
+			steerHinges[i]=(Constraint_t)
 			{
+				.type=CONSTRAINT_HINGE,
 			    .bodyA=&chassis,
 			    .bodyB=&knuckles[i],
 			    .localAnchorA=chassisMounts[i],
@@ -490,8 +491,9 @@ void GenerateWorld(void)
 
 		for(uint32_t i=0;i<2;i++)
 		{
-			frontWheelHinges[i]=(HingeConstraint_t)
+			frontWheelHinges[i]=(Constraint_t)
 			{
+				.type=CONSTRAINT_HINGE,
 			    .bodyA=&knuckles[i],
 			    .bodyB=&wheels[i],
 			    .localAnchorA=Vec3(wheelOffsetOffsetX[i], 0.0f, 0.0f),
@@ -500,8 +502,9 @@ void GenerateWorld(void)
 			    .localAxisB=Vec3(1.0f, 0.0f, 0.0f)
 			};
 
-			rearWheelHinges[i]=(HingeConstraint_t)
+			rearWheelHinges[i]=(Constraint_t)
 			{
+				.type=CONSTRAINT_HINGE,
 			    .bodyA=&chassis,
 			    .bodyB=&wheels[i+2],
 			    .localAnchorA=chassisMounts[i+2],
@@ -1156,9 +1159,9 @@ void Thread_Physics(void *arg)
 			{
 				for(uint32_t i=0;i<2;i++)
 				{
-					PhysicsSolveHingeConstraint(&chassis, &knuckles[i], &steerHinges[i]);
-					PhysicsSolveHingeConstraint(&knuckles[i], &wheels[i], &frontWheelHinges[i]);
-					PhysicsSolveHingeConstraint(&chassis, &wheels[i+2], &rearWheelHinges[i]);
+					PhysicsSolveConstraint(&steerHinges[i], fTimeStep);
+					PhysicsSolveConstraint(&frontWheelHinges[i], fTimeStep);
+					PhysicsSolveConstraint(&rearWheelHinges[i], fTimeStep);
 				}
 			}
 
@@ -1177,7 +1180,17 @@ void Thread_Physics(void *arg)
 				float steerSpeed=angleError*12.0f;
 				float maxSteerTorque=2.0f;
 
-				PhysicsSolveHingeMotor(&chassis, &knuckles[i], steerAxisWorld, steerSpeed, maxSteerTorque, fTimeStep);
+				Constraint_t steerMotor=
+				{
+					.type=CONSTRAINT_ANGULAR_MOTOR,
+					.bodyA=&chassis,
+					.bodyB=&knuckles[i],
+					.worldAxis=steerAxisWorld,
+					.motorEnabled=true,
+					.motorVelocity=steerSpeed,
+					.maxMotorForce=maxSteerTorque
+				};
+				PhysicsSolveConstraint(&steerMotor, fTimeStep);
 			}
 
 			float driveThrottle=10.0f;
@@ -1186,7 +1199,17 @@ void Thread_Physics(void *arg)
 			for(uint32_t i=0;i<2;i++)
 			{
 				vec3 driveAxis=QuatRotate(chassis.orientation, rearWheelHinges[i].localAxisA);
-				PhysicsSolveHingeMotor(&chassis, &wheels[i+2], driveAxis, driveThrottle, maxDriveTorque, fTimeStep);
+				Constraint_t driveMotor=
+				{
+					.type=CONSTRAINT_ANGULAR_MOTOR,
+					.bodyA=&chassis,
+					.bodyB=&wheels[i+2],
+					.worldAxis=driveAxis,
+					.motorEnabled=true,
+					.motorVelocity=driveThrottle,
+					.maxMotorForce=maxDriveTorque
+				};
+				PhysicsSolveConstraint(&driveMotor, fTimeStep);
 			}
 
 			// Run particle system simlation

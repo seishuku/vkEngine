@@ -3,10 +3,10 @@
 
 const float contactBias=200.0f;
 
-void PhysicsSolveDistanceConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const DistanceConstraint_t *constraint)
+static void SolveDistanceConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const vec3 localAnchorA, const vec3 localAnchorB, const float length)
 {
-	vec3 rA=QuatRotate(bodyA->orientation, constraint->localAnchorA);
-	vec3 rB=QuatRotate(bodyB->orientation, constraint->localAnchorB);
+	vec3 rA=QuatRotate(bodyA->orientation, localAnchorA);
+	vec3 rB=QuatRotate(bodyB->orientation, localAnchorB);
 
 	vec3 pA=Vec3_Addv(bodyA->position, rA);
 	vec3 pB=Vec3_Addv(bodyB->position, rB);
@@ -14,7 +14,7 @@ void PhysicsSolveDistanceConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, cons
 	vec3 normal=Vec3_Subv(pB, pA);
 	float distance=Vec3_Normalize(&normal);
 
-	float Cerr=distance-constraint->length;
+	float Cerr=distance-length;
 
 	vec3 velocityA=Vec3_Addv(bodyA->velocity, Vec3_Cross(QuatRotate(bodyA->orientation, bodyA->angularVelocity), rA));
 	vec3 velocityB=Vec3_Addv(bodyB->velocity, Vec3_Cross(QuatRotate(bodyB->orientation, bodyB->angularVelocity), rB));
@@ -37,10 +37,10 @@ void PhysicsSolveDistanceConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, cons
 	PhysicsApplyImpulse(bodyB, Vec3_Muls(impulse, 1.0f), pB);
 }
 
-void PhysicsSolvePointConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const PointConstraint_t *constraint)
+static void SolvePointConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const vec3 localAnchorA, const vec3 localAnchorB)
 {
-	vec3 rA=QuatRotate(bodyA->orientation, constraint->localAnchorA);
-	vec3 rB=QuatRotate(bodyB->orientation, constraint->localAnchorB);
+	vec3 rA=QuatRotate(bodyA->orientation, localAnchorA);
+	vec3 rB=QuatRotate(bodyB->orientation, localAnchorB);
 
 	vec3 pA=Vec3_Addv(bodyA->position, rA);
 	vec3 pB=Vec3_Addv(bodyB->position, rB);
@@ -74,19 +74,12 @@ void PhysicsSolvePointConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const P
 	}
 }
 
-void PhysicsSolveHingeConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const HingeConstraint_t *constraint)
+static void SolveHingeConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const vec3 localAnchorA, const vec3 localAnchorB, const vec3 localAxisA, const vec3 localAxisB)
 {
-	PointConstraint_t pointConstraint=
-	{
-		.bodyA=constraint->bodyA,
-		.bodyB=constraint->bodyB,
-		.localAnchorA=constraint->localAnchorA,
-		.localAnchorB=constraint->localAnchorB
-	};
-	PhysicsSolvePointConstraint(bodyA, bodyB, &pointConstraint);
+	SolvePointConstraint(bodyA, bodyB, localAnchorA, localAnchorB);
 
-	vec3 axisA=QuatRotate(bodyA->orientation, constraint->localAxisA);
-	vec3 axisB=QuatRotate(bodyB->orientation, constraint->localAxisB);
+	vec3 axisA=QuatRotate(bodyA->orientation, localAxisA);
+	vec3 axisB=QuatRotate(bodyB->orientation, localAxisB);
 
 	vec3 angularError=Vec3_Cross(axisA, axisB);
 
@@ -134,7 +127,7 @@ void PhysicsSolveHingeConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const H
 	}
 }
 
-void PhysicsSolveHingeMotor(RigidBody_t *bodyA, RigidBody_t *bodyB, const vec3 worldAxis, float targetAngularVelocity, float maxMotorTorque, float dt)
+static void SolveAngularMotor(RigidBody_t *bodyA, RigidBody_t *bodyB, const vec3 worldAxis, const float targetAngularVelocity, const float maxMotorForce, const float dt)
 {
 	vec3 wA=QuatRotate(bodyA->orientation, bodyA->angularVelocity);
 	vec3 wB=QuatRotate(bodyB->orientation, bodyB->angularVelocity);
@@ -148,7 +141,7 @@ void PhysicsSolveHingeMotor(RigidBody_t *bodyA, RigidBody_t *bodyB, const vec3 w
 	float deltaVel=targetAngularVelocity-currentRelVel;
 	float lambda=deltaVel/effectiveInertia;
 
-	float maxImpulse=maxMotorTorque*dt;
+	float maxImpulse=maxMotorForce*dt;
 	lambda=clampf(lambda, -maxImpulse, maxImpulse);
 
 	vec3 angularImpulse=Vec3_Muls(worldAxis, lambda);
@@ -160,7 +153,26 @@ void PhysicsSolveHingeMotor(RigidBody_t *bodyA, RigidBody_t *bodyB, const vec3 w
 	bodyB->angularVelocity=Vec3_Addv(bodyB->angularVelocity, Vec3_Muls(localImpulseB, bodyB->invInertia));
 }
 
-void PhysicsSolvePrismaticConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const PrismaticConstraint_t *constraint)
+static void SolveLinearMotor(RigidBody_t *bodyA, RigidBody_t *bodyB, const vec3 worldAxis, const float targetLinearVelocity, const float maxMotorForce, const float dt)
+{
+	float currentRelVel=Vec3_Dot(worldAxis, Vec3_Subv(bodyB->velocity, bodyA->velocity));
+
+	float effectiveMass=bodyA->invMass+bodyB->invMass;
+
+	if(effectiveMass<FLT_EPSILON)
+		return;
+
+	float deltaVel=targetLinearVelocity-currentRelVel;
+	float lambda=deltaVel/effectiveMass;
+	float maxImpulse=maxMotorForce*dt;
+
+	vec3 impulse=Vec3_Muls(worldAxis, clampf(lambda, -maxImpulse, maxImpulse));
+
+	PhysicsApplyImpulse(bodyA, Vec3_Muls(impulse, -1.0f), bodyA->position);
+	PhysicsApplyImpulse(bodyB, Vec3_Muls(impulse, 1.0f), bodyB->position);
+}
+
+static void SolvePrismaticConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, const vec3 localAnchorA, const vec3 localAnchorB, const vec3 localAxisA)
 {
 	vec3 wA=QuatRotate(bodyA->orientation, bodyA->angularVelocity);
 	vec3 wB=QuatRotate(bodyB->orientation, bodyB->angularVelocity);
@@ -193,13 +205,13 @@ void PhysicsSolvePrismaticConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, con
 		}
 	}
 
-	vec3 rA=QuatRotate(bodyA->orientation, constraint->localAnchorA);
-	vec3 rB=QuatRotate(bodyB->orientation, constraint->localAnchorB);
+	vec3 rA=QuatRotate(bodyA->orientation, localAnchorA);
+	vec3 rB=QuatRotate(bodyB->orientation, localAnchorB);
 
 	vec3 pA=Vec3_Addv(bodyA->position, rA);
 	vec3 pB=Vec3_Addv(bodyB->position, rB);
 
-	vec3 axisA=QuatRotate(bodyA->orientation, constraint->localAxisA);
+	vec3 axisA=QuatRotate(bodyA->orientation, localAxisA);
 
 	vec3 u;
 
@@ -239,5 +251,40 @@ void PhysicsSolvePrismaticConstraint(RigidBody_t *bodyA, RigidBody_t *bodyB, con
 
 		PhysicsApplyImpulse(bodyA, Vec3_Muls(impulse, -1.0f), pA);
 		PhysicsApplyImpulse(bodyB, Vec3_Muls(impulse, 1.0f), pB);
+	}
+}
+
+void PhysicsSolveConstraint(Constraint_t *constraint, const float dt)
+{
+	switch(constraint->type)
+	{
+		case CONSTRAINT_DISTANCE:
+			SolveDistanceConstraint(constraint->bodyA, constraint->bodyB, constraint->localAnchorA, constraint->localAnchorB, constraint->distance);
+			break;
+
+		case CONSTRAINT_POINT:
+			SolvePointConstraint(constraint->bodyA, constraint->bodyB, constraint->localAnchorA, constraint->localAnchorB);
+			break;
+
+		case CONSTRAINT_HINGE:
+			SolveHingeConstraint(constraint->bodyA, constraint->bodyB, constraint->localAnchorA, constraint->localAnchorB, constraint->localAxisA, constraint->localAxisB);
+			break;
+
+		case CONSTRAINT_PRISMATIC:
+			SolvePrismaticConstraint(constraint->bodyA, constraint->bodyB, constraint->localAnchorA, constraint->localAnchorB, constraint->localAxisA);
+			break;
+
+		case CONSTRAINT_ANGULAR_MOTOR:
+			if(constraint->motorEnabled)
+				SolveAngularMotor(constraint->bodyA, constraint->bodyB, constraint->localAxisA, constraint->motorVelocity, constraint->maxMotorForce, dt);
+			break;
+
+		case CONSTRAINT_LINEAR_MOTOR:
+			if(constraint->motorEnabled)
+				SolveLinearMotor(constraint->bodyA, constraint->bodyB, constraint->localAxisA, constraint->motorVelocity, constraint->maxMotorForce, dt);
+			break;
+
+		default:
+			break;
 	}
 }
