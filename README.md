@@ -68,3 +68,8 @@ To connect to a server, just bring up the console in game with '~'/'`' and type:
 ```connect XXX.XXX.XXX.XXX```<br>
 Where XXX.XXX.XXX.XXX is the remote IP.
 > <b>Note:</b> Networking is very much a WIP.
+
+## Tools:
+I tasked some clankers with making some web-based tools because I don't do webdev and I didn't feel like taking the time to do it my usual way (IE. the hard way).<br>
+The UI editor is a bit meh, that was more of an experiment and I don't know how useful it will end up being...<br>
+The physics assembly tool is really nice though, I've included the car assembly.

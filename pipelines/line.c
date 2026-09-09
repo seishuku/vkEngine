@@ -10,7 +10,7 @@ extern VkuContext_t vkContext;
 extern VkuSwapchain_t swapchain;
 extern VkRenderPass renderPass;
 
-Pipeline_t linePipeline;
+static Pipeline_t linePipeline;
 
 bool CreateLinePipeline(void)
 {

@@ -19,8 +19,8 @@ static const uint32_t skyboxHeight=512;
 
 VkuImage_t skyboxTex;
 
-Pipeline_t skyboxPipeline;
-Pipeline_t skyboxGenPipeline;
+static Pipeline_t skyboxPipeline;
+static Pipeline_t skyboxGenPipeline;
 
 static VkCommandPool computeCommandPool;
 static VkCommandBuffer computeCommand;

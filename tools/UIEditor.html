@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>UI Layout Editor — Vulkan UI Codegen</title>
+<style>
+  :root{
+    --bg:#0b0d10;
+    --panel:#12151a;
+    --panel2:#181c22;
+    --line:#242a32;
+    --grid:#1a1f26;
+    --text:#dfe4ea;
+    --dim:#7c8794;
+    --accent:#59d9c7;
+    --accent-dim:#2b5a54;
+    --warn:#ffb454;
+    --danger:#ff6b6b;
+    --mono: "JetBrains Mono","Fira Code",ui-monospace,SFMono-Regular,Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;}
+  button,input,select,textarea{font-family:var(--mono);font-size:12px;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:4px 6px;}
+  button{cursor:pointer;transition:border-color .12s, color .12s;}
+  button:hover{border-color:var(--accent);color:var(--accent);}
+  button.primary{background:var(--accent-dim);border-color:var(--accent);color:#eafffb;}
+  button.danger:hover{border-color:var(--danger);color:var(--danger);}
+  label{color:var(--dim);font-size:11px;display:block;margin-bottom:2px;letter-spacing:.02em;}
+  .app{display:flex;flex-direction:column;height:100%;}
+  header{display:flex;align-items:center;gap:14px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  header h1{font-size:13px;font-weight:600;color:var(--accent);letter-spacing:.04em;margin:0;text-transform:uppercase;}
+  .hgroup{display:flex;align-items:center;gap:6px;}
+  .hgroup input[type=number]{width:64px;}
+  .spacer{flex:1;}
+  .body{display:flex;flex:1;min-height:0;}
+  .palette{width:150px;background:var(--panel);border-right:1px solid var(--line);padding:10px 8px;overflow-y:auto;}
+  .palette h2, .inspector h2{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:10px 0 6px;}
+  .palette button{display:flex;align-items:center;gap:6px;width:100%;text-align:left;margin-bottom:4px;padding:6px 8px;}
+  .swatch{width:9px;height:9px;border-radius:2px;flex:none;}
+  .stage-wrap{flex:1;overflow:auto;background:
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0/40px 40px,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0/40px 40px,
+      var(--bg);
+    position:relative;padding:30px;}
+  .stage{position:relative;background:#0e1114;border:1px solid var(--line);box-shadow:0 0 0 4000px rgba(0,0,0,.15);}
+  .ctrl{position:absolute;border:1px solid #444;font-size:10px;color:#cfd6dd;cursor:grab;overflow:hidden;user-select:none;display:flex;align-items:flex-start;justify-content:flex-start;padding:2px 4px;background:rgba(255,255,255,.03);}
+  .ctrl.selected{outline:2px solid var(--accent);outline-offset:1px;z-index:50 !important;}
+  .ctrl .tag{position:absolute;top:-15px;left:0;font-size:9px;background:#000;padding:1px 4px;border-radius:2px;white-space:nowrap;opacity:.85;}
+  .inspector{width:300px;background:var(--panel);border-left:1px solid var(--line);padding:10px;overflow-y:auto;}
+  .layer-row{display:flex;align-items:center;gap:5px;padding:4px 5px;border-radius:3px;cursor:pointer;border:1px solid transparent;}
+  .layer-row:hover{border-color:var(--line);}
+  .layer-row.active{background:var(--accent-dim);}
+  .layer-row .dot{width:8px;height:8px;border-radius:2px;flex:none;}
+  .layer-row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .layer-row .mini{background:none;border:none;padding:1px 3px;color:var(--dim);}
+  .layer-row .mini:hover{color:var(--accent);}
+  .field{margin-bottom:8px;}
+  .row2{display:flex;gap:6px;}
+  .row2 > div{flex:1;}
+  .propgroup{border-top:1px dashed var(--line);margin-top:10px;padding-top:8px;}
+  .colorpick{display:flex;gap:6px;align-items:center;}
+  .colorpick input[type=number]{width:52px;}
+  .colorprev{width:20px;height:20px;border-radius:3px;border:1px solid #333;flex:none;}
+  select, textarea{width:100%;}
+  textarea{resize:vertical;min-height:44px;}
+  .checkline{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+  .checkline input{width:auto;}
+  .hint{color:var(--dim);font-size:10px;line-height:1.4;margin-top:2px;}
+  .handle{position:absolute;width:8px;height:8px;background:var(--accent);border:1px solid #05201c;z-index:60;}
+  .handle:hover{background:#fff;}
+  .code-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100;}
+  .code-box{width:min(920px,92vw);height:min(720px,86vh);background:var(--panel);border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;overflow:hidden;}
+  .code-box header{border-bottom:1px solid var(--line);}
+  .code-box pre{flex:1;margin:0;padding:14px 16px;overflow:auto;font-size:12px;line-height:1.55;color:#c9e8e2;white-space:pre;}
+  .empty{color:var(--dim);text-align:center;margin-top:40px;font-size:11px;line-height:1.6;}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-thumb{background:#262c34;border-radius:5px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>UI Layout Editor</h1>
+    <div class="hgroup">
+      <label style="margin:0">UI.size</label>
+      <input type="number" id="uiW" value="1920" style="width:70px">
+      <span style="color:var(--dim)">×</span>
+      <input type="number" id="uiH" value="1080" style="width:70px">
+    </div>
+    <div class="hgroup">
+      <label style="margin:0">Zoom</label>
+      <input type="range" id="zoom" min="0.2" max="1" step="0.05" value="0.45">
+    </div>
+    <div class="spacer"></div>
+    <button id="btnExample">Load sample layout</button>
+    <button id="btnJson">Export/Import JSON</button>
+    <button id="btnClear" class="danger">Clear</button>
+    <button id="btnGenerate" class="primary">Generate C Code</button>
+  </header>
+  <div class="body">
+    <div class="palette">
+      <h2>Add Control</h2>
+      <div id="paletteButtons"></div>
+      <h2>Layers</h2>
+      <div id="layerList"></div>
+    </div>
+    <div class="stage-wrap">
+      <div class="stage" id="stage"></div>
+    </div>
+    <div class="inspector" id="inspector">
+      <div class="empty">Select a control on the canvas<br>or add a new one from the left.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- constants ----------
+const TYPES = {
+  window:     {label:'Window',      color:'#5ee6d0', hasTitle:true,  size:true,  titleField:'window'},
+  button:     {label:'Button',      color:'#8ea0b8', hasTitle:true,  size:true,  callback:true, titleField:'button'},
+  checkbox:   {label:'CheckBox',    color:'#4fa8ff', hasTitle:true,  radius:true, boolValue:true, titleField:'checkBox'},
+  cursor:     {label:'Cursor',      color:'#ff6fae', radius:true},
+  edittext:   {label:'EditText',    color:'#ffd24f', size:true, mutability:true, maxLength:true, initialText:true, titleField:'editText'},
+  sprite:     {label:'Sprite',      color:'#b98cff', size:true, image:true, rotation:true},
+  text:       {label:'Text',        color:'#e6e8eb', hasTitle:true, fontSize:true},
+  virtualstick:{label:'VirtualStick',color:'#ffa04f', hasTitle:true, radius:true, titleField:'virtualStick'},
+  bargraph:   {label:'BarGraph',    color:'#59d97e', hasTitle:true, size:true, mutability:true, direction:true, minMaxVal:true, titleField:'barGraph'},
+};
+const ADD_FN = {window:'UI_AddWindow',button:'UI_AddButton',checkbox:'UI_AddCheckBox',cursor:'UI_AddCursor',
+  edittext:'UI_AddEditText',sprite:'UI_AddSprite',text:'UI_AddText',virtualstick:'UI_AddVirtualStick',bargraph:'UI_AddBarGraph'};
+
+let controls = [];
+let selectedId = null;
+let uidSeq = 1;
+let uiSize = {w:1920,h:1080};
+let scale = 0.45;
+let counters = {};
+
+// ---------- helpers ----------
+function fmtNum(n){
+  n = Number(n);
+  if(Number.isNaN(n)) n = 0;
+  return (Number.isInteger(n) ? n.toString() : n.toFixed(3).replace(/0+$/,'').replace(/\.$/,''));
+}
+function fmtF(n){ return fmtNum(n)+'f'; }
+function sanitizeVar(s){
+  s = (s||'').replace(/[^a-zA-Z0-9_]/g,'');
+  if(!/^[a-zA-Z_]/.test(s)) s = '_'+s;
+  return s || 'ctrl';
+}
+function nextVar(type){
+  counters[type] = (counters[type]||0)+1;
+  return type+counters[type];
+}
+function byId(uid){ return controls.find(c=>c.uid===uid); }
+function colorExpr(c){
+  const {r,g,b} = c.color;
+  if(r===g && g===b) return `Vec3b(${fmtF(r)})`;
+  return `Vec3(${fmtF(r)}, ${fmtF(g)}, ${fmtF(b)})`;
+}
+function visExpr(c){ return c.visibility==='visible' ? 'UI_CONTROL_VISIBLE' : 'UI_CONTROL_HIDDEN'; }
+
+function axisExpr(axis, sizeVar){
+  const v = Number(axis.value)||0;
+  if(axis.mode==='start') return fmtNum(v);
+  if(axis.mode==='end'){
+    if(v===0) return sizeVar;
+    return `${sizeVar}-${fmtNum(Math.abs(v))}`;
+  }
+  if(axis.mode==='center'){
+    if(v===0) return `${sizeVar}/2.0f`;
+    return v>0 ? `${sizeVar}/2.0f+${fmtNum(v)}` : `${sizeVar}/2.0f${fmtNum(v)}`;
+  }
+  return fmtNum(v);
+}
+function resolveAxisValue(axis, dim){
+  const size = dim==='x' ? uiSize.w : uiSize.h;
+  const v = Number(axis.value)||0;
+  if(axis.mode==='start') return v;
+  if(axis.mode==='end') return size-v;
+  if(axis.mode==='center') return size/2+v;
+  return v;
+}
+function worldPos(c){
+  if(c.parentId){
+    const p = byId(c.parentId);
+    const base = p ? worldPos(p) : {x:0,y:0};
+    return {x: base.x + Number(c.x||0), y: base.y + Number(c.y||0)};
+  }
+  if(c.posOverride && c.posOverride.trim()){
+    return {x: Number(c.customX||0), y: Number(c.customY||0)};
+  }
+  return {x: resolveAxisValue(c.xAxis,'x'), y: resolveAxisValue(c.yAxis,'y')};
+}
+function worldSize(c){
+  const meta = TYPES[c.type];
+  if(meta.size) return {w:Number(c.width||0), h:Number(c.height||0)};
+  if(meta.radius) return {w:Number(c.radius||0)*2, h:Number(c.radius||0)*2};
+  if(c.type==='text') return {w: Math.max(40,(c.titleText||'').length*Number(c.fontSize||16)*0.55), h:Number(c.fontSize||16)*1.4};
+  return {w:40,h:40};
+}
+
+// ---------- factory ----------
+function newControl(type){
+  const meta = TYPES[type];
+  const c = {
+    uid: uidSeq++,
+    type,
+    varName: nextVar(type),
+    parentId: null,
+    color:{r:0.25,g:0.25,b:0.25},
+    visibility:'visible',
+    xAxis:{mode:'start', value: 40 + (controls.length*15)%300},
+    yAxis:{mode:'start', value: 40 + (controls.length*15)%300},
+    x: 0, y: 0,
+    posOverride:'', customX:200, customY:200,
+    width: meta.size ? 120 : 0,
+    height: meta.size ? 44 : 0,
+    radius: meta.radius ? 24 : 0,
+    titleText: meta.hasTitle ? meta.label : '',
+    fontSize: 16,
+    callback: meta.callback ? '' : undefined,
+    boolValue: false,
+    mutability: 'modifiable',
+    direction: 'horizontal',
+    min:0, max:1, value:0,
+    maxLength: 32, initialText:'',
+    image: 'TEXTURE_CROSSHAIR', rotation:0,
+    zOrderOverride:false, zOrderValue:1,
+    titleZOrderOverride:false, titleZOrderValue:1,
+  };
+  if(type==='window'){ c.width=400; c.height=128; }
+  if(type==='sprite'){ c.width=64; c.height=64; }
+  if(type==='bargraph'){ c.width=400; c.height=30; }
+  return c;
+}
+
+// ---------- palette ----------
+const paletteEl = document.getElementById('paletteButtons');
+Object.keys(TYPES).forEach(type=>{
+  const meta = TYPES[type];
+  const btn = document.createElement('button');
+  btn.innerHTML = `<span class="swatch" style="background:${meta.color}"></span>${meta.label}`;
+  btn.onclick = ()=>{
+    const c = newControl(type);
+    controls.push(c);
+    selectedId = c.uid;
+    render();
+  };
+  paletteEl.appendChild(btn);
+});
+
+document.getElementById('btnClear').onclick = ()=>{
+  if(confirm('Clear all controls?')){ controls=[]; selectedId=null; counters={}; render(); }
+};
+document.getElementById('btnExample').onclick = loadExample;
+document.getElementById('uiW').oninput = e=>{ uiSize.w = Number(e.target.value)||1; render(); };
+document.getElementById('uiH').oninput = e=>{ uiSize.h = Number(e.target.value)||1; render(); };
+document.getElementById('zoom').oninput = e=>{ scale = Number(e.target.value); render(); };
+document.getElementById('btnGenerate').onclick = ()=> showCode(buildCode());
+document.getElementById('btnJson').onclick = ()=> showJson();
+
+// ---------- render stage ----------
+const stage = document.getElementById('stage');
+const HANDLE_DEFS = {
+  full: [ // types with width/height (window, button, edittext, sprite, bargraph)
+    {h:'nw', fx:0,   fy:0,   cursor:'nwse-resize'},
+    {h:'n',  fx:0.5, fy:0,   cursor:'ns-resize'},
+    {h:'ne', fx:1,   fy:0,   cursor:'nesw-resize'},
+    {h:'e',  fx:1,   fy:0.5, cursor:'ew-resize'},
+    {h:'se', fx:1,   fy:1,   cursor:'nwse-resize'},
+    {h:'s',  fx:0.5, fy:1,   cursor:'ns-resize'},
+    {h:'sw', fx:0,   fy:1,   cursor:'nesw-resize'},
+    {h:'w',  fx:0,   fy:0.5, cursor:'ew-resize'},
+  ],
+  corner: [ // radius controls and text (single scalar) — one grab point
+    {h:'se', fx:1, fy:1, cursor:'nwse-resize'},
+  ],
+};
+function renderStage(){
+  stage.style.width = (uiSize.w*scale)+'px';
+  stage.style.height = (uiSize.h*scale)+'px';
+  stage.innerHTML='';
+  controls.forEach(c=>{
+    const pos = worldPos(c);
+    const size = worldSize(c);
+    const meta = TYPES[c.type];
+    const left = pos.x*scale, top = pos.y*scale;
+    const w = Math.max(4,size.w*scale), h = Math.max(4,size.h*scale);
+    const div = document.createElement('div');
+    div.className = 'ctrl'+(c.uid===selectedId?' selected':'');
+    div.style.left = left+'px';
+    div.style.top = top+'px';
+    div.style.width = w+'px';
+    div.style.height = h+'px';
+    div.style.borderColor = meta.color;
+    if(c.type==='checkbox' || c.type==='cursor' || c.type==='virtualstick') div.style.borderRadius='50%';
+    if(c.visibility==='hidden') div.style.opacity='0.35';
+    div.style.color = meta.color;
+    div.innerHTML = `<span class="tag" style="border:1px solid ${meta.color}">${c.varName}</span>${c.titleText||''}`;
+    div.dataset.uid = c.uid;
+    div.onmousedown = (e)=>startDrag(e,c);
+    stage.appendChild(div);
+
+    if(c.uid===selectedId){
+      const defs = meta.size ? HANDLE_DEFS.full : (meta.radius || c.type==='text') ? HANDLE_DEFS.corner : null;
+      if(defs){
+        defs.forEach(d=>{
+          const hd = document.createElement('div');
+          hd.className='handle';
+          hd.style.left = (left + d.fx*w - 4)+'px';
+          hd.style.top = (top + d.fy*h - 4)+'px';
+          hd.style.cursor = d.cursor;
+          hd.onmousedown = (e)=>{ e.stopPropagation(); startResize(e,c,d.h); };
+          stage.appendChild(hd);
+        });
+      }
+    }
+  });
+  renderLayers();
+}
+function render(){
+  renderStage();
+  renderInspector();
+}
+
+function startDrag(e, c){
+  e.preventDefault();
+  const isNewSelection = selectedId !== c.uid;
+  selectedId = c.uid;
+  if(isNewSelection) render(); else renderStage();
+  const startMouse = {x:e.clientX,y:e.clientY};
+  const usesCustom = c.posOverride && c.posOverride.trim() && !c.parentId;
+  function move(ev){
+    const dx = (ev.clientX-startMouse.x)/scale;
+    const dy = (ev.clientY-startMouse.y)/scale;
+    startMouse.x = ev.clientX; startMouse.y = ev.clientY;
+    if(c.parentId){ c.x = Number(c.x||0)+dx; c.y = Number(c.y||0)+dy; }
+    else if(usesCustom){ c.customX = Number(c.customX||0)+dx; c.customY = Number(c.customY||0)+dy; }
+    else{
+      adjustAxis(c.xAxis, dx); adjustAxis(c.yAxis, dy);
+    }
+    renderStage();
+  }
+  function up(){
+    document.removeEventListener('mousemove',move);
+    document.removeEventListener('mouseup',up);
+    render(); // sync inspector's numeric fields to the final dragged position
+  }
+  document.addEventListener('mousemove',move);
+  document.addEventListener('mouseup',up);
+}
+function adjustAxis(axis, delta){
+  if(axis.mode==='end') axis.value = Number(axis.value||0)-delta;
+  else axis.value = Number(axis.value||0)+delta;
+}
+
+function startResize(e, c, handle){
+  e.preventDefault();
+  const startMouse = {x:e.clientX,y:e.clientY};
+  function moveX(delta){
+    if(c.parentId) c.x = Number(c.x||0)+delta;
+    else if(c.posOverride && c.posOverride.trim()) c.customX = Number(c.customX||0)+delta;
+    else adjustAxis(c.xAxis, delta);
+  }
+  function moveY(delta){
+    if(c.parentId) c.y = Number(c.y||0)+delta;
+    else if(c.posOverride && c.posOverride.trim()) c.customY = Number(c.customY||0)+delta;
+    else adjustAxis(c.yAxis, delta);
+  }
+  const meta = TYPES[c.type];
+  function move(ev){
+    const dx = (ev.clientX-startMouse.x)/scale;
+    const dy = (ev.clientY-startMouse.y)/scale;
+    startMouse.x = ev.clientX; startMouse.y = ev.clientY;
+    if(meta.size){
+      if(handle.includes('w')){ moveX(dx); c.width = Math.max(8,(Number(c.width)||0)-dx); }
+      if(handle.includes('e')){ c.width = Math.max(8,(Number(c.width)||0)+dx); }
+      if(handle.includes('n')){ moveY(dy); c.height = Math.max(8,(Number(c.height)||0)-dy); }
+      if(handle.includes('s')){ c.height = Math.max(8,(Number(c.height)||0)+dy); }
+    } else if(meta.radius){
+      c.radius = Math.max(2,(Number(c.radius)||0)+(dx+dy)/2);
+    } else if(c.type==='text'){
+      c.fontSize = Math.max(4,(Number(c.fontSize)||0)+(dx+dy)/2);
+    }
+    renderStage();
+  }
+  function up(){
+    document.removeEventListener('mousemove',move);
+    document.removeEventListener('mouseup',up);
+    render(); // sync inspector's width/height/radius/fontSize fields
+  }
+  document.addEventListener('mousemove',move);
+  document.addEventListener('mouseup',up);
+}
+
+// ---------- layers panel ----------
+function renderLayers(){
+  const el = document.getElementById('layerList');
+  el.innerHTML='';
+  controls.forEach((c,i)=>{
+    const meta = TYPES[c.type];
+    const row = document.createElement('div');
+    row.className='layer-row'+(c.uid===selectedId?' active':'');
+    row.innerHTML = `<span class="dot" style="background:${meta.color}"></span><span class="name">${c.varName}</span>`;
+    row.onclick = ()=>{ selectedId=c.uid; render(); };
+    const up = document.createElement('button'); up.className='mini'; up.textContent='↑';
+    up.onclick=(e)=>{e.stopPropagation(); if(i>0){[controls[i-1],controls[i]]=[controls[i],controls[i-1]]; render();}};
+    const down = document.createElement('button'); down.className='mini'; down.textContent='↓';
+    down.onclick=(e)=>{e.stopPropagation(); if(i<controls.length-1){[controls[i+1],controls[i]]=[controls[i],controls[i+1]]; render();}};
+    const del = document.createElement('button'); del.className='mini'; del.textContent='✕';
+    del.onclick=(e)=>{e.stopPropagation(); deleteControl(c.uid);};
+    row.appendChild(up); row.appendChild(down); row.appendChild(del);
+    el.appendChild(row);
+  });
+}
+function deleteControl(uid){
+  controls.forEach(c=>{ if(c.parentId===uid) c.parentId=null; });
+  controls = controls.filter(c=>c.uid!==uid);
+  if(selectedId===uid) selectedId=null;
+  render();
+}
+
+// ---------- inspector ----------
+// NOTE: text/number field callbacks call renderStage() (canvas + layers only), never the
+// full render(), so the inspector panel's own DOM is never torn down and rebuilt while a
+// field still has focus. Only actions that change *which fields should be visible*
+// (changing parent, toggling zOrder override, etc.) call the full render().
+function field(labelText, inputEl){
+  const wrap = document.createElement('div'); wrap.className='field';
+  const lab = document.createElement('label'); lab.textContent = labelText;
+  wrap.appendChild(lab); wrap.appendChild(inputEl);
+  return wrap;
+}
+function numberInput(value, onChange, step){
+  const i = document.createElement('input'); i.type='number'; i.value=value; if(step) i.step=step;
+  i.oninput = ()=> onChange(Number(i.value));
+  return i;
+}
+function textInput(value, onChange){
+  const i = document.createElement('input'); i.type='text'; i.value=value||'';
+  i.oninput = ()=> onChange(i.value);
+  return i;
+}
+function selectInput(options, value, onChange){
+  const s = document.createElement('select');
+  options.forEach(([val,lab])=>{
+    const o=document.createElement('option'); o.value=val; o.textContent=lab; if(val===value)o.selected=true; s.appendChild(o);
+  });
+  s.onchange = ()=> onChange(s.value);
+  return s;
+}
+function checkInput(checked, onChange, labelText){
+  const wrap = document.createElement('div'); wrap.className='checkline';
+  const cb = document.createElement('input'); cb.type='checkbox'; cb.checked=checked;
+  cb.onchange = ()=> onChange(cb.checked);
+  const lab = document.createElement('label'); lab.style.margin='0'; lab.textContent=labelText;
+  wrap.appendChild(cb); wrap.appendChild(lab);
+  return wrap;
+}
+function axisEditor(labelText, axis, sizeLabel){
+  const wrap = document.createElement('div'); wrap.className='field';
+  const lab = document.createElement('label'); lab.textContent=labelText; wrap.appendChild(lab);
+  const row = document.createElement('div'); row.className='row2';
+  const sel = selectInput([['start',sizeLabel[0]],['end',sizeLabel[1]],['center','center']], axis.mode, v=>{axis.mode=v; renderStage();});
+  const num = numberInput(axis.value, v=>{axis.value=v; renderStage();});
+  row.appendChild(sel); row.appendChild(num);
+  wrap.appendChild(row);
+  return wrap;
+}
+
+function renderInspector(){
+  const el = document.getElementById('inspector');
+  el.innerHTML='';
+  const c = byId(selectedId);
+  if(!c){ el.innerHTML = '<div class="empty">Select a control on the canvas<br>or add a new one from the left.</div>'; return; }
+  const meta = TYPES[c.type];
+
+  const h = document.createElement('h2'); h.id='inspTitle'; h.textContent = meta.label+' — '+c.varName; el.appendChild(h);
+
+  el.appendChild(field('Variable name', textInput(c.varName, v=>{
+    c.varName=sanitizeVar(v);
+    renderStage();
+    const t = document.getElementById('inspTitle'); if(t) t.textContent = meta.label+' — '+c.varName;
+  })));
+
+  const windows = controls.filter(w=>w.type==='window' && w.uid!==c.uid);
+  const parentOpts = [['','(none — top level)']].concat(windows.map(w=>[String(w.uid), w.varName]));
+  el.appendChild(field('Parent window', selectInput(parentOpts, c.parentId?String(c.parentId):'', v=>{
+    c.parentId = v?Number(v):null;
+    render(); // structural: switches between offset fields and anchor fields
+  })));
+
+  if(c.parentId){
+    const row = document.createElement('div'); row.className='field';
+    const lab = document.createElement('label'); lab.textContent='Offset from parent (x, y)'; row.appendChild(lab);
+    const r2 = document.createElement('div'); r2.className='row2';
+    r2.appendChild(numberInput(c.x, v=>{c.x=v; renderStage();}));
+    r2.appendChild(numberInput(c.y, v=>{c.y=v; renderStage();}));
+    row.appendChild(r2);
+    el.appendChild(row);
+  } else {
+    el.appendChild(axisEditor('X anchor / offset', c.xAxis, ['left','right']));
+    el.appendChild(axisEditor('Y anchor / offset', c.yAxis, ['top','bottom']));
+    el.appendChild(field('Raw position override (optional — inner x, y args, replaces the anchors above)', textInput(c.posOverride, v=>{
+      c.posOverride=v;
+      renderStage();
+      const hint = document.getElementById('posOverrideHint');
+      if(hint) hint.style.display = v.trim() ? 'block' : 'none';
+    })));
+    const hint = document.createElement('div'); hint.id='posOverrideHint'; hint.className='hint';
+    hint.style.display = (c.posOverride && c.posOverride.trim()) ? 'block' : 'none';
+    hint.textContent = 'Override active — dragging on canvas moves the preview only, not the generated expression.';
+    el.appendChild(hint);
+  }
+
+  if(meta.size){
+    const row = document.createElement('div'); row.className='field';
+    const lab = document.createElement('label'); lab.textContent='Size (w, h)'; row.appendChild(lab);
+    const r2 = document.createElement('div'); r2.className='row2';
+    r2.appendChild(numberInput(c.width, v=>{c.width=v; renderStage();}));
+    r2.appendChild(numberInput(c.height, v=>{c.height=v; renderStage();}));
+    row.appendChild(r2);
+    el.appendChild(row);
+  }
+  if(meta.radius){
+    el.appendChild(field('Radius', numberInput(c.radius, v=>{c.radius=v; renderStage();})));
+  }
+  if(c.type==='text'){
+    el.appendChild(field('Font size', numberInput(c.fontSize, v=>{c.fontSize=v; renderStage();})));
+  }
+
+  {
+    const row = document.createElement('div'); row.className='field';
+    const lab = document.createElement('label'); lab.textContent='Color (r, g, b — 0..1)'; row.appendChild(lab);
+    const cp = document.createElement('div'); cp.className='colorpick';
+    const prev = document.createElement('div'); prev.className='colorprev';
+    const upd = ()=>{ prev.style.background = `rgb(${c.color.r*255},${c.color.g*255},${c.color.b*255})`; };
+    upd();
+    ['r','g','b'].forEach(ch=>{
+      const i = document.createElement('input'); i.type='number'; i.step='0.05'; i.min='0'; i.max='1'; i.value=c.color[ch];
+      i.oninput = ()=>{ c.color[ch]=Number(i.value); upd(); };
+      cp.appendChild(i);
+    });
+    cp.appendChild(prev);
+    row.appendChild(cp);
+    el.appendChild(row);
+  }
+
+  el.appendChild(field('Visibility', selectInput([['visible','UI_CONTROL_VISIBLE'],['hidden','UI_CONTROL_HIDDEN']], c.visibility, v=>{c.visibility=v; renderStage();})));
+
+  if(meta.hasTitle){
+    el.appendChild(field('Title text', textInput(c.titleText, v=>{c.titleText=v; renderStage();})));
+  }
+
+  if(meta.callback){
+    el.appendChild(field('Callback (function identifier, blank = NULL)', textInput(c.callback, v=>{c.callback=v; renderStage();})));
+  }
+
+  if(meta.boolValue){
+    el.appendChild(checkInput(c.boolValue, v=>{c.boolValue=v; renderStage();}, 'Initial value (true/false)'));
+  }
+
+  if(meta.mutability){
+    el.appendChild(field('Mutability', selectInput([['modifiable','UI_CONTROL_MODIFIABLE'],['readonly','UI_CONTROL_READONLY']], c.mutability, v=>{c.mutability=v; renderStage();})));
+  }
+
+  if(meta.direction){
+    el.appendChild(field('Direction', selectInput([['horizontal','UI_CONTROL_HORIZONTAL'],['vertical','UI_CONTROL_VERTICAL']], c.direction, v=>{c.direction=v; renderStage();})));
+  }
+  if(meta.minMaxVal){
+    const row = document.createElement('div'); row.className='field';
+    const lab = document.createElement('label'); lab.textContent='Min / Max / Initial value'; row.appendChild(lab);
+    const r2 = document.createElement('div'); r2.className='row2';
+    r2.appendChild(numberInput(c.min, v=>{c.min=v; renderStage();}));
+    r2.appendChild(numberInput(c.max, v=>{c.max=v; renderStage();}));
+    r2.appendChild(numberInput(c.value, v=>{c.value=v; renderStage();}));
+    row.appendChild(r2);
+    el.appendChild(row);
+  }
+
+  if(meta.maxLength){
+    el.appendChild(field('Max length', numberInput(c.maxLength, v=>{c.maxLength=v; renderStage();})));
+  }
+  if(meta.initialText){
+    el.appendChild(field('Initial text', textInput(c.initialText, v=>{c.initialText=v; renderStage();})));
+  }
+
+  if(meta.image){
+    el.appendChild(field('Texture asset (TEXTURE_* enum)', textInput(c.image, v=>{c.image=v; renderStage();})));
+  }
+  if(meta.rotation){
+    el.appendChild(field('Rotation (radians)', numberInput(c.rotation, v=>{c.rotation=v; renderStage();}, '0.01')));
+  }
+
+  const zg = document.createElement('div'); zg.className='propgroup';
+  el.appendChild(zg);
+  zg.appendChild(checkInput(c.zOrderOverride, v=>{c.zOrderOverride=v; render();}, 'Override zOrder after creation'));
+  if(c.zOrderOverride){
+    zg.appendChild(field('zOrder value', numberInput(c.zOrderValue, v=>{c.zOrderValue=v; renderStage();})));
+    if(meta.titleField){
+      zg.appendChild(checkInput(c.titleZOrderOverride, v=>{c.titleZOrderOverride=v; render();}, "Also set title label's zOrder"));
+      if(c.titleZOrderOverride){
+        zg.appendChild(field('Title zOrder value', numberInput(c.titleZOrderValue, v=>{c.titleZOrderValue=v; renderStage();})));
+      }
+    }
+  }
+
+  const delBtn = document.createElement('button'); delBtn.className='danger'; delBtn.textContent='Delete control'; delBtn.style.marginTop='10px'; delBtn.style.width='100%';
+  delBtn.onclick = ()=> deleteControl(c.uid);
+  el.appendChild(delBtn);
+}
+
+// ---------- code generation ----------
+function posExprFor(c){
+  if(c.parentId) return `Vec2(${fmtNum(c.x)}, ${fmtNum(c.y)})`;
+  if(c.posOverride && c.posOverride.trim()) return `Vec2(${c.posOverride.trim()})`;
+  return `Vec2(${axisExpr(c.xAxis,'UI.size.x')}, ${axisExpr(c.yAxis,'UI.size.y')})`;
+}
+function sizeExprFor(c){ return `Vec2(${fmtNum(c.width)}, ${fmtNum(c.height)})`; }
+function callArgs(lines){
+  return lines.map(l=>'\t\t\t\t'+l.text+(l.comment?('\t\t\t\t\t// '+l.comment):'')).join('\n');
+}
+function buildCode(){
+  let out = [];
+  const zBlocks = [];
+
+  controls.forEach(c=>{
+    const meta = TYPES[c.type];
+    const fn = ADD_FN[c.type];
+    const pos = posExprFor(c);
+    const col = colorExpr(c);
+    const vis = visExpr(c);
+    let lines = [];
+    switch(c.type){
+      case 'window':
+        lines = [
+          {text:pos+',', comment:'Position'},
+          {text:sizeExprFor(c)+',', comment:'Size'},
+          {text:col+',', comment:'Color'},
+          {text:vis+',', comment: c.visibility==='visible'?'Not hidden':'Hidden'},
+          {text:`"${c.titleText}");`, comment:'Title text'},
+        ];
+        break;
+      case 'button':
+        lines = [
+          {text:pos+',', comment:'Position'},
+          {text:sizeExprFor(c)+',', comment:'Size'},
+          {text:col+',', comment:'Color'},
+          {text:vis+',', comment: c.visibility==='visible'?'Not hidden':'Hidden'},
+          {text:`"${c.titleText}",`, comment:'Title text'},
+          {text:(c.callback&&c.callback.trim()?c.callback.trim():'NULL')+');', comment:'Callback'},
+        ];
+        break;
+      case 'checkbox':
+        lines = [
+          {text:pos+',', comment:'Position'},
+          {text:fmtF(c.radius)+',', comment:'Radius'},
+          {text:col+',', comment:'Color'},
+          {text:vis+',', comment: c.visibility==='visible'?'Not hidden':'Hidden'},
+          {text:`"${c.titleText}",`, comment:'Title text'},
+          {text:(c.boolValue?'true':'false')+');', comment:'Initial value'},
+        ];
+        break;
+      case 'cursor':
+        lines = [
+          {text:pos+',', comment:'Position'},
+          {text:fmtF(c.radius)+',', comment:'Radius'},
+          {text:col+',', comment:'Color'},
+          {text:vis+');', comment: c.visibility==='visible'?'Not hidden':'Hidden'},
+        ];
+        break;
+      case 'edittext':
+        lines = [
+          {text:pos+',', comment:'Position'},
+          {text:sizeExprFor(c)+',', comment:'Size'},
+          {text:col+',', comment:'Color'},
+          {text:vis+',', comment: c.visibility==='visible'?'Not hidden':'Hidden'},
+          {text:(c.mutability==='modifiable'?'UI_CONTROL_MODIFIABLE':'UI_CONTROL_READONLY')+',', comment:'Mutability'},
+          {text:fmtNum(c.maxLength)+',', comment:'Max length'},
+          {text:`"${c.initialText}");`, comment:'Initial text'},
+        ];
+        break;
+      case 'sprite':
+        lines = [
+          {text:pos+',', comment:'Position'},
+          {text:sizeExprFor(c)+',', comment:'Size'},
+          {text:col+',', comment:'Color'},
+          {text:vis+',', comment: c.visibility==='visible'?'Not hidden':'Hidden'},
+          {text:`&AssetManager_GetAsset(assets, ${c.image})->image,`, comment:'Image'},
+          {text:fmtF(c.rotation)+');', comment:'Rotation'},
+        ];
+        break;
+      case 'text':
+        lines = [
+          {text:pos+',', comment:'Position'},
+          {text:fmtF(c.fontSize)+',', comment:'Font size'},
+          {text:col+',', comment:'Color'},
+          {text:vis+',', comment: c.visibility==='visible'?'Not hidden':'Hidden'},
+          {text:`"${c.titleText}");`, comment:'Title text'},
+        ];
+        break;
+      case 'virtualstick':
+        lines = [
+          {text:pos+',', comment:'Position'},
+          {text:fmtF(c.radius)+',', comment:'Radius'},
+          {text:col+',', comment:'Color'},
+          {text:vis+',', comment: c.visibility==='visible'?'Not hidden':'Hidden'},
+          {text:`"${c.titleText}");`, comment:'Title text'},
+        ];
+        break;
+      case 'bargraph':
+        lines = [
+          {text:pos+',', comment:'Position'},
+          {text:sizeExprFor(c)+',', comment:'Size'},
+          {text:col+',', comment:'Color'},
+          {text:vis+',', comment: c.visibility==='visible'?'Not hidden':'Hidden'},
+          {text:`"${c.titleText}",`, comment:'Title text'},
+          {text:(c.mutability==='modifiable'?'UI_CONTROL_MODIFIABLE':'UI_CONTROL_READONLY')+',', comment:'Mutability'},
+          {text:(c.direction==='horizontal'?'UI_CONTROL_HORIZONTAL':'UI_CONTROL_VERTICAL')+',', comment:'Direction'},
+          {text:`${fmtF(c.min)}, ${fmtF(c.max)}, ${fmtF(c.value)});`, comment:'min/max/initial value'},
+        ];
+        break;
+    }
+    out.push(`\tuint32_t ${c.varName}=${fn}(&UI,\n${callArgs(lines)}`);
+
+    if(c.zOrderOverride){
+      let blk = `\t{\n\t\tUI_Control_t *temp=UI_FindControlByID(&UI, ${c.varName});\n\t\ttemp->zOrder=${fmtNum(c.zOrderValue)};\n`;
+      if(c.titleZOrderOverride && meta.titleField){
+        blk += `\t\ttemp=UI_FindControlByID(&UI, temp->${meta.titleField}.titleTextID);\n\t\ttemp->zOrder=${fmtNum(c.titleZOrderValue)};\n`;
+      }
+      blk += `\t}`;
+      zBlocks.push(blk);
+    }
+  });
+
+  let code = out.join('\n\n');
+  if(zBlocks.length) code += '\n\n'+zBlocks.join('\n\n');
+
+  const attach = controls.filter(c=>c.parentId).map(c=>{
+    const p = byId(c.parentId);
+    return `\tUI_WindowAddControl(&UI, ${p?p.varName:'/* missing parent */'}, ${c.varName});`;
+  });
+  if(attach.length) code += '\n\n'+attach.join('\n');
+
+  return code+'\n';
+}
+
+function showCode(code){
+  const overlay = document.createElement('div'); overlay.className='code-overlay';
+  overlay.innerHTML = `<div class="code-box">
+    <header style="display:flex;align-items:center;padding:8px 12px;gap:8px;">
+      <strong style="color:var(--accent);font-size:12px;">Generated C</strong>
+      <div class="spacer" style="flex:1"></div>
+      <button id="copyBtn">Copy</button>
+      <button id="closeBtn">Close</button>
+    </header>
+    <pre id="codeText"></pre>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#codeText').textContent = code;
+  overlay.querySelector('#closeBtn').onclick = ()=> overlay.remove();
+  overlay.querySelector('#copyBtn').onclick = ()=>{
+    navigator.clipboard.writeText(code).then(()=>{
+      overlay.querySelector('#copyBtn').textContent='Copied!';
+      setTimeout(()=>overlay.querySelector('#copyBtn').textContent='Copy',1200);
+    });
+  };
+  overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
+}
+
+function showJson(){
+  const overlay = document.createElement('div'); overlay.className='code-overlay';
+  overlay.innerHTML = `<div class="code-box">
+    <header style="display:flex;align-items:center;padding:8px 12px;gap:8px;">
+      <strong style="color:var(--accent);font-size:12px;">Layout JSON — copy to save, paste to load</strong>
+      <div class="spacer" style="flex:1"></div>
+      <button id="loadBtn">Load pasted JSON</button>
+      <button id="closeBtn">Close</button>
+    </header>
+    <textarea id="jsonText" style="flex:1;border:none;padding:14px 16px;background:var(--panel);color:#c9e8e2;"></textarea>
+  </div>`;
+  document.body.appendChild(overlay);
+  const ta = overlay.querySelector('#jsonText');
+  ta.value = JSON.stringify({uiSize, controls, counters}, null, 2);
+  overlay.querySelector('#closeBtn').onclick = ()=> overlay.remove();
+  overlay.querySelector('#loadBtn').onclick = ()=>{
+    try{
+      const data = JSON.parse(ta.value);
+      uiSize = data.uiSize || uiSize;
+      controls = data.controls || [];
+      counters = data.counters || {};
+      uidSeq = controls.reduce((m,c)=>Math.max(m,c.uid),0)+1;
+      document.getElementById('uiW').value = uiSize.w;
+      document.getElementById('uiH').value = uiSize.h;
+      selectedId=null;
+      render();
+      overlay.remove();
+    }catch(err){ alert('Invalid JSON: '+err.message); }
+  };
+  overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
+}
+
+// ---------- sample layout matching the prompt example ----------
+function loadExample(){
+  if(controls.length && !confirm('This replaces the current layout. Continue?')) return;
+  controls = []; counters = {}; uidSeq = 1;
+
+  const win = newControl('window');
+  win.varName='windowID'; win.xAxis={mode:'end',value:450}; win.yAxis={mode:'end',value:50};
+  win.width=400; win.height=128; win.color={r:0.1,g:0.1,b:0.1}; win.titleText='Controls';
+  win.zOrderOverride=true; win.zOrderValue=1; win.titleZOrderOverride=true; win.titleZOrderValue=1;
+  controls.push(win);
+
+  function child(type, varName, x, y, w, h, r, g, b, title, extra){
+    const c = newControl(type);
+    c.varName=varName; c.parentId=win.uid; c.x=x; c.y=y;
+    if(w!==undefined){c.width=w;c.height=h;}
+    c.color={r,g,b}; c.titleText=title||'';
+    Object.assign(c, extra||{});
+    controls.push(c);
+    return c;
+  }
+  child('button','playButton',0,-50,100,50,0.25,0.25,0.25,'Play',{callback:'StartStreamCallback'});
+  child('button','pauseButton',100,-50,100,50,0.25,0.25,0.25,'Pause',{callback:'StopStreamCallback'});
+  child('button','prevButton',200,-50,100,50,0.25,0.25,0.25,'Prev',{callback:'PrevTrackCallback'});
+  child('button','nextButton',300,-50,100,50,0.25,0.25,0.25,'Next',{callback:'NextTrackCallback'});
+  child('text','currentTrack',0,-58,undefined,undefined,1,1,1,'NULL',{fontSize:16});
+  child('bargraph','volumeID',0,-96,400,30,0.1,1.0,0.1,'Volume',{min:0,max:1,value:0.125});
+  child('bargraph','colorShiftID',0,-128,400,30,0.1,0.1,1.0,'Cloud Color Shift',{min:0,max:1,value:0.45});
+
+  const crosshair = newControl('sprite');
+  crosshair.varName='crosshair'; crosshair.xAxis={mode:'center',value:0}; crosshair.yAxis={mode:'center',value:0};
+  crosshair.width=64; crosshair.height=64; crosshair.color={r:1,g:1,b:1}; crosshair.image='TEXTURE_CROSSHAIR';
+  controls.push(crosshair);
+
+  const health = newControl('bargraph');
+  health.varName='playerHealthID'; health.xAxis={mode:'start',value:5}; health.yAxis={mode:'start',value:5};
+  health.width=400; health.height=30; health.color={r:1,g:0.1,b:0.1}; health.titleText='Player Health';
+  health.mutability='readonly'; health.min=0; health.max=100; health.value=100;
+  controls.push(health);
+
+  const consoleBg = newControl('sprite');
+  consoleBg.varName='consoleBackground'; consoleBg.xAxis={mode:'center',value:0};
+  consoleBg.posOverride='UI.size.x/2.0f, 100.0f-24.0f+(16.0f*6.0f/2.0f)';
+  consoleBg.width=1920; consoleBg.height=96; consoleBg.color={r:1,g:1,b:1}; consoleBg.image='TEXTURE_CONSOLEBG';
+  consoleBg.visibility='hidden';
+  controls.push(consoleBg);
+
+  counters = {window:1,button:4,text:1,bargraph:3,sprite:2};
+  selectedId=null;
+  render();
+}
+
+render();
+</script>
+</body>
+</html>

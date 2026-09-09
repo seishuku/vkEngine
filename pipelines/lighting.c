@@ -13,7 +13,7 @@ extern VkuContext_t vkContext;
 extern VkuSwapchain_t swapchain;
 
 VkRenderPass renderPass;
-Pipeline_t mainPipeline;
+static Pipeline_t mainPipeline;
 
 bool CreateLightingPipeline(void)
 {

@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Assembly Editor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --panel: #18181b;
+    --border: #27272a;
+    --text: #e5e7eb;
+    --muted: #71717a;
+    --accent: #22d3ee;
+    --accent-dim: #0a3540;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); }
+  body {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--text);
+    font-size: 12px;
+  }
+  #app {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  header .title { color: var(--muted); }
+  button {
+    font-family: inherit;
+    font-size: 11px;
+    background: #27272a;
+    color: var(--text);
+    border: 1px solid #3f3f46;
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+  button:hover { background: #3f3f46; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button.accent { background: var(--accent-dim); color: var(--accent); border-color: #155e75; }
+  button.accent:hover { background: #0e4a58; }
+  .main { display: flex; flex: 1; min-height: 0; }
+  .panel {
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .panel-left { width: 300px; border-right: 1px solid var(--border); }
+  .panel-right { width: 300px; border-left: 1px solid var(--border); }
+  #viewport { flex: 1; min-width: 0; position: relative; }
+  .toolbar { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--border); }
+  .toolbar button { flex: 1; }
+  .list { flex: 1; overflow-y: auto; }
+  .list-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 8px; cursor: pointer; border-bottom: 1px solid #27272a80;
+  }
+  .list-item:hover { background: #232326; }
+  .list-item.selected { background: var(--accent-dim); color: var(--accent); }
+  .list-item .del { color: #52525b; }
+  .list-item .del:hover { color: #f87171; }
+  .inspector {
+    border-top: 1px solid var(--border);
+    padding: 8px;
+    max-height: 340px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .row { display: flex; align-items: center; gap: 6px; }
+  .row label { width: 78px; color: var(--muted); flex-shrink: 0; }
+  .row input[type="number"] {
+    width: 56px; background: #27272a; border: 1px solid #3f3f46;
+    color: var(--text); border-radius: 3px; padding: 3px 4px; font-family: inherit; font-size: 11px;
+  }
+  .row input[type="text"], select {
+    flex: 1; background: #27272a; border: 1px solid #3f3f46;
+    color: var(--text); border-radius: 3px; padding: 4px 6px; font-family: inherit; font-size: 11px;
+  }
+  input[type="number"]:focus, input[type="text"]:focus, select:focus { outline: none; border-color: var(--accent); }
+  .divider { border-top: 1px dashed #3f3f46; margin: 4px 0; }
+  #exportPanel {
+    border-top: 1px solid var(--border);
+    background: #000;
+    max-height: 260px;
+    display: none;
+    flex-direction: column;
+  }
+  #exportPanel.open { display: flex; }
+  #exportPanel .exp-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 12px; border-bottom: 1px solid var(--border);
+  }
+  #exportPanel pre {
+    margin: 0; padding: 10px 12px; overflow-y: auto; color: #6ee7b7;
+    white-space: pre-wrap; font-size: 11px;
+  }
+  .badge { font-size: 10px; padding: 1px 5px; border-radius: 3px; border: 1px solid currentColor; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <span class="title">assembly editor</span>
+    <div style="display:flex; gap:6px;">
+      <button onclick="saveToFile()">save</button>
+      <button onclick="triggerLoad()">load</button>
+      <input type="file" id="loadFileInput" accept="application/json" style="display:none" onchange="onLoadFile(this)">
+      <button class="accent" onclick="toggleExport()" id="exportBtn">export .c</button>
+    </div>
+  </header>
+  <div class="main">
+    <div class="panel panel-left">
+      <div class="toolbar">
+        <button onclick="addBody('RIGIDBODY_OBB')">+ box</button>
+        <button onclick="addBody('RIGIDBODY_SPHERE')">+ sphere</button>
+        <button onclick="addBody('RIGIDBODY_CAPSULE')">+ capsule</button>
+      </div>
+      <div class="list" id="bodyList"></div>
+      <div class="inspector" id="bodyInspector"></div>
+    </div>
+
+    <div id="viewport"></div>
+
+    <div class="panel panel-right">
+      <div class="toolbar" style="flex-direction:column;">
+        <select id="newType">
+          <option value="CONSTRAINT_DISTANCE">CONSTRAINT_DISTANCE</option>
+          <option value="CONSTRAINT_POINT">CONSTRAINT_POINT</option>
+          <option value="CONSTRAINT_HINGE" selected>CONSTRAINT_HINGE</option>
+          <option value="CONSTRAINT_PRISMATIC">CONSTRAINT_PRISMATIC</option>
+          <option value="CONSTRAINT_ANGULAR_MOTOR">CONSTRAINT_ANGULAR_MOTOR</option>
+          <option value="CONSTRAINT_LINEAR_MOTOR">CONSTRAINT_LINEAR_MOTOR</option>
+        </select>
+        <div class="row" style="margin-top:6px;">
+          <select id="newA"></select>
+          <select id="newB"></select>
+        </div>
+        <button onclick="addConstraint()" style="margin-top:6px;">+ add constraint</button>
+      </div>
+      <div class="list" id="constraintList"></div>
+      <div class="inspector" id="constraintInspector"></div>
+    </div>
+  </div>
+
+  <div id="exportPanel">
+    <div class="exp-head">
+      <span style="color:var(--muted)">generated C</span>
+      <button onclick="copyCode()">copy</button>
+    </div>
+    <pre id="codeOut"></pre>
+  </div>
+</div>
+
+<script>
+/* ---------------- state ---------------- */
+let idCounter = 1;
+const nextId = () => "id" + (idCounter++);
+
+const state = {
+  bodies: [],
+  constraints: [],
+  selectedBodyId: null,
+  selectedConstraintId: null,
+};
+
+function makeBody(type, name) {
+  return {
+    id: nextId(),
+    name,
+    type,                              // RIGIDBODY_OBB | RIGIDBODY_SPHERE | RIGIDBODY_CAPSULE
+    position: { x: 0, y: 3, z: 0 },
+    rotation: { x: 0, y: 0, z: 0 },     // degrees, editor-only -> exported as quaternion
+    size: { x: 0.5, y: 0.5, z: 0.5 },   // OBB half-size
+    radius: 0.5,                        // sphere radius
+    radiusHeight: { radius: 0.3, halfHeight: 0.5 }, // capsule
+    mass: 1,
+    inertia: 1,
+    isStatic: false,
+    restitution: 0.3,
+    friction: 0.5,
+  };
+}
+
+function makeConstraint(type, bodyA, bodyB) {
+  return {
+    id: nextId(),
+    type,
+    bodyA, bodyB,
+    localAnchorA: { x: 0, y: 0, z: 0 },
+    localAnchorB: { x: 0, y: 0, z: 0 },
+    distance: 1,
+    localAxisA: { x: 0, y: 1, z: 0 },
+    localAxisB: { x: 0, y: 1, z: 0 },
+    worldAxis: { x: 0, y: 1, z: 0 },
+    motorEnabled: true,
+    motorVelocity: 1,
+    maxMotorForce: 10,
+  };
+}
+
+state.bodies.push(Object.assign(makeBody("RIGIDBODY_OBB", "anchor"), { position: { x: 0, y: 3, z: 0 }, isStatic: true }));
+state.bodies.push(Object.assign(makeBody("RIGIDBODY_OBB", "link1"), { position: { x: 2, y: 3, z: 0 } }));
+
+/* ---------------- helpers ---------------- */
+function getNested(obj, path) {
+  return path.split(".").reduce((o, k) => (o == null ? o : o[k]), obj);
+}
+function setNested(obj, path, value) {
+  const keys = path.split(".");
+  let o = obj;
+  for (let i = 0; i < keys.length - 1; i++) o = o[keys[i]];
+  o[keys[keys.length - 1]] = value;
+}
+function fmt(n) {
+  const v = Number.isFinite(n) ? n : 0;
+  let s = v.toFixed(4);         // cap at 4 decimal places
+  s = s.replace(/0+$/, "");    // trim trailing zeros ("1.5000" -> "1.5", "3.0000" -> "3.")
+  return s;
+}
+function fmt3(v) { return `${fmt(v.x)}f, ${fmt(v.y)}f, ${fmt(v.z)}f`; }
+
+/* ---------------- closest-surface-point anchoring ---------------- */
+function bodyQuat(b) {
+  return new THREE.Quaternion().setFromEuler(new THREE.Euler(
+    THREE.MathUtils.degToRad(b.rotation.x),
+    THREE.MathUtils.degToRad(b.rotation.y),
+    THREE.MathUtils.degToRad(b.rotation.z)
+  ));
+}
+function worldToLocal(b, worldPoint) {
+  const v = worldPoint.clone().sub(new THREE.Vector3(b.position.x, b.position.y, b.position.z));
+  v.applyQuaternion(bodyQuat(b).invert());
+  return v;
+}
+function localToWorld(b, localPoint) {
+  const v = localPoint.clone().applyQuaternion(bodyQuat(b));
+  v.add(new THREE.Vector3(b.position.x, b.position.y, b.position.z));
+  return v;
+}
+// Closest point on a body's surface to a point given in that body's LOCAL space.
+function closestSurfaceLocal(b, localTarget) {
+  if (b.type === "RIGIDBODY_SPHERE") {
+    const len = localTarget.length();
+    const dir = len < 1e-6 ? new THREE.Vector3(1, 0, 0) : localTarget.clone().normalize();
+    return dir.multiplyScalar(b.radius);
+  }
+  if (b.type === "RIGIDBODY_CAPSULE") {
+    const r = b.radiusHeight.radius, h = b.radiusHeight.halfHeight;
+    const y = Math.min(h, Math.max(-h, localTarget.y));
+    const seg = new THREE.Vector3(0, y, 0);
+    const diff = localTarget.clone().sub(seg);
+    const len = diff.length();
+    const dir = len < 1e-6 ? new THREE.Vector3(1, 0, 0) : diff.normalize();
+    return seg.add(dir.multiplyScalar(r));
+  }
+  const s = b.size; // OBB half-size
+  return new THREE.Vector3(
+    Math.min(s.x, Math.max(-s.x, localTarget.x)),
+    Math.min(s.y, Math.max(-s.y, localTarget.y)),
+    Math.min(s.z, Math.max(-s.z, localTarget.z))
+  );
+}
+// Approximate nearest-point-pair between two bodies' surfaces (a few fixed-point iterations).
+function computeClosestAnchors(bodyA, bodyB) {
+  let pB = new THREE.Vector3(bodyB.position.x, bodyB.position.y, bodyB.position.z);
+  let localA, localB;
+  for (let i = 0; i < 4; i++) {
+    localA = closestSurfaceLocal(bodyA, worldToLocal(bodyA, pB));
+    const pA = localToWorld(bodyA, localA);
+    localB = closestSurfaceLocal(bodyB, worldToLocal(bodyB, pA));
+    pB = localToWorld(bodyB, localB);
+  }
+  return {
+    localAnchorA: { x: localA.x, y: localA.y, z: localA.z },
+    localAnchorB: { x: localB.x, y: localB.y, z: localB.z },
+  };
+}
+function snapAnchors(constraintId) {
+  const c = state.constraints.find((x) => x.id === constraintId);
+  if (!c) return;
+  const bA = state.bodies.find((b) => b.id === c.bodyA);
+  const bB = state.bodies.find((b) => b.id === c.bodyB);
+  if (!bA || !bB) return;
+  const { localAnchorA, localAnchorB } = computeClosestAnchors(bA, bB);
+  c.localAnchorA = localAnchorA;
+  c.localAnchorB = localAnchorB;
+  renderAll();
+}
+
+/* ---------------- C code export ---------------- */
+function sanitizeIdent(s) {
+  let out = String(s).toUpperCase().replace(/[^A-Z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "");
+  if (!out) out = "X";
+  if (/^[0-9]/.test(out)) out = "_" + out;
+  return out;
+}
+function uniqueEnumNames(prefix, rawNames) {
+  const used = {};
+  return rawNames.map((raw) => {
+    const base = prefix + sanitizeIdent(raw);
+    let name = base, n = 2;
+    while (used[name]) { name = `${base}_${n}`; n++; }
+    used[name] = true;
+    return name;
+  });
+}
+
+function generateCCode() {
+  const { bodies, constraints } = state;
+  const lines = [];
+
+  const bodyNames = uniqueEnumNames("BODY_", bodies.map((b) => b.name));
+  const jointNames = uniqueEnumNames("JOINT_", constraints.map((c) => {
+    const bA = bodies.find((b) => b.id === c.bodyA);
+    const bB = bodies.find((b) => b.id === c.bodyB);
+    return `${bA?.name ?? "a"}_${bB?.name ?? "b"}`;
+  }));
+
+  lines.push("enum");
+  lines.push("{");
+  bodyNames.forEach((n, i) => lines.push(`\t${n}${i === 0 ? " = 0" : ""},`));
+  lines.push("\tBODY_COUNT");
+  lines.push("};");
+  lines.push("");
+
+  if (constraints.length) {
+    lines.push("enum");
+    lines.push("{");
+    jointNames.forEach((n, i) => lines.push(`\t${n}${i === 0 ? " = 0" : ""},`));
+    lines.push("\tJOINT_COUNT");
+    lines.push("};");
+    lines.push("");
+  }
+
+  lines.push(`RigidBody_t bodies[BODY_COUNT] =`);
+  lines.push("{");
+  bodies.forEach((b, i) => {
+    const q = new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(
+        THREE.MathUtils.degToRad(b.rotation.x),
+        THREE.MathUtils.degToRad(b.rotation.y),
+        THREE.MathUtils.degToRad(b.rotation.z),
+        "XYZ"
+      )
+    );
+    const mass = b.isStatic ? 0 : b.mass;
+    const invMass = b.isStatic || mass <= 0 ? 0 : 1 / mass;
+    const inertia = b.isStatic ? 0 : b.inertia;
+    const invInertia = b.isStatic || inertia <= 0 ? 0 : 1 / inertia;
+
+    lines.push(`\t{ /* [${bodyNames[i]}] "${b.name}" */`);
+    lines.push(`\t\t.position = { ${fmt3(b.position)} },`);
+    lines.push(`\t\t.velocity = { 0.0f, 0.0f, 0.0f },`);
+    lines.push(`\t\t.force = { 0.0f, 0.0f, 0.0f },`);
+    lines.push(`\t\t.mass = ${fmt(mass)}f, .invMass = ${fmt(invMass)}f,`);
+    lines.push(`\t\t.orientation = { ${fmt(q.x)}f, ${fmt(q.y)}f, ${fmt(q.z)}f, ${fmt(q.w)}f }, /* xyzw */`);
+    lines.push(`\t\t.angularVelocity = { 0.0f, 0.0f, 0.0f },`);
+    lines.push(`\t\t.inertia = ${fmt(inertia)}f, .invInertia = ${fmt(invInertia)}f,`);
+    lines.push(`\t\t.restitution = ${fmt(b.restitution)}f,`);
+    lines.push(`\t\t.friction = ${fmt(b.friction)}f,`);
+    lines.push(`\t\t.type = ${b.type},`);
+    if (b.type === "RIGIDBODY_OBB") {
+      lines.push(`\t\t.size = { ${fmt3(b.size)} },`);
+    } else if (b.type === "RIGIDBODY_SPHERE") {
+      lines.push(`\t\t.radius = ${fmt(b.radius)}f,`);
+    } else {
+      lines.push(`\t\t.radiusHeight = { ${fmt(b.radiusHeight.radius)}f, ${fmt(b.radiusHeight.halfHeight)}f },`);
+    }
+    lines.push("\t},");
+  });
+  lines.push("};");
+  lines.push("");
+
+  lines.push(`Constraint_t assembly[JOINT_COUNT] =`);
+  lines.push("{");
+  constraints.forEach((c, ci) => {
+    const ai = bodies.findIndex((b) => b.id === c.bodyA);
+    const bi = bodies.findIndex((b) => b.id === c.bodyB);
+    lines.push(`\t{ /* ${jointNames[ci]} */`);
+    lines.push(`\t\t.type = ${c.type},`);
+    lines.push(`\t\t.bodyA = &bodies[${bodyNames[ai] ?? "?"}],  /* "${bodies[ai]?.name ?? "?"}" */`);
+    lines.push(`\t\t.bodyB = &bodies[${bodyNames[bi] ?? "?"}],  /* "${bodies[bi]?.name ?? "?"}" */`);
+    lines.push(`\t\t.localAnchorA = { ${fmt3(c.localAnchorA)} },`);
+    lines.push(`\t\t.localAnchorB = { ${fmt3(c.localAnchorB)} },`);
+    switch (c.type) {
+      case "CONSTRAINT_DISTANCE":
+        lines.push(`\t\t.distance = ${fmt(c.distance)}f,`);
+        break;
+      case "CONSTRAINT_POINT":
+        break;
+      case "CONSTRAINT_HINGE":
+      case "CONSTRAINT_PRISMATIC":
+        lines.push(`\t\t.localAxisA = { ${fmt3(c.localAxisA)} },`);
+        lines.push(`\t\t.localAxisB = { ${fmt3(c.localAxisB)} },`);
+        break;
+      case "CONSTRAINT_ANGULAR_MOTOR":
+      case "CONSTRAINT_LINEAR_MOTOR":
+        lines.push(`\t\t.worldAxis = { ${fmt3(c.worldAxis)} },`);
+        lines.push(`\t\t.motorEnabled = ${c.motorEnabled ? "true" : "false"},`);
+        lines.push(`\t\t.motorVelocity = ${fmt(c.motorVelocity)}f,`);
+        lines.push(`\t\t.maxMotorForce = ${fmt(c.maxMotorForce)}f,`);
+        break;
+    }
+    lines.push("\t},");
+  });
+  lines.push("};");
+  return lines.join("\n");
+}
+
+function saveToFile() {
+  const payload = JSON.stringify({ bodies: state.bodies, constraints: state.constraints }, null, 2);
+  const blob = new Blob([payload], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "assembly.json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function triggerLoad() {
+  document.getElementById("loadFileInput").click();
+}
+function onLoadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!Array.isArray(data.bodies) || !Array.isArray(data.constraints)) throw new Error("missing bodies/constraints arrays");
+
+      // Merge onto fresh defaults so older save files missing newer fields don't break.
+      state.bodies = data.bodies.map((b) => Object.assign(makeBody(b.type || "RIGIDBODY_OBB", b.name || "body"), b));
+      state.constraints = data.constraints.map((c) => Object.assign(makeConstraint(c.type || "CONSTRAINT_DISTANCE", c.bodyA, c.bodyB), c));
+      state.selectedBodyId = null;
+      state.selectedConstraintId = null;
+
+      let maxN = 0;
+      [...state.bodies, ...state.constraints].forEach((o) => {
+        const m = /^id(\d+)$/.exec(o.id);
+        if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+      });
+      idCounter = maxN + 1;
+
+      renderAll();
+    } catch (err) {
+      alert("Couldn't load file: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+  input.value = "";
+}
+
+function toggleExport() {
+  const panel = document.getElementById("exportPanel");
+  const open = panel.classList.toggle("open");
+  document.getElementById("exportBtn").textContent = open ? "close export" : "export .c";
+  if (open) document.getElementById("codeOut").textContent = generateCCode();
+}
+function copyCode() {
+  navigator.clipboard?.writeText(document.getElementById("codeOut").textContent);
+}
+
+/* ---------------- three.js scene ---------------- */
+const TYPE_COLOR = {
+  CONSTRAINT_DISTANCE: 0xe5e7eb,
+  CONSTRAINT_POINT: 0x22d3ee,
+  CONSTRAINT_HINGE: 0xf59e0b,
+  CONSTRAINT_PRISMATIC: 0xa78bfa,
+  CONSTRAINT_ANGULAR_MOTOR: 0xef4444,
+  CONSTRAINT_LINEAR_MOTOR: 0x34d399,
+};
+
+const mount = document.getElementById("viewport");
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a0a);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+mount.appendChild(renderer.domElement);
+
+scene.add(new THREE.GridHelper(20, 20, 0x27272a, 0x18181b));
+scene.add(new THREE.AxesHelper(1.2));
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(5, 8, 4);
+scene.add(dirLight);
+
+const constraintGroup = new THREE.Group();
+scene.add(constraintGroup);
+
+const meshMap = {}; // bodyId -> Object3D
+
+const cam = { theta: 0.8, phi: 1.05, radius: 12, dragging: false, lastX: 0, lastY: 0, downX: 0, downY: 0 };
+function updateCamera() {
+  camera.position.x = cam.radius * Math.sin(cam.phi) * Math.sin(cam.theta);
+  camera.position.z = cam.radius * Math.sin(cam.phi) * Math.cos(cam.theta);
+  camera.position.y = cam.radius * Math.cos(cam.phi);
+  camera.lookAt(0, 0, 0);
+}
+updateCamera();
+
+function resize() {
+  const w = mount.clientWidth, h = mount.clientHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  renderer.render(scene, camera);
+}
+new ResizeObserver(resize).observe(mount);
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+mount.addEventListener("pointerdown", (e) => {
+  cam.dragging = true;
+  cam.lastX = e.clientX; cam.lastY = e.clientY;
+  cam.downX = e.clientX; cam.downY = e.clientY;
+});
+window.addEventListener("pointermove", (e) => {
+  if (!cam.dragging) return;
+  const dx = e.clientX - cam.lastX, dy = e.clientY - cam.lastY;
+  cam.lastX = e.clientX; cam.lastY = e.clientY;
+  cam.theta -= dx * 0.006;
+  cam.phi = Math.min(Math.PI - 0.05, Math.max(0.05, cam.phi - dy * 0.006));
+  updateCamera();
+  renderer.render(scene, camera);
+});
+window.addEventListener("pointerup", (e) => {
+  cam.dragging = false;
+  const moved = Math.hypot(e.clientX - cam.downX, e.clientY - cam.downY);
+  if (moved < 4) {
+    const rect = mount.getBoundingClientRect();
+    pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(Object.values(meshMap), true);
+    if (hits.length) {
+      let o = hits[0].object;
+      while (o && !o.userData.bodyId) o = o.parent;
+      if (o) { state.selectedBodyId = o.userData.bodyId; state.selectedConstraintId = null; renderAll(); }
+    } else {
+      state.selectedBodyId = null;
+      renderAll();
+    }
+  }
+});
+mount.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  cam.radius = Math.min(60, Math.max(2, cam.radius * (1 + e.deltaY * 0.001)));
+  updateCamera();
+  renderer.render(scene, camera);
+}, { passive: false });
+
+function makeAxesGizmo(len) {
+  const g = new THREE.Group();
+  const mkLine = (dir, color) => {
+    const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), dir.clone().multiplyScalar(len)]);
+    return new THREE.Line(geo, new THREE.LineBasicMaterial({ color }));
+  };
+  g.add(mkLine(new THREE.Vector3(1, 0, 0), 0xff5555)); // local X
+  g.add(mkLine(new THREE.Vector3(0, 1, 0), 0x55ff55)); // local Y
+  g.add(mkLine(new THREE.Vector3(0, 0, 1), 0x5588ff)); // local Z
+  return g;
+}
+
+function makeObject3D(b) {
+  let obj, mat, gizmoLen;
+  const color = 0x52525b;
+  if (b.type === "RIGIDBODY_SPHERE") {
+    const geo = new THREE.SphereGeometry(b.radius, 20, 16);
+    mat = new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0.1 });
+    obj = new THREE.Mesh(geo, mat);
+    obj.userData.mat = mat;
+    gizmoLen = b.radius * 1.8;
+  } else if (b.type === "RIGIDBODY_CAPSULE") {
+    const r = b.radiusHeight.radius, h = b.radiusHeight.halfHeight;
+    const group = new THREE.Group();
+    mat = new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0.1 });
+    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h * 2, 16), mat);
+    const capTop = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), mat);
+    capTop.position.y = h;
+    const capBot = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), mat);
+    capBot.position.y = -h;
+    group.add(cyl, capTop, capBot);
+    group.userData.mat = mat;
+    obj = group;
+    gizmoLen = (h + r) * 1.3;
+  } else {
+    const geo = new THREE.BoxGeometry(b.size.x * 2, b.size.y * 2, b.size.z * 2);
+    mat = new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0.1 });
+    obj = new THREE.Mesh(geo, mat);
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x09090b }));
+    obj.add(edges);
+    obj.userData.mat = mat;
+    gizmoLen = Math.max(b.size.x, b.size.y, b.size.z) * 1.6;
+  }
+  obj.add(makeAxesGizmo(gizmoLen));
+  obj.userData.bodyId = b.id;
+  obj.traverse((c) => (c.userData.bodyId = b.id));
+  return obj;
+}
+
+function bodySig(b) {
+  if (b.type === "RIGIDBODY_SPHERE") return `sphere-${b.radius}`;
+  if (b.type === "RIGIDBODY_CAPSULE") return `capsule-${b.radiusHeight.radius}-${b.radiusHeight.halfHeight}`;
+  return `box-${b.size.x}-${b.size.y}-${b.size.z}`;
+}
+
+function syncScene() {
+  const currentIds = new Set(state.bodies.map((b) => b.id));
+  Object.keys(meshMap).forEach((id) => {
+    if (!currentIds.has(id)) {
+      scene.remove(meshMap[id]);
+      delete meshMap[id];
+    }
+  });
+
+  state.bodies.forEach((b) => {
+    const sig = bodySig(b);
+    let obj = meshMap[b.id];
+    if (!obj || obj.userData.sig !== sig) {
+      if (obj) scene.remove(obj);
+      obj = makeObject3D(b);
+      obj.userData.sig = sig;
+      scene.add(obj);
+      meshMap[b.id] = obj;
+    }
+    obj.position.set(b.position.x, b.position.y, b.position.z);
+    obj.rotation.set(
+      THREE.MathUtils.degToRad(b.rotation.x),
+      THREE.MathUtils.degToRad(b.rotation.y),
+      THREE.MathUtils.degToRad(b.rotation.z)
+    );
+    const isSel = b.id === state.selectedBodyId;
+    const mat = obj.userData.mat;
+    mat.color.set(isSel ? 0x22d3ee : (b.isStatic ? 0x3f3f46 : 0x52525b));
+    mat.emissive.set(isSel ? 0x0a3540 : 0x000000);
+  });
+
+  while (constraintGroup.children.length) {
+    const c = constraintGroup.children.pop();
+    c.geometry?.dispose?.();
+    c.material?.dispose?.();
+  }
+  const byId = Object.fromEntries(state.bodies.map((b) => [b.id, b]));
+  const worldAnchor = (body, local) => {
+    const v = new THREE.Vector3(local.x, local.y, local.z);
+    const e = new THREE.Euler(
+      THREE.MathUtils.degToRad(body.rotation.x),
+      THREE.MathUtils.degToRad(body.rotation.y),
+      THREE.MathUtils.degToRad(body.rotation.z)
+    );
+    v.applyEuler(e);
+    v.add(new THREE.Vector3(body.position.x, body.position.y, body.position.z));
+    return v;
+  };
+
+  state.constraints.forEach((c) => {
+    const bA = byId[c.bodyA], bB = byId[c.bodyB];
+    if (!bA || !bB) return;
+    const pA = worldAnchor(bA, c.localAnchorA);
+    const pB = worldAnchor(bB, c.localAnchorB);
+    const isSel = c.id === state.selectedConstraintId;
+    const color = TYPE_COLOR[c.type];
+
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([pA, pB]);
+    constraintGroup.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color })));
+
+    [pA, pB].forEach((p) => {
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(isSel ? 0.09 : 0.06, 10, 8),
+        new THREE.MeshBasicMaterial({ color })
+      );
+      dot.position.copy(p);
+      constraintGroup.add(dot);
+    });
+
+    if (c.type === "CONSTRAINT_HINGE" || c.type === "CONSTRAINT_PRISMATIC") {
+      const axis = new THREE.Vector3(c.localAxisA.x, c.localAxisA.y, c.localAxisA.z)
+        .applyEuler(new THREE.Euler(
+          THREE.MathUtils.degToRad(bA.rotation.x),
+          THREE.MathUtils.degToRad(bA.rotation.y),
+          THREE.MathUtils.degToRad(bA.rotation.z)
+        )).normalize().multiplyScalar(0.6);
+      constraintGroup.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([pA, pA.clone().add(axis)]),
+        new THREE.LineBasicMaterial({ color: 0xffffff })
+      ));
+    }
+    if (c.type === "CONSTRAINT_ANGULAR_MOTOR" || c.type === "CONSTRAINT_LINEAR_MOTOR") {
+      const axis = new THREE.Vector3(c.worldAxis.x, c.worldAxis.y, c.worldAxis.z).normalize().multiplyScalar(0.6);
+      constraintGroup.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([pA, pA.clone().add(axis)]),
+        new THREE.LineBasicMaterial({ color: 0xffffff })
+      ));
+    }
+  });
+
+  renderer.render(scene, camera);
+}
+
+/* ---------------- DOM rendering ---------------- */
+function vec3Row(label, obj, path) {
+  const v = getNested(obj, path);
+  return `<div class="row"><label>${label}</label>
+    <input type="number" step="0.1" value="${v.x}" oninput="onVecInput('${obj.id}','${path}','x',this.value)">
+    <input type="number" step="0.1" value="${v.y}" oninput="onVecInput('${obj.id}','${path}','y',this.value)">
+    <input type="number" step="0.1" value="${v.z}" oninput="onVecInput('${obj.id}','${path}','z',this.value)">
+  </div>`;
+}
+
+let vecTargetKind = null; // "body" | "constraint" — set right before building inspector HTML
+function refreshExportIfOpen() {
+  if (document.getElementById("exportPanel").classList.contains("open")) {
+    document.getElementById("codeOut").textContent = generateCCode();
+  }
+}
+function onVecInput(id, path, axis, value) {
+  const list = vecTargetKind === "body" ? state.bodies : state.constraints;
+  const obj = list.find((o) => o.id === id);
+  if (!obj) return;
+  getNested(obj, path)[axis] = parseFloat(value) || 0;
+  syncScene();
+  refreshExportIfOpen();
+}
+// Lightweight scalar-field update: mutates state and refreshes the 3D view/export
+// WITHOUT rebuilding the inspector DOM, so the input never loses focus mid-edit.
+function onScalarInput(kind, id, path, value) {
+  const obj = (kind === "body" ? state.bodies : state.constraints).find((o) => o.id === id);
+  if (!obj) return;
+  setNested(obj, path, parseFloat(value) || 0);
+  syncScene();
+  refreshExportIfOpen();
+}
+
+function renderBodyList() {
+  document.getElementById("bodyList").innerHTML = state.bodies.map((b) => `
+    <div class="list-item ${b.id === state.selectedBodyId ? "selected" : ""}" onclick="selectBody('${b.id}')">
+      <span>${b.name}</span>
+      <span class="del" onclick="event.stopPropagation(); deleteBody('${b.id}')">×</span>
+    </div>`).join("");
+}
+
+function renderBodyInspector() {
+  const b = state.bodies.find((x) => x.id === state.selectedBodyId);
+  const el = document.getElementById("bodyInspector");
+  if (!b) { el.innerHTML = ""; return; }
+  vecTargetKind = "body";
+
+  let dims = "";
+  if (b.type === "RIGIDBODY_OBB") {
+    dims = vec3Row("size (half)", b, "size");
+  } else if (b.type === "RIGIDBODY_SPHERE") {
+    dims = `<div class="row"><label>radius</label><input type="number" step="0.1" value="${b.radius}" oninput="onScalarInput('body','${b.id}','radius',this.value)"></div>`;
+  } else {
+    dims = `<div class="row"><label>radius</label><input type="number" step="0.1" value="${b.radiusHeight.radius}" oninput="onScalarInput('body','${b.id}','radiusHeight.radius',this.value)"></div>
+            <div class="row"><label>halfHeight</label><input type="number" step="0.1" value="${b.radiusHeight.halfHeight}" oninput="onScalarInput('body','${b.id}','radiusHeight.halfHeight',this.value)"></div>`;
+  }
+
+  el.innerHTML = `
+    <div class="row"><input type="text" value="${b.name}" onkeydown="if(event.key==='Enter') this.blur();" onblur="updateBodyField('${b.id}','name',this.value)"></div>
+    ${vec3Row("position", b, "position")}
+    ${vec3Row("rotation°", b, "rotation")}
+    <div class="divider"></div>
+    <select onchange="updateBodyField('${b.id}','type',this.value)">
+      <option value="RIGIDBODY_OBB" ${b.type === "RIGIDBODY_OBB" ? "selected" : ""}>RIGIDBODY_OBB</option>
+      <option value="RIGIDBODY_SPHERE" ${b.type === "RIGIDBODY_SPHERE" ? "selected" : ""}>RIGIDBODY_SPHERE</option>
+      <option value="RIGIDBODY_CAPSULE" ${b.type === "RIGIDBODY_CAPSULE" ? "selected" : ""}>RIGIDBODY_CAPSULE</option>
+    </select>
+    ${dims}
+    <div class="divider"></div>
+    <div class="row"><label><input type="checkbox" ${b.isStatic ? "checked" : ""} onchange="updateBodyField('${b.id}','isStatic',this.checked)"> static</label></div>
+    <div class="row"><label>mass</label><input type="number" step="0.1" value="${b.mass}" ${b.isStatic ? "disabled" : ""} oninput="onScalarInput('body','${b.id}','mass',this.value)"></div>
+    <div class="row"><label>inertia</label><input type="number" step="0.1" value="${b.inertia}" ${b.isStatic ? "disabled" : ""} oninput="onScalarInput('body','${b.id}','inertia',this.value)"></div>
+    <div class="row"><label>restitution</label><input type="number" step="0.05" value="${b.restitution}" oninput="onScalarInput('body','${b.id}','restitution',this.value)"></div>
+    <div class="row"><label>friction</label><input type="number" step="0.05" value="${b.friction}" oninput="onScalarInput('body','${b.id}','friction',this.value)"></div>
+  `;
+}
+
+function renderConstraintList() {
+  document.getElementById("constraintList").innerHTML = state.constraints.map((c) => {
+    const bA = state.bodies.find((b) => b.id === c.bodyA);
+    const bB = state.bodies.find((b) => b.id === c.bodyB);
+    return `<div class="list-item ${c.id === state.selectedConstraintId ? "selected" : ""}" onclick="selectConstraint('${c.id}')">
+      <span>${c.type.replace("CONSTRAINT_", "")}: ${bA?.name ?? "?"} → ${bB?.name ?? "?"}</span>
+      <span class="del" onclick="event.stopPropagation(); deleteConstraint('${c.id}')">×</span>
+    </div>`;
+  }).join("");
+}
+
+function renderConstraintInspector() {
+  const c = state.constraints.find((x) => x.id === state.selectedConstraintId);
+  const el = document.getElementById("constraintInspector");
+  if (!c) { el.innerHTML = ""; return; }
+  vecTargetKind = "constraint";
+
+  let extra = "";
+  if (c.type === "CONSTRAINT_DISTANCE") {
+    extra = `<div class="row"><label>distance</label><input type="number" step="0.1" value="${c.distance}" oninput="onScalarInput('constraint','${c.id}','distance',this.value)"></div>`;
+  } else if (c.type === "CONSTRAINT_HINGE" || c.type === "CONSTRAINT_PRISMATIC") {
+    extra = vec3Row("axisA", c, "localAxisA") + vec3Row("axisB", c, "localAxisB");
+  } else if (c.type === "CONSTRAINT_ANGULAR_MOTOR" || c.type === "CONSTRAINT_LINEAR_MOTOR") {
+    extra = vec3Row("worldAxis", c, "worldAxis") + `
+      <div class="row"><label><input type="checkbox" ${c.motorEnabled ? "checked" : ""} onchange="updateConstraintField('${c.id}','motorEnabled',this.checked)"> motorEnabled</label></div>
+      <div class="row"><label>velocity</label><input type="number" step="0.1" value="${c.motorVelocity}" oninput="onScalarInput('constraint','${c.id}','motorVelocity',this.value)"></div>
+      <div class="row"><label>maxForce</label><input type="number" step="0.1" value="${c.maxMotorForce}" oninput="onScalarInput('constraint','${c.id}','maxMotorForce',this.value)"></div>`;
+  }
+
+  el.innerHTML = `
+    <select onchange="updateConstraintField('${c.id}','type',this.value)">
+      ${["CONSTRAINT_DISTANCE","CONSTRAINT_POINT","CONSTRAINT_HINGE","CONSTRAINT_PRISMATIC","CONSTRAINT_ANGULAR_MOTOR","CONSTRAINT_LINEAR_MOTOR"]
+        .map((t) => `<option value="${t}" ${c.type === t ? "selected" : ""}>${t}</option>`).join("")}
+    </select>
+    ${vec3Row("anchorA", c, "localAnchorA")}
+    ${vec3Row("anchorB", c, "localAnchorB")}
+    <button onclick="snapAnchors('${c.id}')">snap anchors to surfaces</button>
+    ${extra}
+  `;
+}
+
+function renderConstraintPickers() {
+  const opts = state.bodies.map((b) => `<option value="${b.id}">${b.name}</option>`).join("");
+  document.getElementById("newA").innerHTML = `<option value="">body A</option>${opts}`;
+  document.getElementById("newB").innerHTML = `<option value="">body B</option>${opts}`;
+}
+
+function renderAll() {
+  renderBodyList();
+  renderBodyInspector();
+  renderConstraintList();
+  renderConstraintInspector();
+  renderConstraintPickers();
+  syncScene();
+  if (document.getElementById("exportPanel").classList.contains("open")) {
+    document.getElementById("codeOut").textContent = generateCCode();
+  }
+}
+
+/* ---------------- actions ---------------- */
+function addBody(type) {
+  const n = state.bodies.length + 1;
+  const label = type === "RIGIDBODY_SPHERE" ? "sphere" : type === "RIGIDBODY_CAPSULE" ? "capsule" : "box";
+  const b = makeBody(type, `${label}${n}`);
+  b.position = { x: (n % 4) * 1.5 - 2, y: 3, z: Math.floor(n / 4) * 1.5 };
+  state.bodies.push(b);
+  state.selectedBodyId = b.id;
+  state.selectedConstraintId = null;
+  renderAll();
+}
+function selectBody(id) { state.selectedBodyId = id; state.selectedConstraintId = null; renderAll(); }
+function deleteBody(id) {
+  state.bodies = state.bodies.filter((b) => b.id !== id);
+  state.constraints = state.constraints.filter((c) => c.bodyA !== id && c.bodyB !== id);
+  if (state.selectedBodyId === id) state.selectedBodyId = null;
+  renderAll();
+}
+function updateBodyField(id, path, value) {
+  const b = state.bodies.find((x) => x.id === id);
+  if (!b) return;
+  setNested(b, path, value);
+  renderAll();
+}
+
+function addConstraint() {
+  const type = document.getElementById("newType").value;
+  const a = document.getElementById("newA").value;
+  const b = document.getElementById("newB").value;
+  if (!a || !b || a === b) return;
+  const c = makeConstraint(type, a, b);
+  const bA = state.bodies.find((x) => x.id === a);
+  const bB = state.bodies.find((x) => x.id === b);
+  if (bA && bB) {
+    const { localAnchorA, localAnchorB } = computeClosestAnchors(bA, bB);
+    c.localAnchorA = localAnchorA;
+    c.localAnchorB = localAnchorB;
+  }
+  state.constraints.push(c);
+  state.selectedConstraintId = c.id;
+  state.selectedBodyId = null;
+  renderAll();
+}
+function selectConstraint(id) { state.selectedConstraintId = id; state.selectedBodyId = null; renderAll(); }
+function deleteConstraint(id) {
+  state.constraints = state.constraints.filter((c) => c.id !== id);
+  if (state.selectedConstraintId === id) state.selectedConstraintId = null;
+  renderAll();
+}
+function updateConstraintField(id, path, value) {
+  const c = state.constraints.find((x) => x.id === id);
+  if (!c) return;
+  setNested(c, path, value);
+  renderAll();
+}
+
+/* ---------------- init ---------------- */
+resize();
+renderAll();
+</script>
+</body>
+</html>

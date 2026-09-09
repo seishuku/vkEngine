@@ -42,6 +42,7 @@ set(PROJECT_SOURCES
 	"physics/solver.c"
 	"pipelines/postprocess/bloom.c"
 	"pipelines/composite.c"
+	"pipelines/cube.c"
 	"pipelines/lighting.c"
 	"pipelines/line.c"
 	"pipelines/linegraph.c"

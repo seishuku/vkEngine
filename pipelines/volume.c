@@ -18,7 +18,7 @@ extern uint32_t colorShiftID;
 extern float fTimeStep, fTime;
 
 // Volume rendering vulkan stuff
-Pipeline_t volumePipeline;
+static Pipeline_t volumePipeline;
 //////
 
 // Nebula volume texture generation

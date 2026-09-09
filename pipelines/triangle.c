@@ -9,7 +9,7 @@
 extern VkuContext_t vkContext;
 extern VkRenderPass renderPass;
 
-Pipeline_t trianglePipeline;
+static Pipeline_t trianglePipeline;
 
 bool CreateTrianglePipeline(void)
 {

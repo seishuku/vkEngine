@@ -19,6 +19,7 @@
 #include "physics/particle.h"
 #include "physics/physics.h"
 #include "pipelines/composite.h"
+#include "pipelines/cube.h"
 #include "pipelines/lighting.h"
 #include "pipelines/line.h"
 #include "pipelines/linegraph.h"
@@ -99,13 +100,229 @@ EntityList_t entityList;
 RigidBody_t cubeBody[NUM_CUBE];
 RigidBody_t platformBody;
 
-RigidBody_t chassis;
-RigidBody_t wheels[4];
-RigidBody_t knuckles[2];
+enum
+{
+	BODY_CHASSIS = 0,
+	BODY_FLWHEEL,
+	BODY_FRWHEEL,
+	BODY_RLWHEEL,
+	BODY_RRWHEEL,
+	BODY_FLKNUCKLE,
+	BODY_FRKNUCKLE,
+	BODY_RLKNUCKLE,
+	BODY_RRKNUCKLE,
+	BODY_COUNT
+};
 
-Constraint_t steerHinges[2];
-Constraint_t frontWheelHinges[2];
-Constraint_t rearWheelHinges[2];
+enum
+{
+	JOINT_CHASSIS_FLKNUCKLE = 0,
+	JOINT_FLKNUCKLE_FLWHEEL,
+	JOINT_CHASSIS_FRKNUCKLE,
+	JOINT_FRKNUCKLE_FRWHEEL,
+	JOINT_CHASSIS_RLKNUCKLE,
+	JOINT_CHASSIS_RRKNUCKLE,
+	JOINT_RLKNUCKLE_RLWHEEL,
+	JOINT_RRKNUCKLE_RRWHEEL,
+	JOINT_COUNT
+};
+
+RigidBody_t bodies[BODY_COUNT] =
+{
+	{ /* [BODY_CHASSIS] "Chassis" */
+		.position = { 0.f, 0.f, 0.f },
+		.velocity = { 0.0f, 0.0f, 0.0f },
+		.force = { 0.0f, 0.0f, 0.0f },
+		.mass = 0.6f, .invMass = 1.6667f,
+		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
+		.angularVelocity = { 0.0f, 0.0f, 0.0f },
+		.inertia = 0.2f, .invInertia = 5.f,
+		.restitution = 0.3f,
+		.friction = 0.5f,
+		.type = RIGIDBODY_OBB,
+		.size = { 2.f, 0.5f, 4.f },
+	},
+	{ /* [BODY_FLWHEEL] "FLwheel" */
+		.position = { 3.6f, -0.3f, 3.f },
+		.velocity = { 0.0f, 0.0f, 0.0f },
+		.force = { 0.0f, 0.0f, 0.0f },
+		.mass = 0.05f, .invMass = 20.f,
+		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
+		.angularVelocity = { 0.0f, 0.0f, 0.0f },
+		.inertia = 0.005f, .invInertia = 200.f,
+		.restitution = 0.1f,
+		.friction = 2.f,
+		.type = RIGIDBODY_SPHERE,
+		.radius = 1.2f,
+	},
+	{ /* [BODY_FRWHEEL] "FRwheel" */
+		.position = { -3.6f, -0.3f, 3.f },
+		.velocity = { 0.0f, 0.0f, 0.0f },
+		.force = { 0.0f, 0.0f, 0.0f },
+		.mass = 0.05f, .invMass = 20.f,
+		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
+		.angularVelocity = { 0.0f, 0.0f, 0.0f },
+		.inertia = 0.005f, .invInertia = 200.f,
+		.restitution = 0.1f,
+		.friction = 2.f,
+		.type = RIGIDBODY_SPHERE,
+		.radius = 1.2f,
+	},
+	{ /* [BODY_RLWHEEL] "RLwheel" */
+		.position = { 3.6f, -0.3f, -3.f },
+		.velocity = { 0.0f, 0.0f, 0.0f },
+		.force = { 0.0f, 0.0f, 0.0f },
+		.mass = 0.05f, .invMass = 20.f,
+		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
+		.angularVelocity = { 0.0f, 0.0f, 0.0f },
+		.inertia = 0.005f, .invInertia = 200.f,
+		.restitution = 0.1f,
+		.friction = 2.f,
+		.type = RIGIDBODY_SPHERE,
+		.radius = 1.2f,
+	},
+	{ /* [BODY_RRWHEEL] "RRwheel" */
+		.position = { -3.6f, -0.3f, -3.f },
+		.velocity = { 0.0f, 0.0f, 0.0f },
+		.force = { 0.0f, 0.0f, 0.0f },
+		.mass = 0.05f, .invMass = 20.f,
+		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
+		.angularVelocity = { 0.0f, 0.0f, 0.0f },
+		.inertia = 0.005f, .invInertia = 200.f,
+		.restitution = 0.1f,
+		.friction = 2.f,
+		.type = RIGIDBODY_SPHERE,
+		.radius = 1.2f,
+	},
+	{ /* [BODY_FLKNUCKLE] "FLknuckle" */
+		.position = { 2.2f, -0.3f, 3.f },
+		.velocity = { 0.0f, 0.0f, 0.0f },
+		.force = { 0.0f, 0.0f, 0.0f },
+		.mass = 0.05f, .invMass = 20.f,
+		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
+		.angularVelocity = { 0.0f, 0.0f, 0.0f },
+		.inertia = 0.001f, .invInertia = 1000.f,
+		.restitution = 0.1f,
+		.friction = 0.5f,
+		.type = RIGIDBODY_SPHERE,
+		.radius = 0.2f,
+	},
+	{ /* [BODY_FRKNUCKLE] "FRknuckle" */
+		.position = { -2.2f, -0.3f, 3.f },
+		.velocity = { 0.0f, 0.0f, 0.0f },
+		.force = { 0.0f, 0.0f, 0.0f },
+		.mass = 0.05f, .invMass = 20.f,
+		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
+		.angularVelocity = { 0.0f, 0.0f, 0.0f },
+		.inertia = 0.001f, .invInertia = 1000.f,
+		.restitution = 0.1f,
+		.friction = 0.5f,
+		.type = RIGIDBODY_SPHERE,
+		.radius = 0.2f,
+	},
+	{ /* [BODY_RLKNUCKLE] "RLknuckle" */
+		.position = { 2.2f, -0.3f, -3.f },
+		.velocity = { 0.0f, 0.0f, 0.0f },
+		.force = { 0.0f, 0.0f, 0.0f },
+		.mass = 0.05f, .invMass = 20.f,
+		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
+		.angularVelocity = { 0.0f, 0.0f, 0.0f },
+		.inertia = 0.001f, .invInertia = 1000.f,
+		.restitution = 0.1f,
+		.friction = 0.5f,
+		.type = RIGIDBODY_SPHERE,
+		.radius = 0.2f,
+	},
+	{ /* [BODY_RRKNUCKLE] "RRknuckle" */
+		.position = { -2.2f, -0.3f, -3.f },
+		.velocity = { 0.0f, 0.0f, 0.0f },
+		.force = { 0.0f, 0.0f, 0.0f },
+		.mass = 0.05f, .invMass = 20.f,
+		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
+		.angularVelocity = { 0.0f, 0.0f, 0.0f },
+		.inertia = 0.001f, .invInertia = 1000.f,
+		.restitution = 0.1f,
+		.friction = 0.5f,
+		.type = RIGIDBODY_SPHERE,
+		.radius = 0.2f,
+	},
+};
+
+Constraint_t assembly[JOINT_COUNT] =
+{
+	{ /* JOINT_CHASSIS_FLKNUCKLE */
+		.type = CONSTRAINT_HINGE,
+		.bodyA = &bodies[BODY_CHASSIS],  /* "Chassis" */
+		.bodyB = &bodies[BODY_FLKNUCKLE],  /* "FLknuckle" */
+		.localAnchorA = { 2.f, -0.3f, 3.f },
+		.localAnchorB = { -0.2f, 0.f, 0.f },
+		.localAxisA = { 0.f, 1.f, 0.f },
+		.localAxisB = { 0.f, 1.f, 0.f },
+	},
+	{ /* JOINT_FLKNUCKLE_FLWHEEL */
+		.type = CONSTRAINT_HINGE,
+		.bodyA = &bodies[BODY_FLKNUCKLE],  /* "FLknuckle" */
+		.bodyB = &bodies[BODY_FLWHEEL],  /* "FLwheel" */
+		.localAnchorA = { 0.2f, 0.f, 0.f },
+		.localAnchorB = { -1.2f, 0.f, 0.f },
+		.localAxisA = { 1.f, 0.f, 0.f },
+		.localAxisB = { 1.f, 0.f, 0.f },
+	},
+	{ /* JOINT_CHASSIS_FRKNUCKLE */
+		.type = CONSTRAINT_HINGE,
+		.bodyA = &bodies[BODY_CHASSIS],  /* "Chassis" */
+		.bodyB = &bodies[BODY_FRKNUCKLE],  /* "FRknuckle" */
+		.localAnchorA = { -2.f, -0.3f, 3.f },
+		.localAnchorB = { 0.2f, 0.f, 0.f },
+		.localAxisA = { 0.f, 1.f, 0.f },
+		.localAxisB = { 0.f, 1.f, 0.f },
+	},
+	{ /* JOINT_FRKNUCKLE_FRWHEEL */
+		.type = CONSTRAINT_HINGE,
+		.bodyA = &bodies[BODY_FRKNUCKLE],  /* "FRknuckle" */
+		.bodyB = &bodies[BODY_FRWHEEL],  /* "FRwheel" */
+		.localAnchorA = { -0.2f, 0.f, 0.f },
+		.localAnchorB = { 1.2f, 0.f, 0.f },
+		.localAxisA = { 1.f, 0.f, 0.f },
+		.localAxisB = { 1.f, 0.f, 0.f },
+	},
+	{ /* JOINT_CHASSIS_RLKNUCKLE */
+		.type = CONSTRAINT_HINGE,
+		.bodyA = &bodies[BODY_CHASSIS],  /* "Chassis" */
+		.bodyB = &bodies[BODY_RLKNUCKLE],  /* "RLknuckle" */
+		.localAnchorA = { 2.f, -0.3f, -3.f },
+		.localAnchorB = { -0.2f, 0.f, 0.f },
+		.localAxisA = { 1.f, 0.f, 0.f },
+		.localAxisB = { 1.f, 0.f, 0.f },
+	},
+	{ /* JOINT_CHASSIS_RRKNUCKLE */
+		.type = CONSTRAINT_HINGE,
+		.bodyA = &bodies[BODY_CHASSIS],  /* "Chassis" */
+		.bodyB = &bodies[BODY_RRKNUCKLE],  /* "RRknuckle" */
+		.localAnchorA = { -2.f, -0.3f, -3.f },
+		.localAnchorB = { 0.2f, 0.f, 0.f },
+		.localAxisA = { 1.f, 0.f, 0.f },
+		.localAxisB = { 1.f, 0.f, 0.f },
+	},
+	{ /* JOINT_RLKNUCKLE_RLWHEEL */
+		.type = CONSTRAINT_HINGE,
+		.bodyA = &bodies[BODY_RLKNUCKLE],  /* "RLknuckle" */
+		.bodyB = &bodies[BODY_RLWHEEL],  /* "RLwheel" */
+		.localAnchorA = { 0.2f, 0.f, 0.f },
+		.localAnchorB = { -1.2f, 0.f, 0.f },
+		.localAxisA = { 1.f, 0.f, 0.f },
+		.localAxisB = { 1.f, 0.f, 0.f },
+	},
+	{ /* JOINT_RRKNUCKLE_RRWHEEL */
+		.type = CONSTRAINT_HINGE,
+		.bodyA = &bodies[BODY_RRKNUCKLE],  /* "RRknuckle" */
+		.bodyB = &bodies[BODY_RRWHEEL],  /* "RRwheel" */
+		.localAnchorA = { -0.2f, 0.f, 0.f },
+		.localAnchorB = { 1.2f, 0.f, 0.f },
+		.localAxisA = { 1.f, 0.f, 0.f },
+		.localAxisB = { 1.f, 0.f, 0.f },
+	},
+};
 
 // Thread stuff
 typedef struct
@@ -423,96 +640,6 @@ void GenerateWorld(void)
 
 		ResetPhysicsCubes();
 		ResetAsteroids();
-
-		vec3 chassisMounts[4]=
-		{
-			Vec3(-1.5f, -0.2f, 3.5f),  // 0: Front-Left
-			Vec3(1.5f, -0.2f, 3.5f),   // 1: Front-Right
-			Vec3(-1.5f, -0.2f, -3.5f), // 2: Rear-Left
-			Vec3(1.5f, -0.2f, -3.5f)   // 3: Rear-Right
-		};
-
-		float wheelOffsetOffsetX[4]={ -1.0f, 1.0f, -1.0f, 1.0f};
-
-		chassis=(RigidBody_t)
-		{
-		    .position=Vec3(0.0f, -45.0f, 0.0f),
-		    .mass=0.6f,
-		    .invMass=1.0f/0.6f,
-		    .orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
-		    .inertia=0.25f,
-		    .invInertia=1.0f / 0.25f,
-		    .restitution=0.1f,
-		    .friction=0.5f,
-		    .type=RIGIDBODY_OBB,
-		    .size=Vec3(1.2f, 0.3f, 4.0f)};
-
-		for(uint32_t i=0;i<4;i++)
-		{
-			wheels[i]=(RigidBody_t)
-			{
-			    .position=Vec3_Addv(chassis.position, Vec3_Addv(chassisMounts[i], Vec3(wheelOffsetOffsetX[i], 0.0f, 0.0f))),
-			    .mass=0.05f,
-			    .invMass=1.0f/0.05f,
-			    .orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
-			    .inertia=0.005f,
-			    .invInertia=1.0f/0.005f,
-			    .restitution=0.1f,
-			    .friction=2.0f,
-			    .type=RIGIDBODY_SPHERE,
-			    .radius=0.8f};
-		}
-
-		for(uint32_t i=0;i<2;i++)
-		{
-			knuckles[i]=(RigidBody_t)
-			{
-			    .position=Vec3_Addv(chassis.position, chassisMounts[i]),
-			    .mass=0.05f,
-			    .invMass=1.0f/0.05f,
-			    .orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
-			    .inertia=0.01f,
-			    .invInertia=1.0f/0.01f,
-			    .restitution=0.1f,
-			    .friction=0.5f,
-			    .type=RIGIDBODY_OBB,
-			    .size=Vec3(0.2f, 0.2f, 0.2f)};
-
-			steerHinges[i]=(Constraint_t)
-			{
-				.type=CONSTRAINT_HINGE,
-			    .bodyA=&chassis,
-			    .bodyB=&knuckles[i],
-			    .localAnchorA=chassisMounts[i],
-			    .localAnchorB=Vec3(0.0f, 0.0f, 0.0f),
-			    .localAxisA=Vec3(0.0f, 1.0f, 0.0f),
-			    .localAxisB=Vec3(0.0f, 1.0f, 0.0f)};
-		}
-
-		for(uint32_t i=0;i<2;i++)
-		{
-			frontWheelHinges[i]=(Constraint_t)
-			{
-				.type=CONSTRAINT_HINGE,
-			    .bodyA=&knuckles[i],
-			    .bodyB=&wheels[i],
-			    .localAnchorA=Vec3(wheelOffsetOffsetX[i], 0.0f, 0.0f),
-			    .localAnchorB=Vec3(0.0f, 0.0f, 0.0f),
-			    .localAxisA=Vec3(1.0f, 0.0f, 0.0f),
-			    .localAxisB=Vec3(1.0f, 0.0f, 0.0f)
-			};
-
-			rearWheelHinges[i]=(Constraint_t)
-			{
-				.type=CONSTRAINT_HINGE,
-			    .bodyA=&chassis,
-			    .bodyB=&wheels[i+2],
-			    .localAnchorA=chassisMounts[i+2],
-			    .localAnchorB=Vec3(-wheelOffsetOffsetX[i+2], 0.0f, 0.0f),
-			    .localAxisA=Vec3(1.0f, 0.0f, 0.0f),
-			    .localAxisB=Vec3(1.0f, 0.0f, 0.0f)
-			};
-		}
 	}
 
 	playerHealth=100.0f;
@@ -535,13 +662,15 @@ void GenerateWorld(void)
 
 	if(!ClientNetwork_IsConnected())
 	{
-		EntityList_Add(&entityList, &chassis, true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
-		EntityList_Add(&entityList, &wheels[0], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
-		EntityList_Add(&entityList, &wheels[1], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
-		EntityList_Add(&entityList, &wheels[2], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
-		EntityList_Add(&entityList, &wheels[3], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
-		EntityList_Add(&entityList, &knuckles[0], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
-		EntityList_Add(&entityList, &knuckles[1], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
+		for(uint32_t i=0;i<sizeof(bodies)/sizeof(RigidBody_t);i++)
+		{
+			if(bodies[i].type==RIGIDBODY_OBB)
+				EntityList_Add(&entityList, &bodies[i], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
+			else if(bodies[i].type==RIGIDBODY_SPHERE)
+				EntityList_Add(&entityList, &bodies[i], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
+			else if(bodies[i].type==RIGIDBODY_CAPSULE)
+				EntityList_Add(&entityList, &bodies[i], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
+		}
 
 		for(uint32_t i=0;i<NUM_ENEMY;i++)
 			EntityList_Add(&entityList, &enemy[i].body, false, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[i]+0), TEXTURE_FIGHTER1+(2*fighterTexture[i]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
@@ -916,6 +1045,7 @@ void Thread_Main(void *arg)
 	// BVH_DrawDebug(&bvh, data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye);
 
 	{
+#if 0
 		struct
 		{
 			matrix mvp;
@@ -965,6 +1095,67 @@ void Thread_Main(void *arg)
 			spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
 			DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
+		}
+#endif
+		for(uint32_t i=0;i<sizeof(bodies)/sizeof(RigidBody_t);i++)
+		{
+			if(bodies[i].type==RIGIDBODY_OBB)
+			{
+				struct
+				{
+					matrix mvp;
+					vec4 color;
+				} cubePC;
+
+				cubePC.color=Vec4(1.0f, 1.0f, 1.0f, 0.0f);
+
+				matrix local=MatrixScalev(Vec3_Muls(bodies[i].size, 2.0f));
+				local=MatrixMult(local, QuatToMatrix(bodies[i].orientation));
+				local=MatrixMult(local, MatrixTranslatev(bodies[i].position));
+				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
+				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+				cubePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
+
+				DrawCubePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(cubePC), &cubePC);
+			}
+			else if(bodies[i].type==RIGIDBODY_SPHERE)
+			{
+				struct
+				{
+					matrix mvp;
+					vec4 color;
+				} spherePC;
+
+				spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 0.0f);
+
+				matrix local=MatrixScale(bodies[i].radius, bodies[i].radius, bodies[i].radius);
+				local=MatrixMult(local, QuatToMatrix(bodies[i].orientation));
+				local=MatrixMult(local, MatrixTranslatev(bodies[i].position));
+				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
+				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+				spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
+
+				DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
+			}
+			else if(bodies[i].type==RIGIDBODY_CAPSULE)
+			{
+				struct
+				{
+					matrix mvp;
+					vec4 color;
+				} spherePC;
+
+				spherePC.color=Vec4(1.0f, 1.0f, 1.0f, bodies[i].radiusHeight.y);
+
+				matrix local=MatrixScale(bodies[i].radiusHeight.x, bodies[i].radiusHeight.x, bodies[i].radiusHeight.x);
+				local=MatrixMult(local, QuatToMatrix(bodies[i].orientation));
+				local=MatrixMult(local, MatrixTranslatev(bodies[i].position));
+				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
+				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+				spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
+
+				DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
+			}
 		}
 	}
 
@@ -1157,60 +1348,60 @@ void Thread_Physics(void *arg)
 		{
 			for(uint32_t iteration=0;iteration<8;iteration++)
 			{
+				for(uint32_t i=0;i<sizeof(assembly)/sizeof(assembly[0]);i++)
+					PhysicsSolveConstraint(&assembly[i], fTimeStep);
+			}
+
+#if 1
+			{
+				vec3 dirToCamWorld=Vec3_Subv(camera.body.position, bodies[BODY_CHASSIS].position);
+				vec3 dirToCamLocal=QuatRotate(QuatInverse(bodies[BODY_CHASSIS].orientation), dirToCamWorld);
+
+				float targetSteerAngle=clampf(atan2f(dirToCamLocal.x, dirToCamLocal.z), -0.6f, 0.6f);
+				vec3 steerAxisWorld=QuatRotate(bodies[BODY_CHASSIS].orientation, Vec3(0.0f, 1.0f, 0.0f));
+
 				for(uint32_t i=0;i<2;i++)
 				{
-					PhysicsSolveConstraint(&steerHinges[i], fTimeStep);
-					PhysicsSolveConstraint(&frontWheelHinges[i], fTimeStep);
-					PhysicsSolveConstraint(&rearWheelHinges[i], fTimeStep);
+					vec3 knuckleForwardLocal=QuatRotate(QuatInverse(bodies[BODY_CHASSIS].orientation), QuatRotate(bodies[BODY_FLKNUCKLE+i].orientation, Vec3(0.0f, 0.0f, 1.0f)));
+					float currentSteerAngle=atan2f(knuckleForwardLocal.x, knuckleForwardLocal.z);
+
+					float angleError=targetSteerAngle-currentSteerAngle;
+					float steerSpeed=angleError*12.0f;
+					float maxSteerTorque=2.0f;
+
+					Constraint_t steerMotor=
+					{
+						.type=CONSTRAINT_ANGULAR_MOTOR,
+						.bodyA=&bodies[BODY_CHASSIS],		// chassis
+						.bodyB=&bodies[BODY_FLKNUCKLE+i],	// knuckles
+						.worldAxis=steerAxisWorld,
+						.motorEnabled=true,
+						.motorVelocity=steerSpeed,
+						.maxMotorForce=maxSteerTorque
+					};
+					PhysicsSolveConstraint(&steerMotor, fTimeStep);
+				}
+
+				float driveThrottle=10.0f;
+				float maxDriveTorque=5.0f;
+
+				for(uint32_t i=0;i<2;i++)
+				{
+					vec3 driveAxis=QuatRotate(bodies[BODY_CHASSIS].orientation, assembly[JOINT_RLKNUCKLE_RLWHEEL+i].localAxisA);
+					Constraint_t driveMotor=
+					{
+						.type=CONSTRAINT_ANGULAR_MOTOR,
+						.bodyA=&bodies[BODY_CHASSIS],		// chassis
+						.bodyB=&bodies[BODY_RLWHEEL+i],	// rear wheels
+						.worldAxis=driveAxis,
+						.motorEnabled=true,
+						.motorVelocity=driveThrottle,
+						.maxMotorForce=maxDriveTorque
+					};
+					PhysicsSolveConstraint(&driveMotor, fTimeStep);
 				}
 			}
-
-			vec3 dirToCamWorld=Vec3_Subv(camera.body.position, chassis.position);
-			vec3 dirToCamLocal=QuatRotate(QuatInverse(chassis.orientation), dirToCamWorld);
-
-			float targetSteerAngle=clampf(atan2f(dirToCamLocal.x, dirToCamLocal.z), -0.6f, 0.6f);
-			vec3 steerAxisWorld=QuatRotate(chassis.orientation, Vec3(0.0f, 1.0f, 0.0f));
-
-			for(uint32_t i=0;i<2;i++)
-			{
-				vec3 knuckleForwardLocal=QuatRotate(QuatInverse(chassis.orientation), QuatRotate(knuckles[i].orientation, Vec3(0.0f, 0.0f, 1.0f)));
-				float currentSteerAngle=atan2f(knuckleForwardLocal.x, knuckleForwardLocal.z);
-
-				float angleError=targetSteerAngle-currentSteerAngle;
-				float steerSpeed=angleError*12.0f;
-				float maxSteerTorque=2.0f;
-
-				Constraint_t steerMotor=
-				{
-					.type=CONSTRAINT_ANGULAR_MOTOR,
-					.bodyA=&chassis,
-					.bodyB=&knuckles[i],
-					.worldAxis=steerAxisWorld,
-					.motorEnabled=true,
-					.motorVelocity=steerSpeed,
-					.maxMotorForce=maxSteerTorque
-				};
-				PhysicsSolveConstraint(&steerMotor, fTimeStep);
-			}
-
-			float driveThrottle=10.0f;
-			float maxDriveTorque=5.0f;
-
-			for(uint32_t i=0;i<2;i++)
-			{
-				vec3 driveAxis=QuatRotate(chassis.orientation, rearWheelHinges[i].localAxisA);
-				Constraint_t driveMotor=
-				{
-					.type=CONSTRAINT_ANGULAR_MOTOR,
-					.bodyA=&chassis,
-					.bodyB=&wheels[i+2],
-					.worldAxis=driveAxis,
-					.motorEnabled=true,
-					.motorVelocity=driveThrottle,
-					.maxMotorForce=maxDriveTorque
-				};
-				PhysicsSolveConstraint(&driveMotor, fTimeStep);
-			}
+#endif
 
 			// Run particle system simlation
 			ParticleSystem_Step(&particleSystem, fTimeStep);
@@ -1933,7 +2124,7 @@ bool Init(void)
 
 	vkuMemAllocator_Init(&vkContext);
 
-	LoadingScreenInit(&loadingScreen, NUM_ASSETS+11);
+	LoadingScreenInit(&loadingScreen, NUM_ASSETS+12);
 
 	//const uint32_t seed=time(NULL);
 	const uint32_t seed=69420;
@@ -1985,6 +2176,8 @@ bool Init(void)
 	CreateLinePipeline();
 	LoadingScreenAdvance(&loadingScreen);
 	CreateTrianglePipeline();
+	LoadingScreenAdvance(&loadingScreen);
+	CreateCubePipeline();
 	LoadingScreenAdvance(&loadingScreen);
 
 	// Create volumetric rendering pipeline
@@ -2459,6 +2652,7 @@ void Destroy(void)
 	DestroyLine();
 	DestroySphere();
 	DestroyTriangle();
+	DestroyCube();
 	//////////
 
 	// UI destruction

@@ -32,9 +32,9 @@ typedef struct RigidBody_s
 	RigidBodyType_e type;	// OBB, sphere, capsule
 	union
 	{
-		float radius;
-		vec3 size;				
-		vec2 radiusHeight;
+		float radius;		// Sphere radius
+		vec3 size;			// OBB half size
+		vec2 radiusHeight;	// Capsule radius and half height
 	}; // Type dimensions
 } RigidBody_t;
 

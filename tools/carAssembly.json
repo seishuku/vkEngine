@@ -1,0 +1,556 @@
+{
+  "bodies": [
+    {
+      "id": "id1",
+      "name": "Chassis",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 2,
+        "y": 0.5,
+        "z": 4
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.6,
+      "inertia": 0.2,
+      "isStatic": false,
+      "restitution": 0.3,
+      "friction": 0.5
+    },
+    {
+      "id": "id3",
+      "name": "FLwheel",
+      "type": "RIGIDBODY_SPHERE",
+      "position": {
+        "x": 3.6,
+        "y": -0.3,
+        "z": 3
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 0.5,
+        "y": 0.5,
+        "z": 0.5
+      },
+      "radius": 1.2,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.05,
+      "inertia": 0.005,
+      "isStatic": false,
+      "restitution": 0.1,
+      "friction": 2
+    },
+    {
+      "id": "id4",
+      "name": "FRwheel",
+      "type": "RIGIDBODY_SPHERE",
+      "position": {
+        "x": -3.6,
+        "y": -0.3,
+        "z": 3
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 0.5,
+        "y": 0.5,
+        "z": 0.5
+      },
+      "radius": 1.2,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.05,
+      "inertia": 0.005,
+      "isStatic": false,
+      "restitution": 0.1,
+      "friction": 2
+    },
+    {
+      "id": "id5",
+      "name": "RLwheel",
+      "type": "RIGIDBODY_SPHERE",
+      "position": {
+        "x": 3.6,
+        "y": -0.3,
+        "z": -3
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 0.5,
+        "y": 0.5,
+        "z": 0.5
+      },
+      "radius": 1.2,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.05,
+      "inertia": 0.005,
+      "isStatic": false,
+      "restitution": 0.1,
+      "friction": 2
+    },
+    {
+      "id": "id6",
+      "name": "RRwheel",
+      "type": "RIGIDBODY_SPHERE",
+      "position": {
+        "x": -3.6,
+        "y": -0.3,
+        "z": -3
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 0.5,
+        "y": 0.5,
+        "z": 0.5
+      },
+      "radius": 1.2,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.05,
+      "inertia": 0.005,
+      "isStatic": false,
+      "restitution": 0.1,
+      "friction": 2
+    },
+    {
+      "id": "id7",
+      "name": "FLknuckle",
+      "type": "RIGIDBODY_SPHERE",
+      "position": {
+        "x": 2.2,
+        "y": -0.3,
+        "z": 3
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 0.5,
+        "y": 0.5,
+        "z": 0.5
+      },
+      "radius": 0.2,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.05,
+      "inertia": 0.001,
+      "isStatic": false,
+      "restitution": 0.1,
+      "friction": 0.5
+    },
+    {
+      "id": "id8",
+      "name": "FRknuckle",
+      "type": "RIGIDBODY_SPHERE",
+      "position": {
+        "x": -2.2,
+        "y": -0.3,
+        "z": 3
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 0.5,
+        "y": 0.5,
+        "z": 0.5
+      },
+      "radius": 0.2,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.05,
+      "inertia": 0.001,
+      "isStatic": false,
+      "restitution": 0.1,
+      "friction": 0.5
+    },
+    {
+      "id": "id23",
+      "name": "RLknuckle",
+      "type": "RIGIDBODY_SPHERE",
+      "position": {
+        "x": 2.2,
+        "y": -0.3,
+        "z": -3
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 0.5,
+        "y": 0.5,
+        "z": 0.5
+      },
+      "radius": 0.2,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.05,
+      "inertia": 0.001,
+      "isStatic": false,
+      "restitution": 0.1,
+      "friction": 0.5
+    },
+    {
+      "id": "id24",
+      "name": "RRknuckle",
+      "type": "RIGIDBODY_SPHERE",
+      "position": {
+        "x": -2.2,
+        "y": -0.3,
+        "z": -3
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 0.5,
+        "y": 0.5,
+        "z": 0.5
+      },
+      "radius": 0.2,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.05,
+      "inertia": 0.001,
+      "isStatic": false,
+      "restitution": 0.1,
+      "friction": 0.5
+    }
+  ],
+  "constraints": [
+    {
+      "id": "id11",
+      "type": "CONSTRAINT_HINGE",
+      "bodyA": "id1",
+      "bodyB": "id7",
+      "localAnchorA": {
+        "x": 2,
+        "y": -0.3,
+        "z": 3
+      },
+      "localAnchorB": {
+        "x": -0.2,
+        "y": 0,
+        "z": 0
+      },
+      "distance": 1,
+      "localAxisA": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "localAxisB": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "worldAxis": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "motorEnabled": true,
+      "motorVelocity": 1,
+      "maxMotorForce": 10
+    },
+    {
+      "id": "id12",
+      "type": "CONSTRAINT_HINGE",
+      "bodyA": "id7",
+      "bodyB": "id3",
+      "localAnchorA": {
+        "x": 0.2,
+        "y": 0,
+        "z": 0
+      },
+      "localAnchorB": {
+        "x": -1.2,
+        "y": 0,
+        "z": 0
+      },
+      "distance": 1,
+      "localAxisA": {
+        "x": 1,
+        "y": 0,
+        "z": 0
+      },
+      "localAxisB": {
+        "x": 1,
+        "y": 0,
+        "z": 0
+      },
+      "worldAxis": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "motorEnabled": true,
+      "motorVelocity": 1,
+      "maxMotorForce": 10
+    },
+    {
+      "id": "id13",
+      "type": "CONSTRAINT_HINGE",
+      "bodyA": "id1",
+      "bodyB": "id8",
+      "localAnchorA": {
+        "x": -2,
+        "y": -0.3,
+        "z": 3
+      },
+      "localAnchorB": {
+        "x": 0.2,
+        "y": 0,
+        "z": 0
+      },
+      "distance": 1,
+      "localAxisA": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "localAxisB": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "worldAxis": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "motorEnabled": true,
+      "motorVelocity": 1,
+      "maxMotorForce": 10
+    },
+    {
+      "id": "id14",
+      "type": "CONSTRAINT_HINGE",
+      "bodyA": "id8",
+      "bodyB": "id4",
+      "localAnchorA": {
+        "x": -0.2,
+        "y": 0,
+        "z": 0
+      },
+      "localAnchorB": {
+        "x": 1.2,
+        "y": 0,
+        "z": 0
+      },
+      "distance": 1,
+      "localAxisA": {
+        "x": 1,
+        "y": 0,
+        "z": 0
+      },
+      "localAxisB": {
+        "x": 1,
+        "y": 0,
+        "z": 0
+      },
+      "worldAxis": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "motorEnabled": true,
+      "motorVelocity": 1,
+      "maxMotorForce": 10
+    },
+    {
+      "id": "id25",
+      "type": "CONSTRAINT_HINGE",
+      "bodyA": "id1",
+      "bodyB": "id23",
+      "localAnchorA": {
+        "x": 2,
+        "y": -0.3,
+        "z": -3
+      },
+      "localAnchorB": {
+        "x": -0.2,
+        "y": 0,
+        "z": 0
+      },
+      "distance": 1,
+      "localAxisA": {
+        "x": 1,
+        "y": 0,
+        "z": 0
+      },
+      "localAxisB": {
+        "x": 1,
+        "y": 0,
+        "z": 0
+      },
+      "worldAxis": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "motorEnabled": true,
+      "motorVelocity": 1,
+      "maxMotorForce": 10
+    },
+    {
+      "id": "id26",
+      "type": "CONSTRAINT_HINGE",
+      "bodyA": "id1",
+      "bodyB": "id24",
+      "localAnchorA": {
+        "x": -2,
+        "y": -0.3,
+        "z": -3
+      },
+      "localAnchorB": {
+        "x": 0.2,
+        "y": 0,
+        "z": 0
+      },
+      "distance": 1,
+      "localAxisA": {
+        "x": 1,
+        "y": 0,
+        "z": 0
+      },
+      "localAxisB": {
+        "x": 1,
+        "y": 0,
+        "z": 0
+      },
+      "worldAxis": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "motorEnabled": true,
+      "motorVelocity": 1,
+      "maxMotorForce": 10
+    },
+    {
+      "id": "id27",
+      "type": "CONSTRAINT_HINGE",
+      "bodyA": "id23",
+      "bodyB": "id5",
+      "localAnchorA": {
+        "x": 0.2,
+        "y": 0,
+        "z": 0
+      },
+      "localAnchorB": {
+        "x": -1.2,
+        "y": 0,
+        "z": 0
+      },
+      "distance": 1,
+      "localAxisA": {
+        "x": 1,
+        "y": 0,
+        "z": 0
+      },
+      "localAxisB": {
+        "x": 1,
+        "y": 0,
+        "z": 0
+      },
+      "worldAxis": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "motorEnabled": true,
+      "motorVelocity": 1,
+      "maxMotorForce": 10
+    },
+    {
+      "id": "id28",
+      "type": "CONSTRAINT_HINGE",
+      "bodyA": "id24",
+      "bodyB": "id6",
+      "localAnchorA": {
+        "x": -0.2,
+        "y": 0,
+        "z": 0
+      },
+      "localAnchorB": {
+        "x": 1.2,
+        "y": 0,
+        "z": 0
+      },
+      "distance": 1,
+      "localAxisA": {
+        "x": 1,
+        "y": 0,
+        "z": 0
+      },
+      "localAxisB": {
+        "x": 1,
+        "y": 0,
+        "z": 0
+      },
+      "worldAxis": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "motorEnabled": true,
+      "motorVelocity": 1,
+      "maxMotorForce": 10
+    }
+  ]
+}
