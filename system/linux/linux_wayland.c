@@ -406,8 +406,13 @@ int main(int argc, char** argv)
     wl_surface_commit(vkContext.wlSurface);
     wl_display_roundtrip(vkContext.wlDisplay);
 
-	struct zwp_locked_pointer_v1 *lockedPointer=zwp_pointer_constraints_v1_lock_pointer(pointerConstraints, vkContext.wlSurface, pointer, NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-	zwp_locked_pointer_v1_add_listener(lockedPointer, &lockedPointerListener, NULL);
+	if(pointer!=NULL&&pointerConstraints!=NULL) 
+    {
+        struct zwp_locked_pointer_v1 *lockedPointer=zwp_pointer_constraints_v1_lock_pointer(pointerConstraints, vkContext.wlSurface, pointer, NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+        zwp_locked_pointer_v1_add_listener(lockedPointer, &lockedPointerListener, NULL);
+    }
+    else 
+        DBGPRINTF(DEBUG_WARNING, "No pointer available or constraints unsupported.\n");
 
 	XruExtensionRequirements_t extensionRequirements;
 
