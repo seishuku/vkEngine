@@ -1346,10 +1346,11 @@ void Thread_Physics(void *arg)
 	{
 		if(!pausePhysics)
 		{
-			for(uint32_t iteration=0;iteration<8;iteration++)
+			const uint32_t constraintIterations=8;
+			for(uint32_t iteration=0;iteration<constraintIterations;iteration++)
 			{
 				for(uint32_t i=0;i<sizeof(assembly)/sizeof(assembly[0]);i++)
-					PhysicsSolveConstraint(&assembly[i], fTimeStep);
+					PhysicsSolveConstraint(&assembly[i], fTimeStep/constraintIterations);
 			}
 
 #if 1
@@ -1628,6 +1629,9 @@ void Thread_Physics(void *arg)
 				for(uint32_t j=0;j<manifold->contactCount;j++)
 					PhysicsPositionCorrection(manifold->a, manifold->b, manifold->contacts[j]);
 			}
+
+			for(uint32_t i=0;i<sizeof(assembly)/sizeof(assembly[0]);i++)
+				PhysicsSolvePositionConstraint(&assembly[i]);
 
 			PhysicsRecorder_EndFrame();
 		}

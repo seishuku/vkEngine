@@ -119,5 +119,6 @@ typedef struct
 } Constraint_t;
 
 void PhysicsSolveConstraint(Constraint_t *constraint, const float dt);
+void PhysicsSolvePositionConstraint(Constraint_t *constraint);
 
 #endif
