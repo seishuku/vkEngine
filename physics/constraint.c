@@ -376,6 +376,9 @@ static void SolvePrismaticPosition(RigidBody_t *bodyA, RigidBody_t *bodyB, const
 
 void PhysicsSolveConstraint(Constraint_t *constraint, const float dt)
 {
+	if(dt<=0.0f)
+		return;
+
 	switch(constraint->type)
 	{
 		case CONSTRAINT_DISTANCE:
