@@ -30,6 +30,23 @@ typedef struct
 
 typedef struct
 {
+	char name[256];
+	int32_t parent;
+	vec3 position;
+	vec4 orientation;
+
+	matrix inverseBind;
+	matrix skinnedMatrix;
+} BModel_Bone_t;
+
+typedef struct
+{
+	uint32_t bone[4];
+	float weight[4];
+} BModel_VertexWeight_t;
+
+typedef struct
+{
 	uint32_t numMesh;
 	BModel_Mesh_t *mesh;
 
@@ -42,8 +59,14 @@ typedef struct
 	float *tangent;
 	float *binormal;
 	float *normal;
+	BModel_VertexWeight_t *weight;
 
 	VkuBuffer_t vertexBuffer;
+
+	uint32_t numBone;
+	BModel_Bone_t *bone;
+
+	VkuBuffer_t boneBuffer;
 
 	vec3 bBoxMin;
 	vec3 bBoxMax;

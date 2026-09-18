@@ -13,7 +13,7 @@ pipeline {
 	depthBiasConstantFactor(0.001)
 	depthBiasSlopeFactor(1.75)
 
-	addVertexBinding(0, 80, perVertex)
+	addVertexBinding(0, 112, perVertex)
 	addVertexAttribute(0, 0, rgba32_sfloat, 0)
 
 	addVertexBinding(1, 64, perInstance)

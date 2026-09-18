@@ -16,7 +16,7 @@ pipeline {
 	depthCompareOp(greaterOrEqual)
 	rasterizationSamples(4)
 
-	addVertexBinding(0, 80, perVertex)
+	addVertexBinding(0, 112, perVertex)
 	addVertexAttribute(0, 0, rgba32_sfloat, 0)
 	addVertexAttribute(1, 0, rgba32_sfloat, 16)
 	addVertexAttribute(2, 0, rgba32_sfloat, 32)

@@ -17,6 +17,8 @@ const uint32_t TEXC_MAGIC='T'|'E'<<8|'X'<<16|'C'<<24;
 const uint32_t TANG_MAGIC='T'|'A'<<8|'N'<<16|'G'<<24;
 const uint32_t BNRM_MAGIC='B'|'N'<<8|'R'<<16|'M'<<24;
 const uint32_t NORM_MAGIC='N'|'O'<<8|'R'<<16|'M'<<24;
+const uint32_t BONE_MAGIC='B'|'O'<<8|'N'<<16|'E'<<24;
+const uint32_t BWGT_MAGIC='B'|'W'<<8|'G'<<16|'T'<<24;
 
 static void CalculateTangent(BModel_t *model)
 {
@@ -364,13 +366,67 @@ bool LoadBModel(BModel_t *model, const char *filename)
 					}
 					break;
 
+				case BONE_MAGIC:
+					fread(&model->numBone, sizeof(uint32_t), 1, fp);
+
+					if(model->numBone)
+					{
+						model->bone=(BModel_Bone_t *)Zone_Malloc(zone, sizeof(BModel_Bone_t)*model->numBone);
+
+						if(model->bone==NULL)
+							return false;
+
+						memset(model->bone, 0, sizeof(BModel_Bone_t)*model->numBone);
+
+						for(uint32_t i=0;i<model->numBone;i++)
+						{
+							ReadString(model->bone[i].name, 256, fp);
+							fread(&model->bone[i].parent, sizeof(int32_t), 1, fp);
+							fread(&model->bone[i].position, sizeof(float), 3, fp);
+							fread(&model->bone[i].orientation, sizeof(float), 4, fp);
+						}
+					}
+					break;
+
+				case BWGT_MAGIC:
+					if(model->numVertex)
+					{
+						model->weight=(BModel_VertexWeight_t *)Zone_Malloc(zone, sizeof(BModel_VertexWeight_t)*model->numVertex);
+
+						if(model->weight==NULL)
+							return false;
+
+						if(fread(model->weight, sizeof(BModel_VertexWeight_t), model->numVertex, fp)!=model->numVertex)
+						{
+							Zone_Free(zone, model->weight);
+							model->weight=NULL;
+						}
+					}
+					break;
+
 				default:
 					break;
 			}
 		}
 	}
 
-	CalculateTangent(model);
+	// If the model didn't contain tangent space data, calculate it.
+	if(model->UV && (!model->tangent || !model->binormal || !model->normal))
+		CalculateTangent(model);
+
+	// Build bind-pose and inverse matrices.
+	for(uint32_t i=0;i<model->numBone;i++)
+	{
+		matrix local=MatrixMult(QuatToMatrix(model->bone[i].orientation), MatrixTranslatev(model->bone[i].position));
+
+		if(model->bone[i].parent>=0&&(uint32_t)model->bone[i].parent<model->numBone)
+			model->bone[i].skinnedMatrix=MatrixMult(local, model->bone[model->bone[i].parent].skinnedMatrix);
+		else
+			model->bone[i].skinnedMatrix=local;
+
+		model->bone[i].inverseBind=MatrixInverse(model->bone[i].skinnedMatrix);
+		model->bone[i].skinnedMatrix=MatrixIdentity();
+	}
 
 	CalculateBounds(model);
 
@@ -400,6 +456,8 @@ void FreeBModel(BModel_t *model)
 	Zone_Free(zone, model->normal);
 	Zone_Free(zone, model->tangent);
 	Zone_Free(zone, model->binormal);
+	Zone_Free(zone, model->bone);
+	Zone_Free(zone, model->weight);
 
 	if(model->numMesh)
 	{
@@ -419,10 +477,10 @@ void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 	VkuBuffer_t stagingBuffer;
 
 	// Vertex data on device memory
-	vkuCreateGPUBuffer(context, &model->vertexBuffer, sizeof(float)*20*model->numVertex, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+	vkuCreateGPUBuffer(context, &model->vertexBuffer, sizeof(float)*28*model->numVertex, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
 	// Create staging buffer to transfer from host memory to device memory
-	vkuCreateHostBuffer(context, &stagingBuffer, sizeof(float)*20*model->numVertex, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+	vkuCreateHostBuffer(context, &stagingBuffer, sizeof(float)*28*model->numVertex, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 	if(!stagingBuffer.memory->mappedPointer)
 		return;
@@ -455,11 +513,36 @@ void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 		*fPtr++=model->normal[3*j+1];
 		*fPtr++=model->normal[3*j+2];
 		*fPtr++=0.0f;
+
+		if(model->weight)
+		{
+			*fPtr++=(float)model->weight[j].bone[0];
+			*fPtr++=(float)model->weight[j].bone[1];
+			*fPtr++=(float)model->weight[j].bone[2];
+			*fPtr++=(float)model->weight[j].bone[3];
+
+			*fPtr++=model->weight[j].weight[0];
+			*fPtr++=model->weight[j].weight[1];
+			*fPtr++=model->weight[j].weight[2];
+			*fPtr++=model->weight[j].weight[3];
+		}
+		else
+		{
+			*fPtr++=0.0f;
+			*fPtr++=0.0f;
+			*fPtr++=0.0f;
+			*fPtr++=0.0f;
+
+			*fPtr++=0.0f;
+			*fPtr++=0.0f;
+			*fPtr++=0.0f;
+			*fPtr++=0.0f;
+		}
 	}
 
 	// Copy to device memory
 	copyCommand=vkuOneShotCommandBufferBegin(context);
-	vkCmdCopyBuffer(copyCommand, stagingBuffer.buffer, model->vertexBuffer.buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(float)*20*model->numVertex });
+	vkCmdCopyBuffer(copyCommand, stagingBuffer.buffer, model->vertexBuffer.buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(float)*28*model->numVertex });
 	vkuOneShotCommandBufferEnd(context, copyCommand);
 
 	// Delete staging data
@@ -492,4 +575,26 @@ void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 		// Delete staging data
 		vkuDestroyBuffer(context, &stagingBuffer);
 	}
+
+	// Bone data on device memory
+	vkuCreateGPUBuffer(context, &model->boneBuffer, sizeof(matrix)*model->numBone, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+	// Create staging buffer to transfer from host memory to device memory
+	vkuCreateHostBuffer(context, &stagingBuffer, sizeof(matrix)*model->numBone, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+	if(!stagingBuffer.memory->mappedPointer)
+		return;
+
+	matrix *mPtr=(matrix *)stagingBuffer.memory->mappedPointer;
+
+	for(uint32_t j=0;j<model->numBone;j++)
+		*mPtr++=model->bone[j].inverseBind;
+
+	// Copy to device memory
+	copyCommand=vkuOneShotCommandBufferBegin(context);
+	vkCmdCopyBuffer(copyCommand, stagingBuffer.buffer, model->boneBuffer.buffer, 1, &(VkBufferCopy) {.srcOffset=0, .dstOffset=0, .size=sizeof(matrix)*model->numBone });
+	vkuOneShotCommandBufferEnd(context, copyCommand);
+
+	// Delete staging data
+	vkuDestroyBuffer(context, &stagingBuffer);
 }

@@ -14,6 +14,7 @@
 #include "image/image.h"
 #include "math/math.h"
 #include "model/bmodel.h"
+#include "model/banim.h"
 #include "network/network.h"
 #include "network/client_network.h"
 #include "physics/particle.h"
@@ -26,6 +27,7 @@
 #include "pipelines/shadow.h"
 #include "pipelines/skybox.h"
 #include "pipelines/sphere.h"
+#include "pipelines/test.h"
 #include "pipelines/triangle.h"
 #include "pipelines/volume.h"
 #include "system/system.h"
@@ -99,6 +101,9 @@ EntityList_t entityList;
 #define NUM_CUBE 30
 RigidBody_t cubeBody[NUM_CUBE];
 RigidBody_t platformBody;
+
+RigidBody_t testBody;
+BAnim_t testAnim;
 
 enum
 {
@@ -497,6 +502,14 @@ matrix FighterTransform(const RigidBody_t *body)
 	return MatrixMult(local, MatrixTranslatev(body->position));
 }
 
+matrix TestTransform(const RigidBody_t *body)
+{
+	matrix local=MatrixIdentity();
+	local=MatrixMult(local, MatrixTranslatev(Vec3_Muls(AssetManager_GetAsset(assets, MODEL_TEST)->model.center, -1.0f)));
+	local=MatrixMult(local, QuatToMatrix(body->orientation));
+	return MatrixMult(local, MatrixTranslatev(body->position));
+}
+
 void ResetPhysicsCubes(void)
 {
 	const float radius=20.0f;
@@ -659,6 +672,31 @@ void GenerateWorld(void)
 	}
 
 	playerID=EntityList_Add(&entityList, &camera.body, !camera.thirdPerson, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+0), TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
+
+	const float mass=0.01f;
+	const float inertia=1.0f;
+	const BModel_t *model=&AssetManager_GetAsset(assets, MODEL_TEST)->model;
+	volatile const vec3 size=Vec3_Muls(Vec3_Subv(model->bBoxMax, model->bBoxMin), 0.5f);
+	testBody=(RigidBody_t)
+	{
+		.position=Vec3(0.0f, 0.0f, 0.0f),
+
+		.velocity=Vec3b(0.0f),
+		.force=Vec3b(0.0f),
+		.mass=mass,
+		.invMass=1.0f/mass,
+
+		.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
+		.angularVelocity=Vec3b(0.0f),
+		.inertia=inertia,
+		.invInertia=1.0f/inertia,
+
+		.restitution=0.1f,
+		.friction=1.0f,
+
+		.type=RIGIDBODY_OBB,
+		.size=size,
+	};
 
 	if(!ClientNetwork_IsConnected())
 	{
@@ -987,10 +1025,69 @@ void Thread_Main(void *arg)
 	}
 
 #if 0
-	// for(uint32_t i=0;i<numPhysicsObjects;i++)
-	// {
-	// 	DrawAABBCube(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, physicsObjects[i].bounds.min, physicsObjects[i].bounds.max, Vec4(1.0f, 1.0f, 0.0f, 1.0f));
-	// }
+	// for(uint32_t i=0;i<entityList.entityCount;i++)
+	// 	DrawAABBCube(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, entityList.entities[i].bounds.min, entityList.entities[i].bounds.max, Vec4(1.0f, 1.0f, 0.0f, 1.0f));
+	for(uint32_t i=0;i<entityList.entityCount;i++)
+	{
+		RigidBody_t *body=entityList.entities[i].body;
+		if(body->type==RIGIDBODY_OBB)
+		{
+			struct
+			{
+				matrix mvp;
+				vec4 color;
+			} cubePC;
+
+			cubePC.color=Vec4(1.0f, 1.0f, 1.0f, 0.0f);
+
+			matrix local=MatrixScalev(Vec3_Muls(body->size, 2.0f));
+			local=MatrixMult(local, QuatToMatrix(body->orientation));
+			local=MatrixMult(local, MatrixTranslatev(body->position));
+			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
+			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+			cubePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
+
+			DrawCubePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(cubePC), &cubePC);
+		}
+		else if(body->type==RIGIDBODY_SPHERE)
+		{
+			struct
+			{
+				matrix mvp;
+				vec4 color;
+			} spherePC;
+
+			spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 0.0f);
+
+			matrix local=MatrixScale(body->radius, body->radius, body->radius);
+			local=MatrixMult(local, QuatToMatrix(body->orientation));
+			local=MatrixMult(local, MatrixTranslatev(body->position));
+			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
+			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+			spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
+
+			DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
+		}
+		else if(body->type==RIGIDBODY_CAPSULE)
+		{
+			struct
+			{
+				matrix mvp;
+				vec4 color;
+			} spherePC;
+
+			spherePC.color=Vec4(1.0f, 1.0f, 1.0f, body->radiusHeight.y);
+
+			matrix local=MatrixScale(body->radiusHeight.x, body->radiusHeight.x, body->radiusHeight.x);
+			local=MatrixMult(local, QuatToMatrix(body->orientation));
+			local=MatrixMult(local, MatrixTranslatev(body->position));
+			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
+			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+			spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
+
+			DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
+		}
+	}
 #endif
 
 #if 0
@@ -1045,58 +1142,6 @@ void Thread_Main(void *arg)
 	// BVH_DrawDebug(&bvh, data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye);
 
 	{
-#if 0
-		struct
-		{
-			matrix mvp;
-			vec4 color;
-		} spherePC;
-
-		spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 0.0f);
-
-		matrix local=MatrixScalev(chassis.size);
-		local=MatrixMult(local, QuatToMatrix(chassis.orientation));
-		local=MatrixMult(local, MatrixTranslatev(chassis.position));
-		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
-		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
-		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
-
-		DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
-
-		local=MatrixScalev(knuckles[0].size);
-		local=MatrixMult(local, QuatToMatrix(knuckles[0].orientation));
-		local=MatrixMult(local, MatrixTranslatev(knuckles[0].position));
-		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
-		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
-		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
-
-		DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
-
-		local=MatrixScalev(knuckles[1].size);
-		local=MatrixMult(local, QuatToMatrix(knuckles[1].orientation));
-		local=MatrixMult(local, MatrixTranslatev(knuckles[1].position));
-		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
-		local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
-		spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
-
-		DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
-
-		for(int i=0;i<4;i++)
-		{
-			spherePC.color=Vec4(1.0f, 1.0f, 1.0f, 0.0f);
-
-			const float radiusScale=wheels[i].radius;
-
-			matrix local=MatrixScale(radiusScale, radiusScale, radiusScale);
-			local=MatrixMult(local, QuatToMatrix(wheels[i].orientation));
-			local=MatrixMult(local, MatrixTranslatev(wheels[i].position));
-			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
-			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
-			spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
-
-			DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
-		}
-#endif
 		for(uint32_t i=0;i<sizeof(bodies)/sizeof(RigidBody_t);i++)
 		{
 			if(bodies[i].type==RIGIDBODY_OBB)
@@ -1158,6 +1203,8 @@ void Thread_Main(void *arg)
 			}
 		}
 	}
+
+	DrawTest(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, data->perFrame[data->index].descriptorPool[data->eye]);
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
@@ -2128,6 +2175,9 @@ bool Init(void)
 
 	vkuMemAllocator_Init(&vkContext);
 
+ 	if(!LoadBAnim(&testAnim, "assets/test.banim"))
+		return false;
+
 	LoadingScreenInit(&loadingScreen, NUM_ASSETS+12);
 
 	//const uint32_t seed=time(NULL);
@@ -2196,6 +2246,8 @@ bool Init(void)
 	// Create compositing pipeline
 	CreateCompositePipeline();
 	LoadingScreenAdvance(&loadingScreen);
+
+	CreateTestPipeline();
 
 	// Create primary frame buffers, depth image
 	CreateFramebuffers(0);
@@ -2643,6 +2695,8 @@ void Destroy(void)
 	// Particle system destruction
 	ParticleSystem_Destroy(&particleSystem);
 	//////////
+
+	DestroyTest();
 
 	// Skybox destruction
 	DestroySkybox();

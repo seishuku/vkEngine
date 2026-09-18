@@ -52,6 +52,7 @@ AssetManager_t assets[]=
 	{ MODEL_ASTEROID4,          ASSET_MODEL,   "assets/asteroid4.bmodel" },
 	{ MODEL_FIGHTER,            ASSET_MODEL,   "assets/fighter1.bmodel" },
 	{ MODEL_CUBE,               ASSET_MODEL,   "assets/cube.bmodel" },
+	{ MODEL_TEST,				ASSET_MODEL,   "assets/test.bmodel" },
 
 	{ SOUND_PEW1,               ASSET_SOUND,   "assets/pew1.wav" },
 	{ SOUND_PEW2,               ASSET_SOUND,   "assets/pew1.wav" },
@@ -137,6 +138,7 @@ void AssetManagerDestroy(AssetManager_t *assets, uint32_t numAssets)
 
 			case ASSET_MODEL:
 			{
+				vkuDestroyBuffer(&vkContext, &assets[i].model.boneBuffer);
 				vkuDestroyBuffer(&vkContext, &assets[i].model.vertexBuffer);
 
 				for(uint32_t j=0;j<assets[i].model.numMesh;j++)
