@@ -16,6 +16,8 @@ extern VkRenderPass renderPass;
 
 static Pipeline_t testPipeline;
 
+static BAnim_t testAnim;
+
 #define MAX_BONE 128
 static VkuBuffer_t animatedWorldBuffer;
 static matrix animatedWorld[MAX_BONE];
@@ -31,15 +33,20 @@ bool CreateTestPipeline(void)
 
 	vkuCreateHostBuffer(&vkContext, &animatedWorldBuffer, sizeof(matrix)*MAX_BONE, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
+	if(!LoadBAnim(&testAnim, "assets/test.banim"))
+		return false;
+
 	return true;
 }
 
 void DestroyTest(void)
 {
+	FreeBAnim(&testAnim);
+	vkuDestroyBuffer(&vkContext, &animatedWorldBuffer);
+
 	DestroyPipeline(&vkContext, &testPipeline);
 }
 
-extern BAnim_t testAnim;
 extern float fTimeStep;
 
 static uint32_t frameCount=0;
@@ -51,20 +58,27 @@ void DrawTest(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkDes
 
 	frameTime+=fTimeStep;
 
-	if(frameTime>=(1.0f/testAnim.frameRate))
+	while(frameTime>=(1.0f/testAnim.frameRate))
 	{
-		frameTime=0.0f;
+		frameTime-=(1.0f/testAnim.frameRate);
 		frameCount++;
+
+		if(frameCount>=testAnim.numFrame)
+			frameCount=0;
 	}
 
-	if(frameCount>=testAnim.numFrame)
-		frameCount=0;
+	const float t=frameTime*testAnim.frameRate;
+	const uint32_t nextFrame=(frameCount+1>=testAnim.numFrame)?0:frameCount+1;
 
-	const BAnim_BoneFrame_t *animframe=&testAnim.frame[frameCount*testAnim.numBone];
+	const BAnim_BoneFrame_t *animframeA=&testAnim.frame[frameCount*testAnim.numBone];
+	const BAnim_BoneFrame_t *animframeB=&testAnim.frame[nextFrame*testAnim.numBone];
 
 	for(uint32_t i=0;i<model->numBone;i++)
 	{
-		matrix local=MatrixMult(QuatToMatrix(animframe[i].orientation), MatrixTranslatev(animframe[i].position));
+		vec4 orientation=QuatSlerp(animframeA[i].orientation, animframeB[i].orientation, t);
+		vec3 position=Vec3_Lerp(animframeA[i].position, animframeB[i].position, t);
+
+		matrix local=MatrixMult(QuatToMatrix(orientation), MatrixTranslatev(position));
 
 		if(model->bone[i].parent>=0)
 			local=MatrixMult(local, animatedWorld[model->bone[i].parent]);

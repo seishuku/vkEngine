@@ -7,7 +7,6 @@
 #include "../entitylist.h"
 
 extern VkRenderPass renderPass;
-extern Pipeline_t mainPipeline;
 
 bool CreateLightingPipeline(void);
 void DestroyLighting(void);

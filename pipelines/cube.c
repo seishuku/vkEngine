@@ -10,7 +10,6 @@ extern VkuContext_t vkContext;
 extern VkuSwapchain_t swapchain;
 extern VkRenderPass renderPass;
 
-//VkPipelineLayout spherePipelineLayout;
 static Pipeline_t cubePipeline;
 
 bool CreateCubePipeline(void)

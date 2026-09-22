@@ -414,18 +414,16 @@ bool LoadBModel(BModel_t *model, const char *filename)
 	if(model->UV && (!model->tangent || !model->binormal || !model->normal))
 		CalculateTangent(model);
 
-	// Build bind-pose and inverse matrices.
+	// Build bind-pose world matrices and their inverses.
 	for(uint32_t i=0;i<model->numBone;i++)
 	{
 		matrix local=MatrixMult(QuatToMatrix(model->bone[i].orientation), MatrixTranslatev(model->bone[i].position));
 
-		if(model->bone[i].parent>=0&&(uint32_t)model->bone[i].parent<model->numBone)
-			model->bone[i].skinnedMatrix=MatrixMult(local, model->bone[model->bone[i].parent].skinnedMatrix);
-		else
-			model->bone[i].skinnedMatrix=local;
+		if(model->bone[i].parent>=0)
+			local=MatrixMult(local, model->bone[model->bone[i].parent].skinnedMatrix);
 
-		model->bone[i].inverseBind=MatrixInverse(model->bone[i].skinnedMatrix);
-		model->bone[i].skinnedMatrix=MatrixIdentity();
+		model->bone[i].skinnedMatrix=local;
+		model->bone[i].inverseBind=MatrixInverse(local);
 	}
 
 	CalculateBounds(model);
@@ -456,8 +454,8 @@ void FreeBModel(BModel_t *model)
 	Zone_Free(zone, model->normal);
 	Zone_Free(zone, model->tangent);
 	Zone_Free(zone, model->binormal);
-	Zone_Free(zone, model->bone);
 	Zone_Free(zone, model->weight);
+	Zone_Free(zone, model->bone);
 
 	if(model->numMesh)
 	{

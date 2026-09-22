@@ -105,5 +105,4 @@ void FreeBAnim(BAnim_t *animation)
         return;
 
     Zone_Free(zone, animation->frame);
-    Zone_Free(zone, animation);
 }
