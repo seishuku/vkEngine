@@ -36,6 +36,7 @@ static const float scale=2.0;
 struct
 {
 	bool running;
+	bool initialized;
 	struct android_app *app;
 } appState;
 
@@ -379,6 +380,7 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 
 			DBGPRINTF(DEBUG_INFO, "\nStarting main loop.\n");
 			appState.running=true;
+			appState.initialized=true;
 			break;
 
 		case APP_CMD_SAVE_STATE:
@@ -398,19 +400,23 @@ static void app_handle_cmd(struct android_app *app, int32_t cmd)
 			DBGPRINTF(DEBUG_WARNING, "Zone remaining block list:\n");
 			Zone_Print(zone);
 			Zone_Destroy(zone);
+			appState.initialized=false;
 			break;
 
 	    case APP_CMD_WINDOW_RESIZED:
 	    case APP_CMD_CONFIG_CHANGED:
-			RecreateSwapchain();
+			if(appState.initialized)
+				RecreateSwapchain();
 		    break;
 
 	    case APP_CMD_LOST_FOCUS:
-		    appState.running=false;
+			if(appState.initialized)
+				appState.running=false;
 			break;
 
 		case APP_CMD_GAINED_FOCUS:
-			appState.running=true;
+			if(appState.initialized)
+				appState.running=true;
 			break;
 	}
 }
@@ -419,6 +425,9 @@ extern AAssetManager *android_asset_manager;
 
 void android_main(struct android_app *app)
 {
+	JNIEnv *env=NULL;
+    (*app->activity->vm)->AttachCurrentThread(app->activity->vm, &env, NULL);
+
 	memset(&appState, 0, sizeof(appState));
 
 	app->userData=&appState;
@@ -462,7 +471,7 @@ void android_main(struct android_app *app)
 		if(isDone)
 			ANativeActivity_finish(appState.app->activity);
 
-		if(appState.running)
+		if(appState.running&&appState.initialized)
 		{
 			static float avgfps=0.0f;
 
