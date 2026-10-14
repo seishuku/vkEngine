@@ -38,12 +38,12 @@ bool EntityList_Init(EntityList_t *list)
 
 	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 	{
-		if(!vkuCreateHostBuffer(&vkContext, &list->perFrame[i].instanceBuffer, sizeof(matrix)*MAX_ENTITY, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT))
+		if(!vkuCreateHostBuffer(&vkContext, &list->perFrame[i].instanceBuffer, sizeof(EntityInstance_t)*MAX_ENTITY, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT))
 			goto fail;
 
 		list->perFrame[i].instancePtr=list->perFrame[i].instanceBuffer.memory->mappedPointer;
 
-		if(!vkuCreateHostBuffer(&vkContext, &list->perFrame[i].culledInstanceBuffer, sizeof(matrix)*MAX_ENTITY, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT))
+		if(!vkuCreateHostBuffer(&vkContext, &list->perFrame[i].culledInstanceBuffer, sizeof(EntityInstance_t)*MAX_ENTITY, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT))
 			goto fail;
 
 		list->perFrame[i].culledInstancePtr=list->perFrame[i].culledInstanceBuffer.memory->mappedPointer;
@@ -95,15 +95,11 @@ uint32_t EntityList_Add(EntityList_t *list, RigidBody_t *body, bool noRender, ui
 		.modelID=modelID,
 		.textureIDs[0]=tex0,
 		.textureIDs[1]=tex1,
+		.animationID=UINT32_MAX,
 		.transformFunc=transformFunc,
 	};
 
-	if(body->type==RIGIDBODY_SPHERE)
-	{
-		entity.bounds.min=Vec3(body->position.x-body->radius, body->position.y-body->radius, body->position.z-body->radius);
-		entity.bounds.max=Vec3(body->position.x+body->radius, body->position.y+body->radius, body->position.z+body->radius);
-	}
-	else if(body->type==RIGIDBODY_OBB)
+	if(body->type==RIGIDBODY_OBB)
 	{
 		vec3 axis[3];
 		QuatAxes(body->orientation, axis);
@@ -116,6 +112,11 @@ uint32_t EntityList_Add(EntityList_t *list, RigidBody_t *body, bool noRender, ui
 
 		entity.bounds.min=Vec3_Subv(body->position, extents);
 		entity.bounds.max=Vec3_Addv(body->position, extents);
+	}
+	else if(body->type==RIGIDBODY_SPHERE)
+	{
+		entity.bounds.min=Vec3(body->position.x-body->radius, body->position.y-body->radius, body->position.z-body->radius);
+		entity.bounds.max=Vec3(body->position.x+body->radius, body->position.y+body->radius, body->position.z+body->radius);
 	}
 	else if(body->type==RIGIDBODY_CAPSULE)
 	{
@@ -172,6 +173,44 @@ void EntityList_Clear(EntityList_t *list)
 	memset(list->entities, 0, sizeof(Entity_t)*MAX_ENTITY);
 }
 
+bool EntityList_SetNoRender(EntityList_t *list, uint32_t ID, bool noRender)
+{
+	for(uint32_t i=0;i<list->entityCount;i++)
+	{
+		Entity_t *entity=&list->entities[i];
+
+		if(entity->ID!=ID)
+			continue;
+
+		entity->noRender=noRender;
+		list->dirty=true;
+
+		return true;
+	}
+
+	DBGPRINTF(DEBUG_ERROR, "Entity not found.\n");
+	return false;
+}
+
+bool EntityList_SetAnimation(EntityList_t *list, uint32_t ID, uint32_t animationID)
+{
+	for(uint32_t i=0;i<list->entityCount;i++)
+	{
+		Entity_t *entity=&list->entities[i];
+
+		if(entity->ID!=ID)
+			continue;
+
+		entity->animationID=animationID;
+		list->dirty=true;
+
+		return true;
+	}
+
+	DBGPRINTF(DEBUG_ERROR, "Entity not found.\n");
+	return false;
+}
+
 void EntityList_RecalculateBounds(EntityList_t *list)
 {
 	for(uint32_t i=0;i<list->entityCount;i++)
@@ -179,12 +218,7 @@ void EntityList_RecalculateBounds(EntityList_t *list)
 		Entity_t *entity=&list->entities[i];
 		RigidBody_t *body=entity->body;
 	
-		if(body->type==RIGIDBODY_SPHERE)
-		{
-			entity->bounds.min=Vec3(body->position.x-body->radius, body->position.y-body->radius, body->position.z-body->radius);
-			entity->bounds.max=Vec3(body->position.x+body->radius, body->position.y+body->radius, body->position.z+body->radius);
-		}
-		else if(body->type==RIGIDBODY_OBB)
+		if(body->type==RIGIDBODY_OBB)
 		{
 			vec3 axis[3];
 			QuatAxes(body->orientation, axis);
@@ -197,6 +231,11 @@ void EntityList_RecalculateBounds(EntityList_t *list)
 
 			entity->bounds.min=Vec3_Subv(body->position, extents);
 			entity->bounds.max=Vec3_Addv(body->position, extents);
+		}
+		else if(body->type==RIGIDBODY_SPHERE)
+		{
+			entity->bounds.min=Vec3(body->position.x-body->radius, body->position.y-body->radius, body->position.z-body->radius);
+			entity->bounds.max=Vec3(body->position.x+body->radius, body->position.y+body->radius, body->position.z+body->radius);
 		}
 		else if(body->type==RIGIDBODY_CAPSULE)
 		{
@@ -262,6 +301,7 @@ void EntityList_Rebuild(EntityList_t *list)
 			(entity->modelID!=list->batches[list->batchCount-1].modelID)||
 			(entity->textureIDs[0]!=list->batches[list->batchCount-1].textureIDs[0])||
 			(entity->textureIDs[1]!=list->batches[list->batchCount-1].textureIDs[1])||
+			(entity->animationID!=list->batches[list->batchCount-1].animationID)||
 			(entity->noRender!=list->batches[list->batchCount-1].noRender))
 		{
 			if(list->batchCount==list->batchCapacity)
@@ -275,6 +315,7 @@ void EntityList_Rebuild(EntityList_t *list)
 			b->modelID=entity->modelID;
 			b->textureIDs[0]=entity->textureIDs[0];
 			b->textureIDs[1]=entity->textureIDs[1];
+			b->animationID=entity->animationID;
 			b->instanceOffset=i;
 			b->instanceCount=0;
 		}
@@ -319,6 +360,7 @@ void EntityList_FrustumCull(EntityList_t *list, const frustum frustum)
 			dst->modelID=src->modelID;
 			dst->textureIDs[0]=src->textureIDs[0];
 			dst->textureIDs[1]=src->textureIDs[1];
+			dst->animationID=src->animationID;
 			dst->instanceOffset=batchStart;
 			dst->instanceCount=remaining;
 		}
@@ -328,24 +370,24 @@ void EntityList_FrustumCull(EntityList_t *list, const frustum frustum)
 void EntityList_UpdateInstances(EntityList_t *list, uint32_t frameIndex)
 {
 	// Update all entities
-	matrix *dst=list->perFrame[frameIndex].instancePtr;
+	EntityInstance_t *dst=list->perFrame[frameIndex].instancePtr;
 
 	for(uint32_t i=0;i<list->sortedCount;i++)
 	{
 		const Entity_t *entity=&list->entities[list->sortedIndices[i]];
 
 		if(entity->transformFunc)
-			dst[i]=entity->transformFunc(entity->body);
+			dst[i].transform=entity->transformFunc(entity->body);
 	}
 
 	// Update culled entities
-	matrix *culledDst=list->perFrame[frameIndex].culledInstancePtr;
+	EntityInstance_t *culledDst=list->perFrame[frameIndex].culledInstancePtr;
 
 	for(uint32_t i=0;i<list->culledCount;i++)
 	{
 		const Entity_t *entity=&list->entities[list->culledIndices[i]];
 
 		if(entity->transformFunc)
-			culledDst[i]=entity->transformFunc(entity->body);
+			culledDst[i].transform=entity->transformFunc(entity->body);
 	}
 }

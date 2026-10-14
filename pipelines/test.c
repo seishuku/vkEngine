@@ -31,7 +31,7 @@ bool CreateTestPipeline(void)
 
 	PipelineOverrideRasterizationSamples(VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);
 
-	vkuCreateHostBuffer(&vkContext, &animatedWorldBuffer, sizeof(matrix)*MAX_BONE, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	vkuCreateHostBuffer(&vkContext, &animatedWorldBuffer, sizeof(matrix)*MAX_BONE, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
 	if(!LoadBAnim(&testAnim, "assets/test.banim"))
 		return false;

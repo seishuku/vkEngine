@@ -454,25 +454,6 @@ bool PopPoint(vec3 *point, uint32_t *index)
 void RecreateSwapchain(void);
 bool CreateFramebuffers(uint32_t eye);
 
-bool EntityList_ChangeRender(EntityList_t *list, uint32_t ID, bool noRender)
-{
-	for(uint32_t i=0;i<list->entityCount;i++)
-	{
-		Entity_t *entity=&list->entities[i];
-
-		if(entity->ID!=ID)
-			continue;
-
-		entity->noRender=noRender;
-		list->dirty=true;
-
-		return true;
-	}
-
-	DBGPRINTF(DEBUG_ERROR, "Entity not found.\n");
-	return false;
-}
-
 matrix CubeTransform(const RigidBody_t *body)
 {
 	matrix local=MatrixScalev(body->size);
@@ -1942,7 +1923,7 @@ void Render(void)
 	camera.thirdPerson=UI_GetCheckBoxValue(&UI, thirdPersonID);
 	if(camera.thirdPerson!=oldThirdPerson)
 	{
-		EntityList_ChangeRender(&entityList, playerID, !camera.thirdPerson);
+		EntityList_SetNoRender(&entityList, playerID, !camera.thirdPerson);
 		oldThirdPerson=camera.thirdPerson;
 	}
 

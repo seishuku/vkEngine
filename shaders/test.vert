@@ -5,7 +5,7 @@ layout (location=1) in vec4 vUV;
 layout (location=2) in vec4 vTangent;
 layout (location=3) in vec4 vBinormal;
 layout (location=4) in vec4 vNormal;
-layout (location=5) in vec4 vBoneIndex;
+layout (location=5) in uvec4 vBoneIndex;
 layout (location=6) in vec4 vBoneWeight;
 
 #define NUM_CASCADES 4

@@ -33,7 +33,10 @@ typedef struct
 	float baseGravity;
 
 	bool noRender;
-	uint32_t modelID, textureIDs[2];
+	uint32_t modelID;
+	uint32_t textureIDs[2];
+
+	uint32_t animationID;
 
 	EntityTransformFunc transformFunc;
 
@@ -43,11 +46,22 @@ typedef struct
 typedef struct
 {
 	bool noRender;
+
 	uint32_t modelID;
 	uint32_t textureIDs[2];
+
+	uint32_t animationID;
+
 	uint32_t instanceOffset;
 	uint32_t instanceCount;
 } EntityBatch_t;
+
+typedef struct
+{
+	matrix transform;
+	uint32_t paletteOffset;
+	uint32_t pad[3];
+} EntityInstance_t;
 
 typedef struct
 {
@@ -75,10 +89,10 @@ typedef struct
 	struct
 	{
 		VkuBuffer_t instanceBuffer;
-		matrix *instancePtr;
+		EntityInstance_t *instancePtr;
 
 		VkuBuffer_t culledInstanceBuffer;
-		matrix *culledInstancePtr;
+		EntityInstance_t *culledInstancePtr;
 	} perFrame[VKU_MAX_FRAME_COUNT];
 } EntityList_t;
 
@@ -88,6 +102,9 @@ void EntityList_Destroy(EntityList_t *list);
 uint32_t EntityList_Add(EntityList_t *list, RigidBody_t *body, bool noRender, uint32_t modelID, uint32_t tex0, uint32_t tex1, EntityObjectType_e objectType, EntityTransformFunc transformFunc);
 bool EntityList_Remove(EntityList_t *list, uint32_t ID);
 void EntityList_Clear(EntityList_t *list);
+
+bool EntityList_SetNoRender(EntityList_t *list, uint32_t ID, bool noRender);
+bool EntityList_SetAnimation(EntityList_t *list, uint32_t ID, uint32_t animationID);
 
 void EntityList_RecalculateBounds(EntityList_t *list);
 void EntityList_Rebuild(EntityList_t *list);

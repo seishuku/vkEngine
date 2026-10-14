@@ -2,11 +2,11 @@
 
 #define NUM_CASCADES 4
 
-layout (location=0) in vec3 Position;
-layout (location=1) in vec2 UV;
-layout (location=2) in mat3 Tangent;
-layout (location=5) in float ViewDepth;
-layout (location=6) in vec4 Shadow[NUM_CASCADES];
+layout (location=0) in vec3 iPosition;
+layout (location=1) in vec2 iUV;
+layout (location=2) in mat3 iTangent;
+layout (location=5) in float iViewDepth;
+layout (location=6) in vec4 iShadow[NUM_CASCADES];
 
 layout (binding=3) uniform MainUBO
 {
@@ -77,7 +77,7 @@ float ShadowPCF(const int cascade)
 	int count=0;
 	int range=5/(cascade+1); // Reduce samples for higher cascades, not sure if I like this
 
-	vec3 projCoords=Shadow[cascade].xyz/Shadow[cascade].w;
+	vec3 projCoords=iShadow[cascade].xyz/iShadow[cascade].w;
 	
 	for(int x=-range;x<range;x++)
 	{
@@ -93,13 +93,13 @@ float ShadowPCF(const int cascade)
 
 void main()
 {
-	vec4 BaseTex=texture(TexBase, UV);
-	vec3 NormalTex=texture(TexNormal, UV).xyz*2.0-1.0;
-	vec3 n=normalize(Tangent*NormalTex);
+	vec4 BaseTex=texture(TexBase, iUV);
+	vec3 NormalTex=texture(TexNormal, iUV).xyz*2.0-1.0;
+	vec3 n=normalize(iTangent*NormalTex);
 
 	int cascade;
 	float blend;
-	SelectCascade(ViewDepth, cascade, blend);
+	SelectCascade(iViewDepth, cascade, blend);
 
 	float shadow0=ShadowPCF(cascade);
 	float shadow=shadow0;

@@ -514,10 +514,10 @@ void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 
 		if(model->weight)
 		{
-			*fPtr++=(float)model->weight[j].bone[0];
-			*fPtr++=(float)model->weight[j].bone[1];
-			*fPtr++=(float)model->weight[j].bone[2];
-			*fPtr++=(float)model->weight[j].bone[3];
+			*(uint32_t *)fPtr++=model->weight[j].bone[0];
+			*(uint32_t *)fPtr++=model->weight[j].bone[1];
+			*(uint32_t *)fPtr++=model->weight[j].bone[2];
+			*(uint32_t *)fPtr++=model->weight[j].bone[3];
 
 			*fPtr++=model->weight[j].weight[0];
 			*fPtr++=model->weight[j].weight[1];
@@ -526,10 +526,10 @@ void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 		}
 		else
 		{
-			*fPtr++=0.0f;
-			*fPtr++=0.0f;
-			*fPtr++=0.0f;
-			*fPtr++=0.0f;
+			*(uint32_t *)fPtr++=0;
+			*(uint32_t *)fPtr++=0;
+			*(uint32_t *)fPtr++=0;
+			*(uint32_t *)fPtr++=0;
 
 			*fPtr++=0.0f;
 			*fPtr++=0.0f;
@@ -575,7 +575,7 @@ void BuildMemoryBuffersBModel(VkuContext_t *context, BModel_t *model)
 	}
 
 	// Bone data on device memory
-	vkuCreateGPUBuffer(context, &model->boneBuffer, sizeof(matrix)*model->numBone, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+	vkuCreateGPUBuffer(context, &model->boneBuffer, sizeof(matrix)*model->numBone, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
 	// Create staging buffer to transfer from host memory to device memory
 	vkuCreateHostBuffer(context, &stagingBuffer, sizeof(matrix)*model->numBone, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);

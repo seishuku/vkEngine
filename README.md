@@ -1,5 +1,5 @@
 # vkEngine
-![vkEngine screen shot](https://github.com/seishuku/vkEngine/blob/master/screen%20shot.png)
+![vkEngine screen shot](screen%20shot.png)
 
 vkEngine, my long term "game engine" project.
 Might end up as an actual game at some point, no idea when.
@@ -19,7 +19,7 @@ This is an on-going learning experience for me and for anyone else that can lear
 - Improve physics (needs more refining, it doesn't pass a box stack very well)
 - Streamline post processing effects (WIP)
 - Improve networking (this is better now, [server here](https://github.com/seishuku/vkEngineServer))
-- 3D model animation?
+- 3D model animation (WIP - code is there, needs refining)
 - ???
 - Profit?
 
@@ -73,3 +73,58 @@ Where XXX.XXX.XXX.XXX is the remote IP.
 I tasked some clankers with making some web-based tools because I don't do webdev and I didn't feel like taking the time to do it my usual way (IE. the hard way).<br>
 The UI editor is a bit meh, that was more of an experiment and I don't know how useful it will end up being...<br>
 The physics assembly tool is really nice though, I've included the car assembly.
+
+# Engine Features
+
+**Graphics and Rendering**
+- Vulkan-based rendering backend
+- Configurable rendering pipelines with embeddable SPIR-V binary shader code
+- Lighting and shadow-rendering systems
+- Skybox rendering
+- Bloom and post-processing infrastructure
+- Custom 3D model format with skeletal animation (WIP)
+
+**Physics and Simulation**
+- Custom rigid-body physics system
+- Sphere, capsule and oriented-box collision detection
+- Constraint and solver infrastructure with web browser based assembly tool
+- Attractor forces
+- Particle system
+- 6 DOF physics based camera
+
+**Audio**
+- Custom audio subsystem with HRTF based positional sound
+- Digital signal processing
+- Sound-effect generator
+- WAV audio file support
+- QOA audio file support
+- Ogg Vorbis integration for music
+
+**Virtual Reality and Networking**
+- OpenXR integration with dedicated VR subsystem
+- Client networking infrastructure
+
+**UI and Input**
+- Custom UI framework
+- Windows, buttons and checkboxes
+- Text rendering and text editing
+- Sprites (with animation), cursors and graph widgets
+- Virtual joystick component
+- Keyboard and mouse input
+- In-game console
+
+**Engine Core and Utilities**
+- Asset management
+- Entity management
+- QOI and TGA image support
+- Vector, matrix and quaternion mathematics
+- Frustum and spatial-query utilities
+- Bounding-volume hierarchy and spatial hashing
+- Memory-zone and threading utilities
+- Event, configuration and parsing utilities
+- Loading screen support
+
+**Build targets**
+- Windows x64
+- Linux x64
+- Android ARM64

@@ -212,7 +212,7 @@ void DrawLighting(VkCommandBuffer commandBuffer, const EntityList_t *entityList,
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &model->vertexBuffer.buffer, &(VkDeviceSize){0});
 
 		// Offset the instance buffer binding to the start of this batch
-		VkDeviceSize instanceOffset=sizeof(matrix)*batch->instanceOffset;
+		VkDeviceSize instanceOffset=sizeof(EntityInstance_t)*batch->instanceOffset;
 		vkCmdBindVertexBuffers(commandBuffer, 1, 1, &entityList->perFrame[index].culledInstanceBuffer.buffer, &instanceOffset);
 
 		for(uint32_t m=0;m<model->numMesh;m++)
