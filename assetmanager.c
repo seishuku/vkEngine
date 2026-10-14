@@ -54,6 +54,8 @@ AssetManager_t assets[]=
 	{ MODEL_CUBE,               ASSET_MODEL,   "assets/cube.bmodel" },
 	{ MODEL_TEST,				ASSET_MODEL,   "assets/test.bmodel" },
 
+	{ ANIMATION_TEST,			ASSET_ANIMATION, "assets/test.banim" },
+
 	{ SOUND_PEW1,               ASSET_SOUND,   "assets/pew1.wav" },
 	{ SOUND_PEW2,               ASSET_SOUND,   "assets/pew1.wav" },
 	{ SOUND_PEW3,               ASSET_SOUND,   "assets/pew1.wav" },
@@ -96,6 +98,12 @@ bool AssetManagerLoad(AssetManager_t *assets, uint32_t numAssets)
 
 					if(result)
 						BuildMemoryBuffersBModel(&vkContext, &assets[i].model);
+					break;
+				}
+
+				case ASSET_ANIMATION:
+				{
+					result=LoadBAnim(&assets[i].animation, assets[i].filename);
 					break;
 				}
 
@@ -145,6 +153,12 @@ void AssetManagerDestroy(AssetManager_t *assets, uint32_t numAssets)
 					vkuDestroyBuffer(&vkContext, &assets[i].model.mesh[j].indexBuffer);
 
 				FreeBModel(&assets[i].model);
+				break;
+			}
+
+			case ASSET_ANIMATION:
+			{
+				FreeBAnim(&assets[i].animation);
 				break;
 			}
 

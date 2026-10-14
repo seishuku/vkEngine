@@ -3,6 +3,7 @@
 
 #include "vulkan/vulkan.h"
 #include "model/bmodel.h"
+#include "model/banim.h"
 #include "audio/audio.h"
 
 typedef enum
@@ -32,6 +33,8 @@ typedef enum
 	MODEL_CUBE,
 	MODEL_TEST,
 
+	ANIMATION_TEST,
+
 	SOUND_PEW1,
 	SOUND_PEW2,
 	SOUND_PEW3,
@@ -50,6 +53,7 @@ typedef enum
 {
 	ASSET_TEXTURE=0,
 	ASSET_MODEL,
+	ASSET_ANIMATION,
 	ASSET_SOUND,
 	NUM_ASSETTYPE
 } AssetType;
@@ -64,6 +68,7 @@ typedef struct
 	{
 		VkuImage_t image;
 		BModel_t model;
+		BAnim_t animation;
 		Sample_t sound;
 	};
 } AssetManager_t;

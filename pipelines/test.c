@@ -16,8 +16,6 @@ extern VkRenderPass renderPass;
 
 static Pipeline_t testPipeline;
 
-static BAnim_t testAnim;
-
 #define MAX_BONE 128
 static VkuBuffer_t animatedWorldBuffer;
 static matrix animatedWorld[MAX_BONE];
@@ -33,15 +31,11 @@ bool CreateTestPipeline(void)
 
 	vkuCreateHostBuffer(&vkContext, &animatedWorldBuffer, sizeof(matrix)*MAX_BONE, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
-	if(!LoadBAnim(&testAnim, "assets/test.banim"))
-		return false;
-
 	return true;
 }
 
 void DestroyTest(void)
 {
-	FreeBAnim(&testAnim);
 	vkuDestroyBuffer(&vkContext, &animatedWorldBuffer);
 
 	DestroyPipeline(&vkContext, &testPipeline);
@@ -55,23 +49,24 @@ static float frameTime=0.0f;
 void DrawTest(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, VkDescriptorPool descriptorPool)
 {
 	BModel_t *model=&AssetManager_GetAsset(assets, MODEL_TEST)->model;
+	BAnim_t *anim=&AssetManager_GetAsset(assets, ANIMATION_TEST)->animation;
 
 	frameTime+=fTimeStep;
 
-	while(frameTime>=(1.0f/testAnim.frameRate))
+	while(frameTime>=(1.0f/anim->frameRate))
 	{
-		frameTime-=(1.0f/testAnim.frameRate);
+		frameTime-=(1.0f/anim->frameRate);
 		frameCount++;
 
-		if(frameCount>=testAnim.numFrame)
+		if(frameCount>=anim->numFrame)
 			frameCount=0;
 	}
 
-	const float t=frameTime*testAnim.frameRate;
-	const uint32_t nextFrame=(frameCount+1>=testAnim.numFrame)?0:frameCount+1;
+	const float t=frameTime*anim->frameRate;
+	const uint32_t nextFrame=(frameCount+1>=anim->numFrame)?0:frameCount+1;
 
-	const BAnim_BoneFrame_t *animframeA=&testAnim.frame[frameCount*testAnim.numBone];
-	const BAnim_BoneFrame_t *animframeB=&testAnim.frame[nextFrame*testAnim.numBone];
+	const BAnim_BoneFrame_t *animframeA=&anim->frame[frameCount*anim->numBone];
+	const BAnim_BoneFrame_t *animframeB=&anim->frame[nextFrame*anim->numBone];
 
 	for(uint32_t i=0;i<model->numBone;i++)
 	{

@@ -33,6 +33,7 @@
 #include "system/system.h"
 #include "system/threads.h"
 #include "ui/ui.h"
+#include "utils/animation.h"
 #include "utils/bvh.h"
 #include "utils/event.h"
 #include "utils/list.h"
@@ -98,12 +99,13 @@ VkFramebuffer framebuffer[2];
 
 EntityList_t entityList;
 
+AnimationSystem_t animationSystem;
+
 #define NUM_CUBE 30
 RigidBody_t cubeBody[NUM_CUBE];
 RigidBody_t platformBody;
 
 RigidBody_t testBody;
-BAnim_t testAnim;
 
 enum
 {
@@ -2156,9 +2158,6 @@ bool Init(void)
 
 	vkuMemAllocator_Init(&vkContext);
 
- 	if(!LoadBAnim(&testAnim, "assets/test.banim"))
-		return false;
-
 	LoadingScreenInit(&loadingScreen, NUM_ASSETS+12);
 
 	//const uint32_t seed=time(NULL);
@@ -2188,6 +2187,7 @@ bool Init(void)
 	Music_Init();
 
 	EntityList_Init(&entityList);
+	Animation_Init(&animationSystem);
 
 	// Load assets
 	if(!AssetManagerLoad(assets, NUM_ASSETS))
@@ -2620,6 +2620,7 @@ void Destroy(void)
 	ClientNetwork_Destroy();
 
 	EntityList_Destroy(&entityList);
+	Animation_Destroy(&animationSystem);
 
 	Audio_Destroy();
 	SFX_Destroy();

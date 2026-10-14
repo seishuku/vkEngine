@@ -184,7 +184,7 @@ void Animation_Update(AnimationSystem_t *system, float dt, uint32_t frameIndex)
 		if(offset+numBone>ANIM_MAX_PALETTE)
 		{
 			DBGPRINTF(DEBUG_ERROR, "Animation_Update: palette full, animator %u skipped.\n", i);
-			animator->paletteOffset=0;
+			animator->paletteOffset=UINT32_MAX;
 			continue;
 		}
 

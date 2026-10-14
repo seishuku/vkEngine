@@ -378,6 +378,8 @@ void EntityList_UpdateInstances(EntityList_t *list, uint32_t frameIndex)
 
 		if(entity->transformFunc)
 			dst[i].transform=entity->transformFunc(entity->body);
+
+		dst[i].paletteOffset=UINT32_MAX;
 	}
 
 	// Update culled entities
@@ -389,5 +391,7 @@ void EntityList_UpdateInstances(EntityList_t *list, uint32_t frameIndex)
 
 		if(entity->transformFunc)
 			culledDst[i].transform=entity->transformFunc(entity->body);
+
+		culledDst[i].paletteOffset=UINT32_MAX;
 	}
 }
