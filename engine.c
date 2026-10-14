@@ -27,7 +27,6 @@
 #include "pipelines/shadow.h"
 #include "pipelines/skybox.h"
 #include "pipelines/sphere.h"
-#include "pipelines/test.h"
 #include "pipelines/triangle.h"
 #include "pipelines/volume.h"
 #include "system/system.h"
@@ -106,6 +105,8 @@ RigidBody_t cubeBody[NUM_CUBE];
 RigidBody_t platformBody;
 
 RigidBody_t testBody;
+uint32_t testAnimID=UINT32_MAX;
+uint32_t testEntityID=UINT32_MAX;
 
 enum
 {
@@ -656,23 +657,21 @@ void GenerateWorld(void)
 
 	playerID=EntityList_Add(&entityList, &camera.body, !camera.thirdPerson, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+0), TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 
-	const float mass=0.01f;
-	const float inertia=1.0f;
 	const BModel_t *model=&AssetManager_GetAsset(assets, MODEL_TEST)->model;
 	volatile const vec3 size=Vec3_Muls(Vec3_Subv(model->bBoxMax, model->bBoxMin), 0.5f);
 	testBody=(RigidBody_t)
 	{
-		.position=Vec3(0.0f, 0.0f, 0.0f),
+		.position=Vec3(0.0f, 0.0f, -50.0f),
 
 		.velocity=Vec3b(0.0f),
 		.force=Vec3b(0.0f),
-		.mass=mass,
-		.invMass=1.0f/mass,
+		.mass=0.0f,
+		.invMass=0.0f,
 
-		.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
+		.orientation=Vec4(0.0f, PI*2, 0.0f, 1.0f),
 		.angularVelocity=Vec3b(0.0f),
-		.inertia=inertia,
-		.invInertia=1.0f/inertia,
+		.inertia=0.0f,
+		.invInertia=0.0f,
 
 		.restitution=0.1f,
 		.friction=1.0f,
@@ -695,6 +694,10 @@ void GenerateWorld(void)
 
 		for(uint32_t i=0;i<NUM_ENEMY;i++)
 			EntityList_Add(&entityList, &enemy[i].body, false, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[i]+0), TEXTURE_FIGHTER1+(2*fighterTexture[i]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
+
+		testEntityID=EntityList_Add(&entityList, &testBody, false, MODEL_TEST, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, TestTransform);
+		testAnimID=Animation_Create(&animationSystem, &AssetManager_GetAsset(assets, MODEL_TEST)->model, &AssetManager_GetAsset(assets, ANIMATION_TEST)->animation);
+		EntityList_SetAnimation(&entityList, testEntityID, testAnimID);
 
 		// for(uint32_t i=0;i<NUM_CUBE;i++)
 		// 	EntityList_Add(&entityList, &cubeBody[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
@@ -1186,8 +1189,6 @@ void Thread_Main(void *arg)
 			}
 		}
 	}
-
-	DrawTest(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, data->perFrame[data->index].descriptorPool[data->eye]);
 
 	vkEndCommandBuffer(data->perFrame[data->index].secCommandBuffer[data->eye]);
 
@@ -1729,6 +1730,8 @@ void Thread_Physics(void *arg)
 	if(enemyView>=0)
 		modelView=MatrixLookAt(enemy[enemyView].body.position, Vec3_Addv(enemy[enemyView].body.position, enemy[enemyView].forward), enemy[enemyView].up);
 
+	Animation_Update(&animationSystem, fTimeStep, index);
+
 	physicsTime=(float)(GetClock()-startTime);
 
 	// Barrier now that we're done here
@@ -2151,6 +2154,24 @@ void Console_CmdPhysicsRecord(Console_t *console, const char *param)
 		ConsolePrint(console, "Invalid parameter. Use 'start' or 'stop'.");
 }
 
+void Console_CmdAnimation(Console_t *console, const char *param)
+{
+	if(param==NULL)
+	{
+		ConsolePrint(console, "Missing parameter.");
+		return;
+	}
+
+	Animator_t *testAnim=Animation_Get(&animationSystem, testAnimID);
+
+	if(strcmp(param, "start")==0)
+		Animator_Play(testAnim, &AssetManager_GetAsset(assets, ANIMATION_TEST)->animation, true);
+	else if(strcmp(param, "stop")==0)
+		Animator_Stop(testAnim);
+	else
+		ConsolePrint(console, "Invalid parameter. Use 'start' or 'stop'.");
+}
+
 // Initialization call from system main
 bool Init(void)
 {
@@ -2174,6 +2195,7 @@ bool Init(void)
 	ConsoleRegisterCommand(&console, "disconnect", Console_CmdDisconnect);
 	ConsoleRegisterCommand(&console, "explode", Console_CmdExplode);
 	ConsoleRegisterCommand(&console, "physics_record", Console_CmdPhysicsRecord);
+	ConsoleRegisterCommand(&console, "animation", Console_CmdAnimation);
 
 	CameraInit(&camera, Vec3(0.0f, 0.0f, -100.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 
@@ -2227,8 +2249,6 @@ bool Init(void)
 	// Create compositing pipeline
 	CreateCompositePipeline();
 	LoadingScreenAdvance(&loadingScreen);
-
-	CreateTestPipeline();
 
 	// Create primary frame buffers, depth image
 	CreateFramebuffers(0);
@@ -2677,8 +2697,6 @@ void Destroy(void)
 	// Particle system destruction
 	ParticleSystem_Destroy(&particleSystem);
 	//////////
-
-	DestroyTest();
 
 	// Skybox destruction
 	DestroySkybox();

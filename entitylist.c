@@ -4,10 +4,12 @@
 #include <string.h>
 #include "system/system.h"
 #include "vulkan/vulkan.h"
+#include "utils/animation.h"
 #include "perframe.h"
 #include "entitylist.h"
 
 extern VkuContext_t vkContext;
+extern AnimationSystem_t animationSystem;
 
 static EntityList_t *sortList;
 
@@ -380,6 +382,11 @@ void EntityList_UpdateInstances(EntityList_t *list, uint32_t frameIndex)
 			dst[i].transform=entity->transformFunc(entity->body);
 
 		dst[i].paletteOffset=UINT32_MAX;
+
+		if(entity->animationID!=UINT32_MAX)
+			dst[i].paletteOffset=animationSystem.animators[entity->animationID].paletteOffset;
+		else
+			dst[i].paletteOffset=UINT32_MAX;
 	}
 
 	// Update culled entities
@@ -392,6 +399,9 @@ void EntityList_UpdateInstances(EntityList_t *list, uint32_t frameIndex)
 		if(entity->transformFunc)
 			culledDst[i].transform=entity->transformFunc(entity->body);
 
-		culledDst[i].paletteOffset=UINT32_MAX;
+		if(entity->animationID!=UINT32_MAX)
+			culledDst[i].paletteOffset=animationSystem.animators[entity->animationID].paletteOffset;
+		else
+			culledDst[i].paletteOffset=UINT32_MAX;
 	}
 }

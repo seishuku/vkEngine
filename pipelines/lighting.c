@@ -3,6 +3,7 @@
 #include "../system/system.h"
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
+#include "../utils/animation.h"
 #include "../utils/pipeline.h"
 #include "../assetmanager.h"
 #include "../entitylist.h"
@@ -11,6 +12,8 @@
 
 extern VkuContext_t vkContext;
 extern VkuSwapchain_t swapchain;
+
+extern AnimationSystem_t animationSystem;
 
 VkRenderPass renderPass;
 static Pipeline_t mainPipeline;
@@ -205,7 +208,7 @@ void DrawLighting(VkCommandBuffer commandBuffer, const EntityList_t *entityList,
 		vkuDescriptorSet_UpdateBindingImageInfo(&mainPipeline.descriptorSet, 2, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 3, perFrame[index].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
 		vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 4, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
-		vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 5, perFrame[index].skyboxUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+		vkuDescriptorSet_UpdateBindingBufferInfo(&mainPipeline.descriptorSet, 5, animationSystem.perFrame[index].paletteBuffer.buffer, 0, VK_WHOLE_SIZE);
 		vkuAllocateUpdateDescriptorSet(&mainPipeline.descriptorSet, descriptorPool);
 
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline.pipelineLayout, 0, 1, &mainPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);

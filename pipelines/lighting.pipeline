@@ -4,6 +4,7 @@ descriptorSet {
 	addBinding(2, combinedSampler, fragment)
 	addBinding(3, uniformBuffer, vertex|fragment)
 	addBinding(4, uniformBuffer, vertex|fragment)
+	addBinding(5, storageBuffer, vertex)
 }
 
 pipeline {

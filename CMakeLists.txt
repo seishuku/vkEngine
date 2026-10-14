@@ -50,7 +50,6 @@ set(PROJECT_SOURCES
 	"pipelines/shadow.c"
 	"pipelines/skybox.c"
 	"pipelines/sphere.c"
-	"pipelines/test.c"
 	"pipelines/triangle.c"
 	"pipelines/volume.c"
 	"system/memzone.c"
