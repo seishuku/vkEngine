@@ -110,9 +110,6 @@ void SFXStreamData(void *buffer, size_t length)
 			sample=engineSample;
 		}
 
-		if(sample<=-32000)
-			break;
-
 		if(sample<INT16_MIN)
 			sample=INT16_MIN;
 		else if(sample>INT16_MAX)

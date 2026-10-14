@@ -3,7 +3,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <threads.h>
 #include "math/math.h"
 #include "physics/physics.h"
 #include "vulkan/vulkan.h"
