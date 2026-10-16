@@ -5,6 +5,7 @@
 #include "system/system.h"
 #include "vulkan/vulkan.h"
 #include "utils/animation.h"
+#include "assetmanager.h"
 #include "perframe.h"
 #include "entitylist.h"
 
@@ -173,6 +174,8 @@ void EntityList_Clear(EntityList_t *list)
 {
 	list->entityCount=0;
 	memset(list->entities, 0, sizeof(Entity_t)*MAX_ENTITY);
+
+	ID_Init(list->IDPool);
 }
 
 bool EntityList_SetNoRender(EntityList_t *list, uint32_t ID, bool noRender)
@@ -194,7 +197,7 @@ bool EntityList_SetNoRender(EntityList_t *list, uint32_t ID, bool noRender)
 	return false;
 }
 
-bool EntityList_SetAnimation(EntityList_t *list, uint32_t ID, uint32_t animationID)
+uint32_t EntityList_AddAnimator(EntityList_t *list, uint32_t ID)
 {
 	for(uint32_t i=0;i<list->entityCount;i++)
 	{
@@ -203,14 +206,65 @@ bool EntityList_SetAnimation(EntityList_t *list, uint32_t ID, uint32_t animation
 		if(entity->ID!=ID)
 			continue;
 
+		// Already has one, nothing to do
+		if(entity->animationID!=UINT32_MAX)
+			return entity->animationID;
+
+		uint32_t animationID=Animation_Create(&animationSystem, &AssetManager_GetAsset(assets, entity->modelID)->model, NULL);
+
+		if(animationID==UINT32_MAX)
+		{
+			DBGPRINTF(DEBUG_ERROR, "Unable to create animator for entity %u.\n", ID);
+			return UINT32_MAX;
+		}
+
 		entity->animationID=animationID;
-		list->dirty=true;
+
+		return animationID;
+	}
+
+	DBGPRINTF(DEBUG_ERROR, "Entity not found.\n");
+	return UINT32_MAX;
+}
+
+bool EntityList_RemoveAnimator(EntityList_t *list, uint32_t ID)
+{
+	for(uint32_t i=0;i<list->entityCount;i++)
+	{
+		Entity_t *entity=&list->entities[i];
+
+		if(entity->ID!=ID)
+			continue;
+
+		if(entity->animationID!=UINT32_MAX)
+		{
+			Animation_Free(&animationSystem, entity->animationID);
+			entity->animationID=UINT32_MAX;
+		}
 
 		return true;
 	}
 
 	DBGPRINTF(DEBUG_ERROR, "Entity not found.\n");
 	return false;
+}
+
+Animator_t *EntityList_GetAnimator(EntityList_t *list, uint32_t ID)
+{
+	for(uint32_t i=0;i<list->entityCount;i++)
+	{
+		const Entity_t *entity=&list->entities[i];
+
+		if(entity->ID!=ID)
+			continue;
+
+		if(entity->animationID==UINT32_MAX)
+			return NULL;
+
+		return Animation_Get(&animationSystem, entity->animationID);
+	}
+
+	return NULL;
 }
 
 void EntityList_RecalculateBounds(EntityList_t *list)
@@ -303,7 +357,6 @@ void EntityList_Rebuild(EntityList_t *list)
 			(entity->modelID!=list->batches[list->batchCount-1].modelID)||
 			(entity->textureIDs[0]!=list->batches[list->batchCount-1].textureIDs[0])||
 			(entity->textureIDs[1]!=list->batches[list->batchCount-1].textureIDs[1])||
-			(entity->animationID!=list->batches[list->batchCount-1].animationID)||
 			(entity->noRender!=list->batches[list->batchCount-1].noRender))
 		{
 			if(list->batchCount==list->batchCapacity)

@@ -13,10 +13,10 @@ layout (location=11) in uint iPaletteOffset;
 
 #define NO_PALETTE 0xFFFFFFFFu
 
-// layout (binding=0) readonly buffer palette
-// {
-// 	mat4 skin[];
-// };
+layout (binding=0) readonly buffer palette
+{
+	mat4 skin[];
+};
 
 layout (push_constant) uniform ubo
 {
@@ -32,16 +32,16 @@ void main()
 {
    	vec4 position=vec4(vPosition.xyz, 1.0);
 
-	// if(iPaletteOffset!=NO_PALETTE&&dot(vBoneWeight, vec4(1.0))>0.0)
-	// {
-	// 	const mat4 skinMatrix=
-	// 	    skin[iPaletteOffset+vBoneIndex.x]*vBoneWeight.x+
-	// 	    skin[iPaletteOffset+vBoneIndex.y]*vBoneWeight.y+
-	// 	    skin[iPaletteOffset+vBoneIndex.z]*vBoneWeight.z+
-	// 	    skin[iPaletteOffset+vBoneIndex.w]*vBoneWeight.w;
+	if(iPaletteOffset!=NO_PALETTE&&dot(vBoneWeight, vec4(1.0))>0.0)
+	{
+		const mat4 skinMatrix=
+		    skin[iPaletteOffset+vBoneIndex.x]*vBoneWeight.x+
+		    skin[iPaletteOffset+vBoneIndex.y]*vBoneWeight.y+
+		    skin[iPaletteOffset+vBoneIndex.z]*vBoneWeight.z+
+		    skin[iPaletteOffset+vBoneIndex.w]*vBoneWeight.w;
 
-	// 	position=skinMatrix*position;
-	// }
+		position=skinMatrix*position;
+	}
 
 	gl_Position=mvp*iTransform*position;
 }

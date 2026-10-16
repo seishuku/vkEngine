@@ -82,6 +82,13 @@ void Animation_Free(AnimationSystem_t *system, uint32_t handle)
 	system->freeList[system->freeCount++]=handle;
 }
 
+void Animation_Clear(AnimationSystem_t *system)
+{
+	memset(system->animators, 0, sizeof(system->animators));
+	system->freeCount=0;
+	system->highWater=0;
+}
+
 Animator_t *Animation_Get(AnimationSystem_t *system, uint32_t handle)
 {
 	if(handle>=system->highWater||!system->animators[handle].active)
@@ -92,15 +99,39 @@ Animator_t *Animation_Get(AnimationSystem_t *system, uint32_t handle)
 
 void Animator_Play(Animator_t *animator, const BAnim_t *clip, bool loop)
 {
+	if((clip&&animator)&&clip==animator->clip&&animator->playing)
+	{
+		animator->loop=loop;
+		return;
+	}
+
+	if(ANIM_BLEND_TIME>0.0f&&animator->hasPose)
+	{
+		memcpy(animator->fromPose, animator->lastPose, sizeof(BAnim_BoneFrame_t)*animator->model->numBone);
+		animator->blendTime=0.0f;
+		animator->blendDuration=ANIM_BLEND_TIME;
+	}
+	else
+		animator->blendDuration=0.0f;
+
 	animator->clip=clip;
 	animator->time=0.0f;
 	animator->loop=loop;
-	animator->playing=(clip!=NULL);
+	animator->playing=true;
 }
 
 void Animator_Stop(Animator_t *animator)
 {
 	animator->playing=false;
+}
+
+static void BindPose(const BModel_t *model, BAnim_BoneFrame_t *out)
+{
+	for(uint32_t b=0;b<model->numBone;b++)
+	{
+		out[b].position=model->bone[b].position;
+		out[b].orientation=model->bone[b].orientation;
+	}
 }
 
 static void SamplePose(const BAnim_t *clip, float time, bool loop, uint32_t numBone, BAnim_BoneFrame_t *out)
@@ -190,16 +221,33 @@ void Animation_Update(AnimationSystem_t *system, float dt, uint32_t frameIndex)
 
 		AdvanceTime(animator, dt);
 
+		BindPose(model, system->pose);
+
 		if(animator->clip&&animator->clip->numFrame>0)
 			SamplePose(animator->clip, animator->time, animator->loop, (numBone<animator->clip->numBone)?numBone:animator->clip->numBone, system->pose);
-		else
+
+		if(animator->blendDuration>0.0f)
 		{
-			for(uint32_t b=0;b<numBone;b++)
+			animator->blendTime+=fabsf(dt*animator->speed);
+
+			float t=animator->blendTime/animator->blendDuration;
+
+			if(t>=1.0f)
+				animator->blendDuration=0.0f;
+			else
 			{
-				system->pose[b].position=model->bone[b].position;
-				system->pose[b].orientation=model->bone[b].orientation;
+				t=t*t*(3.0f-2.0f*t);	// Smoothstep
+
+				for(uint32_t b=0;b<numBone;b++)
+				{
+					system->pose[b].position=Vec3_Lerp(animator->fromPose[b].position, system->pose[b].position, t);
+					system->pose[b].orientation=QuatSlerp(animator->fromPose[b].orientation, system->pose[b].orientation, t);
+				}
 			}
 		}
+
+		memcpy(animator->lastPose, system->pose, sizeof(BAnim_BoneFrame_t)*numBone);
+		animator->hasPose=true;
 
 		for(uint32_t b=0;b<numBone;b++)
 		{

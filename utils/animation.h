@@ -12,6 +12,9 @@
 #define ANIM_MAX_BONE			128
 #define ANIM_MAX_PALETTE		(ANIM_MAX_ANIMATORS*32)
 
+// Crossfade time in seconds when the clip changes
+#define ANIM_BLEND_TIME			0.2f
+
 typedef struct
 {
 	bool active;
@@ -23,6 +26,11 @@ typedef struct
 	float speed;
 	bool loop;
 	bool playing;
+
+	float blendTime, blendDuration;
+	bool hasPose;
+	BAnim_BoneFrame_t lastPose[ANIM_MAX_BONE];
+	BAnim_BoneFrame_t fromPose[ANIM_MAX_BONE];
 
 	uint32_t paletteOffset;
 } Animator_t;
@@ -50,6 +58,7 @@ void Animation_Destroy(AnimationSystem_t *system);
 
 uint32_t Animation_Create(AnimationSystem_t *system, const BModel_t *model, const BAnim_t *clip);
 void Animation_Free(AnimationSystem_t *system, uint32_t handle);
+void Animation_Clear(AnimationSystem_t *system);
 Animator_t *Animation_Get(AnimationSystem_t *system, uint32_t handle);
 
 void Animator_Play(Animator_t *animator, const BAnim_t *clip, bool loop);

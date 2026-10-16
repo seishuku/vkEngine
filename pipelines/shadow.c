@@ -7,6 +7,7 @@
 #include "../math/math.h"
 #include "../camera/camera.h"
 #include "../model/bmodel.h"
+#include "../utils/animation.h"
 #include "../utils/pipeline.h"
 #include "../assetmanager.h"
 #include "../perframe.h"
@@ -17,6 +18,8 @@
 extern VkuContext_t vkContext;
 extern Camera_t camera;
 extern VkuSwapchain_t swapchain;
+
+extern AnimationSystem_t animationSystem;
 
 matrix shadowMVP[NUM_CASCADES];
 float cascadeSplits[NUM_CASCADES+1];
@@ -254,7 +257,7 @@ bool CreateShadowPipeline(void)
 	return true;
 }
 
-void ShadowUpdateMap(VkCommandBuffer commandBuffer, const EntityList_t *entityList, uint32_t frameIndex)
+void ShadowUpdateMap(VkCommandBuffer commandBuffer, const EntityList_t *entityList, uint32_t frameIndex, VkDescriptorPool descriptorPool)
 {
 	for(uint32_t cascade=0;cascade<NUM_CASCADES;cascade++)
 	{
@@ -286,6 +289,11 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, const EntityList_t *entityLi
 		shadowMVP[cascade]=BuildShadowMatrix(90.0f, (float)swapchain.extent.width/(float)swapchain.extent.height, cascadeSplits[cascade], cascadeSplits[cascade+1], modelview, lightDir);
 
 		vkCmdPushConstants(commandBuffer, shadowPipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(matrix), &shadowMVP[cascade]);
+
+		vkuDescriptorSet_UpdateBindingBufferInfo(&shadowPipeline.descriptorSet, 0, animationSystem.perFrame[frameIndex].paletteBuffer.buffer, 0, VK_WHOLE_SIZE);
+		vkuAllocateUpdateDescriptorSet(&shadowPipeline.descriptorSet, descriptorPool);
+
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline.pipelineLayout, 0, 1, &shadowPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
 
 		// Draw entity batches
 		for(uint32_t b=0;b<entityList->batchCount;b++)

@@ -15,7 +15,7 @@ extern VkuImage_t shadowDepth;
 
 void CreateShadowMap(void);
 bool CreateShadowPipeline(void);
-void ShadowUpdateMap(VkCommandBuffer commandBuffer, const EntityList_t *entityList, uint32_t frameIndex);
+void ShadowUpdateMap(VkCommandBuffer commandBuffer, const EntityList_t *entityList, uint32_t frameIndex, VkDescriptorPool descriptorPool);
 void DestroyShadow(void);
 
 #endif

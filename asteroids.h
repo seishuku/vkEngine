@@ -3,6 +3,9 @@
 
 #define MAX_ASTEROIDS 5000
 
+#include "math/math.h"
+#include "physics/physics.h"
+
 typedef struct { uint32_t entityID, modelID, tex0ID, tex1ID; } AsteroidModel_t;
 
 extern uint32_t numAsteroids;

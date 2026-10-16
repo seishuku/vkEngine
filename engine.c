@@ -1,22 +1,27 @@
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <stdalign.h>
 #include <string.h>
-#include <stdatomic.h>
+#include "assetmanager.h"
+#include "asteroids.h"
 #include "audio/audio.h"
 #include "audio/music.h"
 #include "audio/sfx.h"
 #include "camera/camera.h"
 #include "console/console.h"
+#include "enemy.h"
+#include "entitylist.h"
 #include "font/font.h"
 #include "image/image.h"
+#include "input/input.h"
+#include "loadingscreen.h"
 #include "math/math.h"
-#include "model/bmodel.h"
 #include "model/banim.h"
-#include "network/network.h"
+#include "model/bmodel.h"
 #include "network/client_network.h"
+#include "network/network.h"
+#include "perframe.h"
 #include "physics/particle.h"
 #include "physics/physics.h"
 #include "pipelines/composite.h"
@@ -29,6 +34,7 @@
 #include "pipelines/sphere.h"
 #include "pipelines/triangle.h"
 #include "pipelines/volume.h"
+#include "precorder.h"
 #include "system/system.h"
 #include "system/threads.h"
 #include "ui/ui.h"
@@ -36,16 +42,8 @@
 #include "utils/bvh.h"
 #include "utils/event.h"
 #include "utils/list.h"
-#include "input/input.h"
 #include "vr/vr.h"
 #include "vulkan/vulkan.h"
-#include "assetmanager.h"
-#include "asteroids.h"
-#include "enemy.h"
-#include "entitylist.h"
-#include "loadingscreen.h"
-#include "perframe.h"
-#include "precorder.h"
 
 extern bool isDone;
 
@@ -489,7 +487,6 @@ matrix FighterTransform(const RigidBody_t *body)
 matrix TestTransform(const RigidBody_t *body)
 {
 	matrix local=MatrixIdentity();
-	local=MatrixMult(local, MatrixTranslatev(Vec3_Muls(AssetManager_GetAsset(assets, MODEL_TEST)->model.center, -1.0f)));
 	local=MatrixMult(local, QuatToMatrix(body->orientation));
 	return MatrixMult(local, MatrixTranslatev(body->position));
 }
@@ -645,6 +642,7 @@ void GenerateWorld(void)
 	GenNebulaVolume();
 
 	EntityList_Clear(&entityList);
+	Animation_Clear(&animationSystem);
 
 	if(!ClientNetwork_IsConnected())
 	{
@@ -696,8 +694,7 @@ void GenerateWorld(void)
 			EntityList_Add(&entityList, &enemy[i].body, false, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[i]+0), TEXTURE_FIGHTER1+(2*fighterTexture[i]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 
 		testEntityID=EntityList_Add(&entityList, &testBody, false, MODEL_TEST, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, TestTransform);
-		testAnimID=Animation_Create(&animationSystem, &AssetManager_GetAsset(assets, MODEL_TEST)->model, &AssetManager_GetAsset(assets, ANIMATION_TEST)->animation);
-		EntityList_SetAnimation(&entityList, testEntityID, testAnimID);
+		testAnimID=EntityList_AddAnimator(&entityList, testEntityID);
 
 		// for(uint32_t i=0;i<NUM_CUBE;i++)
 		// 	EntityList_Add(&entityList, &cubeBody[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
@@ -1969,7 +1966,7 @@ void Render(void)
 	});
 
 	// Update shadow depth map
-	ShadowUpdateMap(perFrame[index].commandBuffer, &entityList, index);
+	ShadowUpdateMap(perFrame[index].commandBuffer, &entityList, index, perFrame[index].descriptorPool);
 
 	EyeRender(index, 0, headPose[0]);
 

@@ -6,6 +6,7 @@
 #include "math/math.h"
 #include "physics/physics.h"
 #include "vulkan/vulkan.h"
+#include "utils/animation.h"
 #include "utils/id.h"
 
 #define MAX_ENTITY 50000
@@ -103,7 +104,10 @@ bool EntityList_Remove(EntityList_t *list, uint32_t ID);
 void EntityList_Clear(EntityList_t *list);
 
 bool EntityList_SetNoRender(EntityList_t *list, uint32_t ID, bool noRender);
-bool EntityList_SetAnimation(EntityList_t *list, uint32_t ID, uint32_t animationID);
+
+uint32_t EntityList_AddAnimator(EntityList_t *list, uint32_t ID);
+bool EntityList_RemoveAnimator(EntityList_t *list, uint32_t ID);
+Animator_t *EntityList_GetAnimator(EntityList_t *list, uint32_t ID);
 
 void EntityList_RecalculateBounds(EntityList_t *list);
 void EntityList_Rebuild(EntityList_t *list);
