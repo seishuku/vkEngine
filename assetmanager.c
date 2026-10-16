@@ -54,7 +54,8 @@ AssetManager_t assets[]=
 	{ MODEL_CUBE,               ASSET_MODEL,   "assets/cube.bmodel" },
 	{ MODEL_TEST,				ASSET_MODEL,   "assets/test.bmodel" },
 
-	{ ANIMATION_TEST,			ASSET_ANIMATION, "assets/test.banim" },
+	{ ANIMATION_TEST_IDLE,		ASSET_ANIMATION, "assets/test_idle.banim" },
+	{ ANIMATION_TEST_DANCE,		ASSET_ANIMATION, "assets/test_dance.banim" },
 
 	{ SOUND_PEW1,               ASSET_SOUND,   "assets/pew1.wav" },
 	{ SOUND_PEW2,               ASSET_SOUND,   "assets/pew1.wav" },

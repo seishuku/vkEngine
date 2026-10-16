@@ -486,7 +486,11 @@ matrix FighterTransform(const RigidBody_t *body)
 
 matrix TestTransform(const RigidBody_t *body)
 {
-	matrix local=MatrixIdentity();
+	const BModel_t *model=&AssetManager_GetAsset(assets, MODEL_TEST)->model;
+	const vec3 center=Vec3_Muls(Vec3_Addv(model->bBoxMin, model->bBoxMax), 0.5f);
+
+	// Move the model so the center of its bounds is at the body's position
+	matrix local=MatrixTranslatev(Vec3_Muls(center, -1.0f));
 	local=MatrixMult(local, QuatToMatrix(body->orientation));
 	return MatrixMult(local, MatrixTranslatev(body->position));
 }
@@ -659,7 +663,7 @@ void GenerateWorld(void)
 	volatile const vec3 size=Vec3_Muls(Vec3_Subv(model->bBoxMax, model->bBoxMin), 0.5f);
 	testBody=(RigidBody_t)
 	{
-		.position=Vec3(0.0f, 0.0f, -50.0f),
+		.position=Vec3(0.0f, -48.0f, -50.0f),
 
 		.velocity=Vec3b(0.0f),
 		.force=Vec3b(0.0f),
@@ -1381,7 +1385,7 @@ void Thread_Physics(void *arg)
 					PhysicsSolveConstraint(&assembly[i], fTimeStep/constraintIterations);
 			}
 
-#if 1
+#if 0
 			{
 				vec3 dirToCamWorld=Vec3_Subv(camera.body.position, bodies[BODY_CHASSIS].position);
 				vec3 dirToCamLocal=QuatRotate(QuatInverse(bodies[BODY_CHASSIS].orientation), dirToCamWorld);
@@ -2161,12 +2165,14 @@ void Console_CmdAnimation(Console_t *console, const char *param)
 
 	Animator_t *testAnim=Animation_Get(&animationSystem, testAnimID);
 
-	if(strcmp(param, "start")==0)
-		Animator_Play(testAnim, &AssetManager_GetAsset(assets, ANIMATION_TEST)->animation, true);
+	if(strcmp(param, "idle")==0)
+		Animator_Play(testAnim, &AssetManager_GetAsset(assets, ANIMATION_TEST_IDLE)->animation, true);
+	else if(strcmp(param, "dance")==0)
+		Animator_Play(testAnim, &AssetManager_GetAsset(assets, ANIMATION_TEST_DANCE)->animation, true);
 	else if(strcmp(param, "stop")==0)
 		Animator_Stop(testAnim);
 	else
-		ConsolePrint(console, "Invalid parameter. Use 'start' or 'stop'.");
+		ConsolePrint(console, "Invalid parameter. Use 'idle', 'dance', or 'stop'.");
 }
 
 // Initialization call from system main
