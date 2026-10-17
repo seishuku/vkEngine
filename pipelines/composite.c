@@ -148,7 +148,7 @@ bool CreateCompositePipeline(void)
 		},
 	}, 0, &compositeRenderPass);
 
-	if(!CreatePipeline(&vkContext, &compositePipeline, compositeRenderPass, "pipelines/composite.pipeline"))
+	if(!CreatePipeline(&vkContext, &compositePipeline, compositeRenderPass, "assets/pipelines/composite.pipeline"))
 		return false;
 
 	// Post-process chain runs in the order they are added.

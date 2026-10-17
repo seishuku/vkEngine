@@ -3,11 +3,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "math/math.h"
-#include "physics/physics.h"
-#include "vulkan/vulkan.h"
-#include "utils/animation.h"
-#include "utils/id.h"
+#include "../math/math.h"
+#include "../physics/physics.h"
+#include "../vulkan/vulkan.h"
+#include "animation.h"
+#include "id.h"
 
 #define MAX_ENTITY 50000
 

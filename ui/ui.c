@@ -26,7 +26,7 @@ typedef struct
 
 static bool UI_VulkanPipeline(UI_t *UI)
 {
-	if(!CreatePipeline(&vkContext, &UI->pipeline, UI->renderPass, "pipelines/ui_sdf.pipeline"))
+	if(!CreatePipeline(&vkContext, &UI->pipeline, UI->renderPass, "assets/pipelines/ui_sdf.pipeline"))
 		return false;
 
 	// Create a dummy blank image for binding to descriptor sets when no texture is needed

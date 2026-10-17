@@ -41,10 +41,10 @@ bool CreateSkyboxPipeline(void)
 
 	PipelineOverrideRasterizationSamples(config.MSAA);
 
-	if(!CreatePipeline(&vkContext, &skyboxPipeline, renderPass, "pipelines/skybox.pipeline"))
+	if(!CreatePipeline(&vkContext, &skyboxPipeline, renderPass, "assets/pipelines/skybox.pipeline"))
 		return false;
 
-	if(!CreatePipeline(&vkContext, &skyboxGenPipeline, renderPass, "pipelines/skybox_gen.pipeline"))
+	if(!CreatePipeline(&vkContext, &skyboxGenPipeline, renderPass, "assets/pipelines/skybox_gen.pipeline"))
 		return false;
 
 	PipelineOverrideRasterizationSamples(VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);

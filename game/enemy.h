@@ -1,8 +1,8 @@
 #ifndef __ENEMY_H__
 #define __ENEMY_H__
 
-#include "camera/camera.h"
-#include "entitylist.h"
+#include "../camera/camera.h"
+#include "../utils/entitylist.h"
 
 #define NUM_ENEMY 8
 

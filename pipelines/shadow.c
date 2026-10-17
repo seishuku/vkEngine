@@ -8,10 +8,10 @@
 #include "../camera/camera.h"
 #include "../model/bmodel.h"
 #include "../utils/animation.h"
+#include "../utils/entitylist.h"
 #include "../utils/pipeline.h"
 #include "../assetmanager.h"
 #include "../perframe.h"
-#include "../entitylist.h"
 #include "skybox.h"
 #include "shadow.h"
 
@@ -249,7 +249,7 @@ bool CreateShadowPipeline(void)
 		}
 	}, 0, &shadowRenderPass);
 
-	if(!CreatePipeline(&vkContext, &shadowPipeline, shadowRenderPass, "pipelines/shadow.pipeline"))
+	if(!CreatePipeline(&vkContext, &shadowPipeline, shadowRenderPass, "assets/pipelines/shadow.pipeline"))
 		return false;
 
 	CalculateCascadeSplits(0.01, 3000.0f, NUM_CASCADES, 0.9f, cascadeSplits);

@@ -5,7 +5,7 @@
 #include "bvh.h"
 #include "../system/system.h"
 #include "../math/math.h"
-#include "../entitylist.h"
+#include "../utils/entitylist.h"
 
 static int32_t indices[MAX_ENTITY];
 

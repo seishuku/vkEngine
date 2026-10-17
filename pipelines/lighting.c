@@ -6,7 +6,7 @@
 #include "../utils/animation.h"
 #include "../utils/pipeline.h"
 #include "../assetmanager.h"
-#include "../entitylist.h"
+#include "../utils/entitylist.h"
 #include "../perframe.h"
 #include "shadow.h"
 
@@ -171,7 +171,7 @@ bool CreateLightingPipeline(void)
 
 	PipelineOverrideRasterizationSamples(config.MSAA);
 
-	if(!CreatePipeline(&vkContext, &mainPipeline, renderPass, "pipelines/lighting.pipeline"))
+	if(!CreatePipeline(&vkContext, &mainPipeline, renderPass, "assets/pipelines/lighting.pipeline"))
 		return false;
 
 	PipelineOverrideRasterizationSamples(VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);

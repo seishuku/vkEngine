@@ -2,11 +2,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include "system/system.h"
-#include "vulkan/vulkan.h"
-#include "utils/animation.h"
-#include "assetmanager.h"
-#include "perframe.h"
+#include "../system/system.h"
+#include "../vulkan/vulkan.h"
+#include "../utils/animation.h"
+#include "../assetmanager.h"
+#include "../perframe.h"
 #include "entitylist.h"
 
 extern VkuContext_t vkContext;

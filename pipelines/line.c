@@ -16,7 +16,7 @@ bool CreateLinePipeline(void)
 {
 	PipelineOverrideRasterizationSamples(config.MSAA);
 
-	if(!CreatePipeline(&vkContext, &linePipeline, renderPass, "pipelines/line.pipeline"))
+	if(!CreatePipeline(&vkContext, &linePipeline, renderPass, "assets/pipelines/line.pipeline"))
 		return false;
 
 	PipelineOverrideRasterizationSamples(VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);

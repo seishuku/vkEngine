@@ -265,10 +265,10 @@ VkBool32 InitNebulaVolume(void)
 
 	vkuOneShotCommandBufferEnd(&vkContext, command);
 
-	if(!CreatePipeline(&vkContext, &computePipeline, VK_NULL_HANDLE, "pipelines/volume_gen.pipeline"))
+	if(!CreatePipeline(&vkContext, &computePipeline, VK_NULL_HANDLE, "assets/pipelines/volume_gen.pipeline"))
 		return VK_FALSE;
 
-	if(!CreatePipeline(&vkContext, &fluidPipeline, VK_NULL_HANDLE, "pipelines/fluid3d.pipeline"))
+	if(!CreatePipeline(&vkContext, &fluidPipeline, VK_NULL_HANDLE, "assets/pipelines/fluid3d.pipeline"))
 		return VK_FALSE;
 
 	vkCreateDescriptorPool(vkContext.device, &(VkDescriptorPoolCreateInfo)
@@ -584,7 +584,7 @@ bool CreateVolumePipeline(void)
 {
 	PipelineOverrideRasterizationSamples(config.MSAA);
 
-	if(!CreatePipeline(&vkContext, &volumePipeline, renderPass, "pipelines/volume.pipeline"))
+	if(!CreatePipeline(&vkContext, &volumePipeline, renderPass, "assets/pipelines/volume.pipeline"))
 		return false;
 
 	PipelineOverrideRasterizationSamples(VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);

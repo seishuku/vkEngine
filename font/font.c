@@ -30,7 +30,7 @@ bool Font_Init(Font_t *font, uint32_t width, uint32_t height, VkRenderPass rende
 	font->height=height;
 
 	// Load and create pipeline
-	if(!CreatePipeline(&vkContext, &font->pipeline, renderPass, "pipelines/font.pipeline"))
+	if(!CreatePipeline(&vkContext, &font->pipeline, renderPass, "assets/pipelines/font.pipeline"))
 		return false;
 
 	// Create instance buffer and map it

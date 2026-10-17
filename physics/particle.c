@@ -287,7 +287,7 @@ bool ParticleSystem_Init(ParticleSystem_t *system)
 
 	PipelineOverrideRasterizationSamples(config.MSAA);
 
-	if(!CreatePipeline(&vkContext, &particlePipeline, renderPass, "pipelines/particle.pipeline"))
+	if(!CreatePipeline(&vkContext, &particlePipeline, renderPass, "assets/pipelines/particle.pipeline"))
 		return false;
 
 	PipelineOverrideRasterizationSamples(VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);

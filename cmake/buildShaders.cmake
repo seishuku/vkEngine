@@ -1,5 +1,5 @@
 function(buildShaders)
-    file(GLOB PIPELINE_FILES "${PROJECT_SOURCE_DIR}/pipelines/*.pipeline")
+    file(GLOB PIPELINE_FILES "${PROJECT_SOURCE_DIR}/assets/pipelines/*.pipeline")
 
     # Possible supported shader stages
     set(STAGE_EXTENSIONS vert tesc tese geom frag comp)
@@ -34,9 +34,9 @@ function(buildShaders)
 
         add_custom_command(
             OUTPUT ${MARKER_FILE}
-            COMMAND ${PYTHON_EXECUTABLE} ${PROJECT_SOURCE_DIR}/embedPipelineShaders.py ${PIPELINE_FILE} --shader-path ${CMAKE_BINARY_DIR}/shaders
+            COMMAND ${PYTHON_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/embedPipelineShaders.py ${PIPELINE_FILE} --shader-path ${CMAKE_BINARY_DIR}/shaders
             COMMAND ${CMAKE_COMMAND} -E touch ${MARKER_FILE}
-            DEPENDS ${PROJECT_SOURCE_DIR}/embedPipelineShaders.py ${PIPELINE_FILE} ${PIPELINE_SHADER_DEPENDENCIES}
+            DEPENDS ${PROJECT_SOURCE_DIR}/tools/embedPipelineShaders.py ${PIPELINE_FILE} ${PIPELINE_SHADER_DEPENDENCIES}
             COMMENT "Embedding shaders into ${PIPELINE_FILE}..."
         )
 

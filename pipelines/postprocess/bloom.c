@@ -88,10 +88,10 @@ static bool Bloom_Create(PostProcessEffect_t *self)
 	}, 0, &bloom->renderPass)!=VK_SUCCESS)
 		return false;
 
-	if(!CreatePipeline(&vkContext, &bloom->thresholdPipeline, bloom->renderPass, "pipelines/threshold.pipeline"))
+	if(!CreatePipeline(&vkContext, &bloom->thresholdPipeline, bloom->renderPass, "assets/pipelines/threshold.pipeline"))
 		return false;
 
-	if(!CreatePipeline(&vkContext, &bloom->gaussianPipeline, bloom->renderPass, "pipelines/gaussian.pipeline"))
+	if(!CreatePipeline(&vkContext, &bloom->gaussianPipeline, bloom->renderPass, "assets/pipelines/gaussian.pipeline"))
 		return false;
 
 	return true;

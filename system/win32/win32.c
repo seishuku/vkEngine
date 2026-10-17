@@ -399,11 +399,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
 
-#if 0
-#include "../../renderdoc_app.h"
-RENDERDOC_API_1_6_0 *rdoc_api=NULL;
-#endif
-
 #ifndef _CONSOLE
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int iCmdShow)
 {
@@ -557,20 +552,6 @@ int main(int argc, char **argv)
 	DBGPRINTF(DEBUG_INFO, "\nCurrent system zone memory allocations:\n");
 	Zone_Print(zone);
 
-#if 0
-	// RenderDoc frame capture for VR mode
-	HMODULE mod=GetModuleHandleA("renderdoc.dll");
-	if(mod)
-	{
-		pRENDERDOC_GetAPI RENDERDOC_GetAPI=(pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
-
-		if(!RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_6_0, (void **)&rdoc_api))
-			return -1;
-	}
-	
-	bool captureThisFrame=false;
-#endif
-
 	DBGPRINTF(DEBUG_INFO, "\nStarting main loop.\n");
 	while(!isDone)
 	{
@@ -593,12 +574,6 @@ int main(int argc, char **argv)
 
 			double startTime=GetClock();
 
-#if 0
-			// RenderDoc frame capture for VR mode
-			if(captureThisFrame&&rdoc_api)
-				rdoc_api->StartFrameCapture(NULL, NULL);
-#endif
-
 			Input_Update();
 			Render();
 
@@ -608,15 +583,6 @@ int main(int argc, char **argv)
 			avgFPS+=1.0f/fTimeStep;
 
 			static uint32_t frameCount=0;
-
-#if 0
-			// RenderDoc frame capture for VR mode
-			if(captureThisFrame&&rdoc_api)
-			{
-				captureThisFrame=false;
-				rdoc_api->EndFrameCapture(NULL, NULL);
-			}
-#endif
 
 			if(frameCount++>100)
 			{

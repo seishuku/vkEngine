@@ -3,10 +3,9 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "vulkan/vulkan.h"
-#include "system/threads.h"
-#include "image/image.h"
-#include "ui/ui.h"
+#include "../vulkan/vulkan.h"
+#include "../image/image.h"
+#include "../ui/ui.h"
 
 typedef struct
 {

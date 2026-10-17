@@ -2,14 +2,14 @@
 #include <stdint.h>
 #include <string.h>
 #include "../camera/camera.h"
-#include "../entitylist.h"
 #include "../math/math.h"
 #include "../network/network.h"
 #include "../physics/particle.h"
 #include "../system/system.h"
+#include "../utils/entitylist.h"
 #include "../utils/serial.h"
 #include "../utils/id.h"
-#include "../asteroids.h"
+#include "../game/asteroids.h"
 #include "../assetmanager.h"
 #include "client_network.h"
 #include "net_protocol.h"

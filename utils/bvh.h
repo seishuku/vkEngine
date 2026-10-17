@@ -2,7 +2,7 @@
 #define __BVH_H__
 
 #include "../math/math.h"
-#include "../entitylist.h"
+#include "entitylist.h"
 
 #define BVH_MAX_NODES (MAX_ENTITY*2)
  

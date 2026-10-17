@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "../math/math.h"
 
 #define AUDIO_SAMPLE_RATE 48000

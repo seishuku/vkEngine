@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "../entitylist.h"
 #include "../camera/camera.h"
+#include "../utils/entitylist.h"
 #include "net_protocol.h"
 
 #define CLIENT_STATUS_RATE      (1.0/30.0)  // STATUS send rate (seconds)

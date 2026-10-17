@@ -2,9 +2,9 @@
 #define __LIGHTING_H__
 
 #include <stdint.h>
-#include "../vulkan/vulkan.h"
+#include "../utils/entitylist.h"
 #include "../utils/pipeline.h"
-#include "../entitylist.h"
+#include "../vulkan/vulkan.h"
 
 extern VkRenderPass renderPass;
 

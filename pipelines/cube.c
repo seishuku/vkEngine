@@ -16,7 +16,7 @@ bool CreateCubePipeline(void)
 {
 	PipelineOverrideRasterizationSamples(config.MSAA);
 
-	if(!CreatePipeline(&vkContext, &cubePipeline, renderPass, "pipelines/cube.pipeline"))
+	if(!CreatePipeline(&vkContext, &cubePipeline, renderPass, "assets/pipelines/cube.pipeline"))
 		return false;
 
 	PipelineOverrideRasterizationSamples(VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);

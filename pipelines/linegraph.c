@@ -14,7 +14,7 @@ static Pipeline_t lineGraphPipeline;
 
 bool CreateLineGraphPipeline(VkRenderPass renderPass)
 {
-	if(!CreatePipeline(&vkContext, &lineGraphPipeline, renderPass, "pipelines/linegraph.pipeline"))
+	if(!CreatePipeline(&vkContext, &lineGraphPipeline, renderPass, "assets/pipelines/linegraph.pipeline"))
 		return false;
 
 	return true;

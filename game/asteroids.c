@@ -1,9 +1,9 @@
 #include <stdint.h>
 #include <stdbool.h>
-#include "system/system.h"
-#include "physics/physics.h"
-#include "assetmanager.h"
-#include "entitylist.h"
+#include "../system/system.h"
+#include "../physics/physics.h"
+#include "../utils/entitylist.h"
+#include "../assetmanager.h"
 #include "asteroids.h"
 
 extern EntityList_t entityList;

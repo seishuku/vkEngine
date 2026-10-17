@@ -3,7 +3,7 @@
 
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
-#include "../entitylist.h"
+#include "../utils/entitylist.h"
 
 #ifndef NUM_CASCADES
 #define NUM_CASCADES 4

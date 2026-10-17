@@ -1,8 +1,8 @@
-#include "vulkan/vulkan.h"
-#include "system/system.h"
-#include "system/threads.h"
-#include "ui/ui.h"
-#include "image/image.h"
+#include "../vulkan/vulkan.h"
+#include "../system/system.h"
+#include "../system/threads.h"
+#include "../ui/ui.h"
+#include "../image/image.h"
 #include "loadingscreen.h"
 
 extern VkuContext_t vkContext;

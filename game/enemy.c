@@ -1,14 +1,14 @@
 #include <stdint.h>
 #include <stdbool.h>
-#include "system/system.h"
-#include "math/math.h"
-#include "physics/particle.h"
-#include "physics/physics.h"
-#include "camera/camera.h"
-#include "audio/audio.h"
-#include "assetmanager.h"
+#include "../audio/audio.h"
+#include "../camera/camera.h"
+#include "../math/math.h"
+#include "../physics/particle.h"
+#include "../physics/physics.h"
+#include "../system/system.h"
+#include "../utils/entitylist.h"
+#include "../assetmanager.h"
 #include "enemy.h"
-#include "entitylist.h"
 
 extern float fTimeStep;
 extern ParticleSystem_t particleSystem;

@@ -15,7 +15,7 @@ bool CreateTrianglePipeline(void)
 {
 	PipelineOverrideRasterizationSamples(config.MSAA);
 
-	if(!CreatePipeline(&vkContext, &trianglePipeline, renderPass, "pipelines/triangle.pipeline"))
+	if(!CreatePipeline(&vkContext, &trianglePipeline, renderPass, "assets/pipelines/triangle.pipeline"))
 		return false;
 
 	PipelineOverrideRasterizationSamples(VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);

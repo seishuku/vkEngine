@@ -1,13 +1,13 @@
 #ifndef __NET_PROTOCOL_H__
 #define __NET_PROTOCOL_H__
 
-#include "../entitylist.h"
-#include "../math/math.h"
-#include "../utils/id.h"
-#include "../utils/serial.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include "../math/math.h"
+#include "../utils/entitylist.h"
+#include "../utils/id.h"
+#include "../utils/serial.h"
 
 #define NETMAGIC_CONNECT	('C'|'o'<<8|'n'<<16|'n'<<24) // "Conn"
 #define NETMAGIC_DISCONNECT	('D'|'i'<<8|'s'<<16|'C'<<24) // "DisC"

@@ -65,7 +65,7 @@ function("buildAndroid")
 	file(MAKE_DIRECTORY ${APK_BUILD_DIR})
 
 	# Collect pipeline file names
-	file(GLOB PIPELINE_FILES "${PROJECT_SOURCE_DIR}/pipelines/*.pipeline")
+	file(GLOB PIPELINE_FILES "${PROJECT_SOURCE_DIR}/assets/pipelines/*.pipeline")
 
 	# Collect shader file names
 	#file(GLOB SHADER_FILES "${PROJECT_SOURCE_DIR}/shaders/*.spv")
@@ -88,10 +88,6 @@ function("buildAndroid")
 
 		COMMAND ${CMAKE_COMMAND} -E make_directory ${APK_BUILD_DIR}/assets
 		COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/config.ini ${APK_BUILD_DIR}/assets/
-
-		# Copy pipelines
-		COMMAND ${CMAKE_COMMAND} -E make_directory ${APK_BUILD_DIR}/assets/pipelines
-		COMMAND ${CMAKE_COMMAND} -E copy ${PIPELINE_FILES} ${APK_BUILD_DIR}/assets/pipelines/
 
 		# Copy assets and remove music
 		COMMAND ${CMAKE_COMMAND} -E make_directory ${APK_BUILD_DIR}/assets/assets

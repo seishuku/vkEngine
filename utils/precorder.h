@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "physics/physics.h"
+#include "../physics/physics.h"
 
 // File format (little-endian, all fields written explicitly, no raw struct dumps):
 //

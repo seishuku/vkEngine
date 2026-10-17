@@ -16,7 +16,7 @@ bool CreateSpherePipeline(void)
 {
 	PipelineOverrideRasterizationSamples(config.MSAA);
 
-	if(!CreatePipeline(&vkContext, &spherePipeline, renderPass, "pipelines/sphere.pipeline"))
+	if(!CreatePipeline(&vkContext, &spherePipeline, renderPass, "assets/pipelines/sphere.pipeline"))
 		return false;
 
 	PipelineOverrideRasterizationSamples(VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM);
