@@ -490,9 +490,12 @@ matrix TestTransform(const RigidBody_t *body)
 	const vec3 center=Vec3_Muls(Vec3_Addv(model->bBoxMin, model->bBoxMax), 0.5f);
 
 	// Move the model so the center of its bounds is at the body's position
-	matrix local=MatrixTranslatev(Vec3_Muls(center, -1.0f));
+	matrix local=MatrixIdentity();
+	local=MatrixMult(local, MatrixScalev(Vec3b(10.0f)));
+	local=MatrixMult(local, MatrixTranslatev(Vec3_Muls(center, -1.0f)));
 	local=MatrixMult(local, QuatToMatrix(body->orientation));
-	return MatrixMult(local, MatrixTranslatev(body->position));
+	local=MatrixMult(local, MatrixTranslatev(body->position));
+	return local;
 }
 
 void ResetPhysicsCubes(void)
@@ -660,17 +663,17 @@ void GenerateWorld(void)
 	playerID=EntityList_Add(&entityList, &camera.body, !camera.thirdPerson, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+0), TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 
 	const BModel_t *model=&AssetManager_GetAsset(assets, MODEL_TEST)->model;
-	volatile const vec3 size=Vec3_Muls(Vec3_Subv(model->bBoxMax, model->bBoxMin), 0.5f);
+	volatile const vec3 size=Vec3_Muls(Vec3_Subv(model->bBoxMax, model->bBoxMin), 10.5f);
 	testBody=(RigidBody_t)
 	{
-		.position=Vec3(0.0f, -48.0f, -50.0f),
+		.position=Vec3(0.0f, 0.0f, -50.0f),
 
 		.velocity=Vec3b(0.0f),
 		.force=Vec3b(0.0f),
 		.mass=0.0f,
 		.invMass=0.0f,
 
-		.orientation=Vec4(0.0f, PI*2, 0.0f, 1.0f),
+		.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
 		.angularVelocity=Vec3b(0.0f),
 		.inertia=0.0f,
 		.invInertia=0.0f,
@@ -2155,11 +2158,39 @@ void Console_CmdPhysicsRecord(Console_t *console, const char *param)
 		ConsolePrint(console, "Invalid parameter. Use 'start' or 'stop'.");
 }
 
+static uint32_t animationState=0;
+
+void testAnimFinish(Animator_t *animator, void *arg)
+{
+	if(animationState==0)
+	{
+		Animator_Play(animator, &AssetManager_GetAsset(assets, ANIMATION_TEST_DANCE)->animation, false);
+		Animator_SetOnFinish(animator, testAnimFinish, NULL);
+		animationState=1;
+	}
+	else if(animationState==1)
+	{
+		Animator_Play(animator, &AssetManager_GetAsset(assets, ANIMATION_TEST_JAB)->animation, false);
+		Animator_SetOnFinish(animator, testAnimFinish, NULL);
+		animationState=2;
+	}
+	else if(animationState==2)
+	{
+		Animator_Play(animator, &AssetManager_GetAsset(assets, ANIMATION_TEST_IDLE)->animation, true);
+		animationState=0;
+	}
+}
+
+void testAnimFinish2(Animator_t *animator, void *arg)
+{
+	Animator_Play(animator, &AssetManager_GetAsset(assets, ANIMATION_TEST_IDLE)->animation, true);
+}
+
 void Console_CmdAnimation(Console_t *console, const char *param)
 {
 	if(param==NULL)
 	{
-		ConsolePrint(console, "Missing parameter.");
+		ConsolePrint(console, "Missing parameter. Use 'idle', 'dance', 'punch' or 'stop'.");
 		return;
 	}
 
@@ -2168,11 +2199,19 @@ void Console_CmdAnimation(Console_t *console, const char *param)
 	if(strcmp(param, "idle")==0)
 		Animator_Play(testAnim, &AssetManager_GetAsset(assets, ANIMATION_TEST_IDLE)->animation, true);
 	else if(strcmp(param, "dance")==0)
-		Animator_Play(testAnim, &AssetManager_GetAsset(assets, ANIMATION_TEST_DANCE)->animation, true);
+	{
+		Animator_Play(testAnim, &AssetManager_GetAsset(assets, ANIMATION_TEST_DANCE)->animation, false);
+		Animator_SetOnFinish(testAnim, testAnimFinish2, NULL);
+	}
+	else if(strcmp(param, "punch")==0)
+	{
+		Animator_Play(testAnim, &AssetManager_GetAsset(assets, ANIMATION_TEST_CROSS)->animation, false);
+		Animator_SetOnFinish(testAnim, testAnimFinish, NULL);
+	}
 	else if(strcmp(param, "stop")==0)
 		Animator_Stop(testAnim);
 	else
-		ConsolePrint(console, "Invalid parameter. Use 'idle', 'dance', or 'stop'.");
+		ConsolePrint(console, "Invalid parameter. Use 'idle', 'dance', 'punch' or 'stop'.");
 }
 
 // Initialization call from system main

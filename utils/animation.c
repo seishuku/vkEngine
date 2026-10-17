@@ -105,6 +105,9 @@ void Animator_Play(Animator_t *animator, const BAnim_t *clip, bool loop)
 		return;
 	}
 
+	animator->onFinish=NULL;
+	animator->userData=NULL;
+
 	if(ANIM_BLEND_TIME>0.0f&&animator->hasPose)
 	{
 		memcpy(animator->fromPose, animator->lastPose, sizeof(BAnim_BoneFrame_t)*animator->model->numBone);
@@ -123,6 +126,15 @@ void Animator_Play(Animator_t *animator, const BAnim_t *clip, bool loop)
 void Animator_Stop(Animator_t *animator)
 {
 	animator->playing=false;
+}
+
+void Animator_SetOnFinish(Animator_t *animator, AnimatorCallback_t callback, void *userData)
+{
+	if(!animator)
+		return;
+
+	animator->onFinish=callback;
+	animator->userData=userData;
 }
 
 static void BindPose(const BModel_t *model, BAnim_BoneFrame_t *out)
@@ -169,32 +181,37 @@ static void AdvanceTime(Animator_t *animator, float dt)
 	if(!animator->playing||!clip||clip->numFrame==0||clip->frameRate<=0.0f)
 		return;
 
-	animator->time+=dt*animator->speed;
+	float time=animator->time+dt*animator->speed;
 
 	if(animator->loop)
 	{
 		const float length=(float)clip->numFrame/clip->frameRate;
+		const float wraps=floorf(time/length);
 
-		animator->time=fmodf(animator->time, length);
+		time-=wraps*length;
 
-		if(animator->time<0.0f)
-			animator->time+=length;
+		if(wraps!=0.0f)
+			animator->finished=true;
 	}
 	else
 	{
 		const float end=(float)(clip->numFrame-1)/clip->frameRate;
 
-		if(animator->time>=end)
+		if(time>=end)
 		{
-			animator->time=end;
+			time=end;
 			animator->playing=false;
+			animator->finished=true;
 		}
-		else if(animator->time<0.0f)
+		else if(time<0.0f)
 		{
-			animator->time=0.0f;
+			time=0.0f;
 			animator->playing=false;
+			animator->finished=true;
 		}
 	}
+
+	animator->time=time;
 }
 
 void Animation_Update(AnimationSystem_t *system, float dt, uint32_t frameIndex)
@@ -263,5 +280,18 @@ void Animation_Update(AnimationSystem_t *system, float dt, uint32_t frameIndex)
 
 		animator->paletteOffset=offset;
 		offset+=numBone;
+	}
+
+	for(uint32_t i=0;i<system->highWater;i++)
+	{
+		Animator_t *animator=&system->animators[i];
+
+		if(!animator->active||!animator->finished)
+			continue;
+
+		animator->finished=false;
+
+		if(animator->onFinish)
+			animator->onFinish(animator, animator->userData);
 	}
 }

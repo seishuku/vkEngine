@@ -56,6 +56,8 @@ AssetManager_t assets[]=
 
 	{ ANIMATION_TEST_IDLE,		ASSET_ANIMATION, "assets/test_idle.banim" },
 	{ ANIMATION_TEST_DANCE,		ASSET_ANIMATION, "assets/test_dance.banim" },
+	{ ANIMATION_TEST_CROSS,		ASSET_ANIMATION, "assets/test_cross.banim" },
+	{ ANIMATION_TEST_JAB,		ASSET_ANIMATION, "assets/test_jab.banim" },
 
 	{ SOUND_PEW1,               ASSET_SOUND,   "assets/pew1.wav" },
 	{ SOUND_PEW2,               ASSET_SOUND,   "assets/pew1.wav" },

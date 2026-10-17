@@ -15,7 +15,11 @@
 // Crossfade time in seconds when the clip changes
 #define ANIM_BLEND_TIME			0.2f
 
-typedef struct
+typedef struct Animator_s Animator_t;
+
+typedef void (*AnimatorCallback_t)(Animator_t *animator, void *userData);
+
+struct Animator_s
 {
 	bool active;
 
@@ -32,8 +36,12 @@ typedef struct
 	BAnim_BoneFrame_t lastPose[ANIM_MAX_BONE];
 	BAnim_BoneFrame_t fromPose[ANIM_MAX_BONE];
 
+	AnimatorCallback_t onFinish;
+	void *userData;
+	bool finished;
+
 	uint32_t paletteOffset;
-} Animator_t;
+};
 
 typedef struct
 {
@@ -63,6 +71,7 @@ Animator_t *Animation_Get(AnimationSystem_t *system, uint32_t handle);
 
 void Animator_Play(Animator_t *animator, const BAnim_t *clip, bool loop);
 void Animator_Stop(Animator_t *animator);
+void Animator_SetOnFinish(Animator_t *animator, AnimatorCallback_t callback, void *userData);
 
 void Animation_Update(AnimationSystem_t *system, float dt, uint32_t frameIndex);
 
