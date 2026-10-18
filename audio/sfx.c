@@ -98,7 +98,8 @@ void SFXStreamData(void *buffer, size_t length)
 			sample=laserSample;
 		}
 
-		if(camera.moveForward||camera.moveBackward||camera.moveLeft||camera.moveRight||camera.moveUp||camera.moveDown)
+		// Thruster hum is for the flying camera, walking shouldn't play it
+		if(camera.mode==CAMERA_MODE_FLIGHT&&(camera.moveForward||camera.moveBackward||camera.moveLeft||camera.moveRight||camera.moveUp||camera.moveDown))
 		{
 			engineSample=sample+(int16_t)(GenerateWaveSample(&Engine)*INT16_MAX);
 

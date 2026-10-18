@@ -72,7 +72,9 @@ void main()
 	oViewDepth=-worldPosition.z;
 	oUV=vUV.xy;
 
-	oTangent=mat3(iTransform)*mat3(tangent.xyz, binormal.xyz, normal.xyz);
+	// Correct for non-uniform scaling causing shearing
+	mat3 M=transpose(inverse(mat3(iTransform)));
+	oTangent=mat3(normalize(M*tangent.xyz), normalize(M*binormal.xyz), normalize(M*normal.xyz));
 
 	const mat4 biasMat=mat4(
 		0.5, 0.0, 0.0, 0.0,

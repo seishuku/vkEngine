@@ -22,6 +22,7 @@ set(PROJECT_SOURCES
 	"console/console.c"
 	"font/font.c"
 	"game/asteroids.c"
+	"game/character.c"
 	"game/enemy.c"
 	"image/image.c"
 	"image/qoi.c"

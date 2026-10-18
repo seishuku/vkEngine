@@ -179,9 +179,9 @@ vec4 MatrixToQuat(const matrix m)
 	{
 		float S=sqrtf(tr+1.0f)*2.0f;
 
-		q.x=(m.z.y-m.y.z)/S;
-		q.y=(m.x.z-m.z.x)/S;
-		q.z=(m.y.x-m.x.y)/S;
+		q.x=(m.y.z-m.z.y)/S;
+		q.y=(m.z.x-m.x.z)/S;
+		q.z=(m.x.y-m.y.x)/S;
 		q.w=0.25f*S;
 	}
 	else if((m.x.x>m.y.y)&(m.x.x>m.z.z))
@@ -189,27 +189,27 @@ vec4 MatrixToQuat(const matrix m)
 		float S=sqrtf(1.0f+m.x.x-m.y.y-m.z.z)*2.0f;
 
 		q.x=0.25f*S;
-		q.y=(m.x.y+m.y.x)/S;
-		q.z=(m.x.z+m.z.x)/S;
-		q.w=(m.z.y-m.y.z)/S;
+		q.y=(m.y.x+m.x.y)/S;
+		q.z=(m.z.x+m.x.z)/S;
+		q.w=(m.y.z-m.z.y)/S;
 	}
 	else if(m.y.y>m.z.z)
 	{
 		float S=sqrtf(1.0f+m.y.y-m.x.x-m.z.z)*2.0f;
 
-		q.x=(m.x.y+m.y.x)/S;
+		q.x=(m.y.x+m.x.y)/S;
 		q.y=0.25f*S;
-		q.z=(m.y.z+m.z.y)/S;
-		q.w=(m.x.z-m.z.x)/S;
+		q.z=(m.z.y+m.y.z)/S;
+		q.w=(m.z.x-m.x.z)/S;
 	}
 	else
 	{
 		float S=sqrtf(1.0f+m.z.z-m.x.x-m.y.y)*2.0f;
 
-		q.x=(m.x.z+m.z.x)/S;
-		q.y=(m.y.z+m.z.y)/S;
+		q.x=(m.z.x+m.x.z)/S;
+		q.y=(m.z.y+m.y.z)/S;
 		q.z=0.25f*S;
-		q.w=(m.y.x-m.x.y)/S;
+		q.w=(m.x.y-m.y.x)/S;
 	}
 
 	return q;

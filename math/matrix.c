@@ -152,10 +152,10 @@ matrix MatrixAlignPoints(const vec3 start, const vec3 end, const vec3 up)
 
 	return (matrix)
 	{
-		.x={ c+axis.x*axis.x*c1,			axis.y*axis.x*c1+axis.z*s,	axis.z*axis.x*c1-axis.y*s,	0.0f },
+		.x={ c+axis.x*axis.x*c1,		axis.y*axis.x*c1+axis.z*s,	axis.z*axis.x*c1-axis.y*s,	0.0f },
 		.y={ axis.x*axis.y*c1-axis.z*s,	c+axis.y*axis.y*c1,			axis.z*axis.y *c1+axis.x*s,	0.0f },
 		.z={ axis.x*axis.z*c1+axis.y*s,	axis.y*axis.z*c1-axis.x*s,	c+axis.z*axis.z*c1,			0.0f },
-		.w={ start.x,						start.y,					start.z,					1.0f }
+		.w={ start.x,					start.y,					start.z,					1.0f }
 	};
 }
 

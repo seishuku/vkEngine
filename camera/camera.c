@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <float.h>
 #include "../vulkan/vulkan.h"
 #include "../system/system.h"
 #include "../math/math.h"
@@ -160,8 +161,18 @@ void CameraInit(Camera_t *camera, const vec3 position, const vec3 up, const vec3
 	camera->body.mass=(1.0f/6000.0f)*(1.33333333f*PI*camera->body.radius);
 	camera->body.invMass=1.0f/camera->body.mass;
 
-	camera->body.inertia=0.9f*camera->body.mass*(camera->body.radius*camera->body.radius);
+	camera->body.inertia=5.0f*camera->body.mass*(camera->body.radius*camera->body.radius);
 	camera->body.invInertia=1.0f/camera->body.inertia;
+
+	camera->mode=CAMERA_MODE_FLIGHT;
+	camera->followBody=NULL;
+	camera->pivotHeight=0.0f;
+	camera->orbitDistance=0.0f;
+	camera->pitch=0.0f;
+	camera->minPitch=-1.5f;
+	camera->maxPitch=1.5f;
+	camera->heading=camera->forward;
+	camera->lastUp=camera->up;
 
 	camera->moveForward=false;
 	camera->moveBackward=false;
@@ -178,7 +189,7 @@ void CameraInit(Camera_t *camera, const vec3 position, const vec3 up, const vec3
 	camera->shift=false;
 }
 
-matrix CameraUpdate(Camera_t *camera, float dt)
+static matrix CameraUpdateFlight(Camera_t *camera, float dt)
 {
 	float speed=200.0f*dt;
 	float rotation=5.0f*dt;
@@ -246,4 +257,127 @@ matrix CameraUpdate(Camera_t *camera, float dt)
 		camera->targetPosition=camera->body.position;
 		return MatrixLookAt(camera->body.position, Vec3_Addv(camera->body.position, camera->forward), camera->up);
 	}
+}
+
+static vec3 TransportVector(const vec3 v, const vec3 from, const vec3 to)
+{
+	const float cosAngle=clampf(Vec3_Dot(from, to), -1.0f, 1.0f);
+
+	if(cosAngle>0.999999f)
+		return v;
+
+	vec3 axis=Vec3_Cross(from, to);
+	float axisLength=Vec3_Length(axis);
+
+	if(axisLength<FLT_EPSILON)
+	{
+		axis=Vec3_Cross(from, (fabsf(from.y)<0.9f)?Vec3(0.0f, 1.0f, 0.0f):Vec3(1.0f, 0.0f, 0.0f));
+		axisLength=Vec3_Length(axis);
+	}
+
+	return QuatRotate(QuatAnglev(acosf(cosAngle), Vec3_Muls(axis, 1.0f/axisLength)), v);
+}
+
+static matrix CameraUpdateCharacter(Camera_t *camera, float dt)
+{
+	const RigidBody_t *target=camera->followBody;
+	const float rotation=5.0f*dt;
+
+	vec3 targetAxes[3];
+	QuatAxes(target->orientation, targetAxes);
+	const vec3 up=targetAxes[1];
+
+	if(camera->pitchUp)
+		camera->body.angularVelocity=Vec3_Subv(camera->body.angularVelocity, Vec3(rotation, 0.0f, 0.0f));
+
+	if(camera->pitchDown)
+		camera->body.angularVelocity=Vec3_Addv(camera->body.angularVelocity, Vec3(rotation, 0.0f, 0.0f));
+
+	if(camera->yawLeft)
+		camera->body.angularVelocity=Vec3_Addv(camera->body.angularVelocity, Vec3(0.0f, rotation, 0.0f));
+
+	if(camera->yawRight)
+		camera->body.angularVelocity=Vec3_Subv(camera->body.angularVelocity, Vec3(0.0f, rotation, 0.0f));
+
+	vec3 heading=TransportVector(camera->heading, camera->lastUp, up);
+	camera->lastUp=up;
+	heading=Vec3_Subv(heading, Vec3_Muls(up, Vec3_Dot(heading, up)));
+	const float headingLength=Vec3_Length(heading);
+
+	heading=(headingLength>1e-4f)?Vec3_Muls(heading, 1.0f/headingLength):targetAxes[2];
+
+	heading=QuatRotate(QuatAnglev(camera->body.angularVelocity.y*dt, up), heading);
+	camera->pitch=clampf(camera->pitch-camera->body.angularVelocity.x*dt, camera->minPitch, camera->maxPitch);
+	camera->heading=heading;
+
+	camera->body.angularVelocity=Vec3_Muls(camera->body.angularVelocity, expf(-2.0f*dt));
+
+	const vec3 forward=Vec3_Addv(Vec3_Muls(heading, cosf(camera->pitch)), Vec3_Muls(up, sinf(camera->pitch)));
+
+	vec3 right=Vec3_Cross(up, forward);
+	Vec3_Normalize(&right);
+
+	const vec3 viewUp=Vec3_Cross(forward, right);
+
+	const vec3 pivot=Vec3_Addv(target->position, Vec3_Muls(up, camera->pivotHeight));
+	const vec3 eye=Vec3_Subv(pivot, Vec3_Muls(forward, camera->orbitDistance));
+
+	const matrix orientation=
+	{
+		.x=Vec4_Vec3(right, 0.0f),
+		.y=Vec4_Vec3(viewUp, 0.0f),
+		.z=Vec4_Vec3(forward, 0.0f),
+		.w=Vec4(0.0f, 0.0f, 0.0f, 1.0f)
+	};
+
+	camera->right=right;
+	camera->up=viewUp;
+	camera->forward=forward;
+
+	camera->body.position=eye;
+	camera->body.velocity=Vec3b(0.0f);
+	camera->body.orientation=MatrixToQuat(orientation);
+	camera->targetPosition=eye;
+
+	return MatrixLookAt(eye, Vec3_Addv(eye, forward), viewUp);
+}
+
+matrix CameraUpdate(Camera_t *camera, float dt)
+{
+	if(camera->mode==CAMERA_MODE_CHARACTER&&camera->followBody)
+		return CameraUpdateCharacter(camera, dt);
+
+	return CameraUpdateFlight(camera, dt);
+}
+
+void CameraFollowBody(Camera_t *camera, const RigidBody_t *body, const float pivotHeight, const float orbitDistance)
+{
+	vec3 axes[3];
+	QuatAxes(body->orientation, axes);
+
+	camera->mode=CAMERA_MODE_CHARACTER;
+	camera->followBody=body;
+	camera->pivotHeight=pivotHeight;
+	camera->orbitDistance=orbitDistance;
+
+	const float lookUp=clampf(Vec3_Dot(camera->forward, axes[1]), -1.0f, 1.0f);
+
+	camera->pitch=clampf(asinf(lookUp), camera->minPitch, camera->maxPitch);
+	camera->lastUp=axes[1];
+	camera->heading=Vec3_Subv(camera->forward, Vec3_Muls(axes[1], lookUp));
+
+	if(Vec3_Length(camera->heading)<1e-4f)
+		camera->heading=axes[2];
+
+	Vec3_Normalize(&camera->heading);
+	camera->body.angularVelocity=Vec3b(0.0f);
+}
+
+void CameraSetFlight(Camera_t *camera)
+{
+	camera->mode=CAMERA_MODE_FLIGHT;
+	camera->followBody=NULL;
+	camera->body.velocity=Vec3b(0.0f);
+	camera->body.angularVelocity=Vec3b(0.0f);
+	camera->targetPosition=camera->body.position;
 }

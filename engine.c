@@ -12,6 +12,7 @@
 #include "utils/entitylist.h"
 #include "font/font.h"
 #include "game/asteroids.h"
+#include "game/character.h"
 #include "game/enemy.h"
 #include "image/image.h"
 #include "input/input.h"
@@ -102,9 +103,9 @@ AnimationSystem_t animationSystem;
 RigidBody_t cubeBody[NUM_CUBE];
 RigidBody_t platformBody;
 
-RigidBody_t testBody;
-uint32_t testAnimID=UINT32_MAX;
-uint32_t testEntityID=UINT32_MAX;
+Character_t character;
+uint32_t characterEntityID=UINT32_MAX;
+uint32_t characterAnimID=UINT32_MAX;
 
 enum
 {
@@ -498,6 +499,18 @@ matrix TestTransform(const RigidBody_t *body)
 	return local;
 }
 
+matrix CharacterTransform(const RigidBody_t *body)
+{
+	const BModel_t *model=&AssetManager_GetAsset(assets, MODEL_TEST)->model;
+	const vec3 feet=Vec3((model->bBoxMin.x+model->bBoxMax.x)*0.5f, model->bBoxMin.y, (model->bBoxMin.z+model->bBoxMax.z)*0.5f);
+
+	matrix local=MatrixTranslatev(feet);
+	local=MatrixMult(local, MatrixScalev(Vec3b(WORLD_SCALE)));
+	local=MatrixMult(local, MatrixTranslatev(Vec3(0.0f, -(body->radiusHeight.x+body->radiusHeight.y), 0.0f)));
+	local=MatrixMult(local, QuatToMatrix(body->orientation));
+	return MatrixMult(local, MatrixTranslatev(body->position));
+}
+
 void ResetPhysicsCubes(void)
 {
 	const float radius=20.0f;
@@ -651,57 +664,32 @@ void GenerateWorld(void)
 	EntityList_Clear(&entityList);
 	Animation_Clear(&animationSystem);
 
-	if(!ClientNetwork_IsConnected())
-	{
-		// Set up entities to be processed
-		numAsteroids=1000;
+	character.active=false;
+	characterEntityID=UINT32_MAX;
+	characterAnimID=UINT32_MAX;
 
-		for(uint32_t i=0;i<numAsteroids;i++)
-			EntityList_Add(&entityList, &asteroids[i], false, asteroidModels[i].modelID, asteroidModels[i].tex0ID, asteroidModels[i].tex1ID, ENTITYOBJECTTYPE_FIELD, AsteroidTransform);
-	}
+	CameraSetFlight(&camera);
 
+	// Set up entities to be processed
 	playerID=EntityList_Add(&entityList, &camera.body, !camera.thirdPerson, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+0), TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 
-	const BModel_t *model=&AssetManager_GetAsset(assets, MODEL_TEST)->model;
-	volatile const vec3 size=Vec3_Muls(Vec3_Subv(model->bBoxMax, model->bBoxMin), 10.5f);
-	testBody=(RigidBody_t)
-	{
-		.position=Vec3(0.0f, 0.0f, -50.0f),
-
-		.velocity=Vec3b(0.0f),
-		.force=Vec3b(0.0f),
-		.mass=0.0f,
-		.invMass=0.0f,
-
-		.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
-		.angularVelocity=Vec3b(0.0f),
-		.inertia=0.0f,
-		.invInertia=0.0f,
-
-		.restitution=0.1f,
-		.friction=1.0f,
-
-		.type=RIGIDBODY_OBB,
-		.size=size,
-	};
-
 	if(!ClientNetwork_IsConnected())
 	{
-		for(uint32_t i=0;i<sizeof(bodies)/sizeof(RigidBody_t);i++)
-		{
-			if(bodies[i].type==RIGIDBODY_OBB)
-				EntityList_Add(&entityList, &bodies[i], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
-			else if(bodies[i].type==RIGIDBODY_SPHERE)
-				EntityList_Add(&entityList, &bodies[i], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
-			else if(bodies[i].type==RIGIDBODY_CAPSULE)
-				EntityList_Add(&entityList, &bodies[i], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
-		}
+		for(uint32_t i=0;i<numAsteroids;i++)
+			EntityList_Add(&entityList, &asteroids[i], false, asteroidModels[i].modelID, asteroidModels[i].tex0ID, asteroidModels[i].tex1ID, ENTITYOBJECTTYPE_FIELD, AsteroidTransform);
 
-		for(uint32_t i=0;i<NUM_ENEMY;i++)
-			EntityList_Add(&entityList, &enemy[i].body, false, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[i]+0), TEXTURE_FIGHTER1+(2*fighterTexture[i]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
+		// for(uint32_t i=0;i<sizeof(bodies)/sizeof(RigidBody_t);i++)
+		// {
+		// 	if(bodies[i].type==RIGIDBODY_OBB)
+		// 		EntityList_Add(&entityList, &bodies[i], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
+		// 	else if(bodies[i].type==RIGIDBODY_SPHERE)
+		// 		EntityList_Add(&entityList, &bodies[i], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
+		// 	else if(bodies[i].type==RIGIDBODY_CAPSULE)
+		// 		EntityList_Add(&entityList, &bodies[i], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
+		// }
 
-		testEntityID=EntityList_Add(&entityList, &testBody, false, MODEL_TEST, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, TestTransform);
-		testAnimID=EntityList_AddAnimator(&entityList, testEntityID);
+		// for(uint32_t i=0;i<NUM_ENEMY;i++)
+		// 	EntityList_Add(&entityList, &enemy[i].body, false, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[i]+0), TEXTURE_FIGHTER1+(2*fighterTexture[i]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 
 		// for(uint32_t i=0;i<NUM_CUBE;i++)
 		// 	EntityList_Add(&entityList, &cubeBody[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
@@ -1352,21 +1340,50 @@ void AttractorQuery(Entity_t *entity, void *userdata)
 	if(entity==attractor||entity->body==&camera.body)
 		return;
 
+	vec3 gravity=Vec3b(0.0f);
+
 	if(attractor->body->type==RIGIDBODY_SPHERE)
-	{
-		vec3 gravity=AttractorSphereComputeGravity(entity->body->position, attractor->body->position, attractor->body->radius, attractor->baseGravity, attractor->influenceRadius);
-		entity->body->force=Vec3_Addv(entity->body->force, Vec3_Muls(gravity, fTimeStep));
-	}
+		gravity=AttractorSphereComputeGravity(entity->body->position, attractor->body->position, attractor->body->radius, attractor->baseGravity, attractor->influenceRadius);
 	else if(attractor->body->type==RIGIDBODY_OBB)
-	{
-		vec3 gravity=AttractorOBBComputeGravity(entity->body->position, attractor->body->position, attractor->body->size, attractor->body->orientation, attractor->baseGravity, attractor->influenceRadius);
-		entity->body->force=Vec3_Addv(entity->body->force, Vec3_Muls(gravity, fTimeStep));
-	}
+		gravity=AttractorOBBComputeGravity(entity->body->position, attractor->body->position, attractor->body->size, attractor->body->orientation, attractor->baseGravity, attractor->influenceRadius);
 	else if(attractor->body->type==RIGIDBODY_CAPSULE)
-	{
-		vec3 gravity=AttractorCapsuleComputeGravity(entity->body->position, attractor->body->position, attractor->body->orientation, attractor->body->radiusHeight.x, attractor->body->radiusHeight.y, attractor->baseGravity, attractor->influenceRadius);
+		gravity=AttractorCapsuleComputeGravity(entity->body->position, attractor->body->position, attractor->body->orientation, attractor->body->radiusHeight.x, attractor->body->radiusHeight.y, attractor->baseGravity, attractor->influenceRadius);
+
+	// The character controller wants the gravity vector itself (it defines "up" and does its own movement)
+	if(entity->body==&character.body)
+		Character_AddGravity(&character, gravity);
+	else
 		entity->body->force=Vec3_Addv(entity->body->force, Vec3_Muls(gravity, fTimeStep));
-	}
+}
+
+// Pick the clip for what the character is doing, only idle exists in the assets for now
+static void CharacterAnimate(void)
+{
+	Animator_t *animator=Animation_Get(&animationSystem, characterAnimID);
+
+	if(!animator)
+		return;
+
+	const BAnim_t *fall=&AssetManager_GetAsset(assets, ANIMATION_TEST_FALL)->animation;
+	const BAnim_t *idle=&AssetManager_GetAsset(assets, ANIMATION_TEST_IDLE)->animation;
+	const BAnim_t *jump=&AssetManager_GetAsset(assets, ANIMATION_TEST_JUMP)->animation;
+	const BAnim_t *land=&AssetManager_GetAsset(assets, ANIMATION_TEST_LAND)->animation;
+	const BAnim_t *run=&AssetManager_GetAsset(assets, ANIMATION_TEST_RUN)->animation;
+	const BAnim_t *walk=&AssetManager_GetAsset(assets, ANIMATION_TEST_WALK)->animation;
+
+	// Fill these in as clips get added, e.g. CHARACTER_STATE_WALK -> walk loop
+	const BAnim_t *clips[CHARACTER_STATE_COUNT]=
+	{
+		[CHARACTER_STATE_FALL]=fall,
+		[CHARACTER_STATE_IDLE]=idle,
+		[CHARACTER_STATE_JUMP]=jump,
+		[CHARACTER_STATE_LAND]=land,
+		[CHARACTER_STATE_RUN]=run,
+		[CHARACTER_STATE_WALK]=walk,
+	};
+
+	// Asking for the clip that's already playing is ignored, so this is fine to do every step
+	Animator_Play(animator, clips[character.state], true);
 }
 
 // Runs anything physics related
@@ -1381,6 +1398,8 @@ void Thread_Physics(void *arg)
 	{
 		if(!pausePhysics)
 		{
+			Character_ResetGround(&character);
+
 			const uint32_t constraintIterations=8;
 			for(uint32_t iteration=0;iteration<constraintIterations;iteration++)
 			{
@@ -1555,6 +1574,13 @@ void Thread_Physics(void *arg)
 				for(uint32_t j=0;j<manifold->contactCount;j++)
 				{
 					PhysicsRecorder_LogContact(&manifold->contacts[j]);
+
+					// Contact normals point from a to b, the character controller needs one pointing into itself
+					if(manifold->a==&character.body)
+						Character_AddContact(&character, Vec3_Muls(manifold->contacts[j].normal, -1.0f), manifold->contacts[j].penetration);
+					else if(manifold->b==&character.body)
+						Character_AddContact(&character, manifold->contacts[j].normal, manifold->contacts[j].penetration);
+
 					float impactSpeed=PhysicsResolveCollision(manifold->a, manifold->b, manifold->contacts[j]);
 
 					// Run "game logic"
@@ -1720,9 +1746,17 @@ void Thread_Physics(void *arg)
 	//////
 #endif
 
-	// Always run physics on the camera's body
+	// Always run physics on the camera/character body
 	if(pausePhysics||ClientNetwork_IsConnected())
+	{
 		PhysicsIntegrate(&camera.body, fTimeStep);
+		PhysicsIntegrate(&character.body, fTimeStep);
+	}
+
+	Character_Update(&character, &camera, fTimeStep);
+
+	if(character.active)
+		CharacterAnimate();
 
 	// Update camera and modelview matrix
 	if(playerHealth>0.0f)
@@ -2158,60 +2192,85 @@ void Console_CmdPhysicsRecord(Console_t *console, const char *param)
 		ConsolePrint(console, "Invalid parameter. Use 'start' or 'stop'.");
 }
 
-static uint32_t animationState=0;
-
-void testAnimFinish(Animator_t *animator, void *arg)
-{
-	if(animationState==0)
-	{
-		Animator_Play(animator, &AssetManager_GetAsset(assets, ANIMATION_TEST_DANCE)->animation, false);
-		Animator_SetOnFinish(animator, testAnimFinish, NULL);
-		animationState=1;
-	}
-	else if(animationState==1)
-	{
-		Animator_Play(animator, &AssetManager_GetAsset(assets, ANIMATION_TEST_JAB)->animation, false);
-		Animator_SetOnFinish(animator, testAnimFinish, NULL);
-		animationState=2;
-	}
-	else if(animationState==2)
-	{
-		Animator_Play(animator, &AssetManager_GetAsset(assets, ANIMATION_TEST_IDLE)->animation, true);
-		animationState=0;
-	}
-}
-
-void testAnimFinish2(Animator_t *animator, void *arg)
-{
-	Animator_Play(animator, &AssetManager_GetAsset(assets, ANIMATION_TEST_IDLE)->animation, true);
-}
-
-void Console_CmdAnimation(Console_t *console, const char *param)
+void Console_CmdCharacter(Console_t *console, const char *param)
 {
 	if(param==NULL)
 	{
-		ConsolePrint(console, "Missing parameter. Use 'idle', 'dance', 'punch' or 'stop'.");
+		ConsolePrint(console, "Missing parameter. Use 'on', 'off', 'first' or 'third'.");
 		return;
 	}
 
-	Animator_t *testAnim=Animation_Get(&animationSystem, testAnimID);
+	if(strcmp(param, "on")==0)
+	{
+		if(ClientNetwork_IsConnected())
+		{
+			ConsolePrint(console, "Character mode isn't available while connected.");
+			return;
+		}
 
-	if(strcmp(param, "idle")==0)
-		Animator_Play(testAnim, &AssetManager_GetAsset(assets, ANIMATION_TEST_IDLE)->animation, true);
-	else if(strcmp(param, "dance")==0)
-	{
-		Animator_Play(testAnim, &AssetManager_GetAsset(assets, ANIMATION_TEST_DANCE)->animation, false);
-		Animator_SetOnFinish(testAnim, testAnimFinish2, NULL);
+		if(camera.mode==CAMERA_MODE_CHARACTER)
+		{
+			ConsolePrint(console, "Already in character mode.");
+			return;
+		}
+
+		const BModel_t *model=&AssetManager_GetAsset(assets, MODEL_TEST)->model;
+		const float height=(model->bBoxMax.y-model->bBoxMin.y)*WORLD_SCALE;
+
+		const vec3 spawn=Vec3_Addv(platformBody.position, Vec3(0.0f, platformBody.size.y+height*0.5f+2.0f, platformBody.size.z*0.75f));
+
+		Character_Init(&character, spawn, Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f), height);
+
+		characterEntityID=EntityList_Add(&entityList, &character.body, true, MODEL_TEST, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_PLAYER, CharacterTransform);
+		characterAnimID=EntityList_AddAnimator(&entityList, characterEntityID);
+
+		Animator_t *animator=Animation_Get(&animationSystem, characterAnimID);
+
+		if(animator)
+			Animator_Play(animator, &AssetManager_GetAsset(assets, ANIMATION_TEST_IDLE)->animation, true);
+
+		if(playerID!=UINT32_MAX)
+		{
+			EntityList_Remove(&entityList, playerID);
+			playerID=UINT32_MAX;
+		}
+
+		character.active=true;
+
+		CameraFollowBody(&camera, &character.body, height*0.89f-height*0.5f, 0.0f);
 	}
-	else if(strcmp(param, "punch")==0)
+	else if(strcmp(param, "off")==0)
 	{
-		Animator_Play(testAnim, &AssetManager_GetAsset(assets, ANIMATION_TEST_CROSS)->animation, false);
-		Animator_SetOnFinish(testAnim, testAnimFinish, NULL);
+		if(camera.mode!=CAMERA_MODE_CHARACTER)
+		{
+			ConsolePrint(console, "Not in character mode.");
+			return;
+		}
+
+		character.active=false;
+		CameraSetFlight(&camera);
+
+		EntityList_Remove(&entityList, characterEntityID);
+		characterEntityID=UINT32_MAX;
+		characterAnimID=UINT32_MAX;
+
+		playerID=EntityList_Add(&entityList, &camera.body, !camera.thirdPerson, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+0), TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 	}
-	else if(strcmp(param, "stop")==0)
-		Animator_Stop(testAnim);
+	else if(strcmp(param, "first")==0||strcmp(param, "third")==0)
+	{
+		if(camera.mode!=CAMERA_MODE_CHARACTER)
+		{
+			ConsolePrint(console, "Not in character mode.");
+			return;
+		}
+
+		const bool firstPerson=(strcmp(param, "first")==0);
+
+		camera.orbitDistance=firstPerson?0.0f:30.0f;
+		EntityList_SetNoRender(&entityList, characterEntityID, firstPerson);
+	}
 	else
-		ConsolePrint(console, "Invalid parameter. Use 'idle', 'dance', 'punch' or 'stop'.");
+		ConsolePrint(console, "Invalid parameter. Use 'on', 'off', 'first' or 'third'.");
 }
 
 // Initialization call from system main
@@ -2237,7 +2296,7 @@ bool Init(void)
 	ConsoleRegisterCommand(&console, "disconnect", Console_CmdDisconnect);
 	ConsoleRegisterCommand(&console, "explode", Console_CmdExplode);
 	ConsoleRegisterCommand(&console, "physics_record", Console_CmdPhysicsRecord);
-	ConsoleRegisterCommand(&console, "animation", Console_CmdAnimation);
+	ConsoleRegisterCommand(&console, "character", Console_CmdCharacter);
 
 	CameraInit(&camera, Vec3(0.0f, 0.0f, -100.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f));
 

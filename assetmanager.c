@@ -54,10 +54,15 @@ AssetManager_t assets[]=
 	{ MODEL_CUBE,               ASSET_MODEL,   "assets/models/cube.bmodel" },
 	{ MODEL_TEST,				ASSET_MODEL,   "assets/models/test.bmodel" },
 
-	{ ANIMATION_TEST_IDLE,		ASSET_ANIMATION, "assets/animations/test_idle.banim" },
-	{ ANIMATION_TEST_DANCE,		ASSET_ANIMATION, "assets/animations/test_dance.banim" },
 	{ ANIMATION_TEST_CROSS,		ASSET_ANIMATION, "assets/animations/test_cross.banim" },
+	{ ANIMATION_TEST_DANCE,		ASSET_ANIMATION, "assets/animations/test_dance.banim" },
+	{ ANIMATION_TEST_FALL,		ASSET_ANIMATION, "assets/animations/test_fall.banim" },
+	{ ANIMATION_TEST_IDLE,		ASSET_ANIMATION, "assets/animations/test_idle.banim" },
 	{ ANIMATION_TEST_JAB,		ASSET_ANIMATION, "assets/animations/test_jab.banim" },
+	{ ANIMATION_TEST_JUMP,		ASSET_ANIMATION, "assets/animations/test_jump.banim" },
+	{ ANIMATION_TEST_LAND,		ASSET_ANIMATION, "assets/animations/test_land.banim" },
+	{ ANIMATION_TEST_RUN,		ASSET_ANIMATION, "assets/animations/test_run.banim" },
+	{ ANIMATION_TEST_WALK, 		ASSET_ANIMATION, "assets/animations/test_walk.banim" },
 
 	{ SOUND_PEW1,               ASSET_SOUND,   "assets/sounds/pew1.wav" },
 	{ SOUND_PEW2,               ASSET_SOUND,   "assets/sounds/pew2.wav" },
