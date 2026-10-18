@@ -27,7 +27,12 @@ float PhysicsResolveCollision(RigidBody_t *a, RigidBody_t *b, ContactPoint_t con
 	const float invMassSum=a->invMass+b->invMass;
 
 	const float e=fminf(a->restitution, b->restitution);
-	const float j=-(1.0f+e)*relativeSpeed/(invMassSum+Vec3_Dot(contact.normal, Vec3_Addv(d1, d2)));
+	const float denominator=invMassSum+Vec3_Dot(contact.normal, Vec3_Addv(d1, d2));
+
+	if(denominator<=FLT_EPSILON)
+	    return 0.0f;
+
+	const float j=-(1.0f+e)*relativeSpeed/denominator;
 
 	const vec3 impulse=Vec3_Muls(contact.normal, j);
 

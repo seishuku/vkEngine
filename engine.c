@@ -103,6 +103,13 @@ AnimationSystem_t animationSystem;
 RigidBody_t cubeBody[NUM_CUBE];
 RigidBody_t platformBody;
 
+// Small character-controller test course. All dimensions are half-extents.
+#define CHARACTER_WORLD_STATIC_COUNT 17
+#define CHARACTER_WORLD_CRATE_COUNT  12
+
+static RigidBody_t characterWorldStatic[CHARACTER_WORLD_STATIC_COUNT];
+static RigidBody_t characterWorldCrates[CHARACTER_WORLD_CRATE_COUNT];
+
 Character_t character;
 uint32_t characterEntityID=UINT32_MAX;
 uint32_t characterAnimID=UINT32_MAX;
@@ -459,7 +466,6 @@ bool CreateFramebuffers(uint32_t eye);
 matrix CubeTransform(const RigidBody_t *body)
 {
 	matrix local=MatrixScalev(body->size);
-	local=MatrixMult(local, MatrixRotate(PI/2.0f, 0.0f, 1.0f, 0.0));
 	local=MatrixMult(local, MatrixTranslatev(AssetManager_GetAsset(assets, MODEL_CUBE)->model.center));
 	local=MatrixMult(local, QuatToMatrix(body->orientation));
 	return MatrixMult(local, MatrixTranslatev(body->position));
@@ -483,20 +489,6 @@ matrix FighterTransform(const RigidBody_t *body)
 	local=MatrixMult(local, MatrixTranslatev(AssetManager_GetAsset(assets, MODEL_FIGHTER)->model.center));
 	local=MatrixMult(local, QuatToMatrix(body->orientation));
 	return MatrixMult(local, MatrixTranslatev(body->position));
-}
-
-matrix TestTransform(const RigidBody_t *body)
-{
-	const BModel_t *model=&AssetManager_GetAsset(assets, MODEL_TEST)->model;
-	const vec3 center=Vec3_Muls(Vec3_Addv(model->bBoxMin, model->bBoxMax), 0.5f);
-
-	// Move the model so the center of its bounds is at the body's position
-	matrix local=MatrixIdentity();
-	local=MatrixMult(local, MatrixScalev(Vec3b(10.0f)));
-	local=MatrixMult(local, MatrixTranslatev(Vec3_Muls(center, -1.0f)));
-	local=MatrixMult(local, QuatToMatrix(body->orientation));
-	local=MatrixMult(local, MatrixTranslatev(body->position));
-	return local;
 }
 
 matrix CharacterTransform(const RigidBody_t *body)
@@ -529,7 +521,7 @@ void ResetPhysicsCubes(void)
 
 	platformBody=(RigidBody_t)
 	{
-	    .position=Vec3(0.0f, stackBottom-(platformHalfHeight*1.01f), 0.0f),
+	    .position=Vec3(0.0f, -60.0f, 0.0f),
 
 	    .velocity=Vec3b(0.0f),
 	    .force=Vec3b(0.0f),
@@ -584,6 +576,86 @@ void ResetPhysicsCubes(void)
 					.type=RIGIDBODY_OBB,
 					.size=Vec3(radius/2, radius/2, radius/2),
 				};
+			}
+		}
+	}
+}
+
+static void CharacterWorld_InitOBB(RigidBody_t *body, const vec3 position, const vec3 halfExtents, const vec4 orientation, const float mass, const float friction, const float restitution)
+{
+	const float inertia=(mass>0.0f)?(2.0f/3.0f)*mass*halfExtents.x*halfExtents.x:0.0f;
+
+	*body=(RigidBody_t)
+	{
+		.position=position,
+		.velocity=Vec3b(0.0f),
+		.force=Vec3b(0.0f),
+		.mass=mass,
+		.invMass=(mass>0.0f)?1.0f/mass:0.0f,
+		.orientation=orientation,
+		.angularVelocity=Vec3b(0.0f),
+		.inertia=inertia,
+		.invInertia=(inertia>0.0f)?1.0f/inertia:0.0f,
+		.restitution=restitution,
+		.friction=friction,
+		.type=RIGIDBODY_OBB,
+		.size=halfExtents,
+	};
+}
+
+static void BuildCharacterTestWorld(void)
+{
+	const vec4 identity=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	const vec4 gentleSlope=QuatAnglev(17.0f*PI/180.0f, Vec3(1.0f, 0.0f, 0.0f));
+	const vec4 steepSlope=QuatAnglev(55.0f*PI/180.0f, Vec3(1.0f, 0.0f, 0.0f));
+	const vec4 sideSlope=QuatAnglev(-32.0f*PI/180.0f, Vec3(1.0f, 0.0f, 0.0f));
+	uint32_t i=0;
+
+	// Three shallow steps test step-up behavior and grounding on edges.
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(-25.0f, -47.5f, 42.0f), Vec3(8.0f, 2.5f, 8.0f), identity, 0.0f, 0.9f, 0.0f);
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(-25.0f, -44.5f, 26.0f), Vec3(8.0f, 2.5f, 8.0f), identity, 0.0f, 0.9f, 0.0f);
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(-25.0f, -41.5f, 10.0f), Vec3(8.0f, 2.5f, 8.0f), identity, 0.0f, 0.9f, 0.0f);
+
+	// An 8-unit vaultable wall near the spawn area.
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(0.0f, -46.0f, 42.0f), Vec3(9.0f, 4.0f, 1.2f), identity, 0.0f, 0.8f, 0.0f);
+
+	// Walkable ramp and a deliberately over-steep ramp (50-degree limit in the controller).
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(25.0f, -44.5f, 34.0f), Vec3(8.0f, 1.5f, 14.0f), gentleSlope, 0.0f, 0.9f, 0.0f);
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(48.0f, -37.5f, 4.0f), Vec3(7.0f, 1.5f, 10.0f), steepSlope, 0.0f, 0.9f, 0.0f);
+
+	// A narrow raised beam and three platforms form a simple jump sequence.
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(0.0f, -44.0f, -30.0f), Vec3(2.0f, 1.5f, 9.0f), identity, 0.0f, 0.8f, 0.0f);
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(0.0f, -44.0f, -48.0f), Vec3(6.0f, 2.0f, 4.0f), identity, 0.0f, 0.9f, 0.0f);
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(0.0f, -44.0f, -66.0f), Vec3(6.0f, 2.0f, 4.0f), identity, 0.0f, 0.9f, 0.0f);
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(0.0f, -44.0f, -77.0f), Vec3(8.0f, 2.0f, 2.0f), identity, 0.0f, 0.9f, 0.0f);
+
+	// Offset pillars make a slalom and give the controller corners to brush against.
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(-10.0f, -43.0f, 32.0f), Vec3(1.5f, 7.0f, 1.5f), identity, 0.0f, 0.8f, 0.0f);
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(10.0f, -43.0f, 18.0f), Vec3(1.5f, 7.0f, 1.5f), identity, 0.0f, 0.8f, 0.0f);
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(-10.0f, -43.0f, 2.0f), Vec3(1.5f, 7.0f, 1.5f), identity, 0.0f, 0.8f, 0.0f);
+
+	// A low-clearance tunnel
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(16.0f, -41.5f, -12.0f), Vec3(1.0f, 8.5f, 7.0f), identity, 0.0f, 0.8f, 0.0f);
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(30.0f, -41.5f, -12.0f), Vec3(1.0f, 8.5f, 7.0f), identity, 0.0f, 0.8f, 0.0f);
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(23.0f, -31.0f, -12.0f), Vec3(7.0f, 1.0f, 7.0f), identity, 0.0f, 0.8f, 0.0f);
+
+	// Side route with a moderate slope, useful for checking ground-normal stability.
+	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(-48.0f, -44.5f, -12.0f), Vec3(7.0f, 1.5f, 10.0f), sideSlope, 0.0f, 0.9f, 0.0f);
+
+	if(i!=CHARACTER_WORLD_STATIC_COUNT)
+		DBGPRINTF(DEBUG_ERROR, "Character test world static-body count mismatch (%u).\n", i);
+
+	i=0;
+	const float halfSize=4.5f;
+	const float mass=0.025f;
+	for(uint32_t layer=0;layer<2;layer++)
+	{
+		for(uint32_t x=0;x<3;x++)
+		{
+			for(uint32_t z=0;z<2;z++)
+			{
+				const vec3 position=Vec3(35.0f+(float)x*10.0f, -50.0f+halfSize+(float)layer*(2.0f*halfSize+0.1f), -47.0f+(float)z*10.0f);
+				CharacterWorld_InitOBB(&characterWorldCrates[i++], position, Vec3b(halfSize), identity, mass, 0.8f, 0.05f);
 			}
 		}
 	}
@@ -664,6 +736,8 @@ void GenerateWorld(void)
 	EntityList_Clear(&entityList);
 	Animation_Clear(&animationSystem);
 
+	BuildCharacterTestWorld();
+
 	character.active=false;
 	characterEntityID=UINT32_MAX;
 	characterAnimID=UINT32_MAX;
@@ -675,8 +749,15 @@ void GenerateWorld(void)
 
 	if(!ClientNetwork_IsConnected())
 	{
-		for(uint32_t i=0;i<numAsteroids;i++)
-			EntityList_Add(&entityList, &asteroids[i], false, asteroidModels[i].modelID, asteroidModels[i].tex0ID, asteroidModels[i].tex1ID, ENTITYOBJECTTYPE_FIELD, AsteroidTransform);
+		// Render and simulate the character-controller course using existing cube assets.
+		for(uint32_t i=0;i<CHARACTER_WORLD_STATIC_COUNT;i++)
+			EntityList_Add(&entityList, &characterWorldStatic[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
+
+		for(uint32_t i=0;i<CHARACTER_WORLD_CRATE_COUNT;i++)
+			EntityList_Add(&entityList, &characterWorldCrates[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
+
+		// for(uint32_t i=0;i<numAsteroids;i++)
+		// 	EntityList_Add(&entityList, &asteroids[i], false, asteroidModels[i].modelID, asteroidModels[i].tex0ID, asteroidModels[i].tex1ID, ENTITYOBJECTTYPE_FIELD, AsteroidTransform);
 
 		// for(uint32_t i=0;i<sizeof(bodies)/sizeof(RigidBody_t);i++)
 		// {
@@ -1003,8 +1084,9 @@ void Thread_Main(void *arg)
 	}
 
 #if 0
-	// for(uint32_t i=0;i<entityList.entityCount;i++)
-	// 	DrawAABBCube(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, entityList.entities[i].bounds.min, entityList.entities[i].bounds.max, Vec4(1.0f, 1.0f, 0.0f, 1.0f));
+	for(uint32_t i=0;i<entityList.entityCount;i++)
+		DrawAABBCube(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, data->eye, entityList.entities[i].bounds.min, entityList.entities[i].bounds.max, Vec4(1.0f, 1.0f, 0.0f, 1.0f));
+
 	for(uint32_t i=0;i<entityList.entityCount;i++)
 	{
 		RigidBody_t *body=entityList.entities[i].body;
@@ -1054,7 +1136,8 @@ void Thread_Main(void *arg)
 				vec4 color;
 			} spherePC;
 
-			spherePC.color=Vec4(1.0f, 1.0f, 1.0f, body->radiusHeight.y);
+			const float sphereHalfHeight=0.850651f;
+			spherePC.color=Vec4(1.0f, 1.0f, 1.0f, (body->radiusHeight.x+body->radiusHeight.y)/body->radiusHeight.x-sphereHalfHeight);
 
 			matrix local=MatrixScale(body->radiusHeight.x, body->radiusHeight.x, body->radiusHeight.x);
 			local=MatrixMult(local, QuatToMatrix(body->orientation));
@@ -1168,7 +1251,8 @@ void Thread_Main(void *arg)
 					vec4 color;
 				} spherePC;
 
-				spherePC.color=Vec4(1.0f, 1.0f, 1.0f, bodies[i].radiusHeight.y);
+				const float sphereHalfHeight=0.850651f;
+				spherePC.color=Vec4(1.0f, 1.0f, 1.0f, (bodies[i].radiusHeight.x+bodies[i].radiusHeight.y)/bodies[i].radiusHeight.x-sphereHalfHeight);
 
 				matrix local=MatrixScale(bodies[i].radiusHeight.x, bodies[i].radiusHeight.x, bodies[i].radiusHeight.x);
 				local=MatrixMult(local, QuatToMatrix(bodies[i].orientation));
@@ -1342,10 +1426,10 @@ void AttractorQuery(Entity_t *entity, void *userdata)
 
 	vec3 gravity=Vec3b(0.0f);
 
-	if(attractor->body->type==RIGIDBODY_SPHERE)
-		gravity=AttractorSphereComputeGravity(entity->body->position, attractor->body->position, attractor->body->radius, attractor->baseGravity, attractor->influenceRadius);
-	else if(attractor->body->type==RIGIDBODY_OBB)
+	if(attractor->body->type==RIGIDBODY_OBB)
 		gravity=AttractorOBBComputeGravity(entity->body->position, attractor->body->position, attractor->body->size, attractor->body->orientation, attractor->baseGravity, attractor->influenceRadius);
+	else if(attractor->body->type==RIGIDBODY_SPHERE)
+		gravity=AttractorSphereComputeGravity(entity->body->position, attractor->body->position, attractor->body->radius, attractor->baseGravity, attractor->influenceRadius);
 	else if(attractor->body->type==RIGIDBODY_CAPSULE)
 		gravity=AttractorCapsuleComputeGravity(entity->body->position, attractor->body->position, attractor->body->orientation, attractor->body->radiusHeight.x, attractor->body->radiusHeight.y, attractor->baseGravity, attractor->influenceRadius);
 

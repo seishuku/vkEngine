@@ -2,10 +2,10 @@
 #include <stdbool.h>
 #include <string.h>
 #include <float.h>
-#include <math.h>
+#include "../camera/camera.h"
 #include "../math/math.h"
 #include "../physics/physics.h"
-#include "../camera/camera.h"
+#include "../system/system.h"
 #include "character.h"
 
 #define GRAVITY_EPSILON				0.001f	// Gravity weaker than this is treated as free space
@@ -316,6 +316,15 @@ static void ApplyMovement(Character_t *c, const MoveInput_t *input, const float 
 
 	const vec3 planeNormal=c->grounded?c->groundNormal:c->up;
 
+	// Cancel out gravity while grounded to prevent jittering while standing still
+	if(c->grounded)
+	{
+		const float intoGround=Vec3_Dot(body->velocity, planeNormal);
+
+		if(intoGround<0.0f)
+			body->velocity=Vec3_Subv(body->velocity, Vec3_Muls(planeNormal, intoGround));
+	}
+
 	// Keep the full input magnitude when the direction is tilted onto a slope
 	vec3 wishPlane=ProjectOnPlane(input->wish, planeNormal);
 	const float planeLength=Vec3_Length(wishPlane);
@@ -400,10 +409,11 @@ void Character_Update(Character_t *c, const Camera_t *camera, const float dt)
 
 	UpdateGroundState(c, dt);
 	UpdateLanding(c, wasGrounded, airTime);
-	UpdateJump(c, camera, hasGravity);
 
 	if(hasGravity)
 		c->body.velocity=Vec3_Addv(c->body.velocity, Vec3_Muls(c->gravityAccum, dt));
+
+	UpdateJump(c, camera, hasGravity);
 
 	const MoveInput_t input=GatherMoveInput(c, camera);
 
