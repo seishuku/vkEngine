@@ -33,7 +33,7 @@ vec3 Vec3_Adds(const vec3 a, const float b)
 
 vec3 Vec3_Sub(const vec3 a, const float x, const float y, const float z)
 {
-	return (vec3) { a.x+x, a.y+y, a.z+z };
+	return (vec3) { a.x-x, a.y-y, a.z-z };
 }
 
 vec3 Vec3_Subv(const vec3 a, const vec3 b)
