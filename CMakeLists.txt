@@ -118,7 +118,6 @@ buildShaders()
 install(TARGETS ${CMAKE_PROJECT_NAME} DESTINATION .)
 
 install(DIRECTORY assets/ DESTINATION assets)
-install(DIRECTORY pipelines/ DESTINATION pipelines FILES_MATCHING PATTERN "*.pipeline")
 install(FILES config.ini README.md LICENSE DESTINATION .)
 
 include(InstallRequiredSystemLibraries)
