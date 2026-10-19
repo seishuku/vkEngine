@@ -58,7 +58,7 @@
     flex-direction: column;
     min-height: 0;
   }
-  .panel-left { width: 300px; border-right: 1px solid var(--border); }
+  .panel-left { width: 230px; border-right: 1px solid var(--border); }
   .panel-right { width: 300px; border-left: 1px solid var(--border); }
   #viewport { flex: 1; min-width: 0; position: relative; }
   .toolbar { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--border); }
@@ -120,6 +120,9 @@
       <button onclick="saveToFile()">save</button>
       <button onclick="triggerLoad()">load</button>
       <input type="file" id="loadFileInput" accept="application/json" style="display:none" onchange="onLoadFile(this)">
+      <button onclick="triggerImportBModel()">import skeleton</button>
+      <input type="file" id="importBModelInput" accept=".bmodel" style="display:none" onchange="onImportBModel(this)">
+      <button onclick="toggleCameraMode()" id="camBtn">camera: orbit</button>
       <button class="accent" onclick="toggleExport()" id="exportBtn">export .c</button>
     </div>
   </header>
@@ -134,7 +137,7 @@
       <div class="inspector" id="bodyInspector"></div>
     </div>
 
-    <div id="viewport"></div>
+    <div id="viewport"><div id="camHint" style="position:absolute; left:8px; bottom:6px; z-index:1; pointer-events:none; color:var(--muted); font-size:11px;"></div></div>
 
     <div class="panel panel-right">
       <div class="toolbar" style="flex-direction:column;">
@@ -160,7 +163,12 @@
   <div id="exportPanel">
     <div class="exp-head">
       <span style="color:var(--muted)">generated C</span>
-      <button onclick="copyCode()">copy</button>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <label style="display:flex; align-items:center; gap:4px; color:var(--muted);">
+          <input type="checkbox" id="includeBoneIndices" onchange="refreshExportIfOpen()"> bone→body indices
+        </label>
+        <button onclick="copyCode()">copy</button>
+      </div>
     </div>
     <pre id="codeOut"></pre>
   </div>
@@ -193,6 +201,7 @@ function makeBody(type, name) {
     isStatic: false,
     restitution: 0.3,
     friction: 0.5,
+    sourceBoneIndex: null, // set on bodies generated from a .bmodel skeleton import; null for hand-placed bodies
   };
 }
 
@@ -228,7 +237,7 @@ function setNested(obj, path, value) {
 }
 function fmt(n) {
   const v = Number.isFinite(n) ? n : 0;
-  let s = v.toFixed(4);         // cap at 4 decimal places
+  let s = v.toFixed(4);        // cap at 4 decimal places
   s = s.replace(/0+$/, "");    // trim trailing zeros ("1.5000" -> "1.5", "3.0000" -> "3.")
   return s;
 }
@@ -419,7 +428,304 @@ function generateCCode() {
     lines.push("\t},");
   });
   lines.push("};");
+
+  if (document.getElementById("includeBoneIndices")?.checked) {
+    let numBone = 0;
+    bodies.forEach((b) => {
+      if (Number.isInteger(b.sourceBoneIndex)) numBone = Math.max(numBone, b.sourceBoneIndex + 1);
+    });
+
+    lines.push("");
+    if (numBone > 0) {
+      const boneBody = new Array(numBone).fill(-1);
+      bodies.forEach((b, i) => {
+        if (Number.isInteger(b.sourceBoneIndex)) boneBody[b.sourceBoneIndex] = i;
+      });
+      lines.push("// Maps each skeleton bone index to the BODY_* index that represents it, for");
+      lines.push("// ragdoll / IK / procedural-animation code that loops over bones and needs the");
+      lines.push("// matching physics body. -1 = that bone has no body (e.g. a degenerate");
+      lines.push("// zero-length segment skipped on import).");
+      lines.push(`static const int32_t boneBodyIndex[${numBone}] =`);
+      lines.push("{");
+      boneBody.forEach((bodyIdx, boneIdx) => {
+        const val = bodyIdx >= 0 ? bodyNames[bodyIdx] : "-1";
+        lines.push(`\t${val}, /* bone ${boneIdx} */`);
+      });
+      lines.push("};");
+    } else {
+      lines.push("// No bone-sourced bodies in this assembly — nothing to index.");
+    }
+  }
+
   return lines.join("\n");
+}
+
+function toggleExport() {
+  const panel = document.getElementById("exportPanel");
+  const open = panel.classList.toggle("open");
+  document.getElementById("exportBtn").textContent = open ? "close export" : "export .c";
+  if (open) document.getElementById("codeOut").textContent = generateCCode();
+}
+function copyCode() {
+  navigator.clipboard?.writeText(document.getElementById("codeOut").textContent);
+}
+
+
+/* ---------------- BModel (.bmodel) parsing — skeleton import ---------------- */
+function fourCC(s) {
+  return (s.charCodeAt(0) | (s.charCodeAt(1) << 8) | (s.charCodeAt(2) << 16) | (s.charCodeAt(3) << 24)) >>> 0;
+}
+const BMODEL_MAGIC = {
+  BMDL: fourCC("BMDL"), MESH: fourCC("MESH"), MATL: fourCC("MATL"),
+  VERT: fourCC("VERT"), TEXC: fourCC("TEXC"), TANG: fourCC("TANG"),
+  BNRM: fourCC("BNRM"), NORM: fourCC("NORM"), BONE: fourCC("BONE"), BWGT: fourCC("BWGT"),
+};
+
+class BModelReader {
+  constructor(arrayBuffer) {
+    this.dv = new DataView(arrayBuffer);
+    this.len = arrayBuffer.byteLength;
+    this.off = 0;
+  }
+  remaining() { return this.len - this.off; }
+  need(n) { if (this.remaining() < n) throw new Error(`unexpected EOF at offset ${this.off} (needed ${n} bytes)`); }
+  u32() { this.need(4); const v = this.dv.getUint32(this.off, true); this.off += 4; return v; }
+  i32() { this.need(4); const v = this.dv.getInt32(this.off, true); this.off += 4; return v; }
+  f32() { this.need(4); const v = this.dv.getFloat32(this.off, true); this.off += 4; return v; }
+  vec3() { return { x: this.f32(), y: this.f32(), z: this.f32() }; }
+  vec4() { return { x: this.f32(), y: this.f32(), z: this.f32(), w: this.f32() }; }
+  str(maxLen = 256) {
+    const bytes = [];
+    for (let n = 0; n < maxLen; n++) {
+      this.need(1);
+      const b = this.dv.getUint8(this.off);
+      this.off += 1;
+      if (b === 0) break;
+      bytes.push(b);
+    }
+    return new TextDecoder("utf-8").decode(new Uint8Array(bytes));
+  }
+  skip(n) { this.need(n); this.off += n; }
+}
+
+// Walks the whole BMDL layout (materials, meshes, every vertex-data chunk) so the
+// cursor stays correctly synced with no explicit chunk sizes — then returns the
+// bone list from the BONE chunk, wherever it appears.
+function parseBModelBones(arrayBuffer) {
+  const r = new BModelReader(arrayBuffer);
+  if (r.u32() !== BMODEL_MAGIC.BMDL) throw new Error("not a .bmodel file (bad BMDL magic)");
+
+  const numMaterial = r.u32();
+  for (let i = 0; i < numMaterial; i++) {
+    if (r.u32() !== BMODEL_MAGIC.MATL) throw new Error(`expected MATL chunk (material ${i})`);
+    r.str();                 // name
+    r.skip(4 * 3);            // ambient
+    r.skip(4 * 3);            // diffuse
+    r.skip(4 * 3);            // specular
+    r.skip(4 * 3);            // emission
+    r.skip(4);                 // shininess
+    r.str();                 // texture
+  }
+
+  const numMesh = r.u32();
+  for (let i = 0; i < numMesh; i++) {
+    if (r.u32() !== BMODEL_MAGIC.MESH) throw new Error(`expected MESH chunk (mesh ${i})`);
+    r.str();                 // name
+    r.str();                 // materialName
+    const numFace = r.u32();
+    r.skip(numFace * 3 * 4);  // uint32 indices
+  }
+
+  const numVertex = r.u32();
+  let bones = null;
+
+  while (r.remaining() > 0) {
+    const magic = r.u32();
+    if (magic === BMODEL_MAGIC.VERT) r.skip(numVertex * 3 * 4);
+    else if (magic === BMODEL_MAGIC.TEXC) r.skip(numVertex * 2 * 4);
+    else if (magic === BMODEL_MAGIC.TANG) r.skip(numVertex * 3 * 4);
+    else if (magic === BMODEL_MAGIC.BNRM) r.skip(numVertex * 3 * 4);
+    else if (magic === BMODEL_MAGIC.NORM) r.skip(numVertex * 3 * 4);
+    else if (magic === BMODEL_MAGIC.BWGT) r.skip(numVertex * (4 * 4 + 4 * 4)); // 4x uint32 + 4x float
+    else if (magic === BMODEL_MAGIC.BONE) {
+      const numBone = r.u32();
+      bones = [];
+      for (let i = 0; i < numBone; i++) {
+        const name = r.str();
+        const parent = r.i32();
+        const position = r.vec3();
+        const orientation = r.vec4(); // xyzw
+        bones.push({ name, parent, position, orientation });
+      }
+    } else {
+      throw new Error(`unknown chunk magic 0x${magic.toString(16)} at offset ${r.off - 4}`);
+    }
+  }
+
+  if (!bones) throw new Error(".bmodel file has no BONE chunk");
+  return bones;
+}
+
+// Bone position/orientation are LOCAL (relative to parent) bind-pose transforms,
+// so world transforms have to be accumulated up the hierarchy, not read directly.
+// Bone position/orientation are already given in WORLD space (per Matt's
+// clarification — not local-to-parent), so no hierarchy composition is needed
+// here. Parent indices are still used afterward to pair each bone with its
+// parent for capsule placement.
+// Bone position/orientation are LOCAL bind-pose transforms relative to the bone's
+// parent — per the engine's LoadBModel: local = R_i * T_i (rotate then translate),
+// then, if parented, local = local * parentBone.skinnedMatrix. In plain vector terms
+// that's world.pos = rotate(localPos, parentQuat) + parentPos and
+// world.quat = parentQuat * localQuat. Solved recursively so bone storage order
+// (parent-before-child or not) doesn't matter.
+function computeBoneWorldTransforms(bones) {
+  const world = new Array(bones.length);
+  function solve(i) {
+    if (world[i]) return world[i];
+    const b = bones[i];
+    const localPos = new THREE.Vector3(b.position.x, b.position.y, b.position.z);
+    const localQuat = new THREE.Quaternion(b.orientation.x, b.orientation.y, b.orientation.z, b.orientation.w);
+    if (b.parent < 0 || b.parent >= bones.length || b.parent === i) {
+      world[i] = { pos: localPos, quat: localQuat };
+    } else {
+      const p = solve(b.parent);
+      const pos = localPos.clone().applyQuaternion(p.quat).add(p.pos);
+      const quat = p.quat.clone().multiply(localQuat);
+      world[i] = { pos, quat };
+    }
+    return world[i];
+  }
+  for (let i = 0; i < bones.length; i++) solve(i);
+  return world;
+}
+
+// One capsule per parent->child bone edge (root bones produce no capsule of their
+// own — they're just the joint the first capsules originate from). Capsule center
+// is the midpoint between parent and child world positions, and its long axis is
+// aligned to that segment; roll around the axis is irrelevant for a capsule.
+function importSkeletonAsBodies(bones) {
+  const world = computeBoneWorldTransforms(bones);
+  const newBodies = [];
+  const boneToBodyId = new Array(bones.length).fill(null);
+  const isRoot = (b, i) => b.parent < 0 || b.parent >= bones.length || b.parent === i;
+
+  const childrenOf = bones.map(() => []);
+  bones.forEach((b, i) => { if (!isRoot(b, i)) childrenOf[b.parent].push(i); });
+
+  bones.forEach((b, i) => {
+    if (isRoot(b, i)) {
+      // Root bones get a sphere instead of a capsule (no parent to span a segment
+      // to). Radius is guessed from its children's average segment length, since
+      // the format carries no thickness data; falls back to a flat default for an
+      // isolated root with no children at all.
+      const kids = childrenOf[i];
+      let radius = 0.1;
+      if (kids.length) {
+        const avgLen = kids.reduce((sum, ci) => sum + world[ci].pos.distanceTo(world[i].pos), 0) / kids.length;
+        radius = Math.min(0.18, Math.max(0.03, avgLen * 0.18));
+      }
+      const body = makeBody("RIGIDBODY_SPHERE", b.name || `bone${i}`);
+      body.position = { x: world[i].pos.x, y: world[i].pos.y, z: world[i].pos.z };
+      body.radius = radius;
+      body.sourceBoneIndex = i;
+      newBodies.push(body);
+      boneToBodyId[i] = body.id;
+      return;
+    }
+
+    const wThis = world[i].pos;
+    const wParent = world[b.parent].pos;
+    const seg = wThis.clone().sub(wParent);
+    const length = seg.length();
+    if (length < 1e-6) return; // coincident joints — nothing to build a capsule from
+
+    const dir = seg.clone().normalize();
+    const center = wParent.clone().add(wThis).multiplyScalar(0.5);
+    const radius = Math.min(0.15, Math.max(0.015, length * 0.12));
+    const halfHeight = Math.max(0.01, length / 2 - radius);
+
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    const euler = new THREE.Euler().setFromQuaternion(q, "XYZ");
+
+    const body = makeBody("RIGIDBODY_CAPSULE", b.name || `bone${i}`);
+    body.position = { x: center.x, y: center.y, z: center.z };
+    body.rotation = {
+      x: THREE.MathUtils.radToDeg(euler.x),
+      y: THREE.MathUtils.radToDeg(euler.y),
+      z: THREE.MathUtils.radToDeg(euler.z),
+    };
+    body.radiusHeight = { radius, halfHeight };
+    body.sourceBoneIndex = i;
+    newBodies.push(body);
+    boneToBodyId[i] = body.id;
+  });
+
+  return { bodies: newBodies, boneToBodyId, world };
+}
+
+// One constraint per adjacent pair of bone-segment bodies, anchored at the bone's own
+// world position (the joint shared by the capsule ending there and whatever starts
+// there — another capsule, or the root sphere). Root bones get no constraint of their
+// own since they have no parent edge to hinge against; their children now connect to
+// the root sphere the same way any two capsules connect to each other.
+// Defaults to CONSTRAINT_POINT (free rotation, locked position) rather than a hinge,
+// since the .bmodel format carries no anatomical hinge-axis data to derive one from —
+// swap individual joints to CONSTRAINT_HINGE/etc. afterward in the inspector if wanted.
+function generateSkeletonConstraints(bones, boneToBodyId, world, newBodies) {
+  const bodiesById = Object.fromEntries(newBodies.map((b) => [b.id, b]));
+  const newConstraints = [];
+
+  bones.forEach((b, i) => {
+    const parentBodyId = boneToBodyId[i];
+    if (!parentBodyId) return;
+    bones.forEach((c, j) => {
+      if (c.parent !== i) return;
+      const childBodyId = boneToBodyId[j];
+      if (!childBodyId) return;
+
+      const parentBody = bodiesById[parentBodyId];
+      const childBody = bodiesById[childBodyId];
+      const jointWorld = world[i].pos;
+      const localA = worldToLocal(parentBody, jointWorld);
+      const localB = worldToLocal(childBody, jointWorld);
+
+      const con = makeConstraint("CONSTRAINT_POINT", parentBodyId, childBodyId);
+      con.localAnchorA = { x: localA.x, y: localA.y, z: localA.z };
+      con.localAnchorB = { x: localB.x, y: localB.y, z: localB.z };
+      newConstraints.push(con);
+    });
+  });
+
+  return newConstraints;
+}
+
+function triggerImportBModel() {
+  document.getElementById("importBModelInput").click();
+}
+function onImportBModel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const bones = parseBModelBones(reader.result);
+      const { bodies, boneToBodyId, world } = importSkeletonAsBodies(bones);
+      if (!bodies.length) {
+        alert("Parsed the skeleton, but found no parent/child bone pairs to build capsules from.");
+        return;
+      }
+      const constraints = generateSkeletonConstraints(bones, boneToBodyId, world, bodies);
+      state.bodies.push(...bodies);
+      state.constraints.push(...constraints);
+      state.selectedBodyId = null;
+      state.selectedConstraintId = null;
+      renderAll();
+    } catch (err) {
+      alert("Couldn't import skeleton: " + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  input.value = "";
 }
 
 function saveToFile() {
@@ -466,16 +772,6 @@ function onLoadFile(input) {
   input.value = "";
 }
 
-function toggleExport() {
-  const panel = document.getElementById("exportPanel");
-  const open = panel.classList.toggle("open");
-  document.getElementById("exportBtn").textContent = open ? "close export" : "export .c";
-  if (open) document.getElementById("codeOut").textContent = generateCCode();
-}
-function copyCode() {
-  navigator.clipboard?.writeText(document.getElementById("codeOut").textContent);
-}
-
 /* ---------------- three.js scene ---------------- */
 const TYPE_COLOR = {
   CONSTRAINT_DISTANCE: 0xe5e7eb,
@@ -492,6 +788,9 @@ scene.background = new THREE.Color(0x0a0a0a);
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 mount.appendChild(renderer.domElement);
+// Take the canvas out of layout flow: an inline canvas adds baseline space that can
+// make #viewport grow after setSize(), which re-triggers the ResizeObserver.
+Object.assign(renderer.domElement.style, { position: "absolute", left: "0", top: "0", display: "block" });
 
 scene.add(new THREE.GridHelper(20, 20, 0x27272a, 0x18181b));
 scene.add(new THREE.AxesHelper(1.2));
@@ -505,14 +804,64 @@ scene.add(constraintGroup);
 
 const meshMap = {}; // bodyId -> Object3D
 
-const cam = { theta: 0.8, phi: 1.05, radius: 12, dragging: false, lastX: 0, lastY: 0, downX: 0, downY: 0 };
+const cam = {
+  mode: "orbit",
+  // orbit
+  theta: 0.8, phi: 1.05, radius: 12, target: new THREE.Vector3(0, 0, 0),
+  // first person
+  yaw: 0, pitch: 0,
+  // pointer state
+  dragging: false, drag: "look", lastX: 0, lastY: 0, downX: 0, downY: 0,
+};
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const FPS_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE", "ShiftLeft", "ShiftRight"]);
+const heldKeys = new Set();
+
 function updateCamera() {
-  camera.position.x = cam.radius * Math.sin(cam.phi) * Math.sin(cam.theta);
-  camera.position.z = cam.radius * Math.sin(cam.phi) * Math.cos(cam.theta);
-  camera.position.y = cam.radius * Math.cos(cam.phi);
-  camera.lookAt(0, 0, 0);
+  if (cam.mode === "orbit") {
+    camera.position.set(
+      cam.target.x + cam.radius * Math.sin(cam.phi) * Math.sin(cam.theta),
+      cam.target.y + cam.radius * Math.cos(cam.phi),
+      cam.target.z + cam.radius * Math.sin(cam.phi) * Math.cos(cam.theta)
+    );
+    camera.lookAt(cam.target);
+    // Keep the far plane beyond the orbit radius so zooming way out doesn't clip the scene.
+    const far = Math.max(200, cam.radius * 4);
+    if (far !== camera.far) { camera.far = far; camera.updateProjectionMatrix(); }
+  } else {
+    camera.rotation.set(cam.pitch, cam.yaw, 0, "YXZ");
+  }
 }
 updateCamera();
+
+const HINTS = {
+  orbit: "drag: orbit · shift/ctrl+drag (or middle/right drag): pan · wheel: zoom",
+  fps: "drag: look · W/A/S/D: move · Q/E: down/up · shift: fast · wheel: forward/back",
+};
+function refreshCameraUI() {
+  document.getElementById("camBtn").textContent = cam.mode === "orbit" ? "camera: orbit" : "camera: first person";
+  document.getElementById("camHint").textContent = HINTS[cam.mode];
+}
+
+function toggleCameraMode() {
+  if (cam.mode === "orbit") {
+    const e = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ");
+    cam.pitch = e.x; cam.yaw = e.y;
+    cam.mode = "fps";
+  } else {
+    // Keep the view where it is: put the orbit target straight ahead at the current radius.
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    cam.target.copy(camera.position).addScaledVector(fwd, cam.radius);
+    const off = camera.position.clone().sub(cam.target);
+    cam.phi = Math.acos(clamp(off.y / cam.radius, -1, 1));
+    cam.theta = Math.atan2(off.x, off.z);
+    cam.mode = "orbit";
+    heldKeys.clear();
+  }
+  updateCamera();
+  refreshCameraUI();
+  renderer.render(scene, camera);
+}
 
 function resize() {
   const w = mount.clientWidth, h = mount.clientHeight;
@@ -521,13 +870,22 @@ function resize() {
   renderer.setSize(w, h);
   renderer.render(scene, camera);
 }
-new ResizeObserver(resize).observe(mount);
+let resizeQueued = false;
+new ResizeObserver(() => {
+  // Defer to the next frame so resizing never happens inside the observer callback.
+  if (resizeQueued) return;
+  resizeQueued = true;
+  requestAnimationFrame(() => { resizeQueued = false; resize(); });
+}).observe(mount);
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
+mount.addEventListener("contextmenu", (e) => e.preventDefault()); // ctrl+click / right-drag pan
 mount.addEventListener("pointerdown", (e) => {
+  if (e.button === 1 || e.button === 2) e.preventDefault();
   cam.dragging = true;
+  cam.drag = cam.mode === "orbit" && (e.shiftKey || e.ctrlKey || e.metaKey || e.button === 1 || e.button === 2) ? "pan" : "look";
   cam.lastX = e.clientX; cam.lastY = e.clientY;
   cam.downX = e.clientX; cam.downY = e.clientY;
 });
@@ -535,15 +893,26 @@ window.addEventListener("pointermove", (e) => {
   if (!cam.dragging) return;
   const dx = e.clientX - cam.lastX, dy = e.clientY - cam.lastY;
   cam.lastX = e.clientX; cam.lastY = e.clientY;
-  cam.theta -= dx * 0.006;
-  cam.phi = Math.min(Math.PI - 0.05, Math.max(0.05, cam.phi - dy * 0.006));
+  if (cam.mode === "fps") {
+    cam.yaw -= dx * 0.004;
+    cam.pitch = clamp(cam.pitch - dy * 0.004, -1.55, 1.55);
+  } else if (cam.drag === "pan") {
+    camera.updateMatrixWorld();
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+    const k = (2 * cam.radius * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / mount.clientHeight;
+    cam.target.addScaledVector(right, -dx * k).addScaledVector(up, dy * k);
+  } else {
+    cam.theta -= dx * 0.006;
+    cam.phi = clamp(cam.phi - dy * 0.006, 0.05, Math.PI - 0.05);
+  }
   updateCamera();
   renderer.render(scene, camera);
 });
 window.addEventListener("pointerup", (e) => {
   cam.dragging = false;
   const moved = Math.hypot(e.clientX - cam.downX, e.clientY - cam.downY);
-  if (moved < 4) {
+  if (moved < 4 && e.button === 0) {
     const rect = mount.getBoundingClientRect();
     pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -561,10 +930,48 @@ window.addEventListener("pointerup", (e) => {
 });
 mount.addEventListener("wheel", (e) => {
   e.preventDefault();
-  cam.radius = Math.min(60, Math.max(2, cam.radius * (1 + e.deltaY * 0.001)));
-  updateCamera();
+  if (cam.mode === "fps") {
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    camera.position.addScaledVector(fwd, -e.deltaY * 0.01);
+  } else {
+    cam.radius = Math.max(2, cam.radius * (1 + e.deltaY * 0.001)); // no zoom-out limit
+    updateCamera();
+  }
   renderer.render(scene, camera);
 }, { passive: false });
+
+// First-person movement: a frame loop that only runs while a movement key is held.
+let moveLoopRunning = false, lastMoveT = 0;
+function moveTick(t) {
+  if (cam.mode !== "fps" || heldKeys.size === 0) { moveLoopRunning = false; return; }
+  const dt = Math.min(0.05, (t - lastMoveT) / 1000);
+  lastMoveT = t;
+  const fast = heldKeys.has("ShiftLeft") || heldKeys.has("ShiftRight");
+  const step = (fast ? 12 : 4) * dt;
+  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+  if (heldKeys.has("KeyW")) camera.position.addScaledVector(fwd, step);
+  if (heldKeys.has("KeyS")) camera.position.addScaledVector(fwd, -step);
+  if (heldKeys.has("KeyD")) camera.position.addScaledVector(right, step);
+  if (heldKeys.has("KeyA")) camera.position.addScaledVector(right, -step);
+  if (heldKeys.has("KeyE")) camera.position.y += step;
+  if (heldKeys.has("KeyQ")) camera.position.y -= step;
+  renderer.render(scene, camera);
+  requestAnimationFrame(moveTick);
+}
+function isTyping(e) {
+  const t = e.target && e.target.tagName;
+  return t === "INPUT" || t === "TEXTAREA" || t === "SELECT";
+}
+window.addEventListener("keydown", (e) => {
+  if (cam.mode !== "fps" || isTyping(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!FPS_KEYS.has(e.code)) return;
+  e.preventDefault();
+  heldKeys.add(e.code);
+  if (!moveLoopRunning) { moveLoopRunning = true; lastMoveT = performance.now(); requestAnimationFrame(moveTick); }
+});
+window.addEventListener("keyup", (e) => heldKeys.delete(e.code));
+window.addEventListener("blur", () => heldKeys.clear());
 
 function makeAxesGizmo(len) {
   const g = new THREE.Group();
@@ -908,6 +1315,7 @@ function updateConstraintField(id, path, value) {
 }
 
 /* ---------------- init ---------------- */
+refreshCameraUI();
 resize();
 renderAll();
 </script>
