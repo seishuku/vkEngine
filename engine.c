@@ -354,11 +354,36 @@ void GenerateWorld(void)
 	characterEntityID=UINT32_MAX;
 	characterAnimID=UINT32_MAX;
 
-	CameraSetFlight(&camera);
+	const BModel_t *model=&AssetManager_GetAsset(assets, MODEL_TEST)->model;
+	const float height=(model->bBoxMax.y-model->bBoxMin.y)*WORLD_SCALE;
+
+	const vec3 spawn=Vec3_Addv(bodies[BODY_MAIN_FLOOR_PLATFORM].position, Vec3(0.0f, bodies[BODY_MAIN_FLOOR_PLATFORM].size.y+height*0.5f+2.0f, bodies[BODY_MAIN_FLOOR_PLATFORM].size.z*0.75f));
+
+	Character_Init(&character, spawn, Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, -1.0f), height);
+
+	characterEntityID=EntityList_Add(&entityList, &character.body, false, MODEL_TEST, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_PLAYER, CharacterTransform);
+	characterAnimID=EntityList_AddAnimator(&entityList, characterEntityID);
+
+	Animator_t *animator=Animation_Get(&animationSystem, characterAnimID);
+
+	if(animator)
+		Animator_Play(animator, &AssetManager_GetAsset(assets, ANIMATION_TEST_IDLE)->animation, true);
+
+	if(playerID!=UINT32_MAX)
+	{
+		EntityList_Remove(&entityList, playerID);
+		playerID=UINT32_MAX;
+	}
+
+	character.active=true;
+
+	CameraFollowBody(&camera, &character.body, height*0.89f-height*0.5f, 0.0f);
+	camera.orbitDistance=30.0f;
+
+	//CameraSetFlight(&camera);
+	//playerID=EntityList_Add(&entityList, &camera.body, !camera.thirdPerson, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+0), TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 
 	// Set up entities to be processed
-	playerID=EntityList_Add(&entityList, &camera.body, !camera.thirdPerson, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+0), TEXTURE_FIGHTER1+(2*fighterTexture[NUM_ENEMY]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
-
 	if(!ClientNetwork_IsConnected())
 	{
 		for(uint32_t i=0;i<numAsteroids;i++)
@@ -1909,7 +1934,7 @@ void Console_CmdCharacter(Console_t *console, const char *param)
 
 		const vec3 spawn=Vec3_Addv(bodies[BODY_MAIN_FLOOR_PLATFORM].position, Vec3(0.0f, bodies[BODY_MAIN_FLOOR_PLATFORM].size.y+height*0.5f+2.0f, bodies[BODY_MAIN_FLOOR_PLATFORM].size.z*0.75f));
 
-		Character_Init(&character, spawn, Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f), height);
+		Character_Init(&character, spawn, Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, -1.0f), height);
 
 		characterEntityID=EntityList_Add(&entityList, &character.body, true, MODEL_TEST, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_PLAYER, CharacterTransform);
 		characterAnimID=EntityList_AddAnimator(&entityList, characterEntityID);
