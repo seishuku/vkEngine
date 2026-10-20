@@ -46,6 +46,8 @@
 #include "vr/vr.h"
 #include "vulkan/vulkan.h"
 
+#include "assembly.h"
+
 extern bool isDone;
 
 // VR context (if running in VR mode)
@@ -99,244 +101,9 @@ EntityList_t entityList;
 
 AnimationSystem_t animationSystem;
 
-#define NUM_CUBE 30
-RigidBody_t cubeBody[NUM_CUBE];
-RigidBody_t platformBody;
-
-// Small character-controller test course. All dimensions are half-extents.
-#define CHARACTER_WORLD_STATIC_COUNT 17
-#define CHARACTER_WORLD_CRATE_COUNT  12
-
-static RigidBody_t characterWorldStatic[CHARACTER_WORLD_STATIC_COUNT];
-static RigidBody_t characterWorldCrates[CHARACTER_WORLD_CRATE_COUNT];
-
 Character_t character;
 uint32_t characterEntityID=UINT32_MAX;
 uint32_t characterAnimID=UINT32_MAX;
-
-enum
-{
-	BODY_CHASSIS = 0,
-	BODY_FLWHEEL,
-	BODY_FRWHEEL,
-	BODY_RLWHEEL,
-	BODY_RRWHEEL,
-	BODY_FLKNUCKLE,
-	BODY_FRKNUCKLE,
-	BODY_RLKNUCKLE,
-	BODY_RRKNUCKLE,
-	BODY_COUNT
-};
-
-enum
-{
-	JOINT_CHASSIS_FLKNUCKLE = 0,
-	JOINT_FLKNUCKLE_FLWHEEL,
-	JOINT_CHASSIS_FRKNUCKLE,
-	JOINT_FRKNUCKLE_FRWHEEL,
-	JOINT_CHASSIS_RLKNUCKLE,
-	JOINT_CHASSIS_RRKNUCKLE,
-	JOINT_RLKNUCKLE_RLWHEEL,
-	JOINT_RRKNUCKLE_RRWHEEL,
-	JOINT_COUNT
-};
-
-RigidBody_t bodies[BODY_COUNT] =
-{
-	{ /* [BODY_CHASSIS] "Chassis" */
-		.position = { 0.f, 0.f, 0.f },
-		.velocity = { 0.0f, 0.0f, 0.0f },
-		.force = { 0.0f, 0.0f, 0.0f },
-		.mass = 0.6f, .invMass = 1.6667f,
-		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
-		.angularVelocity = { 0.0f, 0.0f, 0.0f },
-		.inertia = 0.2f, .invInertia = 5.f,
-		.restitution = 0.3f,
-		.friction = 0.5f,
-		.type = RIGIDBODY_OBB,
-		.size = { 2.f, 0.5f, 4.f },
-	},
-	{ /* [BODY_FLWHEEL] "FLwheel" */
-		.position = { 3.6f, -0.3f, 3.f },
-		.velocity = { 0.0f, 0.0f, 0.0f },
-		.force = { 0.0f, 0.0f, 0.0f },
-		.mass = 0.05f, .invMass = 20.f,
-		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
-		.angularVelocity = { 0.0f, 0.0f, 0.0f },
-		.inertia = 0.005f, .invInertia = 200.f,
-		.restitution = 0.1f,
-		.friction = 2.f,
-		.type = RIGIDBODY_SPHERE,
-		.radius = 1.2f,
-	},
-	{ /* [BODY_FRWHEEL] "FRwheel" */
-		.position = { -3.6f, -0.3f, 3.f },
-		.velocity = { 0.0f, 0.0f, 0.0f },
-		.force = { 0.0f, 0.0f, 0.0f },
-		.mass = 0.05f, .invMass = 20.f,
-		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
-		.angularVelocity = { 0.0f, 0.0f, 0.0f },
-		.inertia = 0.005f, .invInertia = 200.f,
-		.restitution = 0.1f,
-		.friction = 2.f,
-		.type = RIGIDBODY_SPHERE,
-		.radius = 1.2f,
-	},
-	{ /* [BODY_RLWHEEL] "RLwheel" */
-		.position = { 3.6f, -0.3f, -3.f },
-		.velocity = { 0.0f, 0.0f, 0.0f },
-		.force = { 0.0f, 0.0f, 0.0f },
-		.mass = 0.05f, .invMass = 20.f,
-		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
-		.angularVelocity = { 0.0f, 0.0f, 0.0f },
-		.inertia = 0.005f, .invInertia = 200.f,
-		.restitution = 0.1f,
-		.friction = 2.f,
-		.type = RIGIDBODY_SPHERE,
-		.radius = 1.2f,
-	},
-	{ /* [BODY_RRWHEEL] "RRwheel" */
-		.position = { -3.6f, -0.3f, -3.f },
-		.velocity = { 0.0f, 0.0f, 0.0f },
-		.force = { 0.0f, 0.0f, 0.0f },
-		.mass = 0.05f, .invMass = 20.f,
-		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
-		.angularVelocity = { 0.0f, 0.0f, 0.0f },
-		.inertia = 0.005f, .invInertia = 200.f,
-		.restitution = 0.1f,
-		.friction = 2.f,
-		.type = RIGIDBODY_SPHERE,
-		.radius = 1.2f,
-	},
-	{ /* [BODY_FLKNUCKLE] "FLknuckle" */
-		.position = { 2.2f, -0.3f, 3.f },
-		.velocity = { 0.0f, 0.0f, 0.0f },
-		.force = { 0.0f, 0.0f, 0.0f },
-		.mass = 0.05f, .invMass = 20.f,
-		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
-		.angularVelocity = { 0.0f, 0.0f, 0.0f },
-		.inertia = 0.001f, .invInertia = 1000.f,
-		.restitution = 0.1f,
-		.friction = 0.5f,
-		.type = RIGIDBODY_SPHERE,
-		.radius = 0.2f,
-	},
-	{ /* [BODY_FRKNUCKLE] "FRknuckle" */
-		.position = { -2.2f, -0.3f, 3.f },
-		.velocity = { 0.0f, 0.0f, 0.0f },
-		.force = { 0.0f, 0.0f, 0.0f },
-		.mass = 0.05f, .invMass = 20.f,
-		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
-		.angularVelocity = { 0.0f, 0.0f, 0.0f },
-		.inertia = 0.001f, .invInertia = 1000.f,
-		.restitution = 0.1f,
-		.friction = 0.5f,
-		.type = RIGIDBODY_SPHERE,
-		.radius = 0.2f,
-	},
-	{ /* [BODY_RLKNUCKLE] "RLknuckle" */
-		.position = { 2.2f, -0.3f, -3.f },
-		.velocity = { 0.0f, 0.0f, 0.0f },
-		.force = { 0.0f, 0.0f, 0.0f },
-		.mass = 0.05f, .invMass = 20.f,
-		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
-		.angularVelocity = { 0.0f, 0.0f, 0.0f },
-		.inertia = 0.001f, .invInertia = 1000.f,
-		.restitution = 0.1f,
-		.friction = 0.5f,
-		.type = RIGIDBODY_SPHERE,
-		.radius = 0.2f,
-	},
-	{ /* [BODY_RRKNUCKLE] "RRknuckle" */
-		.position = { -2.2f, -0.3f, -3.f },
-		.velocity = { 0.0f, 0.0f, 0.0f },
-		.force = { 0.0f, 0.0f, 0.0f },
-		.mass = 0.05f, .invMass = 20.f,
-		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
-		.angularVelocity = { 0.0f, 0.0f, 0.0f },
-		.inertia = 0.001f, .invInertia = 1000.f,
-		.restitution = 0.1f,
-		.friction = 0.5f,
-		.type = RIGIDBODY_SPHERE,
-		.radius = 0.2f,
-	},
-};
-
-Constraint_t assembly[JOINT_COUNT] =
-{
-	{ /* JOINT_CHASSIS_FLKNUCKLE */
-		.type = CONSTRAINT_HINGE,
-		.bodyA = &bodies[BODY_CHASSIS],  /* "Chassis" */
-		.bodyB = &bodies[BODY_FLKNUCKLE],  /* "FLknuckle" */
-		.localAnchorA = { 2.f, -0.3f, 3.f },
-		.localAnchorB = { -0.2f, 0.f, 0.f },
-		.localAxisA = { 0.f, 1.f, 0.f },
-		.localAxisB = { 0.f, 1.f, 0.f },
-	},
-	{ /* JOINT_FLKNUCKLE_FLWHEEL */
-		.type = CONSTRAINT_HINGE,
-		.bodyA = &bodies[BODY_FLKNUCKLE],  /* "FLknuckle" */
-		.bodyB = &bodies[BODY_FLWHEEL],  /* "FLwheel" */
-		.localAnchorA = { 0.2f, 0.f, 0.f },
-		.localAnchorB = { -1.2f, 0.f, 0.f },
-		.localAxisA = { 1.f, 0.f, 0.f },
-		.localAxisB = { 1.f, 0.f, 0.f },
-	},
-	{ /* JOINT_CHASSIS_FRKNUCKLE */
-		.type = CONSTRAINT_HINGE,
-		.bodyA = &bodies[BODY_CHASSIS],  /* "Chassis" */
-		.bodyB = &bodies[BODY_FRKNUCKLE],  /* "FRknuckle" */
-		.localAnchorA = { -2.f, -0.3f, 3.f },
-		.localAnchorB = { 0.2f, 0.f, 0.f },
-		.localAxisA = { 0.f, 1.f, 0.f },
-		.localAxisB = { 0.f, 1.f, 0.f },
-	},
-	{ /* JOINT_FRKNUCKLE_FRWHEEL */
-		.type = CONSTRAINT_HINGE,
-		.bodyA = &bodies[BODY_FRKNUCKLE],  /* "FRknuckle" */
-		.bodyB = &bodies[BODY_FRWHEEL],  /* "FRwheel" */
-		.localAnchorA = { -0.2f, 0.f, 0.f },
-		.localAnchorB = { 1.2f, 0.f, 0.f },
-		.localAxisA = { 1.f, 0.f, 0.f },
-		.localAxisB = { 1.f, 0.f, 0.f },
-	},
-	{ /* JOINT_CHASSIS_RLKNUCKLE */
-		.type = CONSTRAINT_HINGE,
-		.bodyA = &bodies[BODY_CHASSIS],  /* "Chassis" */
-		.bodyB = &bodies[BODY_RLKNUCKLE],  /* "RLknuckle" */
-		.localAnchorA = { 2.f, -0.3f, -3.f },
-		.localAnchorB = { -0.2f, 0.f, 0.f },
-		.localAxisA = { 1.f, 0.f, 0.f },
-		.localAxisB = { 1.f, 0.f, 0.f },
-	},
-	{ /* JOINT_CHASSIS_RRKNUCKLE */
-		.type = CONSTRAINT_HINGE,
-		.bodyA = &bodies[BODY_CHASSIS],  /* "Chassis" */
-		.bodyB = &bodies[BODY_RRKNUCKLE],  /* "RRknuckle" */
-		.localAnchorA = { -2.f, -0.3f, -3.f },
-		.localAnchorB = { 0.2f, 0.f, 0.f },
-		.localAxisA = { 1.f, 0.f, 0.f },
-		.localAxisB = { 1.f, 0.f, 0.f },
-	},
-	{ /* JOINT_RLKNUCKLE_RLWHEEL */
-		.type = CONSTRAINT_HINGE,
-		.bodyA = &bodies[BODY_RLKNUCKLE],  /* "RLknuckle" */
-		.bodyB = &bodies[BODY_RLWHEEL],  /* "RLwheel" */
-		.localAnchorA = { 0.2f, 0.f, 0.f },
-		.localAnchorB = { -1.2f, 0.f, 0.f },
-		.localAxisA = { 1.f, 0.f, 0.f },
-		.localAxisB = { 1.f, 0.f, 0.f },
-	},
-	{ /* JOINT_RRKNUCKLE_RRWHEEL */
-		.type = CONSTRAINT_HINGE,
-		.bodyA = &bodies[BODY_RRKNUCKLE],  /* "RRknuckle" */
-		.bodyB = &bodies[BODY_RRWHEEL],  /* "RRwheel" */
-		.localAnchorA = { -0.2f, 0.f, 0.f },
-		.localAnchorB = { 1.2f, 0.f, 0.f },
-		.localAxisA = { 1.f, 0.f, 0.f },
-		.localAxisB = { 1.f, 0.f, 0.f },
-	},
-};
 
 // Thread stuff
 typedef struct
@@ -466,7 +233,13 @@ bool CreateFramebuffers(uint32_t eye);
 matrix CubeTransform(const RigidBody_t *body)
 {
 	matrix local=MatrixScalev(body->size);
-	local=MatrixMult(local, MatrixTranslatev(AssetManager_GetAsset(assets, MODEL_CUBE)->model.center));
+	local=MatrixMult(local, QuatToMatrix(body->orientation));
+	return MatrixMult(local, MatrixTranslatev(body->position));
+}
+
+matrix SphereTransform(const RigidBody_t *body)
+{
+	matrix local=MatrixScale(body->radius, body->radius, body->radius);
 	local=MatrixMult(local, QuatToMatrix(body->orientation));
 	return MatrixMult(local, MatrixTranslatev(body->position));
 }
@@ -501,164 +274,6 @@ matrix CharacterTransform(const RigidBody_t *body)
 	local=MatrixMult(local, MatrixTranslatev(Vec3(0.0f, -(body->radiusHeight.x+body->radiusHeight.y), 0.0f)));
 	local=MatrixMult(local, QuatToMatrix(body->orientation));
 	return MatrixMult(local, MatrixTranslatev(body->position));
-}
-
-void ResetPhysicsCubes(void)
-{
-	const float radius=20.0f;
-	const float mass=(1.0f/3000.0f)*(1.33333333f*PI*radius);
-	const float h=radius*0.5f;
-	const float inertia=(2.0f/3.0f)*mass*h*h;
-
-	const uint32_t layers=4;
-	const uint32_t cubesPerLayer=4;
-	const float spacing=radius*1.01f;
-
-	const float platformHalfHeight=5.0f;
-	const float platformHalfWidth=cubesPerLayer*spacing;
-
-	const float stackBottom=-(layers*radius/2.0f)-(radius/2.0f);
-
-	platformBody=(RigidBody_t)
-	{
-	    .position=Vec3(0.0f, -60.0f, 0.0f),
-
-	    .velocity=Vec3b(0.0f),
-	    .force=Vec3b(0.0f),
-	    .mass=0.0f,
-	    .invMass=0.0f,
-
-	    .orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
-	    .angularVelocity=Vec3b(0.0f),
-	    .inertia=0.0f,
-	    .invInertia=0.0f,
-
-		.restitution=0.0f,
-		.friction=1.0f,
-
-	    .type=RIGIDBODY_OBB,
-	    .size=Vec3(platformHalfWidth, platformHalfHeight, platformHalfWidth),
-	};
-
-	uint32_t index=0;
-	for(uint32_t y=0;y<layers;y++)
-	{
-		for(uint32_t x=0;x<cubesPerLayer-y; x++)
-		{
-			for(uint32_t z=0;z<cubesPerLayer-y;z++)
-			{
-				if(index>=NUM_CUBE) break;
-
-				float offsetX=(cubesPerLayer-y-1)*spacing*0.5f;
-				float offsetZ=(cubesPerLayer-y-1)*spacing*0.5f;
-
-				cubeBody[index++]=(RigidBody_t)
-				{
-					.position=Vec3(
-						x*spacing-offsetX,
-						(y*spacing)-(layers*radius/2),
-						z*spacing-offsetZ
-					),
-
-					.velocity=Vec3b(0.0f),
-					.force=Vec3b(0.0f),
-					.mass=mass,
-					.invMass=1.0f/mass,
-
-					.orientation=Vec4(0.0f, 0.0f, 0.0f, 1.0f),
-					.angularVelocity=Vec3b(0.0f),
-					.inertia=inertia,
-					.invInertia=1.0f/inertia,
-
-					.restitution=0.1f,
-					.friction=1.0f,
-
-					.type=RIGIDBODY_OBB,
-					.size=Vec3(radius/2, radius/2, radius/2),
-				};
-			}
-		}
-	}
-}
-
-static void CharacterWorld_InitOBB(RigidBody_t *body, const vec3 position, const vec3 halfExtents, const vec4 orientation, const float mass, const float friction, const float restitution)
-{
-	const float inertia=(mass>0.0f)?(2.0f/3.0f)*mass*halfExtents.x*halfExtents.x:0.0f;
-
-	*body=(RigidBody_t)
-	{
-		.position=position,
-		.velocity=Vec3b(0.0f),
-		.force=Vec3b(0.0f),
-		.mass=mass,
-		.invMass=(mass>0.0f)?1.0f/mass:0.0f,
-		.orientation=orientation,
-		.angularVelocity=Vec3b(0.0f),
-		.inertia=inertia,
-		.invInertia=(inertia>0.0f)?1.0f/inertia:0.0f,
-		.restitution=restitution,
-		.friction=friction,
-		.type=RIGIDBODY_OBB,
-		.size=halfExtents,
-	};
-}
-
-static void BuildCharacterTestWorld(void)
-{
-	const vec4 identity=Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-	const vec4 gentleSlope=QuatAnglev(17.0f*PI/180.0f, Vec3(1.0f, 0.0f, 0.0f));
-	const vec4 steepSlope=QuatAnglev(55.0f*PI/180.0f, Vec3(1.0f, 0.0f, 0.0f));
-	const vec4 sideSlope=QuatAnglev(-32.0f*PI/180.0f, Vec3(1.0f, 0.0f, 0.0f));
-	uint32_t i=0;
-
-	// Three shallow steps test step-up behavior and grounding on edges.
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(-25.0f, -47.5f, 42.0f), Vec3(8.0f, 2.5f, 8.0f), identity, 0.0f, 0.9f, 0.0f);
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(-25.0f, -44.5f, 26.0f), Vec3(8.0f, 2.5f, 8.0f), identity, 0.0f, 0.9f, 0.0f);
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(-25.0f, -41.5f, 10.0f), Vec3(8.0f, 2.5f, 8.0f), identity, 0.0f, 0.9f, 0.0f);
-
-	// An 8-unit vaultable wall near the spawn area.
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(0.0f, -46.0f, 42.0f), Vec3(9.0f, 4.0f, 1.2f), identity, 0.0f, 0.8f, 0.0f);
-
-	// Walkable ramp and a deliberately over-steep ramp (50-degree limit in the controller).
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(25.0f, -44.5f, 34.0f), Vec3(8.0f, 1.5f, 14.0f), gentleSlope, 0.0f, 0.9f, 0.0f);
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(48.0f, -37.5f, 4.0f), Vec3(7.0f, 1.5f, 10.0f), steepSlope, 0.0f, 0.9f, 0.0f);
-
-	// A narrow raised beam and three platforms form a simple jump sequence.
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(0.0f, -44.0f, -30.0f), Vec3(2.0f, 1.5f, 9.0f), identity, 0.0f, 0.8f, 0.0f);
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(0.0f, -44.0f, -48.0f), Vec3(6.0f, 2.0f, 4.0f), identity, 0.0f, 0.9f, 0.0f);
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(0.0f, -44.0f, -66.0f), Vec3(6.0f, 2.0f, 4.0f), identity, 0.0f, 0.9f, 0.0f);
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(0.0f, -44.0f, -77.0f), Vec3(8.0f, 2.0f, 2.0f), identity, 0.0f, 0.9f, 0.0f);
-
-	// Offset pillars make a slalom and give the controller corners to brush against.
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(-10.0f, -43.0f, 32.0f), Vec3(1.5f, 7.0f, 1.5f), identity, 0.0f, 0.8f, 0.0f);
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(10.0f, -43.0f, 18.0f), Vec3(1.5f, 7.0f, 1.5f), identity, 0.0f, 0.8f, 0.0f);
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(-10.0f, -43.0f, 2.0f), Vec3(1.5f, 7.0f, 1.5f), identity, 0.0f, 0.8f, 0.0f);
-
-	// A low-clearance tunnel
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(16.0f, -41.5f, -12.0f), Vec3(1.0f, 8.5f, 7.0f), identity, 0.0f, 0.8f, 0.0f);
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(30.0f, -41.5f, -12.0f), Vec3(1.0f, 8.5f, 7.0f), identity, 0.0f, 0.8f, 0.0f);
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(23.0f, -31.0f, -12.0f), Vec3(7.0f, 1.0f, 7.0f), identity, 0.0f, 0.8f, 0.0f);
-
-	// Side route with a moderate slope, useful for checking ground-normal stability.
-	CharacterWorld_InitOBB(&characterWorldStatic[i++], Vec3(-48.0f, -44.5f, -12.0f), Vec3(7.0f, 1.5f, 10.0f), sideSlope, 0.0f, 0.9f, 0.0f);
-
-	if(i!=CHARACTER_WORLD_STATIC_COUNT)
-		DBGPRINTF(DEBUG_ERROR, "Character test world static-body count mismatch (%u).\n", i);
-
-	i=0;
-	const float halfSize=4.5f;
-	const float mass=0.025f;
-	for(uint32_t layer=0;layer<2;layer++)
-	{
-		for(uint32_t x=0;x<3;x++)
-		{
-			for(uint32_t z=0;z<2;z++)
-			{
-				const vec3 position=Vec3(35.0f+(float)x*10.0f, -50.0f+halfSize+(float)layer*(2.0f*halfSize+0.1f), -47.0f+(float)z*10.0f);
-				CharacterWorld_InitOBB(&characterWorldCrates[i++], position, Vec3b(halfSize), identity, mass, 0.8f, 0.05f);
-			}
-		}
-	}
 }
 
 // Build up random data for skybox and asteroid field
@@ -724,7 +339,6 @@ void GenerateWorld(void)
 
 		fighterTexture[NUM_ENEMY]=RandRange(0, 7);
 
-		ResetPhysicsCubes();
 		ResetAsteroids();
 	}
 
@@ -735,8 +349,6 @@ void GenerateWorld(void)
 
 	EntityList_Clear(&entityList);
 	Animation_Clear(&animationSystem);
-
-	BuildCharacterTestWorld();
 
 	character.active=false;
 	characterEntityID=UINT32_MAX;
@@ -749,37 +361,26 @@ void GenerateWorld(void)
 
 	if(!ClientNetwork_IsConnected())
 	{
-		// Render and simulate the character-controller course using existing cube assets.
-		for(uint32_t i=0;i<CHARACTER_WORLD_STATIC_COUNT;i++)
-			EntityList_Add(&entityList, &characterWorldStatic[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
+		for(uint32_t i=0;i<numAsteroids;i++)
+			EntityList_Add(&entityList, &asteroids[i], false, asteroidModels[i].modelID, asteroidModels[i].tex0ID, asteroidModels[i].tex1ID, ENTITYOBJECTTYPE_FIELD, AsteroidTransform);
 
-		for(uint32_t i=0;i<CHARACTER_WORLD_CRATE_COUNT;i++)
-			EntityList_Add(&entityList, &characterWorldCrates[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
-
-		// for(uint32_t i=0;i<numAsteroids;i++)
-		// 	EntityList_Add(&entityList, &asteroids[i], false, asteroidModels[i].modelID, asteroidModels[i].tex0ID, asteroidModels[i].tex1ID, ENTITYOBJECTTYPE_FIELD, AsteroidTransform);
-
-		// for(uint32_t i=0;i<sizeof(bodies)/sizeof(RigidBody_t);i++)
-		// {
-		// 	if(bodies[i].type==RIGIDBODY_OBB)
-		// 		EntityList_Add(&entityList, &bodies[i], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
-		// 	else if(bodies[i].type==RIGIDBODY_SPHERE)
-		// 		EntityList_Add(&entityList, &bodies[i], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
-		// 	else if(bodies[i].type==RIGIDBODY_CAPSULE)
-		// 		EntityList_Add(&entityList, &bodies[i], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
-		// }
+		for(uint32_t i=0;i<sizeof(bodies)/sizeof(RigidBody_t);i++)
+		{
+			if(bodies[i].type==RIGIDBODY_OBB)
+				EntityList_Add(&entityList, &bodies[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
+			else if(bodies[i].type==RIGIDBODY_SPHERE)
+				EntityList_Add(&entityList, &bodies[i], false, MODEL_SPHERE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, SphereTransform);
+			else if(bodies[i].type==RIGIDBODY_CAPSULE)
+				EntityList_Add(&entityList, &bodies[i], true, 0, 0, 0, ENTITYOBJECTTYPE_FIELD, NULL);
+		}
 
 		// for(uint32_t i=0;i<NUM_ENEMY;i++)
 		// 	EntityList_Add(&entityList, &enemy[i].body, false, MODEL_FIGHTER, TEXTURE_FIGHTER1+(2*fighterTexture[i]+0), TEXTURE_FIGHTER1+(2*fighterTexture[i]+1), ENTITYOBJECTTYPE_PLAYER, FighterTransform);
 
-		// for(uint32_t i=0;i<NUM_CUBE;i++)
-		// 	EntityList_Add(&entityList, &cubeBody[i], false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
-
-		uint32_t platformID=EntityList_Add(&entityList, &platformBody, false, MODEL_CUBE, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_FIELD, CubeTransform);
 		for(uint32_t i=0;i<entityList.entityCount;i++)
 		{
 			Entity_t *entity=&entityList.entities[i];
-			if(entity->ID==platformID)
+			if(entity->body==&bodies[BODY_MAIN_FLOOR_PLATFORM])
 			{
 				entity->isAttractor=true;
 				entity->influenceRadius=100.0f;
@@ -1205,6 +806,7 @@ void Thread_Main(void *arg)
 	{
 		for(uint32_t i=0;i<sizeof(bodies)/sizeof(RigidBody_t);i++)
 		{
+#if 0
 			if(bodies[i].type==RIGIDBODY_OBB)
 			{
 				struct
@@ -1224,7 +826,9 @@ void Thread_Main(void *arg)
 
 				DrawCubePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(cubePC), &cubePC);
 			}
-			else if(bodies[i].type==RIGIDBODY_SPHERE)
+			else
+#endif
+			if(bodies[i].type==RIGIDBODY_SPHERE)
 			{
 				struct
 				{
@@ -1440,7 +1044,11 @@ void AttractorQuery(Entity_t *entity, void *userdata)
 		entity->body->force=Vec3_Addv(entity->body->force, Vec3_Muls(gravity, fTimeStep));
 }
 
-// Pick the clip for what the character is doing, only idle exists in the assets for now
+// Ground speed that animation clip was authored for.
+#define WALK_CLIP_SPEED 0.98f
+#define RUN_CLIP_SPEED 8.91f
+
+// Pick the clip for what the character is doing, and play it at a speed that fits how fast the character is moving
 static void CharacterAnimate(void)
 {
 	Animator_t *animator=Animation_Get(&animationSystem, characterAnimID);
@@ -1448,26 +1056,22 @@ static void CharacterAnimate(void)
 	if(!animator)
 		return;
 
-	const BAnim_t *fall=&AssetManager_GetAsset(assets, ANIMATION_TEST_FALL)->animation;
-	const BAnim_t *idle=&AssetManager_GetAsset(assets, ANIMATION_TEST_IDLE)->animation;
-	const BAnim_t *jump=&AssetManager_GetAsset(assets, ANIMATION_TEST_JUMP)->animation;
-	const BAnim_t *land=&AssetManager_GetAsset(assets, ANIMATION_TEST_LAND)->animation;
-	const BAnim_t *run=&AssetManager_GetAsset(assets, ANIMATION_TEST_RUN)->animation;
-	const BAnim_t *walk=&AssetManager_GetAsset(assets, ANIMATION_TEST_WALK)->animation;
-
-	// Fill these in as clips get added, e.g. CHARACTER_STATE_WALK -> walk loop
-	const BAnim_t *clips[CHARACTER_STATE_COUNT]=
+	const uint32_t clipIndex[CHARACTER_STATE_COUNT]=
 	{
-		[CHARACTER_STATE_FALL]=fall,
-		[CHARACTER_STATE_IDLE]=idle,
-		[CHARACTER_STATE_JUMP]=jump,
-		[CHARACTER_STATE_LAND]=land,
-		[CHARACTER_STATE_RUN]=run,
-		[CHARACTER_STATE_WALK]=walk,
+		[CHARACTER_STATE_FALL]=ANIMATION_TEST_FALL,
+		[CHARACTER_STATE_IDLE]=ANIMATION_TEST_IDLE,
+		[CHARACTER_STATE_JUMP]=ANIMATION_TEST_JUMP,
+		[CHARACTER_STATE_LAND]=ANIMATION_TEST_LAND,
+		[CHARACTER_STATE_RUN]=ANIMATION_TEST_RUN,
+		[CHARACTER_STATE_WALK]=ANIMATION_TEST_WALK,
 	};
 
-	// Asking for the clip that's already playing is ignored, so this is fine to do every step
-	Animator_Play(animator, clips[character.state], true);
+	Animator_Play(animator, &AssetManager_GetAsset(assets, clipIndex[character.state])->animation, true);
+
+	if(character.state==CHARACTER_STATE_WALK)
+		animator->speed=character.speed/(WALK_CLIP_SPEED*WORLD_SCALE);
+	else if(character.state==CHARACTER_STATE_RUN)
+		animator->speed=character.speed/(RUN_CLIP_SPEED*WORLD_SCALE);
 }
 
 // Runs anything physics related
@@ -1679,12 +1283,12 @@ void Thread_Physics(void *arg)
 						else if((objA->objectType==ENTITYOBJECTTYPE_FIELD&&objB->objectType==ENTITYOBJECTTYPE_PLAYER)||
 								(objA->objectType==ENTITYOBJECTTYPE_PLAYER&&objB->objectType==ENTITYOBJECTTYPE_FIELD))
 						{
-							Audio_PlaySample(&AssetManager_GetAsset(assets, SOUND_CRASH)->sound, false, 1.0f, objB->body->position);
+							//Audio_PlaySample(&AssetManager_GetAsset(assets, SOUND_CRASH)->sound, false, 1.0f, objB->body->position);
 						}
 						// If both objects are players
 						else if(objA->objectType==ENTITYOBJECTTYPE_PLAYER&&objB->objectType==ENTITYOBJECTTYPE_PLAYER)
 						{
-							Audio_PlaySample(&AssetManager_GetAsset(assets, SOUND_CRASH)->sound, false, 1.0f, objB->body->position);
+							//Audio_PlaySample(&AssetManager_GetAsset(assets, SOUND_CRASH)->sound, false, 1.0f, objB->body->position);
 						}
 						// If it was a projectile colliding with anything
 						else if(objA->objectType==ENTITYOBJECTTYPE_PROJECTILE||objB->objectType==ENTITYOBJECTTYPE_PROJECTILE)
@@ -1775,8 +1379,10 @@ void Thread_Physics(void *arg)
 					PhysicsPositionCorrection(manifold->a, manifold->b, manifold->contacts[j]);
 			}
 
+#if 1
 			for(uint32_t i=0;i<sizeof(assembly)/sizeof(assembly[0]);i++)
 				PhysicsSolvePositionConstraint(&assembly[i]);
+#endif
 
 			PhysicsRecorder_EndFrame();
 		}
@@ -2301,7 +1907,7 @@ void Console_CmdCharacter(Console_t *console, const char *param)
 		const BModel_t *model=&AssetManager_GetAsset(assets, MODEL_TEST)->model;
 		const float height=(model->bBoxMax.y-model->bBoxMin.y)*WORLD_SCALE;
 
-		const vec3 spawn=Vec3_Addv(platformBody.position, Vec3(0.0f, platformBody.size.y+height*0.5f+2.0f, platformBody.size.z*0.75f));
+		const vec3 spawn=Vec3_Addv(bodies[BODY_MAIN_FLOOR_PLATFORM].position, Vec3(0.0f, bodies[BODY_MAIN_FLOOR_PLATFORM].size.y+height*0.5f+2.0f, bodies[BODY_MAIN_FLOOR_PLATFORM].size.z*0.75f));
 
 		Character_Init(&character, spawn, Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f), height);
 
@@ -2367,7 +1973,7 @@ bool Init(void)
 	LoadingScreenInit(&loadingScreen, NUM_ASSETS+12);
 
 	//const uint32_t seed=time(NULL);
-	const uint32_t seed=69420;
+	const uint32_t seed=42;
 	RandomSeed(seed);
 
 	// TODO: This is a hack, fix it proper.

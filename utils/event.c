@@ -230,8 +230,6 @@ bool Event_Trigger(EventID ID, void *arg)
 			        else
 						FireParticleEmitter(Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, camera.body.radius)), camera.forward);
 					break;
-				case KB_I:
-					ResetPhysicsCubes();				break;
 				case KB_O:		GenerateWorld();		break;
 				case KB_P:		pausePhysics=!pausePhysics; break;
 				case KB_W:		camera.moveForward=true;		break;

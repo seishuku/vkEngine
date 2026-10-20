@@ -52,6 +52,7 @@ AssetManager_t assets[]=
 	{ MODEL_ASTEROID4,          ASSET_MODEL,   "assets/models/asteroid4.bmodel" },
 	{ MODEL_FIGHTER,            ASSET_MODEL,   "assets/models/fighter1.bmodel" },
 	{ MODEL_CUBE,               ASSET_MODEL,   "assets/models/cube.bmodel" },
+	{ MODEL_SPHERE,				ASSET_MODEL,   "assets/models/sphere.bmodel" },
 	{ MODEL_TEST,				ASSET_MODEL,   "assets/models/test.bmodel" },
 
 	{ ANIMATION_TEST_CROSS,		ASSET_ANIMATION, "assets/animations/test_cross.banim" },

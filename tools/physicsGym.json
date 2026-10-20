@@ -1,0 +1,1134 @@
+{
+  "bodies": [
+    {
+      "id": "floor",
+      "name": "Main Floor Platform",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 0,
+        "y": -60,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 100,
+        "y": 10,
+        "z": 100
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.9,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "step1",
+      "name": "Step Course - Low",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": -25,
+        "y": -49,
+        "z": 42
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 8,
+        "y": 1,
+        "z": 8
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.9,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "step2",
+      "name": "Step Course - Medium",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": -25,
+        "y": -47,
+        "z": 26
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 8,
+        "y": 1,
+        "z": 8
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.9,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "step3",
+      "name": "Step Course - High",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": -25,
+        "y": -45,
+        "z": 10
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 8,
+        "y": 1,
+        "z": 8
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.9,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "vaultwall",
+      "name": "Vault Wall",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 0,
+        "y": -46,
+        "z": 42
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 9,
+        "y": 4,
+        "z": 1.2
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "gentleramp",
+      "name": "Walkable Ramp - 17 Degrees",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 25,
+        "y": -47.4,
+        "z": 34
+      },
+      "rotation": {
+        "x": 17,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 8,
+        "y": 1.5,
+        "z": 14
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.9,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "steepramp",
+      "name": "Steep Ramp - 55 Degrees",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 48,
+        "y": -42.7,
+        "z": 4
+      },
+      "rotation": {
+        "x": 55,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 7,
+        "y": 1.5,
+        "z": 10
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.9,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "jumpbeam",
+      "name": "Narrow Raised Beam",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 0,
+        "y": -44,
+        "z": -30
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 2,
+        "y": 1.5,
+        "z": 9
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "jumpplatform1",
+      "name": "Jump Platform A",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 0,
+        "y": -44,
+        "z": -48
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 6,
+        "y": 2,
+        "z": 4
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.9,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "jumpplatform2",
+      "name": "Jump Platform B",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 0,
+        "y": -44,
+        "z": -66
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 6,
+        "y": 2,
+        "z": 4
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.9,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "jumpplatform3",
+      "name": "Jump Landing Pad",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 0,
+        "y": -44,
+        "z": -77
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 8,
+        "y": 2,
+        "z": 2
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.9,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "pillar1",
+      "name": "Slalom Pillar A",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": -10,
+        "y": -43,
+        "z": 32
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 1.5,
+        "y": 7,
+        "z": 1.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "pillar2",
+      "name": "Slalom Pillar B",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 10,
+        "y": -43,
+        "z": 18
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 1.5,
+        "y": 7,
+        "z": 1.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "pillar3",
+      "name": "Slalom Pillar C",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": -10,
+        "y": -43,
+        "z": 2
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 1.5,
+        "y": 7,
+        "z": 1.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "tunnelleft",
+      "name": "Tunnel - Left Wall",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 17,
+        "y": -40,
+        "z": -12
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 1,
+        "y": 10,
+        "z": 7
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "tunnelright",
+      "name": "Tunnel - Right Wall",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 29,
+        "y": -40,
+        "z": -12
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 1,
+        "y": 10,
+        "z": 7
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "tunnelroof",
+      "name": "Tunnel Roof",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 23,
+        "y": -29,
+        "z": -12
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 7,
+        "y": 1,
+        "z": 7
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "sideramp",
+      "name": "Side Slope - 32 Degrees",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": -48,
+        "y": -46,
+        "z": -12
+      },
+      "rotation": {
+        "x": -32,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 7,
+        "y": 1.5,
+        "z": 10
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0,
+      "inertia": 0,
+      "isStatic": true,
+      "restitution": 0,
+      "friction": 0.9,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "crate1",
+      "name": "Pushable Crate 1",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 35,
+        "y": -45.5,
+        "z": -47
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 4.5,
+        "y": 4.5,
+        "z": 4.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.025,
+      "inertia": 0.3375,
+      "isStatic": false,
+      "restitution": 0.05,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "crate2",
+      "name": "Pushable Crate 2",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 35,
+        "y": -45.5,
+        "z": -37
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 4.5,
+        "y": 4.5,
+        "z": 4.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.025,
+      "inertia": 0.3375,
+      "isStatic": false,
+      "restitution": 0.05,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "crate3",
+      "name": "Pushable Crate 3",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 45,
+        "y": -45.5,
+        "z": -47
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 4.5,
+        "y": 4.5,
+        "z": 4.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.025,
+      "inertia": 0.3375,
+      "isStatic": false,
+      "restitution": 0.05,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "crate4",
+      "name": "Pushable Crate 4",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 45,
+        "y": -45.5,
+        "z": -37
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 4.5,
+        "y": 4.5,
+        "z": 4.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.025,
+      "inertia": 0.3375,
+      "isStatic": false,
+      "restitution": 0.05,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "crate5",
+      "name": "Pushable Crate 5",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 55,
+        "y": -45.5,
+        "z": -47
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 4.5,
+        "y": 4.5,
+        "z": 4.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.025,
+      "inertia": 0.3375,
+      "isStatic": false,
+      "restitution": 0.05,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "crate6",
+      "name": "Pushable Crate 6",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 55,
+        "y": -45.5,
+        "z": -37
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 4.5,
+        "y": 4.5,
+        "z": 4.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.025,
+      "inertia": 0.3375,
+      "isStatic": false,
+      "restitution": 0.05,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "crate7",
+      "name": "Pushable Crate 7",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 35,
+        "y": -36.4,
+        "z": -47
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 4.5,
+        "y": 4.5,
+        "z": 4.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.025,
+      "inertia": 0.3375,
+      "isStatic": false,
+      "restitution": 0.05,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "crate8",
+      "name": "Pushable Crate 8",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 35,
+        "y": -36.4,
+        "z": -37
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 4.5,
+        "y": 4.5,
+        "z": 4.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.025,
+      "inertia": 0.3375,
+      "isStatic": false,
+      "restitution": 0.05,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "crate9",
+      "name": "Pushable Crate 9",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 45,
+        "y": -36.4,
+        "z": -47
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 4.5,
+        "y": 4.5,
+        "z": 4.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.025,
+      "inertia": 0.3375,
+      "isStatic": false,
+      "restitution": 0.05,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "crate10",
+      "name": "Pushable Crate 10",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 45,
+        "y": -36.4,
+        "z": -37
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 4.5,
+        "y": 4.5,
+        "z": 4.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.025,
+      "inertia": 0.3375,
+      "isStatic": false,
+      "restitution": 0.05,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "crate11",
+      "name": "Pushable Crate 11",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 55,
+        "y": -36.4,
+        "z": -47
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 4.5,
+        "y": 4.5,
+        "z": 4.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.025,
+      "inertia": 0.3375,
+      "isStatic": false,
+      "restitution": 0.05,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "crate12",
+      "name": "Pushable Crate 12",
+      "type": "RIGIDBODY_OBB",
+      "position": {
+        "x": 55,
+        "y": -36.4,
+        "z": -37
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 4.5,
+        "y": 4.5,
+        "z": 4.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.025,
+      "inertia": 0.3375,
+      "isStatic": false,
+      "restitution": 0.05,
+      "friction": 0.8,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "id1",
+      "name": "Hanging Ball",
+      "type": "RIGIDBODY_SPHERE",
+      "position": {
+        "x": 23,
+        "y": -38,
+        "z": -12
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 0.5,
+        "y": 0.5,
+        "z": 0.5
+      },
+      "radius": 2,
+      "radiusHeight": {
+        "radius": 0.3,
+        "halfHeight": 0.5
+      },
+      "mass": 0.001,
+      "inertia": 0.1,
+      "isStatic": false,
+      "restitution": 0.8,
+      "friction": 0.5,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "id2",
+      "name": "Link1",
+      "type": "RIGIDBODY_CAPSULE",
+      "position": {
+        "x": 23,
+        "y": -34.4,
+        "z": -12
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 0.5,
+        "y": 0.5,
+        "z": 0.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.2,
+        "halfHeight": 1
+      },
+      "mass": 0.001,
+      "inertia": 0.01,
+      "isStatic": false,
+      "restitution": 0.8,
+      "friction": 0.5,
+      "sourceBoneIndex": null
+    },
+    {
+      "id": "id5",
+      "name": "Link2",
+      "type": "RIGIDBODY_CAPSULE",
+      "position": {
+        "x": 23,
+        "y": -31.7,
+        "z": -12
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "size": {
+        "x": 0.5,
+        "y": 0.5,
+        "z": 0.5
+      },
+      "radius": 0.5,
+      "radiusHeight": {
+        "radius": 0.2,
+        "halfHeight": 1
+      },
+      "mass": 0.001,
+      "inertia": 0.01,
+      "isStatic": false,
+      "restitution": 0.8,
+      "friction": 0.5,
+      "sourceBoneIndex": null
+    }
+  ],
+  "constraints": [
+    {
+      "id": "id8",
+      "type": "CONSTRAINT_POINT",
+      "bodyA": "tunnelroof",
+      "bodyB": "id5",
+      "localAnchorA": {
+        "x": 0,
+        "y": -1,
+        "z": 0
+      },
+      "localAnchorB": {
+        "x": 0,
+        "y": 1.2,
+        "z": 0
+      },
+      "distance": 1,
+      "localAxisA": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "localAxisB": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "worldAxis": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "motorEnabled": true,
+      "motorVelocity": 1,
+      "maxMotorForce": 10
+    },
+    {
+      "id": "id9",
+      "type": "CONSTRAINT_POINT",
+      "bodyA": "id5",
+      "bodyB": "id2",
+      "localAnchorA": {
+        "x": 0,
+        "y": -1.2,
+        "z": 0
+      },
+      "localAnchorB": {
+        "x": 0,
+        "y": 1.2,
+        "z": 0
+      },
+      "distance": 1,
+      "localAxisA": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "localAxisB": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "worldAxis": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "motorEnabled": true,
+      "motorVelocity": 1,
+      "maxMotorForce": 10
+    },
+    {
+      "id": "id10",
+      "type": "CONSTRAINT_POINT",
+      "bodyA": "id2",
+      "bodyB": "id1",
+      "localAnchorA": {
+        "x": 0,
+        "y": -1.2,
+        "z": 0
+      },
+      "localAnchorB": {
+        "x": 0,
+        "y": 2,
+        "z": 0
+      },
+      "distance": 1,
+      "localAxisA": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "localAxisB": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "worldAxis": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "motorEnabled": true,
+      "motorVelocity": 1,
+      "maxMotorForce": 10
+    }
+  ]
+}

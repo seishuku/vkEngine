@@ -138,7 +138,7 @@ void Character_Init(Character_t *c, const vec3 position, const vec3 up, const ve
 	c->facing=NormalizeOr(ProjectOnPlane(facing, c->up), AnyPerpendicular(c->up));
 	c->groundNormal=c->up;
 
-	c->walkSpeed=3.5f*WORLD_SCALE;
+	c->walkSpeed=1.5f*WORLD_SCALE;
 	c->runSpeed=6.0f*WORLD_SCALE;
 	c->groundAcceleration=30.0f*WORLD_SCALE;
 	c->groundDeceleration=40.0f*WORLD_SCALE;
