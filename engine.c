@@ -387,7 +387,7 @@ void GenerateWorld(void)
 	if(!ClientNetwork_IsConnected())
 	{
 		for(uint32_t i=0;i<numAsteroids;i++)
-			EntityList_Add(&entityList, &asteroids[i], false, asteroidModels[i].modelID, asteroidModels[i].tex0ID, asteroidModels[i].tex1ID, ENTITYOBJECTTYPE_FIELD, AsteroidTransform);
+			asteroidModels[i].entityID=EntityList_Add(&entityList, &asteroids[i], false, asteroidModels[i].modelID, asteroidModels[i].tex0ID, asteroidModels[i].tex1ID, ENTITYOBJECTTYPE_FIELD, AsteroidTransform);
 
 		for(uint32_t i=0;i<sizeof(bodies)/sizeof(RigidBody_t);i++)
 		{
@@ -1097,6 +1097,8 @@ static void CharacterAnimate(void)
 		animator->speed=character.speed/(WALK_CLIP_SPEED*WORLD_SCALE);
 	else if(character.state==CHARACTER_STATE_RUN)
 		animator->speed=character.speed/(RUN_CLIP_SPEED*WORLD_SCALE);
+	else
+		animator->speed=1.0f;
 }
 
 // Runs anything physics related
