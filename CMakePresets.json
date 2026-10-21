@@ -60,7 +60,7 @@
                 "CMAKE_BUILD_TYPE": "Debug"
             }
         },
- 
+
         {
             "name": "linux_x64_release",
             "displayName": "Linux x64 Release",
@@ -92,6 +92,41 @@
                 "rhs": "Linux"
             }
         },
+        {
+            "name": "linux_aarch64_release_cross",
+            "displayName": "Linux aarch64 Release (cross build)",
+            "architecture": {
+                "value": "aarch64",
+                "strategy": "external"
+            },
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "toolchainFile": "cmake/linux-aarch64-toolchain.cmake",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/${presetName}",
+                "CMAKE_BUILD_TYPE": "Release",
+                "WAYLAND": true
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
+        },
+        {
+            "name": "linux_aarch64_debug_cross",
+            "displayName": "Linux aarch64 Debug (cross build)",
+            "inherits": "linux_aarch64_release_cross",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
+        },
+
         {
             "name": "android_arm64_release",
             "displayName": "Android ARM64 Release",
