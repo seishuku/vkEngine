@@ -16,6 +16,8 @@
 #define IDLE_SPEED_RATIO			0.15f	// Below this fraction of walkSpeed is idle
 #define RUN_SPEED_RATIO				1.25f	// Above this fraction of walkSpeed is running
 #define LAND_CANCEL_SPEED_RATIO		0.5f	// Moving faster than this fraction of walkSpeed cancels the landing state
+#define EYE_HEIGHT_RATIO			0.89f	// Eye height as a fraction of body height
+#define HEADROOM_RADIUS_RATIO		0.9f	// The headroom volume is a bit thinner than the body, so touching a wall beside it doesn't block standing
 
 typedef struct
 {
@@ -140,18 +142,46 @@ void Character_Init(Character_t *c, const vec3 position, const vec3 up, const ve
 
 	c->walkSpeed=1.5f*WORLD_SCALE;
 	c->runSpeed=6.0f*WORLD_SCALE;
+
 	c->groundAcceleration=30.0f*WORLD_SCALE;
 	c->groundDeceleration=40.0f*WORLD_SCALE;
-	c->airAcceleration=8.0f*WORLD_SCALE;
-	c->jumpSpeed=4.5f*WORLD_SCALE;
+
+	c->airAcceleration=20.0f*WORLD_SCALE;
+	c->airDeceleration=6.0f*WORLD_SCALE;
+
+	c->jumpHeight=2.0f*WORLD_SCALE;
+	c->jumpBufferTime=0.12f;
+	c->jumpSpeed=sqrtf(2.0f*9.81f*WORLD_SCALE*c->riseGravityScale*c->jumpHeight);	// Reworked from the real gravity at takeoff
+
+	c->riseGravityScale=2.0f;
+	c->fallGravityScale=3.0f;
+	c->cutGravityScale=5.0f;
+	c->maxFallSpeed=25.0f*WORLD_SCALE;
+
 	c->maxSlopeCos=cosf(50.0f*(PI/180.0f));
+
 	c->coyoteTime=0.1f;
+
 	c->upSmoothing=8.0f;
 	c->turnRate=10.0f;
 	c->turnSmoothTime=0.15f;
+
 	c->landTime=0.3f;
 	c->minLandSpeed=2.0f*WORLD_SCALE;
 	c->minLandAirTime=0.15f;
+
+	c->crouchHeightRatio=0.6f;
+	c->crouchSpeedRatio=0.6f;
+	c->crouchTransitionTime=0.12f;
+	c->crouchToggle=false;
+
+	c->crouchHalfHeight=fmaxf(height*c->crouchHeightRatio*0.5f-radius, 0.0f);
+	c->crouchEyeHeight=height*c->crouchHeightRatio*EYE_HEIGHT_RATIO;
+
+	c->standHalfHeight=halfHeight;
+	c->standEyeHeight=height*EYE_HEIGHT_RATIO;
+
+	c->eyeHeight=c->standEyeHeight;
 
 	c->timeSinceGrounded=1.0f;
 
@@ -252,25 +282,137 @@ static void UpdateLanding(Character_t *c, const bool wasGrounded, const float ai
 	}
 }
 
-static void UpdateJump(Character_t *c, const Camera_t *camera, const bool hasGravity)
+// Distance from the body's center down to the feet along up
+static float FeetOffset(const Character_t *c)
+{
+	return c->body.radiusHeight.x+c->body.radiusHeight.y;
+}
+
+float Character_GetEyeOffset(const Character_t *c)
+{
+	return c->eyeHeight-FeetOffset(c);
+}
+
+// Swaps the capsule between standing and crouched size, keeping the feet where they are
+static void SetCrouching(Character_t *c, const bool crouching)
+{
+	const float oldOffset=FeetOffset(c);
+
+	c->body.radiusHeight.y=crouching?c->crouchHalfHeight:c->standHalfHeight;
+	c->body.position=Vec3_Addv(c->body.position, Vec3_Muls(c->up, FeetOffset(c)-oldOffset));
+	c->crouching=crouching;
+}
+
+// Checks the extra space standing would take up, from the top of the crouched capsule to the top of the standing one
+static bool HasHeadroom(const Character_t *c)
+{
+	if(!c->headroomFunc)
+		return true;
+
+	const float radius=c->body.radiusHeight.x;
+	const vec3 feet=Vec3_Subv(c->body.position, Vec3_Muls(c->up, FeetOffset(c)));
+
+	RigidBody_t volume;
+
+	memset(&volume, 0, sizeof(RigidBody_t));
+
+	volume.position=Vec3_Addv(feet, Vec3_Muls(c->up, c->crouchHalfHeight+c->standHalfHeight+radius));
+	volume.orientation=c->body.orientation;
+	volume.type=RIGIDBODY_CAPSULE;
+	volume.radiusHeight=Vec2(radius*HEADROOM_RADIUS_RATIO, fmaxf(c->standHalfHeight-c->crouchHalfHeight, 0.0f));
+
+	return c->headroomFunc(&volume, c->headroomUserData);
+}
+
+static void UpdateCrouch(Character_t *c, const Camera_t *camera, const float dt)
+{
+	if(c->crouchToggle)
+	{
+		if(camera->moveDown&&!c->crouchHeld)
+			c->crouchWanted=!c->crouchWanted;
+	}
+	else
+		c->crouchWanted=camera->moveDown;
+
+	c->crouchHeld=camera->moveDown;
+
+	// Only change size on the ground, and standing back up also needs room above
+	if(c->grounded)
+	{
+		if(c->crouchWanted&&!c->crouching)
+			SetCrouching(c, true);
+		else if(!c->crouchWanted&&c->crouching&&HasHeadroom(c))
+			SetCrouching(c, false);
+	}
+
+	// The capsule changes size right away, the eye eases to its new height
+	const float targetEye=c->crouching?c->crouchEyeHeight:c->standEyeHeight;
+
+	c->eyeHeight+=SmoothDamp(targetEye-c->eyeHeight, &c->eyeVelocity, c->crouchTransitionTime, 100.0f*WORLD_SCALE, dt);
+}
+
+static void UpdateJump(Character_t *c, const Camera_t *camera, const bool hasGravity, const float dt)
 {
 	const bool jumpPressed=camera->moveUp&&!c->jumpHeld;
 
 	c->jumpHeld=camera->moveUp;
 
-	if(!jumpPressed||!hasGravity)
+	// Remember a press for a moment, so pressing jump just before touching down still jumps on landing
+	c->jumpBufferTimer=jumpPressed?c->jumpBufferTime:fmaxf(c->jumpBufferTimer-dt, 0.0f);
+
+	if(c->jumpBufferTimer<=0.0f||!hasGravity)
 		return;
 
 	// Allow a short grace period after walking off a ledge ("coyote time")
 	if(!c->grounded&&c->timeSinceGrounded>=c->coyoteTime)
 		return;
 
+	// Jumping out of a crouch stands up first, which needs room
+	if(c->crouching)
+	{
+		if(!HasHeadroom(c))
+			return;
+
+		SetCrouching(c, false);
+		c->crouchWanted=false;
+	}
+
+	// Takeoff speed that reaches jumpHeight against the rising gravity, so the height is the same on any gravity
+	c->jumpSpeed=sqrtf(2.0f*Vec3_Length(c->gravityAccum)*c->riseGravityScale*c->jumpHeight);
+
 	c->body.velocity=Vec3_Addv(ProjectOnPlane(c->body.velocity, c->up), Vec3_Muls(c->up, c->jumpSpeed));
 
+	c->jumping=true;
+	c->jumpBufferTimer=0.0f;
 	c->grounded=false;
 	c->groundNormal=c->up;
 	c->timeSinceGrounded=c->coyoteTime;
 	c->groundIgnoreTime=JUMP_GROUND_IGNORE_TIME;
+}
+
+static void ApplyGravity(Character_t *c, const Camera_t *camera, const float dt)
+{
+	const float verticalSpeed=Vec3_Dot(c->body.velocity, c->up);
+
+	if(c->grounded||verticalSpeed<=0.0f)
+		c->jumping=false;
+
+	float scale=1.0f;
+
+	if(!c->grounded)
+	{
+		if(verticalSpeed>0.0f)
+			scale=(c->jumping&&!camera->moveUp)?c->cutGravityScale:c->riseGravityScale;
+		else
+			scale=c->fallGravityScale;
+	}
+
+	c->body.velocity=Vec3_Addv(c->body.velocity, Vec3_Muls(c->gravityAccum, scale*dt));
+
+	const float fallSpeed=-Vec3_Dot(c->body.velocity, c->up);
+
+	if(fallSpeed>c->maxFallSpeed)
+		c->body.velocity=Vec3_Addv(c->body.velocity, Vec3_Muls(c->up, fallSpeed-c->maxFallSpeed));
 }
 
 static MoveInput_t GatherMoveInput(const Character_t *c, const Camera_t *camera)
@@ -295,7 +437,7 @@ static MoveInput_t GatherMoveInput(const Character_t *c, const Camera_t *camera)
 	}
 
 	input.hasInput=input.wishLength>INPUT_EPSILON;
-	input.maxSpeed=camera->shift?c->runSpeed:c->walkSpeed;
+	input.maxSpeed=c->crouching?c->walkSpeed*c->crouchSpeedRatio:(camera->shift?c->runSpeed:c->walkSpeed);
 
 	return input;
 }
@@ -305,7 +447,7 @@ static float AccelerationRate(const Character_t *c, const bool hasInput)
 	if(c->grounded)
 		return hasInput?c->groundAcceleration:c->groundDeceleration;
 
-	return hasInput?c->airAcceleration:0.0f;
+	return hasInput?c->airAcceleration:c->airDeceleration;
 }
 
 // Accelerates the velocity along the ground (or the up plane in the air) toward the wanted velocity, leaving the part
@@ -331,10 +473,15 @@ static void ApplyMovement(Character_t *c, const MoveInput_t *input, const float 
 
 	wishPlane=(planeLength>1e-5f)?Vec3_Muls(wishPlane, input->wishLength/planeLength):Vec3b(0.0f);
 
-	const vec3 targetVelocity=Vec3_Muls(wishPlane, input->maxSpeed);
-
 	const vec3 velocityNormal=Vec3_Muls(planeNormal, Vec3_Dot(body->velocity, planeNormal));
 	vec3 velocityPlane=Vec3_Subv(body->velocity, velocityNormal);
+
+	float maxSpeed=input->maxSpeed;
+
+	if(!c->grounded&&input->hasInput)
+		maxSpeed=fmaxf(maxSpeed, Vec3_Length(velocityPlane));
+
+	const vec3 targetVelocity=Vec3_Muls(wishPlane, maxSpeed);
 
 	velocityPlane=MoveTowards(velocityPlane, targetVelocity, AccelerationRate(c, input->hasInput)*dt);
 
@@ -384,7 +531,9 @@ static void UpdateState(Character_t *c, const float dt)
 		return;
 	}
 
-	if(c->landTimer>0.0f)
+	if(c->crouching)
+		c->state=(c->speed<c->walkSpeed*IDLE_SPEED_RATIO)?CHARACTER_STATE_CROUCH_IDLE:CHARACTER_STATE_CROUCH_WALK;
+	else if(c->landTimer>0.0f)
 		c->state=CHARACTER_STATE_LAND;
 	else if(c->speed<c->walkSpeed*IDLE_SPEED_RATIO)
 		c->state=CHARACTER_STATE_IDLE;
@@ -409,11 +558,12 @@ void Character_Update(Character_t *c, const Camera_t *camera, const float dt)
 
 	UpdateGroundState(c, dt);
 	UpdateLanding(c, wasGrounded, airTime);
+	UpdateCrouch(c, camera, dt);
 
 	if(hasGravity)
-		c->body.velocity=Vec3_Addv(c->body.velocity, Vec3_Muls(c->gravityAccum, dt));
+		ApplyGravity(c, camera, dt);
 
-	UpdateJump(c, camera, hasGravity);
+	UpdateJump(c, camera, hasGravity, dt);
 
 	const MoveInput_t input=GatherMoveInput(c, camera);
 

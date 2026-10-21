@@ -264,6 +264,37 @@ matrix FighterTransform(const RigidBody_t *body)
 	return MatrixMult(local, MatrixTranslatev(body->position));
 }
 
+typedef struct
+{
+	const RigidBody_t *volume;
+	bool blocked;
+} HeadroomQuery_t;
+
+static void HeadroomCallback(Entity_t *entity, void *userdata)
+{
+	HeadroomQuery_t *query=(HeadroomQuery_t *)userdata;
+
+	// Skip the character itself, and anything once something has been found
+	if(query->blocked||entity->body==&character.body)
+		return;
+
+	RigidBody_t volume=*query->volume;
+
+	if(PhysicsCollision(&volume, entity->body).contactCount>0)
+		query->blocked=true;
+}
+
+// Tells the character controller whether there's room to stand up, by checking the extra space against everything nearby
+static bool CharacterHeadroom(const RigidBody_t *volume, void *userData)
+{
+	const float extent=volume->radiusHeight.x+volume->radiusHeight.y;
+	HeadroomQuery_t query={ volume, false };
+
+	BVH_QueryAABB(&bvh, &entityList, (aabb) { Vec3_Subs(volume->position, extent), Vec3_Adds(volume->position, extent) }, HeadroomCallback, &query);
+
+	return !query.blocked;
+}
+
 matrix CharacterTransform(const RigidBody_t *body)
 {
 	const BModel_t *model=&AssetManager_GetAsset(assets, MODEL_TEST)->model;
@@ -360,6 +391,7 @@ void GenerateWorld(void)
 	const vec3 spawn=Vec3_Addv(bodies[BODY_MAIN_FLOOR_PLATFORM].position, Vec3(0.0f, bodies[BODY_MAIN_FLOOR_PLATFORM].size.y+height*0.5f+2.0f, bodies[BODY_MAIN_FLOOR_PLATFORM].size.z*0.75f));
 
 	Character_Init(&character, spawn, Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, -1.0f), height);
+	character.headroomFunc=CharacterHeadroom;
 
 	characterEntityID=EntityList_Add(&entityList, &character.body, false, MODEL_TEST, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_PLAYER, CharacterTransform);
 	characterAnimID=EntityList_AddAnimator(&entityList, characterEntityID);
@@ -377,7 +409,7 @@ void GenerateWorld(void)
 
 	character.active=true;
 
-	CameraFollowBody(&camera, &character.body, height*0.89f-height*0.5f, 0.0f);
+	CameraFollowBody(&camera, &character.body, Character_GetEyeOffset(&character), 0.0f);
 	camera.orbitDistance=30.0f;
 
 	//CameraSetFlight(&camera);
@@ -1070,6 +1102,7 @@ void AttractorQuery(Entity_t *entity, void *userdata)
 }
 
 // Ground speed that animation clip was authored for.
+#define CROUCH_WALK_CLIP_SPEED 0.98f
 #define WALK_CLIP_SPEED 0.98f
 #define RUN_CLIP_SPEED 8.91f
 
@@ -1083,6 +1116,8 @@ static void CharacterAnimate(void)
 
 	const uint32_t clipIndex[CHARACTER_STATE_COUNT]=
 	{
+		[CHARACTER_STATE_CROUCH_IDLE]=ANIMATION_TEST_CROUCH_IDLE,
+		[CHARACTER_STATE_CROUCH_WALK]=ANIMATION_TEST_CROUCH_WALK,
 		[CHARACTER_STATE_FALL]=ANIMATION_TEST_FALL,
 		[CHARACTER_STATE_IDLE]=ANIMATION_TEST_IDLE,
 		[CHARACTER_STATE_JUMP]=ANIMATION_TEST_JUMP,
@@ -1095,6 +1130,8 @@ static void CharacterAnimate(void)
 
 	if(character.state==CHARACTER_STATE_WALK)
 		animator->speed=character.speed/(WALK_CLIP_SPEED*WORLD_SCALE);
+	else if(character.state==CHARACTER_STATE_CROUCH_WALK)
+		animator->speed=character.speed/(CROUCH_WALK_CLIP_SPEED*WORLD_SCALE);
 	else if(character.state==CHARACTER_STATE_RUN)
 		animator->speed=character.speed/(RUN_CLIP_SPEED*WORLD_SCALE);
 	else
@@ -1473,7 +1510,12 @@ void Thread_Physics(void *arg)
 	Character_Update(&character, &camera, fTimeStep);
 
 	if(character.active)
+	{
 		CharacterAnimate();
+
+		// Eye height follows crouching, eased
+		camera.pivotHeight=Character_GetEyeOffset(&character);
+	}
 
 	// Update camera and modelview matrix
 	if(playerHealth>0.0f)
@@ -1937,6 +1979,7 @@ void Console_CmdCharacter(Console_t *console, const char *param)
 		const vec3 spawn=Vec3_Addv(bodies[BODY_MAIN_FLOOR_PLATFORM].position, Vec3(0.0f, bodies[BODY_MAIN_FLOOR_PLATFORM].size.y+height*0.5f+2.0f, bodies[BODY_MAIN_FLOOR_PLATFORM].size.z*0.75f));
 
 		Character_Init(&character, spawn, Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, -1.0f), height);
+		character.headroomFunc=CharacterHeadroom;
 
 		characterEntityID=EntityList_Add(&entityList, &character.body, true, MODEL_TEST, TEXTURE_CUBE, TEXTURE_CUBE_NORMAL, ENTITYOBJECTTYPE_PLAYER, CharacterTransform);
 		characterAnimID=EntityList_AddAnimator(&entityList, characterEntityID);
@@ -1954,7 +1997,7 @@ void Console_CmdCharacter(Console_t *console, const char *param)
 
 		character.active=true;
 
-		CameraFollowBody(&camera, &character.body, height*0.89f-height*0.5f, 0.0f);
+		CameraFollowBody(&camera, &character.body, Character_GetEyeOffset(&character), 0.0f);
 	}
 	else if(strcmp(param, "off")==0)
 	{

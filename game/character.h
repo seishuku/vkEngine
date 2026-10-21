@@ -15,8 +15,14 @@ typedef enum
 	CHARACTER_STATE_JUMP,
 	CHARACTER_STATE_FALL,
 	CHARACTER_STATE_LAND,
+	CHARACTER_STATE_CROUCH_IDLE,
+	CHARACTER_STATE_CROUCH_WALK,
 	CHARACTER_STATE_COUNT
 } CharacterState_e;
+
+// Asks the world whether a volume is clear, used to check there's room to stand up. Returns true if nothing is in it.
+// The volume is a capsule and never includes the character itself.
+typedef bool (*CharacterHeadroomFunc_t)(const RigidBody_t *volume, void *userData);
 
 typedef struct
 {
@@ -25,8 +31,21 @@ typedef struct
 	RigidBody_t body;
 
 	float walkSpeed, runSpeed;
-	float groundAcceleration, groundDeceleration, airAcceleration;
-	float jumpSpeed;
+	float groundAcceleration, groundDeceleration;
+	float airAcceleration;	// How fast steering input changes velocity in the air
+	float airDeceleration;	// How fast the character slows down in the air with no input, 0 keeps all momentum
+	float jumpHeight;		// How high a held jump goes, regardless of how strong gravity is where it happens
+	float jumpSpeed;		// Takeoff speed for that height, worked out from the gravity at takeoff
+	float riseGravityScale;	// Gravity multiplier while rising with jump held, higher is a snappier jump
+	float fallGravityScale;	// Gravity multiplier while falling, higher than rise so the descent is quick and weighty
+	float cutGravityScale;	// Gravity multiplier while rising after jump is let go, this is what makes tap jumps short
+	float maxFallSpeed;		// Terminal speed toward the ground
+
+	float crouchHeightRatio;	// Crouched height as a fraction of standing height
+	float crouchSpeedRatio;		// Crouched walking speed as a fraction of walkSpeed
+	float crouchTransitionTime;	// Time for the eye height to ease between standing and crouching (s)
+	bool crouchToggle;			// False: hold the crouch key. True: press it to crouch, press again to stand
+	float jumpBufferTime;	// Jump pressed this long before touching down still happens on landing
 	float maxSlopeCos;		// Cosine of the steepest walkable slope
 	float coyoteTime;		// Seconds after leaving the ground that a jump is still allowed
 	float upSmoothing;		// How fast "up" follows a change in gravity direction (1/s)
@@ -47,9 +66,22 @@ typedef struct
 	vec3 groundNormal;
 	bool grounded;
 	bool jumpHeld;
+	bool jumping;			// Rising from a jump, which is when letting go of jump cuts it short
+	float jumpBufferTimer;	// Time left on a jump press waiting for the ground
 	float timeSinceGrounded;
 	float groundIgnoreTime;
 	float landTimer;		// Time left in the landing state
+
+	// Crouching only changes size on the ground, in the air the capsule stays as it was
+	bool crouching;			// The capsule is currently the crouched size
+	bool crouchWanted;		// What the input is asking for, which can differ from crouching when there's no room to stand
+	bool crouchHeld;
+	float standHalfHeight, crouchHalfHeight;	// Capsule shape for each, the radius stays the same
+	float standEyeHeight, crouchEyeHeight;		// Eye heights above the feet
+	float eyeHeight;							// Current eye height above the feet, eased between the two
+	float eyeVelocity;
+	CharacterHeadroomFunc_t headroomFunc;		// Optional, set after Character_Init. Without it standing up is never blocked.
+	void *headroomUserData;
 	float turnVelocity;		// Current third person turn speed (rad/s)
 	float downSpeed;		// Speed toward the ground at the end of the last update
 
@@ -69,6 +101,9 @@ void Character_AddGravity(Character_t *character, const vec3 gravity);
 
 // Normal vector pointing in from the surface toward the character, contact from collision solver.
 void Character_AddContact(Character_t *character, const vec3 normalIntoCharacter, const float penetration);
+
+// How far the eye is above the body's center along up, for the camera's pivot height. Follows the crouch smoothly.
+float Character_GetEyeOffset(const Character_t *character);
 
 // Update everything
 void Character_Update(Character_t *character, const Camera_t *camera, const float dt);
