@@ -19,7 +19,7 @@ This is an on-going learning experience for me and for anyone else that can lear
 - Improve physics (needs more refining, it doesn't pass a box stack very well)
 - Streamline post processing effects (WIP)
 - Improve networking (this is better now, [server here](https://github.com/seishuku/vkEngineServer))
-- 3D model animation (WIP - code is there, needs refining)
+- IK/FABRIK animation?
 - ???
 - Profit?
 
@@ -69,12 +69,7 @@ To connect to a server, just bring up the console in game with '~'/'`' and type:
 Where XXX.XXX.XXX.XXX is the remote IP.
 > <b>Note:</b> Networking is very much a WIP.
 
-## Tools:
-I tasked some clankers with making some web-based tools because I don't do webdev and I didn't feel like taking the time to do it my usual way (IE. the hard way).<br>
-The UI editor is a bit meh, that was more of an experiment and I don't know how useful it will end up being...<br>
-The physics assembly tool is really nice though, I've included the car assembly.
-
-# Engine Features
+## Engine Features
 
 **Graphics and Rendering**
 - Vulkan-based rendering backend
@@ -82,7 +77,7 @@ The physics assembly tool is really nice though, I've included the car assembly.
 - Lighting and shadow-rendering systems
 - Skybox rendering
 - Bloom and post-processing infrastructure
-- Custom 3D model format with skeletal animation (WIP)
+- Custom 3D model format with skeletal animation
 
 **Physics and Simulation**
 - Custom rigid-body physics system
@@ -90,7 +85,8 @@ The physics assembly tool is really nice though, I've included the car assembly.
 - Constraint and solver infrastructure with web browser based assembly tool
 - Attractor forces
 - Particle system
-- 6 DOF physics based camera
+- 6 DOF physics based camera with 1st person and chase views
+- Character controller with 1st person and chase views
 
 **Audio**
 - Custom audio subsystem with HRTF based positional sound
@@ -102,7 +98,7 @@ The physics assembly tool is really nice though, I've included the car assembly.
 
 **Virtual Reality and Networking**
 - OpenXR integration with dedicated VR subsystem
-- Client networking infrastructure
+- Client networking infrastructure (WIP)
 
 **UI and Input**
 - Custom UI framework
@@ -123,6 +119,9 @@ The physics assembly tool is really nice though, I've included the car assembly.
 - Memory-zone and threading utilities
 - Event, configuration and parsing utilities
 - Loading screen support
+- Browser/web based physics assembly tool (LLM generated)
+- Browser/web based UI editing tool (LLM generated)
+- Blender BModel/BAnim import/export addon (LLM generated)
 
 **Build targets**
 - Windows x64
