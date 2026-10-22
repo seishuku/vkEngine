@@ -149,14 +149,14 @@ void Character_Init(Character_t *c, const vec3 position, const vec3 up, const ve
 	c->airAcceleration=20.0f*WORLD_SCALE;
 	c->airDeceleration=6.0f*WORLD_SCALE;
 
-	c->jumpHeight=2.0f*WORLD_SCALE;
-	c->jumpBufferTime=0.12f;
-	c->jumpSpeed=sqrtf(2.0f*9.81f*WORLD_SCALE*c->riseGravityScale*c->jumpHeight);	// Reworked from the real gravity at takeoff
-
 	c->riseGravityScale=2.0f;
 	c->fallGravityScale=3.0f;
 	c->cutGravityScale=5.0f;
 	c->maxFallSpeed=25.0f*WORLD_SCALE;
+
+	c->jumpHeight=2.0f*WORLD_SCALE;
+	c->jumpBufferTime=0.12f;
+	c->jumpSpeed=sqrtf(2.0f*9.81f*WORLD_SCALE*c->riseGravityScale*c->jumpHeight);	// Reworked from the real gravity at takeoff
 
 	c->maxSlopeCos=cosf(50.0f*(PI/180.0f));
 
@@ -471,7 +471,7 @@ static void ApplyMovement(Character_t *c, const MoveInput_t *input, const float 
 	vec3 wishPlane=ProjectOnPlane(input->wish, planeNormal);
 	const float planeLength=Vec3_Length(wishPlane);
 
-	wishPlane=(planeLength>1e-5f)?Vec3_Muls(wishPlane, input->wishLength/planeLength):Vec3b(0.0f);
+	wishPlane=(planeLength>FLT_EPSILON)?Vec3_Muls(wishPlane, input->wishLength/planeLength):Vec3b(0.0f);
 
 	const vec3 velocityNormal=Vec3_Muls(planeNormal, Vec3_Dot(body->velocity, planeNormal));
 	vec3 velocityPlane=Vec3_Subv(body->velocity, velocityNormal);
