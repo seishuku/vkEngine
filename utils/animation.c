@@ -106,7 +106,7 @@ void Animator_Play(Animator_t *animator, const BAnim_t *clip, bool loop)
 	}
 
 	animator->onFinish=NULL;
-	animator->userData=NULL;
+	animator->onFinishUserData=NULL;
 
 	if(ANIM_BLEND_TIME>0.0f&&animator->hasPose)
 	{
@@ -134,7 +134,16 @@ void Animator_SetOnFinish(Animator_t *animator, AnimatorCallback_t callback, voi
 		return;
 
 	animator->onFinish=callback;
-	animator->userData=userData;
+	animator->onFinishUserData=userData;
+}
+
+void Animator_SetPostPose(Animator_t *animator, AnimatorPostPoseFunc_t callback, void *userData)
+{
+	if(!animator)
+		return;
+
+	animator->postPose=callback;
+	animator->postPoseUserData=userData;
 }
 
 static void BindPose(const BModel_t *model, BAnim_BoneFrame_t *out)
@@ -266,6 +275,9 @@ void Animation_Update(AnimationSystem_t *system, float dt, uint32_t frameIndex)
 		memcpy(animator->lastPose, system->pose, sizeof(BAnim_BoneFrame_t)*numBone);
 		animator->hasPose=true;
 
+		if(animator->postPose)
+			animator->postPose(animator, system->pose, dt, animator->postPoseUserData);
+
 		for(uint32_t b=0;b<numBone;b++)
 		{
 			matrix local=MatrixMult(QuatToMatrix(system->pose[b].orientation), MatrixTranslatev(system->pose[b].position));
@@ -292,6 +304,6 @@ void Animation_Update(AnimationSystem_t *system, float dt, uint32_t frameIndex)
 		animator->finished=false;
 
 		if(animator->onFinish)
-			animator->onFinish(animator, animator->userData);
+			animator->onFinish(animator, animator->onFinishUserData);
 	}
 }

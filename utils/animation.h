@@ -18,6 +18,7 @@
 typedef struct Animator_s Animator_t;
 
 typedef void (*AnimatorCallback_t)(Animator_t *animator, void *userData);
+typedef void (*AnimatorPostPoseFunc_t)(Animator_t *animator, BAnim_BoneFrame_t *pose, float dt, void *userData);
 
 struct Animator_s
 {
@@ -37,8 +38,11 @@ struct Animator_s
 	BAnim_BoneFrame_t fromPose[ANIM_MAX_BONE];
 
 	AnimatorCallback_t onFinish;
-	void *userData;
+	void *onFinishUserData;
 	bool finished;
+
+	AnimatorPostPoseFunc_t postPose;
+	void *postPoseUserData;
 
 	uint32_t paletteOffset;
 };
@@ -72,6 +76,7 @@ Animator_t *Animation_Get(AnimationSystem_t *system, uint32_t handle);
 void Animator_Play(Animator_t *animator, const BAnim_t *clip, bool loop);
 void Animator_Stop(Animator_t *animator);
 void Animator_SetOnFinish(Animator_t *animator, AnimatorCallback_t callback, void *userData);
+void Animator_SetPostPose(Animator_t *animator, AnimatorPostPoseFunc_t callback, void *userData);
 
 void Animation_Update(AnimationSystem_t *system, float dt, uint32_t frameIndex);
 
