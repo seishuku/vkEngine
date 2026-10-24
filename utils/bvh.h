@@ -19,6 +19,13 @@ typedef struct
     BVHNode_t nodes[BVH_MAX_NODES];
 } BVH_t;
 
+typedef struct
+{
+	float distance;
+	vec3 point;
+	Entity_t *entity;
+} BVHRayHit_t;
+
 typedef void (*BVHLeafCallback_t)(Entity_t *a, Entity_t *b);
 typedef void (*BVHQueryCallback_t)(Entity_t *entity, void *userdata);
 
@@ -26,5 +33,6 @@ void BVH_Build(BVH_t *bvh, EntityList_t *entityList);
 void BVH_Test(BVH_t *bvh, EntityList_t *entityList, BVHLeafCallback_t callback);
 void BVH_QuerySphere(BVH_t *bvh, EntityList_t *entityList, vec3 point, float radius, BVHQueryCallback_t callback, void *userdata);
 void BVH_QueryAABB(BVH_t *bvh, EntityList_t *entityList, aabb bounds, BVHQueryCallback_t callback, void *userdata);
+bool BVH_Raycast(BVH_t *bvh, EntityList_t *entityList, vec3 origin, vec3 direction, float maxDistance, const RigidBody_t *ignore, BVHRayHit_t *hit);
 
 #endif

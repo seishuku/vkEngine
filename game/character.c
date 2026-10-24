@@ -158,7 +158,7 @@ void Character_Init(Character_t *c, const vec3 position, const vec3 up, const ve
 	c->jumpBufferTime=0.12f;
 	c->jumpSpeed=sqrtf(2.0f*9.81f*WORLD_SCALE*c->riseGravityScale*c->jumpHeight);	// Reworked from the real gravity at takeoff
 
-	c->maxSlopeCos=cosf(50.0f*(PI/180.0f));
+	c->maxSlopeCos=cosf(65.0f*(PI/180.0f));
 
 	c->coyoteTime=0.1f;
 

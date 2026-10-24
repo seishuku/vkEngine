@@ -74,6 +74,7 @@ set(PROJECT_SOURCES
 	"utils/config.c"
 	"utils/entitylist.c"
 	"utils/event.c"
+	"utils/ik.c"
 	"utils/id.c"
 	"utils/list.c"
 	"utils/loadingscreen.c"

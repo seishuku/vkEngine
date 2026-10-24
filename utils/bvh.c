@@ -298,3 +298,72 @@ void BVH_QueryAABB(BVH_t *bvh, EntityList_t *entityList, aabb bounds, BVHQueryCa
 		}
 	}
 }
+
+// I don't love this setup... It does work though.
+typedef struct
+{
+	vec3 origin, direction;
+	float best;
+	const RigidBody_t *ignore;
+	Entity_t *entity;
+} BVHRayQuery_t;
+
+static void RayQueryCallback(Entity_t *entity, void *userdata)
+{
+	BVHRayQuery_t *query=(BVHRayQuery_t *)userdata;
+	const RigidBody_t *body=entity->body;
+
+	if(!body||body==query->ignore||entity->objectType==ENTITYOBJECTTYPE_PROJECTILE)
+		return;
+
+	float t=-1.0f;
+
+	switch(body->type)
+	{
+		case RIGIDBODY_SPHERE:
+			t=RaySphereIntersect(query->origin, query->direction, body->position, body->radius);
+			break;
+
+		case RIGIDBODY_CAPSULE:
+			t=RayCapsuleIntersect(query->origin, query->direction, body->position, body->radiusHeight.x, body->radiusHeight.y, body->orientation);
+			break;
+
+		case RIGIDBODY_OBB:
+			t=RayOBBIntersect(query->origin, query->direction, body->position, body->size, body->orientation);
+			break;
+
+		default:
+			break;
+	}
+
+	if(t>=0.0f&&t<query->best)
+	{
+		query->best=t;
+		query->entity=entity;
+	}
+}
+
+bool BVH_Raycast(BVH_t *bvh, EntityList_t *entityList, vec3 origin, vec3 direction, float maxDistance, const RigidBody_t *ignore, BVHRayHit_t *hit)
+{
+	const vec3 end=Vec3_Addv(origin, Vec3_Muls(direction, maxDistance));
+
+	// Bounds of the ray segment, padded so grazing hits on flat boxes aren't lost
+	const aabb bounds=
+	{
+		Vec3_Subs(Vec3(fminf(origin.x, end.x), fminf(origin.y, end.y), fminf(origin.z, end.z)), 0.01f),
+		Vec3_Adds(Vec3(fmaxf(origin.x, end.x), fmaxf(origin.y, end.y), fmaxf(origin.z, end.z)), 0.01f)
+	};
+
+	BVHRayQuery_t query={ origin, direction, maxDistance, ignore, NULL };
+
+	BVH_QueryAABB(bvh, entityList, bounds, RayQueryCallback, &query);
+
+	if(!query.entity)
+		return false;
+
+	hit->distance=query.best;
+	hit->point=Vec3_Addv(origin, Vec3_Muls(direction, query.best));
+	hit->entity=query.entity;
+
+	return true;
+}

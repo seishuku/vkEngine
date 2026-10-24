@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <float.h>
 #include "assetmanager.h"
 #include "audio/audio.h"
 #include "audio/music.h"
@@ -39,6 +40,7 @@
 #include "system/threads.h"
 #include "ui/ui.h"
 #include "utils/animation.h"
+#include "utils/ik.h"
 #include "utils/bvh.h"
 #include "utils/event.h"
 #include "utils/list.h"
@@ -104,6 +106,7 @@ AnimationSystem_t animationSystem;
 Character_t character;
 uint32_t characterEntityID=UINT32_MAX;
 uint32_t characterAnimID=UINT32_MAX;
+IK_t characterIK;
 
 // Thread stuff
 typedef struct
@@ -307,6 +310,49 @@ matrix CharacterTransform(const RigidBody_t *body)
 	return MatrixMult(local, MatrixTranslatev(body->position));
 }
 
+
+static bool CharacterFootGround(IK_t *ik, uint32_t chain, vec3 chainTip, float *offset)
+{
+    const RigidBody_t *body=&character.body;
+
+    vec3 up=QuatRotate(body->orientation, ik->up);
+
+    if(Vec3_Normalize(&up)<FLT_EPSILON)
+        return false;
+
+    const float maxStep=ik->maxStep*WORLD_SCALE;
+    const vec3 ground=Vec3_Subv(body->position, Vec3_Muls(up, body->radiusHeight.x+body->radiusHeight.y));
+
+    // Transform foot (chain tip) position to world space.
+    const vec3 tip=Matrix4x4MultVec3(chainTip, CharacterTransform(body));
+    const float tipHeight=Vec3_Dot(Vec3_Subv(tip, ground), up);
+
+    const vec3 origin=Vec3_Addv(tip, Vec3_Muls(up, maxStep+fmaxf(-tipHeight, 0.0f)));
+
+    const float reach=2.0f*maxStep+fmaxf(tipHeight, 0.0f);
+
+    BVHRayHit_t hit;
+
+    if(!BVH_Raycast(&bvh, &entityList, origin, Vec3_Muls(up, -1.0f), reach, body, &hit))
+		return false;
+
+    *offset=Vec3_Dot(Vec3_Subv(hit.point, ground), up)/WORLD_SCALE;
+
+	return true;
+}
+
+static void CharacterSetupIK(Animator_t *animator)
+{
+	static const char *legL[]={ "thigh_l", "calf_l", "foot_l" };
+	static const char *legR[]={ "thigh_r", "calf_r", "foot_r" };
+
+	IK_Init(&characterIK, animator);
+	IK_AddChain(&characterIK, legL, 3);
+	IK_AddChain(&characterIK, legR, 3);
+	IK_SetPelvis(&characterIK, "pelvis");
+	characterIK.groundFunc=CharacterFootGround;
+}
+
 // Build up random data for skybox and asteroid field
 void GenerateWorld(void)
 {
@@ -399,7 +445,7 @@ void GenerateWorld(void)
 	Animator_t *animator=Animation_Get(&animationSystem, characterAnimID);
 
 	if(animator)
-		Animator_Play(animator, &AssetManager_GetAsset(assets, ANIMATION_TEST_IDLE)->animation, true);
+		CharacterSetupIK(animator);
 
 	if(playerID!=UINT32_MAX)
 	{
@@ -1136,6 +1182,10 @@ static void CharacterAnimate(void)
 		animator->speed=character.speed/(RUN_CLIP_SPEED*WORLD_SCALE);
 	else
 		animator->speed=1.0f;
+
+	// Feet only follow the ground while standing on it, the smoothing eases them back to the animation in the air
+	if(characterIK.animator==animator)
+		characterIK.weight=character.grounded?1.0f:0.0f;
 }
 
 // Runs anything physics related
@@ -1987,7 +2037,7 @@ void Console_CmdCharacter(Console_t *console, const char *param)
 		Animator_t *animator=Animation_Get(&animationSystem, characterAnimID);
 
 		if(animator)
-			Animator_Play(animator, &AssetManager_GetAsset(assets, ANIMATION_TEST_IDLE)->animation, true);
+			CharacterSetupIK(animator);
 
 		if(playerID!=UINT32_MAX)
 		{
