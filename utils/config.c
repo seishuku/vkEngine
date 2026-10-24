@@ -34,7 +34,7 @@ bool Config_ReadINI(Config_t *config, const char *filename)
 	config->renderWidth=1920;
 	config->renderHeight=1080;
 
-	config->MSAA=VK_SAMPLE_COUNT_4_BIT;
+	config->MSAA=VK_SAMPLE_COUNT_2_BIT;
 	config->colorFormat=VK_FORMAT_R16G16B16A16_SFLOAT;
 	config->depthFormat=VK_FORMAT_D32_SFLOAT;
 
@@ -138,7 +138,9 @@ bool Config_ReadINI(Config_t *config, const char *filename)
 							case 16:	config->MSAA=VK_SAMPLE_COUNT_16_BIT;	break;
 							case 32:	config->MSAA=VK_SAMPLE_COUNT_32_BIT;	break;
 							case 64:	config->MSAA=VK_SAMPLE_COUNT_64_BIT;	break;
-							default:	config->MSAA=VK_SAMPLE_COUNT_1_BIT;		break;
+							default:	config->MSAA=VK_SAMPLE_COUNT_1_BIT;
+										config->msaaSamples=1;
+										break;
 						}
 					}
 					else

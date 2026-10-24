@@ -90,7 +90,12 @@ VkBool32 vkuCreateTexture2D(VkuContext_t *context, VkuImage_t *image, uint32_t w
 			aspectFlags|=VK_IMAGE_ASPECT_STENCIL_BIT;
 	}
 	else
-		usageFlags|=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_STORAGE_BIT;
+	{
+		usageFlags|=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+		if(samples==VK_SAMPLE_COUNT_1_BIT)
+			usageFlags|=VK_IMAGE_USAGE_STORAGE_BIT;
+	}
 
 	// Create the image buffer and memory
 	if(!vkuCreateImageBuffer(context, image, VK_IMAGE_TYPE_2D, format, 1, 1, width, height, 1, samples, VK_IMAGE_TILING_OPTIMAL, usageFlags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
