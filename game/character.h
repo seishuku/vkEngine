@@ -24,6 +24,17 @@ typedef enum
 // The volume is a capsule and never includes the character itself.
 typedef bool (*CharacterHeadroomFunc_t)(const RigidBody_t *volume, void *userData);
 
+// What the character volume is touching
+typedef struct
+{
+	RigidBody_t *other;
+	vec3 point;
+	vec3 normal;
+	float friction;
+} CharacterContact_t;
+
+#define CHARACTER_MAX_CONTACTS 16
+
 typedef struct
 {
 	bool active;
@@ -47,6 +58,7 @@ typedef struct
 	bool crouchToggle;			// False: hold the crouch key. True: press it to crouch, press again to stand
 	float jumpBufferTime;	// Jump pressed this long before touching down still happens on landing
 	float maxSlopeCos;		// Cosine of the steepest walkable slope
+	float friction;			// Character volume friction
 	float coyoteTime;		// Seconds after leaving the ground that a jump is still allowed
 	float upSmoothing;		// How fast "up" follows a change in gravity direction (1/s)
 	float turnRate;			// Third person body fastest turn speed (rad/s)
@@ -58,12 +70,14 @@ typedef struct
 	// Gathered during the physics step by the attractor and collision passes, consumed by the next Update
 	vec3 gravityAccum;
 	vec3 groundNormalAccum;
-	uint32_t groundContacts;
+	CharacterContact_t contacts[CHARACTER_MAX_CONTACTS];
+	uint32_t numContacts;
 
 	// State
 	vec3 up;
 	vec3 facing;
 	vec3 groundNormal;
+	vec3 slideVelocity;		// Part of the ground velocity from gravity pulling the character down a slope it can't grip
 	bool grounded;
 	bool jumpHeld;
 	bool jumping;			// Rising from a jump, which is when letting go of jump cuts it short
@@ -86,7 +100,8 @@ typedef struct
 	float downSpeed;		// Speed toward the ground at the end of the last update
 
 	// Outputs for animation
-	float speed;			// Speed along the ground plane
+	float speed;			// Speed the character is moving itself along the ground plane, so sliding doesn't play walking or running
+	float slideSpeed;		// Speed along the ground from sliding down a slope, for sliding sounds or poses
 	bool justLanded;		// True for the one update the character touched down, useful for triggering events like sounds
 	float landImpact;		// Downward speed of the most recent landing, to scale or change which landing sound
 	CharacterState_e state;
@@ -99,8 +114,9 @@ void Character_Init(Character_t *character, const vec3 position, const vec3 up, 
 void Character_ResetGround(Character_t *character);
 void Character_AddGravity(Character_t *character, const vec3 gravity);
 
-// Normal vector pointing in from the surface toward the character, contact from collision solver.
-void Character_AddContact(Character_t *character, const vec3 normalIntoCharacter, const float penetration);
+// A contact from the collision solver, called with the manifold's two bodies and one of its contacts (normal pointing from a to b)
+// before it's resolved. Either body can be the character, anything else is ignored.
+void Character_AddContact(Character_t *character, RigidBody_t *a, RigidBody_t *b, const ContactPoint_t *contact);
 
 // How far the eye is above the body's center along up, for the camera's pivot height. Follows the crouch smoothly.
 float Character_GetEyeOffset(const Character_t *character);

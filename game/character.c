@@ -160,6 +160,8 @@ void Character_Init(Character_t *c, const vec3 position, const vec3 up, const ve
 
 	c->maxSlopeCos=cosf(65.0f*(PI/180.0f));
 
+	c->friction=1.0f;
+
 	c->coyoteTime=0.1f;
 
 	c->upSmoothing=8.0f;
@@ -209,7 +211,7 @@ void Character_ResetGround(Character_t *c)
 {
 	c->gravityAccum=Vec3b(0.0f);
 	c->groundNormalAccum=Vec3b(0.0f);
-	c->groundContacts=0;
+	c->numContacts=0;
 }
 
 void Character_AddGravity(Character_t *c, const vec3 gravity)
@@ -217,17 +219,25 @@ void Character_AddGravity(Character_t *c, const vec3 gravity)
 	c->gravityAccum=Vec3_Addv(c->gravityAccum, gravity);
 }
 
-void Character_AddContact(Character_t *c, const vec3 normal, const float penetration)
+void Character_AddContact(Character_t *c, RigidBody_t *a, RigidBody_t *b, const ContactPoint_t *contact)
 {
-	if(!c->active)
+	// Which body belongs to the controller
+	const bool isA=(a==&c->body);
+
+	if(!c->active||(!isA&&b!=&c->body))
 		return;
+
+	RigidBody_t *other=isA?b:a;
+	const vec3 normal=Vec3_Muls(contact->normal, isA?-1.0f:1.0f);
 
 	// Too steep to stand on
 	if(Vec3_Dot(normal, c->up)<c->maxSlopeCos)
 		return;
 
-	c->groundNormalAccum=Vec3_Addv(c->groundNormalAccum, Vec3_Muls(normal, fmaxf(penetration, 0.001f)));
-	c->groundContacts++;
+	c->groundNormalAccum=Vec3_Addv(c->groundNormalAccum, Vec3_Muls(normal, fmaxf(contact->penetration, 0.001f)));
+
+	if(c->numContacts<CHARACTER_MAX_CONTACTS)
+		c->contacts[c->numContacts++]=(CharacterContact_t){ other, contact->position, normal, sqrtf(fmaxf(c->friction*other->friction, 0.0f)) };
 }
 
 // Eases 'up' toward the direction opposing gravity, and facing direction along with it
@@ -252,7 +262,7 @@ static void UpdateGroundState(Character_t *c, const float dt)
 	c->groundIgnoreTime=fmaxf(c->groundIgnoreTime-dt, 0.0f);
 
 	const float verticalSpeed=Vec3_Dot(c->body.velocity, c->up);
-	const bool touching=c->groundContacts>0&&c->groundIgnoreTime<=0.0f&&verticalSpeed<c->jumpSpeed*JUMP_GROUNDED_SPEED_RATIO;
+	const bool touching=c->numContacts>0&&c->groundIgnoreTime<=0.0f&&verticalSpeed<c->jumpSpeed*JUMP_GROUNDED_SPEED_RATIO;
 
 	if(touching)
 	{
@@ -450,6 +460,72 @@ static float AccelerationRate(const Character_t *c, const bool hasInput)
 	return hasInput?c->airAcceleration:c->airDeceleration;
 }
 
+static vec3 PointVelocity(const RigidBody_t *body, const vec3 point)
+{
+	const vec3 w=QuatRotate(body->orientation, body->angularVelocity);
+
+	return Vec3_Addv(body->velocity, Vec3_Cross(w, Vec3_Subv(point, body->position)));
+}
+
+static float ContactInvMass(const RigidBody_t *a, const RigidBody_t *b, const vec3 point, const vec3 direction)
+{
+	const vec3 r1=Vec3_Subv(point, a->position);
+	const vec3 r2=Vec3_Subv(point, b->position);
+
+	const vec3 d1=Vec3_Cross(Vec3_Muls(Vec3_Cross(r1, direction), a->invInertia), r1);
+	const vec3 d2=Vec3_Cross(Vec3_Muls(Vec3_Cross(r2, direction), b->invInertia), r2);
+
+	return a->invMass+b->invMass+Vec3_Dot(direction, Vec3_Addv(d1, d2));
+}
+
+static vec3 ApplySupport(Character_t *c, float *load)
+{
+	RigidBody_t *body=&c->body;
+	vec3 groundVelocity=Vec3b(0.0f);
+
+	*load=0.0f;
+
+	for(uint32_t i=0;i<c->numContacts;i++)
+	{
+		const CharacterContact_t *contact=&c->contacts[i];
+		const float approach=Vec3_Dot(Vec3_Subv(body->velocity, PointVelocity(contact->other, contact->point)), contact->normal);
+		const float impulse=-approach/ContactInvMass(contact->other, body, contact->point, contact->normal);
+
+		if(approach<0.0f)
+		{
+			PhysicsApplyImpulse(body, Vec3_Muls(contact->normal, impulse), contact->point);
+			PhysicsApplyImpulse(contact->other, Vec3_Muls(contact->normal, -impulse), contact->point);
+			*load+=impulse;
+		}
+
+		// After the impulse, which moves a surface that can be pushed
+		groundVelocity=Vec3_Addv(groundVelocity, PointVelocity(contact->other, contact->point));
+	}
+
+	return Vec3_Muls(groundVelocity, 1.0f/(float)c->numContacts);
+}
+
+// Coulomb friction
+static vec3 ApplyFriction(Character_t *c, vec3 slide, const float load)
+{
+	for(uint32_t i=0;i<c->numContacts;i++)
+	{
+		const CharacterContact_t *contact=&c->contacts[i];
+		const float speed=Vec3_Length(slide);
+
+		if(speed<FLT_EPSILON)
+			break;
+
+		const vec3 tangent=Vec3_Muls(slide, 1.0f/speed);
+		const float impulse=fminf(speed/ContactInvMass(contact->other, &c->body, contact->point, tangent), contact->friction*load/(float)c->numContacts);
+
+		slide=Vec3_Subv(slide, Vec3_Muls(tangent, impulse*c->body.invMass));
+		PhysicsApplyImpulse(contact->other, Vec3_Muls(tangent, impulse), contact->point);
+	}
+
+	return slide;
+}
+
 // Accelerates the velocity along the ground (or the up plane in the air) toward the wanted velocity, leaving the part
 // of the velocity along the plane normal (gravity, jumping, and so on) alone
 static void ApplyMovement(Character_t *c, const MoveInput_t *input, const float dt)
@@ -458,14 +534,25 @@ static void ApplyMovement(Character_t *c, const MoveInput_t *input, const float 
 
 	const vec3 planeNormal=c->grounded?c->groundNormal:c->up;
 
-	// Cancel out gravity while grounded to prevent jittering while standing still
+	vec3 ground=Vec3b(0.0f);
+	float load=0.0f, traction=1.0f;
+
 	if(c->grounded)
 	{
-		const float intoGround=Vec3_Dot(body->velocity, planeNormal);
+		ground=ApplySupport(c, &load);
 
-		if(intoGround<0.0f)
-			body->velocity=Vec3_Subv(body->velocity, Vec3_Muls(planeNormal, intoGround));
+		float friction=0.0f;
+
+		for(uint32_t i=0;i<c->numContacts;i++)
+			friction+=c->contacts[i].friction/(float)c->numContacts;
+
+		body->velocity=Vec3_Subv(body->velocity, Vec3_Muls(planeNormal, fminf(Vec3_Dot(Vec3_Subv(body->velocity, ground), planeNormal), 0.0f)));
 	}
+
+	// Everything from here is relative to the ground
+	const vec3 relativeVelocity=Vec3_Subv(body->velocity, ground);
+	const vec3 velocityNormal=Vec3_Muls(planeNormal, Vec3_Dot(relativeVelocity, planeNormal));
+	vec3 velocityPlane=Vec3_Subv(relativeVelocity, velocityNormal);
 
 	// Keep the full input magnitude when the direction is tilted onto a slope
 	vec3 wishPlane=ProjectOnPlane(input->wish, planeNormal);
@@ -473,19 +560,47 @@ static void ApplyMovement(Character_t *c, const MoveInput_t *input, const float 
 
 	wishPlane=(planeLength>FLT_EPSILON)?Vec3_Muls(wishPlane, input->wishLength/planeLength):Vec3b(0.0f);
 
-	const vec3 velocityNormal=Vec3_Muls(planeNormal, Vec3_Dot(body->velocity, planeNormal));
-	vec3 velocityPlane=Vec3_Subv(body->velocity, velocityNormal);
-
 	float maxSpeed=input->maxSpeed;
 
 	if(!c->grounded&&input->hasInput)
 		maxSpeed=fmaxf(maxSpeed, Vec3_Length(velocityPlane));
 
-	const vec3 targetVelocity=Vec3_Muls(wishPlane, maxSpeed);
+	vec3 slide=Vec3b(0.0f);
+	const vec3 slopeGravity=c->grounded?ProjectOnPlane(c->gravityAccum, planeNormal):Vec3b(0.0f);
 
-	velocityPlane=MoveTowards(velocityPlane, targetVelocity, AccelerationRate(c, input->hasInput)*dt);
+	if(c->grounded)
+	{
+		velocityPlane=Vec3_Subv(velocityPlane, Vec3_Muls(slopeGravity, dt));
 
-	body->velocity=Vec3_Addv(velocityPlane, velocityNormal);
+		const vec3 slidePlane=ProjectOnPlane(c->slideVelocity, planeNormal);
+		const float length=Vec3_Length(slidePlane);
+		const float along=(length>FLT_EPSILON)?Vec3_Dot(velocityPlane, slidePlane)/length:0.0f;
+
+		slide=(along>0.0f)?Vec3_Muls(slidePlane, fminf(length, along)/length):Vec3b(0.0f);
+		velocityPlane=Vec3_Subv(velocityPlane, slide);
+	}
+
+	const vec3 driveStart=velocityPlane;
+
+	velocityPlane=MoveTowards(velocityPlane, Vec3_Muls(wishPlane, maxSpeed), AccelerationRate(c, input->hasInput)*traction*dt);
+
+	if(c->grounded)
+	{
+		const vec3 reaction=Vec3_Muls(Vec3_Subv(velocityPlane, driveStart), -body->mass/(float)c->numContacts);
+
+		for(uint32_t i=0;i<c->numContacts;i++)
+			PhysicsApplyImpulse(c->contacts[i].other, reaction, c->contacts[i].point);
+
+		slide=ApplyFriction(c, Vec3_Addv(slide, Vec3_Muls(slopeGravity, dt)), load);
+
+		if(Vec3_Length(slide)>c->maxFallSpeed)
+			slide=Vec3_Muls(slide, c->maxFallSpeed/Vec3_Length(slide));
+	}
+
+	c->slideVelocity=slide;
+	c->slideSpeed=Vec3_Length(slide);
+
+	body->velocity=Vec3_Addv(Vec3_Addv(ground, Vec3_Addv(velocityPlane, slide)), velocityNormal);
 
 	c->speed=Vec3_Length(velocityPlane);
 }

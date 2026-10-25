@@ -1211,6 +1211,10 @@ void Thread_Physics(void *arg)
 					PhysicsSolveConstraint(&assembly[i], fTimeStep/constraintIterations);
 			}
 
+			// Simple moving platform, not a good way to do it.
+			// The position will probably drift after some time, especially if the frame time fluctuates.
+			bodies[BODY_JUMP_PLATFORM_B].velocity.x=sinf(cos(fTime)*2.0f)*WORLD_SCALE;
+
 #if 0
 			{
 				vec3 dirToCamWorld=Vec3_Subv(camera.body.position, bodies[BODY_CHASSIS].position);
@@ -1379,11 +1383,8 @@ void Thread_Physics(void *arg)
 				{
 					PhysicsRecorder_LogContact(&manifold->contacts[j]);
 
-					// Contact normals point from a to b, the character controller needs one pointing into itself
-					if(manifold->a==&character.body)
-						Character_AddContact(&character, Vec3_Muls(manifold->contacts[j].normal, -1.0f), manifold->contacts[j].penetration);
-					else if(manifold->b==&character.body)
-						Character_AddContact(&character, manifold->contacts[j].normal, manifold->contacts[j].penetration);
+					// The character controller wants to know what it's touching
+					Character_AddContact(&character, manifold->a, manifold->b, &manifold->contacts[j]);
 
 					float impactSpeed=PhysicsResolveCollision(manifold->a, manifold->b, manifold->contacts[j]);
 
