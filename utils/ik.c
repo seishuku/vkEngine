@@ -221,41 +221,66 @@ static void PostPose(Animator_t *animator, BAnim_BoneFrame_t *pose, float dt, vo
 
 	ComputeModelPose(model, pose, posePose);
 
-	const float blend=1.0f-expf(-ik->smoothRate*dt);
-	float lowest=0.0f;
+	ik->modelPose=posePose;
+
+	float lowest=0.0f, total=0.0f;
+	uint32_t numSupport=0;
 	bool active=false;
 
 	for(uint32_t c=0;c<ik->numChain;c++)
 	{
-		const IKChain_t *chain=&ik->chain[c];
+		IKChain_t *chain=&ik->chain[c];
 		const vec3 chainTip=posePose[chain->bone[chain->numBone-1]].position;
-		float desired=0.0f;
+		IKTarget_t target;
+		vec3 desired=Vec3b(0.0f);
 
-		if(ik->groundFunc&&ik->groundFunc(ik, c, chainTip, &desired))
-			desired=clampf(desired, -ik->maxStep, ik->maxStep)*ik->weight;
-		else
-			desired=0.0f;
+		// No target (or no callback) means no change, which eases the chain back to the animation
+		if(chain->targetFunc&&chain->targetFunc(ik, c, chainTip, &target))
+		{
+			desired=Vec3_Subv(target.position, chainTip);
 
-		ik->offset[c]+=(desired-ik->offset[c])*blend;
-		targets[c]=Vec3_Addv(chainTip, Vec3_Muls(ik->up, ik->offset[c]));
+			const float length=Vec3_Length(desired);
 
-		lowest=fminf(lowest, ik->offset[c]);
+			if(chain->maxDistance>0.0f&&length>chain->maxDistance)
+				desired=Vec3_Muls(desired, chain->maxDistance/length);
 
-		if(fabsf(ik->offset[c])>1e-4f)
+			desired=Vec3_Muls(desired, chain->weight*ik->weight);
+		}
+
+		// Ease the change, not the target, so the tip is free to move
+		const float blend=(chain->smoothRate>0.0f)?1.0f-expf(-chain->smoothRate*dt):1.0f;
+
+		chain->delta=Vec3_Lerp(chain->delta, desired, blend);
+		targets[c]=Vec3_Addv(chainTip, chain->delta);
+
+		if(Vec3_Dot(chain->delta, chain->delta)>1e-8f)
 			active=true;
+
+		const float shift=Vec3_Dot(chain->delta, ik->up);
+
+		lowest=fminf(lowest, shift);
+		total+=shift;
+		numSupport++;
 	}
+
+	ik->modelPose=NULL;
 
 	if(!active)
 		return;
 
-	if(ik->pelvisBone>=0&&lowest<-FLT_EPSILON)
+	if(ik->bodyBone>=0&&numSupport)
 	{
-		const int32_t parent=model->bone[ik->pelvisBone].parent;
-		const vec4 parentRot=(parent<0)?Vec4(0.0f, 0.0f, 0.0f, 1.0f):posePose[parent].orientation;
+		const float shift=(ik->bodyMode==IK_BODY_AVERAGE)?total/(float)numSupport:lowest;
 
-		pose[ik->pelvisBone].position=Vec3_Addv(pose[ik->pelvisBone].position, QuatRotate(QuatInverse(parentRot), Vec3_Muls(ik->up, lowest)));
+		if(fabsf(shift)>FLT_EPSILON)
+		{
+			const int32_t parent=model->bone[ik->bodyBone].parent;
+			const vec4 parentRot=(parent<0)?Vec4(0.0f, 0.0f, 0.0f, 1.0f):posePose[parent].orientation;
 
-		ComputeModelPose(model, pose, posePose);
+			pose[ik->bodyBone].position=Vec3_Addv(pose[ik->bodyBone].position, QuatRotate(QuatInverse(parentRot), Vec3_Muls(ik->up, shift)));
+
+			ComputeModelPose(model, pose, posePose);
+		}
 	}
 
 	for(uint32_t c=0;c<ik->numChain;c++)
@@ -267,14 +292,16 @@ void IK_Init(IK_t *ik, Animator_t *animator)
 	memset(ik, 0, sizeof(IK_t));
 
 	ik->animator=animator;
-	ik->pelvisBone=-1;
+	ik->bodyBone=-1;
+	ik->bodyMode=IK_BODY_LOWEST;
 	ik->up=Vec3(0.0f, 1.0f, 0.0f);
-	ik->maxStep=0.4f;
-	ik->smoothRate=15.0f;
 	ik->weight=1.0f;
 
-	animator->postPose=PostPose;
-	animator->postPoseUserData=ik;
+	if(animator)
+	{
+		animator->postPose=PostPose;
+		animator->postPoseUserData=ik;
+	}
 }
 
 static int32_t FindBone(const BModel_t *model, const char *name)
@@ -288,43 +315,52 @@ static int32_t FindBone(const BModel_t *model, const char *name)
 	return -1;
 }
 
-int32_t IK_AddChain(IK_t *ik, const char *const *boneNames, uint32_t numBone)
+int32_t IK_AddChain(IK_t *ik, const char *const *boneNames, uint32_t numBone, IKTargetFunc_t targetFunc, void *userData)
 {
 	if(!ik||!ik->animator||!ik->animator->model||numBone<2||numBone>IK_MAX_CHAIN||ik->numChain>=IK_MAX_CHAINS)
 		return -1;
 
 	const BModel_t *model=ik->animator->model;
-	IKChain_t *chain=&ik->chain[ik->numChain];
+	IKChain_t chain;
+
+	memset(&chain, 0, sizeof(IKChain_t));
 
 	for(uint32_t i=0;i<numBone;i++)
 	{
-		chain->bone[i]=FindBone(model, boneNames[i]);
+		chain.bone[i]=FindBone(model, boneNames[i]);
 
-		if(chain->bone[i]<0)
+		if(chain.bone[i]<0)
 		{
 			DBGPRINTF(DEBUG_ERROR, "IK_AddChain: bone '%s' not found.\n", boneNames[i]);
 			return -1;
 		}
 
-		if(i>0&&model->bone[chain->bone[i]].parent!=chain->bone[i-1])
+		if(i>0&&model->bone[chain.bone[i]].parent!=chain.bone[i-1])
 		{
 			DBGPRINTF(DEBUG_ERROR, "IK_AddChain: bone '%s' is not a child of '%s'.\n", boneNames[i], boneNames[i-1]);
 			return -1;
 		}
 	}
 
-	chain->numBone=numBone;
-	ik->offset[ik->numChain]=0.0f;
+	chain.numBone=numBone;
+	chain.targetFunc=targetFunc;
+	chain.userData=userData;
+	chain.weight=1.0f;
+	chain.maxDistance=0.4f;
+	chain.smoothRate=15.0f;
+
+	ik->chain[ik->numChain]=chain;
 
 	return (int32_t)ik->numChain++;
 }
 
-bool IK_SetPelvis(IK_t *ik, const char *boneName)
+bool IK_SetBody(IK_t *ik, const char *boneName, IKBodyMode_e mode)
 {
 	if(!ik||!ik->animator||!ik->animator->model)
 		return false;
 
-	ik->pelvisBone=FindBone(ik->animator->model, boneName);
+	ik->bodyBone=FindBone(ik->animator->model, boneName);
+	ik->bodyMode=mode;
 
-	return ik->pelvisBone>=0;
+	return ik->bodyBone>=0;
 }

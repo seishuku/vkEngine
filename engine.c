@@ -310,33 +310,36 @@ matrix CharacterTransform(const RigidBody_t *body)
 	return MatrixMult(local, MatrixTranslatev(body->position));
 }
 
-
-static bool CharacterFootGround(IK_t *ik, uint32_t chain, vec3 chainTip, float *offset)
+static bool CharacterFootTarget(IK_t *ik, uint32_t chain, const vec3 chainTip, IKTarget_t *target)
 {
-    const RigidBody_t *body=&character.body;
+	const Character_t *c=(const Character_t *)ik->chain[chain].userData;
+	const RigidBody_t *body=&c->body;
 
-    vec3 up=QuatRotate(body->orientation, ik->up);
+	vec3 up=QuatRotate(body->orientation, ik->up);
 
-    if(Vec3_Normalize(&up)<FLT_EPSILON)
-        return false;
+	if(Vec3_Normalize(&up)<FLT_EPSILON)
+		return false;
 
-    const float maxStep=ik->maxStep*WORLD_SCALE;
-    const vec3 ground=Vec3_Subv(body->position, Vec3_Muls(up, body->radiusHeight.x+body->radiusHeight.y));
+	const float maxStep=ik->chain[chain].maxDistance*WORLD_SCALE;
+
+	const vec3 ground=Vec3_Subv(body->position, Vec3_Muls(up, body->radiusHeight.x+body->radiusHeight.y));
 
     // Transform foot (chain tip) position to world space.
     const vec3 tip=Matrix4x4MultVec3(chainTip, CharacterTransform(body));
-    const float tipHeight=Vec3_Dot(Vec3_Subv(tip, ground), up);
+	const float tipHeight=Vec3_Dot(Vec3_Subv(tip, ground), up);
 
-    const vec3 origin=Vec3_Addv(tip, Vec3_Muls(up, maxStep+fmaxf(-tipHeight, 0.0f)));
+	const vec3 origin=Vec3_Addv(tip, Vec3_Muls(up, maxStep+fmaxf(-tipHeight, 0.0f)));
+	const float reach=2.0f*maxStep+fmaxf(tipHeight, 0.0f);
 
-    const float reach=2.0f*maxStep+fmaxf(tipHeight, 0.0f);
+	BVHRayHit_t hit;
 
-    BVHRayHit_t hit;
-
-    if(!BVH_Raycast(&bvh, &entityList, origin, Vec3_Muls(up, -1.0f), reach, body, &hit))
+	if(!BVH_Raycast(&bvh, &entityList, origin, Vec3_Muls(up, -1.0f), reach, body, &hit))
 		return false;
 
-    *offset=Vec3_Dot(Vec3_Subv(hit.point, ground), up)/WORLD_SCALE;
+	// How much higher or lower than flat the ground is under this foot, in model units
+	const float groundDelta=Vec3_Dot(Vec3_Subv(hit.point, ground), up)/WORLD_SCALE;
+
+	target->position=Vec3_Addv(chainTip, Vec3_Muls(ik->up, groundDelta));
 
 	return true;
 }
@@ -347,10 +350,9 @@ static void CharacterSetupIK(Animator_t *animator)
 	static const char *legR[]={ "thigh_r", "calf_r", "foot_r" };
 
 	IK_Init(&characterIK, animator);
-	IK_AddChain(&characterIK, legL, 3);
-	IK_AddChain(&characterIK, legR, 3);
-	IK_SetPelvis(&characterIK, "pelvis");
-	characterIK.groundFunc=CharacterFootGround;
+	IK_AddChain(&characterIK, legL, 3, CharacterFootTarget, &character);
+	IK_AddChain(&characterIK, legR, 3, CharacterFootTarget, &character);
+	IK_SetBody(&characterIK, "pelvis", IK_BODY_LOWEST);
 }
 
 // Build up random data for skybox and asteroid field
