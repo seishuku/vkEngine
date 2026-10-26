@@ -1211,19 +1211,20 @@ void Thread_Physics(void *arg)
 					PhysicsSolveConstraint(&assembly[i], fTimeStep/constraintIterations);
 			}
 
-			// Moving platform, driven by its position so it can't drift. It's given the velocity to get there this step,
-			// which is what the solver and the character standing on it see.
+			// Moving platform
 			{
-				static vec4 platformStart;
+				static vec3 platformStartPos;
+				static vec4 platformStartOrien;
 				static bool platformStarted=false;
 
 				if(!platformStarted)
 				{
-					platformStart=bodies[BODY_JUMP_PLATFORM_B].orientation;
+					platformStartPos=bodies[BODY_JUMP_PLATFORM_B].position;
+					platformStartOrien=bodies[BODY_JUMP_PLATFORM_B].orientation;
 					platformStarted=true;
 				}
 
-				PhysicsMoveKinematic(&bodies[BODY_JUMP_PLATFORM_B], bodies[BODY_JUMP_PLATFORM_B].position, QuatMultiply(platformStart, QuatAngle(fTime, 0.0f, 1.0f, 0.0f)), fTimeStep);
+				PhysicsMoveKinematic(&bodies[BODY_JUMP_PLATFORM_B], Vec3_Addv(platformStartPos, Vec3(sin(fTime)*WORLD_SCALE, 0.0f, 0.0f)), QuatMultiply(platformStartOrien, QuatAngle(fTime, 0.0f, 1.0f, 0.0f)), fTimeStep);
 			}
 
 #if 0
