@@ -162,7 +162,7 @@ void Character_Init(Character_t *c, const vec3 position, const vec3 up, const ve
 
 	c->friction=1.0f;
 
-	c->turnWithGround=false;
+	c->turnWithGround=true;
 
 	c->coyoteTime=0.1f;
 
