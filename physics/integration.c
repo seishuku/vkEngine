@@ -1,3 +1,4 @@
+#include <float.h>
 #include "../math/math.h"
 #include "physics.h"
 
@@ -18,6 +19,10 @@ void SpringIntegrate(Spring_t *s, vec3 target, float dt)
 
 static void ApplyConstraints(RigidBody_t *body, const float dt)
 {
+	// Bodies with infinite mass are moved by whatever is driving them (platforms), the drag would eat the velocity they're given
+	if(body->invMass<=0.0f)
+		return;
+
 	vec3 center={ 0.0f, 0.0f, 0.0f };
 	const float maxRadius=2000.0f;
 	const float maxVelocity=500.0f;
@@ -132,4 +137,28 @@ void PhysicsApplyImpulse(RigidBody_t *body, const vec3 impulse, const vec3 point
 
 	// Update angular velocity
 	body->angularVelocity=Vec3_Addv(body->angularVelocity, Vec3_Muls(localTorque, body->invInertia));
+}
+
+void PhysicsMoveKinematic(RigidBody_t *body, const vec3 position, const vec4 orientation, const float dt)
+{
+	if(dt<=FLT_EPSILON)
+	{
+		body->velocity=Vec3b(0.0f);
+		body->angularVelocity=Vec3b(0.0f);
+		return;
+	}
+
+	body->velocity=Vec3_Muls(Vec3_Subv(position, body->position), 1.0f/dt);
+
+	// The rotation that takes the current orientation to the target, in the body's own space like angularVelocity is
+	vec4 delta=QuatMultiply(QuatInverse(body->orientation), orientation);
+
+	// Go the short way around
+	if(delta.w<0.0f)
+		delta=Vec4_Muls(delta, -1.0f);
+
+	const vec3 axis=Vec3(delta.x, delta.y, delta.z);
+	const float sine=Vec3_Length(axis);
+
+	body->angularVelocity=(sine>FLT_EPSILON)?Vec3_Muls(axis, 2.0f*atan2f(sine, delta.w)/(sine*dt)):Vec3b(0.0f);
 }

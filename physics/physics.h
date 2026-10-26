@@ -54,8 +54,10 @@ typedef struct
 } CollisionManifold_t;
 
 void PhysicsIntegrate(RigidBody_t *body, const float dt);
+
 void PhysicsExplode(RigidBody_t *body);
 void PhysicsApplyImpulse(RigidBody_t *body, const vec3 impulse, const vec3 point);
+void PhysicsMoveKinematic(RigidBody_t *body, const vec3 position, const vec4 orientation, const float dt);
 float PhysicsResolveCollision(RigidBody_t *a, RigidBody_t *b, ContactPoint_t contact);
 void PhysicsPositionCorrection(RigidBody_t *a, RigidBody_t *b, ContactPoint_t contact);
 CollisionManifold_t PhysicsCollision(RigidBody_t *a, RigidBody_t *b);

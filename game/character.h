@@ -63,6 +63,7 @@ typedef struct
 	float upSmoothing;		// How fast "up" follows a change in gravity direction (1/s)
 	float turnRate;			// Third person body fastest turn speed (rad/s)
 	float turnSmoothTime;	// Third person turning easing time (s)
+	bool turnWithGround;	// Does the character turn with the ground it's on?
 	float landTime;			// How long the landing state lasts when standing still
 	float minLandSpeed;		// Fastest downward speed that doesn't count as a landing (small steps and drops)
 	float minLandAirTime;	// Time in the air needed for a touchdown to count
@@ -77,6 +78,8 @@ typedef struct
 	vec3 up;
 	vec3 facing;
 	vec3 groundNormal;
+	vec3 groundVelocity;	// Velocity of the ground the character was last on, and whether it was on it
+	bool riding;
 	vec3 slideVelocity;		// Part of the ground velocity from gravity pulling the character down a slope it can't grip
 	bool grounded;
 	bool jumpHeld;
@@ -122,6 +125,6 @@ void Character_AddContact(Character_t *character, RigidBody_t *a, RigidBody_t *b
 float Character_GetEyeOffset(const Character_t *character);
 
 // Update everything
-void Character_Update(Character_t *character, const Camera_t *camera, const float dt);
+void Character_Update(Character_t *character, Camera_t *camera, const float dt);
 
 #endif

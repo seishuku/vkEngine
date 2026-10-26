@@ -162,6 +162,8 @@ void Character_Init(Character_t *c, const vec3 position, const vec3 up, const ve
 
 	c->friction=1.0f;
 
+	c->turnWithGround=false;
+
 	c->coyoteTime=0.1f;
 
 	c->upSmoothing=8.0f;
@@ -526,20 +528,23 @@ static vec3 ApplyFriction(Character_t *c, vec3 slide, const float load)
 	return slide;
 }
 
-// Accelerates the velocity along the ground (or the up plane in the air) toward the wanted velocity, leaving the part
-// of the velocity along the plane normal (gravity, jumping, and so on) alone
+// Accelerates the velocity along the ground (or the up plane in the air) toward the wanted velocity,
+// leaving the part of the velocity along the plane normal (gravity, jumping, and so on) alone.
 static void ApplyMovement(Character_t *c, const MoveInput_t *input, const float dt)
 {
 	RigidBody_t *body=&c->body;
 
 	const vec3 planeNormal=c->grounded?c->groundNormal:c->up;
 
-	vec3 ground=Vec3b(0.0f);
+	vec3 ground=c->groundVelocity;
 	float load=0.0f, traction=1.0f;
 
 	if(c->grounded)
 	{
 		ground=ApplySupport(c, &load);
+
+		if(c->riding)
+			body->position=Vec3_Addv(body->position, Vec3_Muls(Vec3_Subv(ground, c->groundVelocity), dt));
 
 		float friction=0.0f;
 
@@ -597,12 +602,32 @@ static void ApplyMovement(Character_t *c, const MoveInput_t *input, const float 
 			slide=Vec3_Muls(slide, c->maxFallSpeed/Vec3_Length(slide));
 	}
 
+	c->groundVelocity=ground;
+	c->riding=c->grounded;
+
 	c->slideVelocity=slide;
 	c->slideSpeed=Vec3_Length(slide);
 
 	body->velocity=Vec3_Addv(Vec3_Addv(ground, Vec3_Addv(velocityPlane, slide)), velocityNormal);
 
 	c->speed=Vec3_Length(velocityPlane);
+}
+
+// Ground spinning turns the character only about it's up vector, a tumbling box doesn't swing the view around.
+static void ApplyGroundTurn(Character_t *c, Camera_t *camera, const float dt)
+{
+	if(!c->grounded||c->numContacts==0||!c->turnWithGround)
+		return;
+
+	float spin=0.0f;
+
+	for(uint32_t i=0;i<c->numContacts;i++)
+		spin+=Vec3_Dot(QuatRotate(c->contacts[i].other->orientation, c->contacts[i].other->angularVelocity), c->up);
+
+	const vec4 turn=QuatAnglev(spin/(float)c->numContacts*dt, c->up);
+
+	camera->heading=QuatRotate(turn, camera->heading);
+	c->facing=QuatRotate(turn, c->facing);
 }
 
 // First person always looks where the camera does, third person eases the body around to face where it's moving
@@ -658,7 +683,7 @@ static void UpdateState(Character_t *c, const float dt)
 		c->state=CHARACTER_STATE_RUN;
 }
 
-void Character_Update(Character_t *c, const Camera_t *camera, const float dt)
+void Character_Update(Character_t *c, Camera_t *camera, const float dt)
 {
 	if(!c->active||dt<=0.0f)
 		return;
@@ -679,6 +704,8 @@ void Character_Update(Character_t *c, const Camera_t *camera, const float dt)
 		ApplyGravity(c, camera, dt);
 
 	UpdateJump(c, camera, hasGravity, dt);
+
+	ApplyGroundTurn(c, camera, dt);
 
 	const MoveInput_t input=GatherMoveInput(c, camera);
 

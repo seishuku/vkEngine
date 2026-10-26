@@ -1211,9 +1211,20 @@ void Thread_Physics(void *arg)
 					PhysicsSolveConstraint(&assembly[i], fTimeStep/constraintIterations);
 			}
 
-			// Simple moving platform, not a good way to do it.
-			// The position will probably drift after some time, especially if the frame time fluctuates.
-			bodies[BODY_JUMP_PLATFORM_B].velocity.x=sinf(cos(fTime)*2.0f)*WORLD_SCALE;
+			// Moving platform, driven by its position so it can't drift. It's given the velocity to get there this step,
+			// which is what the solver and the character standing on it see.
+			{
+				static vec4 platformStart;
+				static bool platformStarted=false;
+
+				if(!platformStarted)
+				{
+					platformStart=bodies[BODY_JUMP_PLATFORM_B].orientation;
+					platformStarted=true;
+				}
+
+				PhysicsMoveKinematic(&bodies[BODY_JUMP_PLATFORM_B], bodies[BODY_JUMP_PLATFORM_B].position, QuatMultiply(platformStart, QuatAngle(fTime, 0.0f, 1.0f, 0.0f)), fTimeStep);
+			}
 
 #if 0
 			{
