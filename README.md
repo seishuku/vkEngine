@@ -19,7 +19,6 @@ This is an on-going learning experience for me and for anyone else that can lear
 - Improve physics (needs more refining, it doesn't pass a box stack very well)
 - Streamline post processing effects (WIP)
 - Improve networking (this is better now, [server here](https://github.com/seishuku/vkEngineServer))
-- IK/FABRIK animation?
 - ???
 - Profit?
 
@@ -87,6 +86,7 @@ Where XXX.XXX.XXX.XXX is the remote IP.
 - Particle system
 - 6 DOF physics based camera with 1st person and chase views
 - Character controller with 1st person and chase views
+- IK skeleton pose manipulation (useful for character foot placement, hand touching, weapon holding, etc)
 
 **Audio**
 - Custom audio subsystem with HRTF based positional sound

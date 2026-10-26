@@ -1784,6 +1784,7 @@ void Render(void)
 
 	UI_UpdateBarGraphValue(&UI, playerHealthID, playerHealth);
 
+#if 0
 	for(uint32_t i=0;i<NUM_ENEMY;i++)
 	{
 		const float columnWidth=200.0f; // adjust to match your stat block width
@@ -1796,6 +1797,7 @@ void Render(void)
 
 		PrintEnemyStats(&enemyAI[i], x, y);
 	}
+#endif
 
 	// Reset the frame fence and command pool (and thus the command buffer)
 	vkResetFences(vkContext.device, 1, &perFrame[index].frameFence);
