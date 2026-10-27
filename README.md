@@ -1,12 +1,12 @@
 # vkEngine
 ![vkEngine screen shot](screen_shot.png)
 
-vkEngine, my long term "game engine" project.
-Might end up as an actual game at some point, no idea when.
+vkEngine, my long term "game engine" project.<br>
+Might end up as an actual game at some point, no idea when.<br>
 
-This started long long ago in 2004, with OpenGL and ATI GPU demos... My only game that has actually used this "engine" was my [Tetris game/graphics demo](https://github.com/seishuku/Tetris).
+This started long long ago in 2004, with OpenGL and ATI GPU demos... My only game that has actually used this "engine" was my [Tetris game/graphics demo](https://github.com/seishuku/Tetris).<br>
 
-I also have the [OpenGL version](https://github.com/seishuku/Engine), this is a *far* more evolved codebase than that though, the OpenGL version I should archive the repo as I haven't touched it in quite some time.
+I have an old [OpenGL version](https://github.com/seishuku/Engine) as wel, but I haven't done anything with it since switching to Vulkan, it's just around for historical reasons and is archived now.<br>
 
 I love doing everything my self with as little external library dependencies as possible.<br>
 This is an on-going learning experience for me and for anyone else that can learn from my code, I try to keep it clean and readable.<br>
@@ -15,7 +15,7 @@ This is an on-going learning experience for me and for anyone else that can lear
 ---
 
 ## To-do (in no particular order):
-- Improve audio (needs pops/clicks fixed)
+- Improve audio (needs pops/clicks fixed on Windows)
 - Improve physics (needs more refining, it doesn't pass a box stack very well)
 - Streamline post processing effects (WIP)
 - Improve networking (this is better now, [server here](https://github.com/seishuku/vkEngineServer))
@@ -56,9 +56,11 @@ Should be pretty straightforward cmake:<br>
 or use a preset:<br>
 ```cmake -S. --preset "linux_x64_release"```<br>
 ```cmake -S. --preset "windows_x64_release"```<br>
-```cmake -S. --preset "android_arm64_release"```
-
-> <b>Note:</b> Android building requires the SDK with NDK properly set up with ANDROID_HOME set correctly. This also currently targets a specific NDK version, edit presets file to the version you have installed.
+```cmake -S. --preset "android_arm64_release"```<br>
+```cmake -S. --preset "linux_aarch64_release_cross"```<br><br>
+Then ```cmake --build 'path to build directory'```<br>
+> <b>Note:</b> Android building requires the SDK with NDK properly set up with ANDROID_HOME set correctly. This also currently targets a specific NDK version, edit presets file to the version you have installed.<br>
+> As do the cross compile preset targets, they need a properly set up sysroot or cross build environment.
 
 ---
 
@@ -125,5 +127,5 @@ Where XXX.XXX.XXX.XXX is the remote IP.
 
 **Build targets**
 - Windows x64
-- Linux x64
+- Linux x64/aarch64
 - Android ARM64
