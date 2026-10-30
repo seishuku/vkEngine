@@ -3,8 +3,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <linux/joystick.h>
-#include "../../math/math.h"
 #include "../../input/input.h"
+#include "../../math/math.h"
+#include "../../system/system.h"
 
 #define MAX_JS_DEVICES 4
 #define JOYSTICK_PATH "/dev/input/js1"
@@ -30,7 +31,11 @@ static void TryOpenJoystick(void)
 
 	if(jsDevice.fd>=0)
 	{
-		memset(&jsDevice, 0, sizeof(JSDevice_t));
+		char name[128]="\0";
+
+		if(ioctl(jsDevice.fd, JSIOCGNAME(128), name)>=0)
+			DBGPRINTF(DEBUG_INFO, "Joystick detected: %s\n", name);
+
 		jsDevice.connected=true;
 	}
 }
@@ -87,7 +92,7 @@ static void UpdateGamepadState(void)
 					input->gamepad.leftTrigger=(val>JOYSTICK_DEADZONE)?val:0.0f;
 				}
 				
-				if (event.number == 5)
+				if(event.number==5)
 				{
 					float val=(jsDevice.axes[5]+32767.0f)/65534.0f;
 					input->gamepad.rightTrigger=(val>JOYSTICK_DEADZONE)?val:0.0f;
