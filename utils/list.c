@@ -102,7 +102,7 @@ bool List_Del(List_t *list, const size_t index)
 		return false;
 
 	// Shift data from index to end, overwriting the item to be removed
-	memcpy(&list->buffer[index*list->stride], &list->buffer[(index+1)*list->stride], list->size-(index*list->stride));
+	memmove(&list->buffer[index*list->stride], &list->buffer[(index+1)*list->stride], list->size-((index+1)*list->stride));
 	// Update list size
 	list->size-=list->stride;
 
