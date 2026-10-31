@@ -99,7 +99,7 @@ void SFXStreamData(void *buffer, size_t length)
 		}
 
 		// Thruster hum is for the flying camera, walking shouldn't play it
-		if(camera.mode==CAMERA_MODE_FLIGHT&&(camera.moveForward||camera.moveBackward||camera.moveLeft||camera.moveRight||camera.moveUp||camera.moveDown))
+		if(camera.mode==CAMERA_MODE_FLIGHT&&(Vec3_LengthSq(camera.moveAxis)>0.001f))
 		{
 			engineSample=sample+(int16_t)(GenerateWaveSample(&Engine)*INT16_MAX);
 

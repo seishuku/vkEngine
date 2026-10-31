@@ -174,18 +174,8 @@ void CameraInit(Camera_t *camera, const vec3 position, const vec3 up, const vec3
 	camera->heading=camera->forward;
 	camera->lastUp=camera->up;
 
-	camera->moveForward=false;
-	camera->moveBackward=false;
-	camera->moveLeft=false;
-	camera->moveRight=false;
-	camera->moveUp=false;
-	camera->moveDown=false;
-	camera->rollLeft=false;
-	camera->rollRight=false;
-	camera->pitchUp=false;
-	camera->pitchDown=false;
-	camera->yawLeft=false;
-	camera->yawRight=false;
+	camera->moveAxis=Vec3b(0.0f);
+	camera->rotateAxis=Vec3b(0.0f);
 	camera->shift=false;
 }
 
@@ -197,41 +187,11 @@ static matrix CameraUpdateFlight(Camera_t *camera, float dt)
 	if(camera->shift)
 		speed*=2.0f;
 
-	if(camera->moveLeft)
-		camera->body.velocity=Vec3_Addv(camera->body.velocity, Vec3_Muls(camera->right, speed));
+	camera->body.velocity=Vec3_Addv(camera->body.velocity, Vec3_Muls(camera->right,		camera->moveAxis.x*speed));
+	camera->body.velocity=Vec3_Addv(camera->body.velocity, Vec3_Muls(camera->up,		camera->moveAxis.y*speed));
+	camera->body.velocity=Vec3_Addv(camera->body.velocity, Vec3_Muls(camera->forward,	camera->moveAxis.z*speed));
 
-	if(camera->moveRight)
-		camera->body.velocity=Vec3_Subv(camera->body.velocity, Vec3_Muls(camera->right, speed));
-
-	if(camera->moveUp)
-		camera->body.velocity=Vec3_Addv(camera->body.velocity, Vec3_Muls(camera->up, speed));
-
-	if(camera->moveDown)
-		camera->body.velocity=Vec3_Subv(camera->body.velocity, Vec3_Muls(camera->up, speed));
-
-	if(camera->moveForward)
-		camera->body.velocity=Vec3_Addv(camera->body.velocity, Vec3_Muls(camera->forward, speed));
-
-	if(camera->moveBackward)
-		camera->body.velocity=Vec3_Subv(camera->body.velocity, Vec3_Muls(camera->forward, speed));
-
-	if(camera->pitchUp)
-		camera->body.angularVelocity=Vec3_Subv(camera->body.angularVelocity, Vec3(rotation, 0.0f, 0.0f));
-
-	if(camera->pitchDown)
-		camera->body.angularVelocity=Vec3_Addv(camera->body.angularVelocity, Vec3(rotation, 0.0f, 0.0f));
-
-	if(camera->yawLeft)
-		camera->body.angularVelocity=Vec3_Addv(camera->body.angularVelocity, Vec3(0.0f, rotation, 0.0f));
-
-	if(camera->yawRight)
-		camera->body.angularVelocity=Vec3_Subv(camera->body.angularVelocity, Vec3(0.0f, rotation, 0.0f));
-
-	if(camera->rollLeft)
-		camera->body.angularVelocity=Vec3_Subv(camera->body.angularVelocity, Vec3(0.0f, 0.0f, rotation));
-
-	if(camera->rollRight)
-		camera->body.angularVelocity=Vec3_Addv(camera->body.angularVelocity, Vec3(0.0f, 0.0f, rotation));
+	camera->body.angularVelocity=Vec3_Addv(camera->body.angularVelocity, Vec3_Muls(camera->rotateAxis, rotation));
 
 	const float maxVelocity=200.0f;
 	const float magnitude=Vec3_Length(camera->body.velocity);
@@ -287,17 +247,7 @@ static matrix CameraUpdateCharacter(Camera_t *camera, float dt)
 	QuatAxes(target->orientation, targetAxes);
 	const vec3 up=targetAxes[1];
 
-	if(camera->pitchUp)
-		camera->body.angularVelocity=Vec3_Subv(camera->body.angularVelocity, Vec3(rotation, 0.0f, 0.0f));
-
-	if(camera->pitchDown)
-		camera->body.angularVelocity=Vec3_Addv(camera->body.angularVelocity, Vec3(rotation, 0.0f, 0.0f));
-
-	if(camera->yawLeft)
-		camera->body.angularVelocity=Vec3_Addv(camera->body.angularVelocity, Vec3(0.0f, rotation, 0.0f));
-
-	if(camera->yawRight)
-		camera->body.angularVelocity=Vec3_Subv(camera->body.angularVelocity, Vec3(0.0f, rotation, 0.0f));
+	camera->body.angularVelocity=Vec3_Addv(camera->body.angularVelocity, Vec3_Muls(camera->rotateAxis, rotation));
 
 	vec3 heading=TransportVector(camera->heading, camera->lastUp, up);
 	camera->lastUp=up;

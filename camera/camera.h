@@ -47,12 +47,8 @@ typedef struct Camera_s
 	};
 
 	// Input states
-	bool moveForward, moveBackward;
-	bool moveLeft, moveRight;
-	bool moveUp, moveDown;
-	bool rollLeft, rollRight;
-	bool pitchUp, pitchDown;
-	bool yawLeft, yawRight;
+	vec3 moveAxis;
+	vec3 rotateAxis;
 	bool shift;
 } Camera_t;
 

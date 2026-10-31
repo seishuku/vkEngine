@@ -1691,14 +1691,11 @@ void Render(void)
 		float rightGrip=Input_GetVRGrip(1);
 		vec2 rightThumbstick=Input_GetVRThumbstick(1);
 
-		const float speed=240.0f;
-		const float rotation=5.0f;
+		camera.moveAxis.x=-leftThumbstick.x;
+		camera.moveAxis.z=leftThumbstick.y;
 
-		camera.body.velocity=Vec3_Subv(camera.body.velocity, Vec3_Muls(camera.right, leftThumbstick.x*speed*fTimeStep));
-		camera.body.velocity=Vec3_Addv(camera.body.velocity, Vec3_Muls(camera.forward, leftThumbstick.y*speed*fTimeStep));
-
-		camera.body.angularVelocity.y-=rightThumbstick.x*rotation*fTimeStep;
-		camera.body.angularVelocity.x-=rightThumbstick.y*rotation*fTimeStep;
+		camera.rotateAxis.x=-rightThumbstick.y;
+		camera.rotateAxis.y=-rightThumbstick.x;
 
 		if(leftTrigger>0.1f)
 		{
@@ -1768,14 +1765,11 @@ void Render(void)
 		vec2 leftThumbstick=Input_GetGamepadStick(0);
 		vec2 rightThumbstick=Input_GetGamepadStick(1);
 #endif
-		const float speed=240.0f;
-		const float rotation=5.0f;
+		camera.moveAxis.x=-leftThumbstick.x;
+		camera.moveAxis.z=leftThumbstick.y;
 
-		camera.body.velocity=Vec3_Subv(camera.body.velocity, Vec3_Muls(camera.right, leftThumbstick.x*speed*fTimeStep));
-		camera.body.velocity=Vec3_Addv(camera.body.velocity, Vec3_Muls(camera.forward, leftThumbstick.y*speed*fTimeStep));
-
-		camera.body.angularVelocity.y-=rightThumbstick.x*rotation*fTimeStep;
-		camera.body.angularVelocity.x-=rightThumbstick.y*rotation*fTimeStep;
+		camera.rotateAxis.x=-rightThumbstick.y;
+		camera.rotateAxis.y=-rightThumbstick.x;
 	}
 
 	ConsoleDraw(&console);

@@ -338,15 +338,16 @@ static bool HasHeadroom(const Character_t *c)
 
 static void UpdateCrouch(Character_t *c, const Camera_t *camera, const float dt)
 {
+	const bool moveDown=camera->moveAxis.y<0.0f;
 	if(c->crouchToggle)
 	{
-		if(camera->moveDown&&!c->crouchHeld)
+		if(moveDown&&!c->crouchHeld)
 			c->crouchWanted=!c->crouchWanted;
 	}
 	else
-		c->crouchWanted=camera->moveDown;
+		c->crouchWanted=moveDown;
 
-	c->crouchHeld=camera->moveDown;
+	c->crouchHeld=moveDown;
 
 	// Only change size on the ground, and standing back up also needs room above
 	if(c->grounded)
@@ -365,9 +366,10 @@ static void UpdateCrouch(Character_t *c, const Camera_t *camera, const float dt)
 
 static void UpdateJump(Character_t *c, const Camera_t *camera, const bool hasGravity, const float dt)
 {
-	const bool jumpPressed=camera->moveUp&&!c->jumpHeld;
+	const bool moveUp=camera->moveAxis.y>0.0f;
+	const bool jumpPressed=moveUp&&!c->jumpHeld;
 
-	c->jumpHeld=camera->moveUp;
+	c->jumpHeld=moveUp;
 
 	// Remember a press for a moment, so pressing jump just before touching down still jumps on landing
 	c->jumpBufferTimer=jumpPressed?c->jumpBufferTime:fmaxf(c->jumpBufferTimer-dt, 0.0f);
@@ -405,6 +407,7 @@ static void UpdateJump(Character_t *c, const Camera_t *camera, const bool hasGra
 static void ApplyGravity(Character_t *c, const Camera_t *camera, const float dt)
 {
 	const float verticalSpeed=Vec3_Dot(c->body.velocity, c->up);
+	const bool moveUp=camera->moveAxis.y>0.0f;
 
 	if(c->grounded||verticalSpeed<=0.0f)
 		c->jumping=false;
@@ -414,7 +417,7 @@ static void ApplyGravity(Character_t *c, const Camera_t *camera, const float dt)
 	if(!c->grounded)
 	{
 		if(verticalSpeed>0.0f)
-			scale=(c->jumping&&!camera->moveUp)?c->cutGravityScale:c->riseGravityScale;
+			scale=(c->jumping&&!moveUp)?c->cutGravityScale:c->riseGravityScale;
 		else
 			scale=c->fallGravityScale;
 	}
@@ -435,8 +438,8 @@ static MoveInput_t GatherMoveInput(const Character_t *c, const Camera_t *camera)
 
 	const vec3 side=Vec3_Cross(c->up, input.heading);
 
-	const float forwardInput=(camera->moveForward?1.0f:0.0f)-(camera->moveBackward?1.0f:0.0f);
-	const float sideInput=(camera->moveLeft?1.0f:0.0f)-(camera->moveRight?1.0f:0.0f);
+	const float forwardInput=camera->moveAxis.z;
+	const float sideInput=camera->moveAxis.x;
 
 	input.wish=Vec3_Addv(Vec3_Muls(input.heading, forwardInput), Vec3_Muls(side, sideInput));
 	input.wishLength=Vec3_Length(input.wish);

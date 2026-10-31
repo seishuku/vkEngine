@@ -230,20 +230,20 @@ bool Event_Trigger(EventID ID, void *arg)
 			        else
 						FireParticleEmitter(Vec3_Addv(camera.body.position, Vec3_Muls(camera.forward, camera.body.radius)), camera.forward);
 					break;
-				case KB_O:		GenerateWorld();		break;
+				case KB_O:		GenerateWorld();			break;
 				case KB_P:		pausePhysics=!pausePhysics; break;
-				case KB_W:		camera.moveForward=true;		break;
-				case KB_S:		camera.moveBackward=true;		break;
-				case KB_A:		camera.moveLeft=true;		break;
-				case KB_D:		camera.moveRight=true;		break;
-				case KB_V:		camera.moveUp=true;		break;
-				case KB_C:		camera.moveDown=true;		break;
-				case KB_Q:		camera.rollLeft=true;		break;
-				case KB_E:		camera.rollRight=true;		break;
-				case KB_UP:		camera.pitchUp=true;		break;
-				case KB_DOWN:	camera.pitchDown=true;	break;
-				case KB_LEFT:	camera.yawLeft=true;	break;
-				case KB_RIGHT:	camera.yawRight=true;	break;
+				case KB_A:		camera.moveAxis.x=1.0f;		break;
+				case KB_D:		camera.moveAxis.x=-1.0f;	break;
+				case KB_V:		camera.moveAxis.y=1.0f;		break;
+				case KB_C:		camera.moveAxis.y=-1.0f;	break;
+				case KB_W:		camera.moveAxis.z=1.0f;		break;
+				case KB_S:		camera.moveAxis.z=-1.0f;	break;
+				case KB_DOWN:	camera.rotateAxis.x=1.0f;	break;
+				case KB_UP:		camera.rotateAxis.x=-1.0f;	break;
+				case KB_LEFT:	camera.rotateAxis.y=1.0f;	break;
+				case KB_RIGHT:	camera.rotateAxis.y=-1.0f;	break;
+				case KB_E:		camera.rotateAxis.z=1.0f;	break;
+				case KB_Q:		camera.rotateAxis.z=-1.0f;	break;
 				case KB_LSHIFT:
 				case KB_RSHIFT:	camera.shift=true;		break;
 				case KB_Z:
@@ -264,18 +264,18 @@ bool Event_Trigger(EventID ID, void *arg)
 		{
 			switch(key)
 			{
-				case KB_W:		camera.moveForward=false;		break;
-				case KB_S:		camera.moveBackward=false;		break;
-				case KB_A:		camera.moveLeft=false;		break;
-				case KB_D:		camera.moveRight=false;		break;
-				case KB_V:		camera.moveUp=false;		break;
-				case KB_C:		camera.moveDown=false;		break;
-				case KB_Q:		camera.rollLeft=false;		break;
-				case KB_E:		camera.rollRight=false;		break;
-				case KB_UP:		camera.pitchUp=false;	break;
-				case KB_DOWN:	camera.pitchDown=false;	break;
-				case KB_LEFT:	camera.yawLeft=false;	break;
-				case KB_RIGHT:	camera.yawRight=false;	break;
+				case KB_A:		camera.moveAxis.x=0.0f;		break;
+				case KB_D:		camera.moveAxis.x=0.0f;		break;
+				case KB_V:		camera.moveAxis.y=0.0f;		break;
+				case KB_C:		camera.moveAxis.y=0.0f;		break;
+				case KB_W:		camera.moveAxis.z=0.0f;		break;
+				case KB_S:		camera.moveAxis.z=0.0f;		break;
+				case KB_UP:		camera.rotateAxis.x=0.0f;	break;
+				case KB_DOWN:	camera.rotateAxis.x=0.0f;	break;
+				case KB_LEFT:	camera.rotateAxis.y=0.0f;	break;
+				case KB_RIGHT:	camera.rotateAxis.y=0.0f;	break;
+				case KB_Q:		camera.rotateAxis.z=0.0f;	break;
+				case KB_E:		camera.rotateAxis.z=0.0f;	break;
 				case KB_LSHIFT:
 				case KB_RSHIFT:	camera.shift=false;		break;
 				case KB_LCTRL:
