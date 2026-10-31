@@ -1635,6 +1635,7 @@ void Render(void)
 {
 	static uint32_t index=0, imageIndex[3]={ 0, 0, 0 };
 
+	Input_Update();
 	ClientNetwork_Update(GetClock(), fTimeStep);
 
 	EntityList_RecalculateBounds(&entityList);
@@ -1676,57 +1677,6 @@ void Render(void)
 
 		perFrame[index].headPose[0]=xruGetHeadPose(&xrContext, 0);
 		perFrame[index].headPose[1]=xruGetHeadPose(&xrContext, 1);
-
-		vec4 leftHandOrientation=Input_GetVRHandOrientation(0);
-		vec3 leftHandPosition=Input_GetVRHandPosition(0);
-		float leftTrigger=Input_GetVRTrigger(0);
-		float leftGrip=Input_GetVRGrip(0);
-		vec2 leftThumbstick=Input_GetVRThumbstick(0);
-
-		vec4 rightHandOrientation=Input_GetVRHandOrientation(1);
-		vec3 rightHandPosition=Input_GetVRHandPosition(1);
-		float rightTrigger=Input_GetVRTrigger(1);
-		float rightGrip=Input_GetVRGrip(1);
-		vec2 rightThumbstick=Input_GetVRThumbstick(1);
-
-		camera.moveAxis=Vec3_Clamp(Vec3_Add(Event_GetKeyboardMove(), -leftThumbstick.x, 0.0f, leftThumbstick.y), -1.0f, 1.0f);
-		camera.rotateAxis=Vec3_Clamp(Vec3_Add(Event_GetKeyboardLook(), -rightThumbstick.y, -rightThumbstick.x, 0.0f), -1.0f, 1.0f);
-
-		if(leftTrigger>0.1f)
-		{
-			vec3 deltaLeftPosition=Vec3_Muls(Vec3_Subv(Vec3(leftHandPosition.x, leftHandPosition.y, leftHandPosition.z), lastLeftPosition), 100.0f);
-			MouseEvent_t MouseEvent={ .dx=(int32_t)deltaLeftPosition.x, .dy=(int32_t)deltaLeftPosition.y };
-
-			Event_Trigger(EVENT_MOUSEMOVE, &MouseEvent);
-
-			if(leftTrigger>0.75f&&leftTriggerOnce)
-			{
-				leftTriggerOnce=false;
-				MouseEvent.button|=MOUSE_BUTTON_LEFT;
-				Event_Trigger(EVENT_MOUSEDOWN, &MouseEvent);
-			}
-			else
-				MouseEvent.button&=~MOUSE_BUTTON_LEFT;
-
-
-			if(leftTrigger<0.25f&&!leftTriggerOnce)
-				leftTriggerOnce=true;
-		}
-		else
-			lastLeftPosition=Vec3(leftHandPosition.x, leftHandPosition.y, leftHandPosition.z);
-
-		if(rightTrigger>0.75f&&rightTriggerOnce)
-		{
-			rightTriggerOnce=false;
-
-			vec4 rightOrientation=Vec4(rightHandOrientation.x, rightHandOrientation.y, rightHandOrientation.z, rightHandOrientation.w);
-			vec3 direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatToMatrix(rightOrientation), MatrixInverse(perFrame[index].view)));
-
-			FireParticleEmitter(Vec3_Addv(camera.body.position, Vec3_Muls(direction, camera.body.radius)), direction);
-		}
-
-		if(rightTrigger<0.25f&&!rightTriggerOnce)
-			rightTriggerOnce=true;
 	}
 	else
 	// Handle non-VR frame start
@@ -1752,17 +1702,6 @@ void Render(void)
 		perFrame[index].projection[0]=MatrixInfPerspective(90.0f, (float)config.renderWidth/config.renderHeight, 0.01f);
 #endif
 		perFrame[index].headPose[0]=MatrixIdentity();
-
-#ifdef ANDROID
-		vec2 leftThumbstick=UI_GetVirtualStickValue(&UI, leftThumbstickID);
-		vec2 rightThumbstick=UI_GetVirtualStickValue(&UI, rightThumbstickID);
-#else
-		vec2 leftThumbstick=Input_GetGamepadStick(0);
-		vec2 rightThumbstick=Input_GetGamepadStick(1);
-#endif
-
-		camera.moveAxis=Vec3_Clamp(Vec3_Add(Event_GetKeyboardMove(), -leftThumbstick.x, 0.0f, leftThumbstick.y), -1.0f, 1.0f);
-		camera.rotateAxis=Vec3_Clamp(Vec3_Add(Event_GetKeyboardLook(), -rightThumbstick.y, -rightThumbstick.x, 0.0f), -1.0f, 1.0f);
 	}
 
 	ConsoleDraw(&console);
