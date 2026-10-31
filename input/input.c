@@ -1,5 +1,6 @@
 #include <string.h>
 #include "../camera/camera.h"
+#include "../perframe.h"
 #include "input.h"
 
 extern XruContext_t xrContext;
@@ -7,6 +8,8 @@ extern Camera_t camera;
 
 static vec3 lastLeftHandPosition={ 0 };
 static bool leftTriggerWasPressed=false;
+
+void FireParticleEmitter(vec3 position, vec3 direction);
 
 // Forward decl for VR input
 void Input_UpdateVR(void);
@@ -49,73 +52,94 @@ void Input_Update(void)
 		input_state.vr.connected=false;
 		return;
 	}
-
-	input_state.vr.connected=true;
-
-	// Poll left hand
-	XrPosef leftHandPose=xruGetActionPose(&xrContext, xrContext.handPose, xrContext.leftHandSpace, 0);
-	input_state.vr.hand[0].orientation=Vec4(leftHandPose.orientation.x, leftHandPose.orientation.y, leftHandPose.orientation.z, leftHandPose.orientation.w);
-	input_state.vr.hand[0].position=Vec3(leftHandPose.position.x, leftHandPose.position.y, leftHandPose.position.z);
-	input_state.vr.hand[0].trigger=xruGetActionFloat(&xrContext, xrContext.handTrigger, 0);
-	input_state.vr.hand[0].grip=xruGetActionFloat(&xrContext, xrContext.handGrip, 0);
-	input_state.vr.hand[0].thumbstick=xruGetActionVec2(&xrContext, xrContext.handThumbstick, 0);
-
-	// Poll right hand
-	XrPosef rightHandPose=xruGetActionPose(&xrContext, xrContext.handPose, xrContext.rightHandSpace, 1);
-	input_state.vr.hand[1].orientation=Vec4(rightHandPose.orientation.x, rightHandPose.orientation.y, rightHandPose.orientation.z, rightHandPose.orientation.w);
-	input_state.vr.hand[1].position=Vec3(rightHandPose.position.x, rightHandPose.position.y, rightHandPose.position.z);
-	input_state.vr.hand[1].trigger=xruGetActionFloat(&xrContext, xrContext.handTrigger, 1);
-	input_state.vr.hand[1].grip=xruGetActionFloat(&xrContext, xrContext.handGrip, 1);
-	input_state.vr.hand[1].thumbstick=xruGetActionVec2(&xrContext, xrContext.handThumbstick, 1);
-
-	if(!input_state.vr.connected)
-		return;
-
-	// Use left hand trigger for mouse interaction
-	float leftTrigger=input_state.vr.hand[0].trigger;
-	vec3 leftHandPos=input_state.vr.hand[0].position;
-
-	if (leftTrigger>0.1f)
-	{
-		vec3 deltaPos=Vec3_Subv(leftHandPos, lastLeftHandPosition);
-
-		// Scale to mouse delta (approximate scaling)
-		MouseEvent_t mouseEvent={
-			.dx=(int32_t)(deltaPos.x*100.0f),
-			.dy=(int32_t)(deltaPos.y*100.0f),
-			.dz=0
-		};
-
-		// Trigger mouse move event
-		Event_Trigger(EVENT_MOUSEMOVE, &mouseEvent);
-
-		// Trigger click when trigger fully pressed
-		if(leftTrigger>0.75f&&!leftTriggerWasPressed)
-		{
-			leftTriggerWasPressed=true;
-			mouseEvent.button=MOUSE_BUTTON_LEFT;
-
-			Event_Trigger(EVENT_MOUSEDOWN, &mouseEvent);
-		}
-		else if(leftTrigger<0.5f&&leftTriggerWasPressed)
-		{
-			leftTriggerWasPressed=false;
-			mouseEvent.button=MOUSE_BUTTON_LEFT;
-
-			Event_Trigger(EVENT_MOUSEUP, &mouseEvent);
-		}
-	}
 	else
 	{
-		if(leftTriggerWasPressed)
-		{
-			leftTriggerWasPressed=false;
-			MouseEvent_t mouseEvent={ .button=MOUSE_BUTTON_LEFT };
+		input_state.vr.connected=true;
 
-			Event_Trigger(EVENT_MOUSEUP, &mouseEvent);
+		// Poll left hand
+		XrPosef leftHandPose=xruGetActionPose(&xrContext, xrContext.handPose, xrContext.leftHandSpace, 0);
+		input_state.vr.hand[0].orientation=Vec4(leftHandPose.orientation.x, leftHandPose.orientation.y, leftHandPose.orientation.z, leftHandPose.orientation.w);
+		input_state.vr.hand[0].position=Vec3(leftHandPose.position.x, leftHandPose.position.y, leftHandPose.position.z);
+		input_state.vr.hand[0].trigger=xruGetActionFloat(&xrContext, xrContext.handTrigger, 0);
+		input_state.vr.hand[0].grip=xruGetActionFloat(&xrContext, xrContext.handGrip, 0);
+		input_state.vr.hand[0].thumbstick=xruGetActionVec2(&xrContext, xrContext.handThumbstick, 0);
+
+		// Poll right hand
+		XrPosef rightHandPose=xruGetActionPose(&xrContext, xrContext.handPose, xrContext.rightHandSpace, 1);
+		input_state.vr.hand[1].orientation=Vec4(rightHandPose.orientation.x, rightHandPose.orientation.y, rightHandPose.orientation.z, rightHandPose.orientation.w);
+		input_state.vr.hand[1].position=Vec3(rightHandPose.position.x, rightHandPose.position.y, rightHandPose.position.z);
+		input_state.vr.hand[1].trigger=xruGetActionFloat(&xrContext, xrContext.handTrigger, 1);
+		input_state.vr.hand[1].grip=xruGetActionFloat(&xrContext, xrContext.handGrip, 1);
+		input_state.vr.hand[1].thumbstick=xruGetActionVec2(&xrContext, xrContext.handThumbstick, 1);
+
+		// Use left hand trigger for mouse interaction
+		float leftTrigger=input_state.vr.hand[0].trigger;
+		vec3 leftHandPos=input_state.vr.hand[0].position;
+
+		if (leftTrigger>0.1f)
+		{
+			vec3 deltaPos=Vec3_Subv(leftHandPos, lastLeftHandPosition);
+
+			// Scale to mouse delta (approximate scaling)
+			MouseEvent_t mouseEvent={
+				.dx=(int32_t)(deltaPos.x*100.0f),
+				.dy=(int32_t)(deltaPos.y*100.0f),
+				.dz=0
+			};
+
+			// Trigger mouse move event
+			Event_Trigger(EVENT_MOUSEMOVE, &mouseEvent);
+
+			// Trigger click when trigger fully pressed
+			if(leftTrigger>0.75f&&!leftTriggerWasPressed)
+			{
+				leftTriggerWasPressed=true;
+				mouseEvent.button=MOUSE_BUTTON_LEFT;
+
+				Event_Trigger(EVENT_MOUSEDOWN, &mouseEvent);
+			}
+			else if(leftTrigger<0.5f&&leftTriggerWasPressed)
+			{
+				leftTriggerWasPressed=false;
+				mouseEvent.button=MOUSE_BUTTON_LEFT;
+
+				Event_Trigger(EVENT_MOUSEUP, &mouseEvent);
+			}
+		}
+		else
+		{
+			if(leftTriggerWasPressed)
+			{
+				leftTriggerWasPressed=false;
+				MouseEvent_t mouseEvent={ .button=MOUSE_BUTTON_LEFT };
+
+				Event_Trigger(EVENT_MOUSEUP, &mouseEvent);
+			}
+
+			lastLeftHandPosition=leftHandPos;
 		}
 
-		lastLeftHandPosition=leftHandPos;
+		static bool rightTriggerOnce=true;
+		float rightTrigger=input_state.vr.hand[1].trigger;
+
+		if(rightTrigger>0.75f&&rightTriggerOnce)
+		{
+			rightTriggerOnce=false;
+
+			vec4 rightOrientation=Vec4(input_state.vr.hand[1].orientation.x, input_state.vr.hand[1].orientation.y, input_state.vr.hand[1].orientation.z, input_state.vr.hand[1].orientation.w);
+			vec3 direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatToMatrix(rightOrientation), MatrixInverse(perFrame[0].view)));
+
+			FireParticleEmitter(Vec3_Addv(camera.body.position, Vec3_Muls(direction, camera.body.radius)), direction);
+		}
+
+		if(rightTrigger<0.25f&&!rightTriggerOnce)
+			rightTriggerOnce=true;
+
+		const vec2 leftVRThumbstick=Input_GetVRThumbstick(0);
+		const vec2 rightVRThumbstick=Input_GetVRThumbstick(1);
+
+		camera.moveAxis=Vec3_Clamp(Vec3_Add(camera.moveAxis, -leftVRThumbstick.x, 0.0f, leftVRThumbstick.y), -1.0f, 1.0f);
+		camera.rotateAxis=Vec3_Clamp(Vec3_Add(camera.rotateAxis, -rightVRThumbstick.y, -rightVRThumbstick.x, 0.0f), -1.0f, 1.0f);
 	}
 }
 

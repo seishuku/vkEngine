@@ -129,7 +129,7 @@ vec3 Event_GetKeyboardMove(void)
 
 vec3 Event_GetKeyboardLook(void)
 {
-	return Vec3((float)keys.pitchDown-(float)keys.pitchUp, (float)keys.yawLeft- (float)keys.yawRight, (float)keys.rollLeft-(float)keys.rollRight);
+	return Vec3((float)keys.pitchDown-(float)keys.pitchUp, (float)keys.yawLeft- (float)keys.yawRight, (float)keys.rollRight-(float)keys.rollLeft);
 }
 
 bool Event_Trigger(EventID ID, void *arg)

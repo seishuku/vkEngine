@@ -929,9 +929,7 @@ void Thread_Main(void *arg)
 
 				DrawCubePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(cubePC), &cubePC);
 			}
-			else
-#endif
-			if(bodies[i].type==RIGIDBODY_SPHERE)
+			else if(bodies[i].type==RIGIDBODY_SPHERE)
 			{
 				struct
 				{
@@ -944,13 +942,15 @@ void Thread_Main(void *arg)
 				matrix local=MatrixScale(bodies[i].radius, bodies[i].radius, bodies[i].radius);
 				local=MatrixMult(local, QuatToMatrix(bodies[i].orientation));
 				local=MatrixMult(local, MatrixTranslatev(bodies[i].position));
-				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
 				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->view);
+				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
 				spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
 				DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
 			}
-			else if(bodies[i].type==RIGIDBODY_CAPSULE)
+			else
+#endif
+			if(bodies[i].type==RIGIDBODY_CAPSULE)
 			{
 				struct
 				{
@@ -964,8 +964,8 @@ void Thread_Main(void *arg)
 				matrix local=MatrixScale(bodies[i].radiusHeight.x, bodies[i].radiusHeight.x, bodies[i].radiusHeight.x);
 				local=MatrixMult(local, QuatToMatrix(bodies[i].orientation));
 				local=MatrixMult(local, MatrixTranslatev(bodies[i].position));
-				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
 				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->view);
+				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
 				spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
 				DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
