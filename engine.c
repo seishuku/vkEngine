@@ -65,8 +65,6 @@ PerFrame_t perFrame[FRAMES_IN_FLIGHT];
 // Camera data
 Camera_t camera;
 frustum cameraFrustum;
-matrix view, projection[2], headPose[2];
-frustum cameraFrustum;
 
 // extern timing data from system main
 extern float fps, fTimeStep, fTime, audioTime;
@@ -1014,12 +1012,12 @@ void Thread_Particles(void *arg)
 void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 {
 	// Copy projection matrix
-	perFrame[index].mainUBO[eye]->projection=projection[eye];
+	perFrame[index].mainUBO[eye]->projection=perFrame[index].projection[eye];
 
 	// Copy view matrix
-	perFrame[index].mainUBO[eye]->view=view;
+	perFrame[index].mainUBO[eye]->view=perFrame[index].view;
 
-	perFrame[index].mainUBO[eye]->HMD=headPose;
+	perFrame[index].mainUBO[eye]->HMD=perFrame[index].headPose[eye];
 
 	perFrame[index].mainUBO[eye]->lightColor=perFrame[index].skyboxUBO[eye]->uSunColor;
 	perFrame[index].mainUBO[eye]->lightDirection=perFrame[index].skyboxUBO[eye]->uSunPosition;
@@ -1584,13 +1582,13 @@ void Thread_Physics(void *arg)
 
 	// Update camera and view matrix
 	if(playerHealth>0.0f)
-		view=CameraUpdate(&camera, fTimeStep);
+		perFrame[index].view=CameraUpdate(&camera, fTimeStep);
 
 	for(uint32_t i=0;i<NUM_ENEMY;i++)
 		CameraUpdate(&enemy[i], fTimeStep);
 
 	if(enemyView>=0)
-		view=MatrixLookAt(enemy[enemyView].body.position, Vec3_Addv(enemy[enemyView].body.position, enemy[enemyView].forward), enemy[enemyView].up);
+		perFrame[index].view=MatrixLookAt(enemy[enemyView].body.position, Vec3_Addv(enemy[enemyView].body.position, enemy[enemyView].forward), enemy[enemyView].up);
 
 	Animation_Update(&animationSystem, fTimeStep, index);
 
@@ -1673,11 +1671,11 @@ void Render(void)
 			return;
 		}
 
-		projection[0]=xruGetEyeProjection(&xrContext, 0);
-		projection[1]=xruGetEyeProjection(&xrContext, 1);
+		perFrame[index].projection[0]=xruGetEyeProjection(&xrContext, 0);
+		perFrame[index].projection[1]=xruGetEyeProjection(&xrContext, 1);
 
-		headPose[0]=xruGetHeadPose(&xrContext, 0);
-		headPose[1]=xruGetHeadPose(&xrContext, 1);
+		perFrame[index].headPose[0]=xruGetHeadPose(&xrContext, 0);
+		perFrame[index].headPose[1]=xruGetHeadPose(&xrContext, 1);
 
 		vec4 leftHandOrientation=Input_GetVRHandOrientation(0);
 		vec3 leftHandPosition=Input_GetVRHandPosition(0);
@@ -1722,7 +1720,7 @@ void Render(void)
 			rightTriggerOnce=false;
 
 			vec4 rightOrientation=Vec4(rightHandOrientation.x, rightHandOrientation.y, rightHandOrientation.z, rightHandOrientation.w);
-			vec3 direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatToMatrix(rightOrientation), MatrixInverse(view)));
+			vec3 direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatToMatrix(rightOrientation), MatrixInverse(perFrame[index].view)));
 
 			FireParticleEmitter(Vec3_Addv(camera.body.position, Vec3_Muls(direction, camera.body.radius)), direction);
 		}
@@ -1749,11 +1747,11 @@ void Render(void)
 		}
 
 #ifdef ANDROID
-		projection[0]=MatrixMult(MatrixInfPerspective(90.0f, (float)config.renderWidth/config.renderHeight, 0.01f), MatrixRotate(PI/2.0f, 0.0f, 0.0f, 1.0f));
+		perFrame[index].projection[0]=MatrixMult(MatrixInfPerspective(90.0f, (float)config.renderWidth/config.renderHeight, 0.01f), MatrixRotate(PI/2.0f, 0.0f, 0.0f, 1.0f));
 #else
-		projection[0]=MatrixInfPerspective(90.0f, (float)config.renderWidth/config.renderHeight, 0.01f);
+		perFrame[index].projection[0]=MatrixInfPerspective(90.0f, (float)config.renderWidth/config.renderHeight, 0.01f);
 #endif
-		headPose[0]=MatrixIdentity();
+		perFrame[index].headPose[0]=MatrixIdentity();
 
 #ifdef ANDROID
 		vec2 leftThumbstick=UI_GetVirtualStickValue(&UI, leftThumbstickID);
@@ -1770,7 +1768,7 @@ void Render(void)
 	ConsoleDraw(&console);
 
 	Audio_SetStreamVolume(0, UI_GetBarGraphValue(&UI, volumeID));
-	Audio_SetListenerModelView(view);
+	Audio_SetListenerModelView(perFrame[index].view);
 	Audio_SetListenerPosition(camera.body.position);
 
 	UI_UpdateTextTitleTextf(&UI, currentTrack, "Current track: %s", GetCurrentMusicTrack());
@@ -1809,7 +1807,7 @@ void Render(void)
 	// TODO: This create a slight race condition while the physics thread is still running
 	//           and the camera frustum and instance data may have a +/-1 frame delay of stale data.
 	//       Seems ok for now, but may change later.
-	matrix mvp=MatrixMult(MatrixMult(view, headPose[0]), projection[0]);
+	matrix mvp=MatrixMult(MatrixMult(perFrame[index].view, perFrame[index].headPose[0]), perFrame[index].projection[0]);
 	frustum cameraFrustum=Frustum_ExtractPlanes(mvp);
 	EntityList_FrustumCull(&entityList, cameraFrustum);
 	EntityList_UpdateInstances(&entityList, index);
@@ -1824,10 +1822,10 @@ void Render(void)
 	// Update shadow depth map
 	ShadowUpdateMap(perFrame[index].commandBuffer, &entityList, index, perFrame[index].descriptorPool);
 
-	EyeRender(index, 0, headPose[0]);
+	EyeRender(index, 0, perFrame[index].headPose[0]);
 
 	if(config.isVR)
-		EyeRender(index, 1, headPose[1]);
+		EyeRender(index, 1, perFrame[index].headPose[1]);
 
 	// Final drawing compositing
 	CompositeDraw(imageIndex[0], index, 0);

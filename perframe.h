@@ -26,6 +26,11 @@ typedef struct
 
 typedef struct
 {
+	// CPU side matrices
+	matrix view;
+	matrix projection[2];
+	matrix headPose[2];
+
 	// Skybox per-frame, per-eye data
 	Skybox_UBO_t *skyboxUBO[2];
 	VkuBuffer_t skyboxUBOBuffer[2];
