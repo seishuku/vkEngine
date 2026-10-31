@@ -116,6 +116,22 @@ static vec2 mousePosition[MAX_TOUCHES]=
 	{ 0.0f, 0.0f },
 };
 
+static struct
+{
+	bool forward, backward, left, right, up, down;
+	bool rollLeft, rollRight, pitchUp, pitchDown, yawLeft, yawRight;
+} keys;
+
+vec3 Event_GetKeyboardMove(void)
+{
+	return Vec3((float)keys.left-(float)keys.right, (float)keys.up-(float)keys.down, (float)keys.forward-(float)keys.backward);
+}
+
+vec3 Event_GetKeyboardLook(void)
+{
+	return Vec3((float)keys.pitchDown-(float)keys.pitchUp, (float)keys.yawLeft- (float)keys.yawRight, (float)keys.rollLeft-(float)keys.rollRight);
+}
+
 bool Event_Trigger(EventID ID, void *arg)
 {
 	if(ID<0||ID>=NUM_EVENTS)
@@ -232,20 +248,20 @@ bool Event_Trigger(EventID ID, void *arg)
 					break;
 				case KB_O:		GenerateWorld();			break;
 				case KB_P:		pausePhysics=!pausePhysics; break;
-				case KB_A:		camera.moveAxis.x=1.0f;		break;
-				case KB_D:		camera.moveAxis.x=-1.0f;	break;
-				case KB_V:		camera.moveAxis.y=1.0f;		break;
-				case KB_C:		camera.moveAxis.y=-1.0f;	break;
-				case KB_W:		camera.moveAxis.z=1.0f;		break;
-				case KB_S:		camera.moveAxis.z=-1.0f;	break;
-				case KB_DOWN:	camera.rotateAxis.x=1.0f;	break;
-				case KB_UP:		camera.rotateAxis.x=-1.0f;	break;
-				case KB_LEFT:	camera.rotateAxis.y=1.0f;	break;
-				case KB_RIGHT:	camera.rotateAxis.y=-1.0f;	break;
-				case KB_E:		camera.rotateAxis.z=1.0f;	break;
-				case KB_Q:		camera.rotateAxis.z=-1.0f;	break;
+				case KB_W:		keys.forward=true;			break;
+				case KB_S:		keys.backward=true;			break;
+				case KB_A:		keys.left=true;				break;
+				case KB_D:		keys.right=true;			break;
+				case KB_V:		keys.up=true;				break;
+				case KB_C:		keys.down=true;				break;
+				case KB_Q:		keys.rollLeft=true;			break;
+				case KB_E:		keys.rollRight=true;		break;
+				case KB_UP:		keys.pitchUp=true;			break;
+				case KB_DOWN:	keys.pitchDown=true;		break;
+				case KB_LEFT:	keys.yawLeft=true;			break;
+				case KB_RIGHT:	keys.yawRight=true;			break;
 				case KB_LSHIFT:
-				case KB_RSHIFT:	camera.shift=true;		break;
+				case KB_RSHIFT:	camera.shift=true;			break;
 				case KB_Z:
 					for(int i=0;i<numAsteroids;i++)
 						PhysicsExplode(&asteroids[i]);
@@ -264,18 +280,18 @@ bool Event_Trigger(EventID ID, void *arg)
 		{
 			switch(key)
 			{
-				case KB_A:		camera.moveAxis.x=0.0f;		break;
-				case KB_D:		camera.moveAxis.x=0.0f;		break;
-				case KB_V:		camera.moveAxis.y=0.0f;		break;
-				case KB_C:		camera.moveAxis.y=0.0f;		break;
-				case KB_W:		camera.moveAxis.z=0.0f;		break;
-				case KB_S:		camera.moveAxis.z=0.0f;		break;
-				case KB_UP:		camera.rotateAxis.x=0.0f;	break;
-				case KB_DOWN:	camera.rotateAxis.x=0.0f;	break;
-				case KB_LEFT:	camera.rotateAxis.y=0.0f;	break;
-				case KB_RIGHT:	camera.rotateAxis.y=0.0f;	break;
-				case KB_Q:		camera.rotateAxis.z=0.0f;	break;
-				case KB_E:		camera.rotateAxis.z=0.0f;	break;
+				case KB_W:		keys.forward=false;		break;
+				case KB_S:		keys.backward=false;	break;
+				case KB_A:		keys.left=false;		break;
+				case KB_D:		keys.right=false;		break;
+				case KB_V:		keys.up=false;			break;
+				case KB_C:		keys.down=false;		break;
+				case KB_Q:		keys.rollLeft=false;	break;
+				case KB_E:		keys.rollRight=false;	break;
+				case KB_UP:		keys.pitchUp=false;		break;
+				case KB_DOWN:	keys.pitchDown=false;	break;
+				case KB_LEFT:	keys.yawLeft=false;		break;
+				case KB_RIGHT:	keys.yawRight=false;	break;
 				case KB_LSHIFT:
 				case KB_RSHIFT:	camera.shift=false;		break;
 				case KB_LCTRL:

@@ -1691,11 +1691,8 @@ void Render(void)
 		float rightGrip=Input_GetVRGrip(1);
 		vec2 rightThumbstick=Input_GetVRThumbstick(1);
 
-		camera.moveAxis.x=-leftThumbstick.x;
-		camera.moveAxis.z=leftThumbstick.y;
-
-		camera.rotateAxis.x=-rightThumbstick.y;
-		camera.rotateAxis.y=-rightThumbstick.x;
+		camera.moveAxis=Vec3_Clamp(Vec3_Add(Event_GetKeyboardMove(), -leftThumbstick.x, 0.0f, leftThumbstick.y), -1.0f, 1.0f);
+		camera.rotateAxis=Vec3_Clamp(Vec3_Add(Event_GetKeyboardLook(), -rightThumbstick.y, -rightThumbstick.x, 0.0f), -1.0f, 1.0f);
 
 		if(leftTrigger>0.1f)
 		{
@@ -1765,11 +1762,9 @@ void Render(void)
 		vec2 leftThumbstick=Input_GetGamepadStick(0);
 		vec2 rightThumbstick=Input_GetGamepadStick(1);
 #endif
-		camera.moveAxis.x=-leftThumbstick.x;
-		camera.moveAxis.z=leftThumbstick.y;
 
-		camera.rotateAxis.x=-rightThumbstick.y;
-		camera.rotateAxis.y=-rightThumbstick.x;
+		camera.moveAxis=Vec3_Clamp(Vec3_Add(Event_GetKeyboardMove(), -leftThumbstick.x, 0.0f, leftThumbstick.y), -1.0f, 1.0f);
+		camera.rotateAxis=Vec3_Clamp(Vec3_Add(Event_GetKeyboardLook(), -rightThumbstick.y, -rightThumbstick.x, 0.0f), -1.0f, 1.0f);
 	}
 
 	ConsoleDraw(&console);

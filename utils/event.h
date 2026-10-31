@@ -1,6 +1,9 @@
 #ifndef __EVENT_H__
 #define __EVENT_H__
 
+#include <stdint.h>
+#include "../math/math.h"
+
 typedef enum
 {
 	KB_UNKNOWN=0,
@@ -78,6 +81,9 @@ typedef enum
 	EVENT_MOUSEMOVE,
 	NUM_EVENTS
 } EventID;
+
+vec3 Event_GetKeyboardMove(void);
+vec3 Event_GetKeyboardLook(void);
 
 bool Event_Trigger(EventID ID, void *arg);
 
