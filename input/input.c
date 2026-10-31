@@ -1,7 +1,9 @@
-#include "input.h"
 #include <string.h>
+#include "../camera/camera.h"
+#include "input.h"
 
 extern XruContext_t xrContext;
+extern Camera_t camera;
 
 static vec3 lastLeftHandPosition={ 0 };
 static bool leftTriggerWasPressed=false;
@@ -28,6 +30,17 @@ void Input_Update(void)
 
 	// Platform-specific update (gamepad polling, etc.)
 	Input_Platform_Update();
+
+#ifdef ANDROID
+	vec2 leftThumbstick=UI_GetVirtualStickValue(&UI, leftThumbstickID);
+	vec2 rightThumbstick=UI_GetVirtualStickValue(&UI, rightThumbstickID);
+#else
+	vec2 leftThumbstick=Input_GetGamepadStick(0);
+	vec2 rightThumbstick=Input_GetGamepadStick(1);
+#endif
+
+	camera.moveAxis=Vec3_Clamp(Vec3_Add(Event_GetKeyboardMove(), -leftThumbstick.x, 0.0f, leftThumbstick.y), -1.0f, 1.0f);
+	camera.rotateAxis=Vec3_Clamp(Vec3_Add(Event_GetKeyboardLook(), -rightThumbstick.y, -rightThumbstick.x, 0.0f), -1.0f, 1.0f);
 
 	// VR input update
 	// Check if VR is initialized

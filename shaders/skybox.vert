@@ -68,7 +68,7 @@ layout (binding=0) uniform MainUBO
 {
 	mat4 HMD;
 	mat4 projection;
-    mat4 modelview;
+    mat4 view;
 	mat4 lightMVP;
 	vec4 lightColor;
 	vec4 lightDirection;
@@ -85,6 +85,6 @@ void main()
 {
 	vec3 vPosition=ico[gl_VertexIndex];
 
-	gl_Position=projection*HMD*modelview*vec4(vPosition, 0.0);
+	gl_Position=projection*HMD*view*vec4(vPosition, 0.0);
 	Position=normalize(vPosition);
 }

@@ -18,7 +18,7 @@ layout (binding=3) uniform ubo
 {
 	mat4 HMD;
 	mat4 projection;
-    mat4 modelview;
+    mat4 view;
 	mat4 lightMVP[NUM_CASCADES];
 	vec4 lightColor;
 	vec4 lightDirection;
@@ -65,7 +65,7 @@ void main()
 	}
 
 	oPosition=(iTransform*position).xyz;
-	vec4 worldPosition=modelview*vec4(oPosition, 1.0);
+	vec4 worldPosition=view*vec4(oPosition, 1.0);
 
 	gl_Position=projection*HMD*worldPosition;
 

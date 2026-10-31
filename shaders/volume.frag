@@ -13,7 +13,7 @@ layout(binding=3) uniform MainUBO
 {
 	mat4 HMD;
 	mat4 projection;
-    mat4 modelview;
+    mat4 view;
 	mat4 lightMVP[NUM_CASCADES];
 	vec4 lightColor;
 	vec4 lightDirection;
@@ -146,7 +146,7 @@ void main()
 {
 	const float stepSize=0.01;
 
-	const vec3 eye=inverse(modelview)[3].xyz;
+	const vec3 eye=inverse(view)[3].xyz;
     const vec3 ro=eye/Scale;
     const vec3 rd=normalize(Position-eye);
 

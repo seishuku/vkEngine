@@ -466,11 +466,11 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 
 	struct
 	{
-		matrix modelview;
+		matrix view;
 		matrix projection;
 	} particlePC;
 	
-	particlePC.modelview=MatrixMult(perFrame[index].mainUBO[eye]->view, perFrame[index].mainUBO[eye]->HMD);
+	particlePC.view=MatrixMult(perFrame[index].mainUBO[eye]->view, perFrame[index].mainUBO[eye]->HMD);
 	particlePC.projection=perFrame[index].mainUBO[eye]->projection;
 	
 	//vkuDescriptorSet_UpdateBindingImageInfo(&particleDescriptorSet, 0, &particleTexture);

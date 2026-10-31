@@ -12,7 +12,7 @@ layout (binding=3) uniform MainUBO
 {
 	mat4 HMD;
 	mat4 projection;
-    mat4 modelview;
+    mat4 view;
 	mat4 lightMVP[NUM_CASCADES];
 	vec4 lightColor;
 	vec4 lightDirection;

@@ -1016,7 +1016,7 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	// Copy projection matrix
 	perFrame[index].mainUBO[eye]->projection=projection[eye];
 
-	// Copy modelview matrix
+	// Copy view matrix
 	perFrame[index].mainUBO[eye]->view=view;
 
 	perFrame[index].mainUBO[eye]->HMD=headPose;
@@ -1582,7 +1582,7 @@ void Thread_Physics(void *arg)
 		camera.pivotHeight=Character_GetEyeOffset(&character);
 	}
 
-	// Update camera and modelview matrix
+	// Update camera and view matrix
 	if(playerHealth>0.0f)
 		view=CameraUpdate(&camera, fTimeStep);
 

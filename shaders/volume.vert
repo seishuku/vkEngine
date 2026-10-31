@@ -6,7 +6,7 @@ layout (binding=3) uniform MainUBO
 {
 	mat4 HMD;
 	mat4 projection;
-    mat4 modelview;
+    mat4 view;
 	mat4 lightMVP[NUM_CASCADES];
 	vec4 lightColor;
 	vec4 lightDirection;
@@ -32,7 +32,7 @@ void main()
 	Scale=1500.0;
 	vec3 vPosition=Cube[gl_VertexIndex]*Scale.xxx;
 
-	gl_Position=projection*HMD*modelview*vec4(vPosition, 1.0);
+	gl_Position=projection*HMD*view*vec4(vPosition, 1.0);
 
 	Position=vPosition.xyz;
 }

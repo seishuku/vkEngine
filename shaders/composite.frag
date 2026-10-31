@@ -13,7 +13,7 @@ layout(binding=4) uniform MainUBO
 {
 	mat4 HMD;
 	mat4 projection;
-    mat4 modelview;
+    mat4 view;
 	mat4 lightMVP[NUM_CASCADES];
 	vec4 lightColor;
 	vec4 lightDirection;
@@ -118,12 +118,12 @@ vec4 depth2World()
 	const float viewZ=max(depth, 0.00009);
 
 	const vec4 clipPosition=inverse(projection)*vec4(vec3(UV*2-1, viewZ), 1.0);
-	return inverse(HMD*modelview)*clipPosition/clipPosition.w;
+	return inverse(HMD*view)*clipPosition/clipPosition.w;
 }
 
 void main(void)
 {
-    vec3 ro=inverse(HMD*modelview)[3].xyz;
+    vec3 ro=inverse(HMD*view)[3].xyz;
 
 	vec4 worldPos=depth2World();
 
