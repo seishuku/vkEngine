@@ -278,7 +278,7 @@ void ShadowUpdateMap(VkCommandBuffer commandBuffer, const EntityList_t *entityLi
 		vkCmdSetViewport(commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)shadowSize, (float)shadowSize, 0.0f, 1.0f });
 		vkCmdSetScissor(commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { shadowSize, shadowSize } });
 
-		matrix modelview=perFrame[frameIndex].mainUBO[0]->modelView;
+		matrix modelview=perFrame[frameIndex].mainUBO[0]->view;
 		vec3 lightDir={
 			-perFrame[frameIndex].skyboxUBO[0]->uSunPosition.x,
 			-perFrame[frameIndex].skyboxUBO[0]->uSunPosition.y,

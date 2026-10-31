@@ -38,7 +38,7 @@ void DrawLine(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, vec3 
 		vec4 verts[2];
 	} linePC;
 
-	matrix local=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
+	matrix local=MatrixMult(perFrame[index].mainUBO[eye]->view, perFrame[index].mainUBO[eye]->HMD);
 	linePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
 	linePC.color=color;
 	linePC.verts[0]=Vec4_Vec3(start, 1.0f);

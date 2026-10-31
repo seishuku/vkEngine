@@ -40,7 +40,7 @@ void DrawSphere(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, vec
 	matrix local=MatrixIdentity();
 	local=MatrixMult(local, MatrixScale(radius, radius, radius));
 	local=MatrixMult(local, MatrixTranslatev(position));
-	local=MatrixMult(local, perFrame[index].mainUBO[eye]->modelView);
+	local=MatrixMult(local, perFrame[index].mainUBO[eye]->view);
 	local=MatrixMult(local, perFrame[index].mainUBO[eye]->HMD);
 	spherePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
 	spherePC.color=color;

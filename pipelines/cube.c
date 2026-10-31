@@ -40,7 +40,7 @@ void DrawCube(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, vec3 
 	matrix local=MatrixIdentity();
 	local=MatrixMult(local, MatrixScale(size.x, size.y, size.z));
 	local=MatrixMult(local, MatrixTranslatev(position));
-	local=MatrixMult(local, perFrame[index].mainUBO[eye]->modelView);
+	local=MatrixMult(local, perFrame[index].mainUBO[eye]->view);
 	local=MatrixMult(local, perFrame[index].mainUBO[eye]->HMD);
 	cubePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
 	cubePC.color=color;

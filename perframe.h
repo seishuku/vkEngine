@@ -10,10 +10,12 @@ typedef struct
 {
 	matrix HMD;
 	matrix projection;
-	matrix modelView;
+	matrix view;
+
 	matrix lightMVP[NUM_CASCADES];
 	vec4 lightColor;
 	vec4 lightDirection;
+
 	// Ugh, stupid alignment requirements
 	struct
 	{

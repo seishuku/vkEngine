@@ -470,7 +470,7 @@ void ParticleSystem_Draw(ParticleSystem_t *system, VkCommandBuffer commandBuffer
 		matrix projection;
 	} particlePC;
 	
-	particlePC.modelview=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
+	particlePC.modelview=MatrixMult(perFrame[index].mainUBO[eye]->view, perFrame[index].mainUBO[eye]->HMD);
 	particlePC.projection=perFrame[index].mainUBO[eye]->projection;
 	
 	//vkuDescriptorSet_UpdateBindingImageInfo(&particleDescriptorSet, 0, &particleTexture);

@@ -65,7 +65,7 @@ PerFrame_t perFrame[FRAMES_IN_FLIGHT];
 // Camera data
 Camera_t camera;
 frustum cameraFrustum;
-matrix modelView, projection[2], headPose[2];
+matrix view, projection[2], headPose[2];
 frustum cameraFrustum;
 
 // extern timing data from system main
@@ -510,7 +510,7 @@ static void DrawCameraAxes(VkCommandBuffer commandBuffer, uint32_t index, uint32
 	vec4 up=Vec4_Vec3(camera.up, 1.0f);
 	vec4 right=Vec4_Vec3(camera.right, 1.0f);
 
-	matrix local=MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD);
+	matrix local=MatrixMult(perFrame[index].mainUBO[eye]->view, perFrame[index].mainUBO[eye]->HMD);
 	linePC.mvp=MatrixMult(local, perFrame[index].mainUBO[eye]->projection);
 	linePC.start=position;
 
@@ -810,7 +810,7 @@ void Thread_Main(void *arg)
 			local=MatrixMult(local, QuatToMatrix(body->orientation));
 			local=MatrixMult(local, MatrixTranslatev(body->position));
 			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
-			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->view);
 			cubePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
 			DrawCubePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(cubePC), &cubePC);
@@ -829,7 +829,7 @@ void Thread_Main(void *arg)
 			local=MatrixMult(local, QuatToMatrix(body->orientation));
 			local=MatrixMult(local, MatrixTranslatev(body->position));
 			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
-			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->view);
 			spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
 			DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
@@ -849,7 +849,7 @@ void Thread_Main(void *arg)
 			local=MatrixMult(local, QuatToMatrix(body->orientation));
 			local=MatrixMult(local, MatrixTranslatev(body->position));
 			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
-			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+			local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->view);
 			spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
 			DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
@@ -926,7 +926,7 @@ void Thread_Main(void *arg)
 				local=MatrixMult(local, QuatToMatrix(bodies[i].orientation));
 				local=MatrixMult(local, MatrixTranslatev(bodies[i].position));
 				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
-				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->view);
 				cubePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
 				DrawCubePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(cubePC), &cubePC);
@@ -947,7 +947,7 @@ void Thread_Main(void *arg)
 				local=MatrixMult(local, QuatToMatrix(bodies[i].orientation));
 				local=MatrixMult(local, MatrixTranslatev(bodies[i].position));
 				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
-				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->view);
 				spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
 				DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
@@ -967,7 +967,7 @@ void Thread_Main(void *arg)
 				local=MatrixMult(local, QuatToMatrix(bodies[i].orientation));
 				local=MatrixMult(local, MatrixTranslatev(bodies[i].position));
 				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->HMD);
-				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->modelView);
+				local=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->view);
 				spherePC.mvp=MatrixMult(local, perFrame[data->index].mainUBO[data->eye]->projection);
 
 				DrawSpherePushConstant(data->perFrame[data->index].secCommandBuffer[data->eye], data->index, sizeof(spherePC), &spherePC);
@@ -1017,7 +1017,7 @@ void EyeRender(uint32_t index, uint32_t eye, matrix headPose)
 	perFrame[index].mainUBO[eye]->projection=projection[eye];
 
 	// Copy modelview matrix
-	perFrame[index].mainUBO[eye]->modelView=modelView;
+	perFrame[index].mainUBO[eye]->view=view;
 
 	perFrame[index].mainUBO[eye]->HMD=headPose;
 
@@ -1584,13 +1584,13 @@ void Thread_Physics(void *arg)
 
 	// Update camera and modelview matrix
 	if(playerHealth>0.0f)
-		modelView=CameraUpdate(&camera, fTimeStep);
+		view=CameraUpdate(&camera, fTimeStep);
 
 	for(uint32_t i=0;i<NUM_ENEMY;i++)
 		CameraUpdate(&enemy[i], fTimeStep);
 
 	if(enemyView>=0)
-		modelView=MatrixLookAt(enemy[enemyView].body.position, Vec3_Addv(enemy[enemyView].body.position, enemy[enemyView].forward), enemy[enemyView].up);
+		view=MatrixLookAt(enemy[enemyView].body.position, Vec3_Addv(enemy[enemyView].body.position, enemy[enemyView].forward), enemy[enemyView].up);
 
 	Animation_Update(&animationSystem, fTimeStep, index);
 
@@ -1722,7 +1722,7 @@ void Render(void)
 			rightTriggerOnce=false;
 
 			vec4 rightOrientation=Vec4(rightHandOrientation.x, rightHandOrientation.y, rightHandOrientation.z, rightHandOrientation.w);
-			vec3 direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatToMatrix(rightOrientation), MatrixInverse(modelView)));
+			vec3 direction=Matrix3x3MultVec3(Vec3(0.0f, 0.0f, -1.0f), MatrixMult(QuatToMatrix(rightOrientation), MatrixInverse(view)));
 
 			FireParticleEmitter(Vec3_Addv(camera.body.position, Vec3_Muls(direction, camera.body.radius)), direction);
 		}
@@ -1770,7 +1770,7 @@ void Render(void)
 	ConsoleDraw(&console);
 
 	Audio_SetStreamVolume(0, UI_GetBarGraphValue(&UI, volumeID));
-	Audio_SetListenerModelView(modelView);
+	Audio_SetListenerModelView(view);
 	Audio_SetListenerPosition(camera.body.position);
 
 	UI_UpdateTextTitleTextf(&UI, currentTrack, "Current track: %s", GetCurrentMusicTrack());
@@ -1809,7 +1809,7 @@ void Render(void)
 	// TODO: This create a slight race condition while the physics thread is still running
 	//           and the camera frustum and instance data may have a +/-1 frame delay of stale data.
 	//       Seems ok for now, but may change later.
-	matrix mvp=MatrixMult(MatrixMult(modelView, headPose[0]), projection[0]);
+	matrix mvp=MatrixMult(MatrixMult(view, headPose[0]), projection[0]);
 	frustum cameraFrustum=Frustum_ExtractPlanes(mvp);
 	EntityList_FrustumCull(&entityList, cameraFrustum);
 	EntityList_UpdateInstances(&entityList, index);

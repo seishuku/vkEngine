@@ -37,7 +37,7 @@ void DrawTriangle(VkCommandBuffer commandBuffer, uint32_t index, uint32_t eye, v
 		vec4 verts[3];
 	} trianglePC;
 
-	trianglePC.mvp=MatrixMult(MatrixMult(perFrame[index].mainUBO[eye]->modelView, perFrame[index].mainUBO[eye]->HMD), perFrame[index].mainUBO[eye]->projection);
+	trianglePC.mvp=MatrixMult(MatrixMult(perFrame[index].mainUBO[eye]->view, perFrame[index].mainUBO[eye]->HMD), perFrame[index].mainUBO[eye]->projection);
 	trianglePC.color=color;
 	trianglePC.verts[0]=Vec4_Vec3(verts[0], 1.0f);
 	trianglePC.verts[1]=Vec4_Vec3(verts[1], 1.0f);
