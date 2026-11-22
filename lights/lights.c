@@ -1,267 +1,336 @@
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <float.h>
+#include <math.h>
+#include "../system/system.h"
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
-#include "../system/system.h"
+#include "../model/bmodel.h"
 #include "../utils/id.h"
 #include "../utils/list.h"
+#include "../utils/animation.h"
+#include "../utils/entitylist.h"
+#include "../utils/pipeline.h"
+#include "../assetmanager.h"
+#include "../perframe.h"
 #include "lights.h"
 
 extern VkuContext_t vkContext;
+extern AnimationSystem_t animationSystem;
+
+static const VkFormat shadowDepthFormat=VK_FORMAT_D32_SFLOAT;
+
+#define LIGHTS_HEADER_SIZE 16
+
+static const float faceAxes[6][6]=
+{
+	{  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,  0.0f },	// +X
+	{ -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,  0.0f },	// -X
+	{  0.0f,  1.0f,  0.0f,  0.0f, 0.0f, -1.0f },	// +Y
+	{  0.0f, -1.0f,  0.0f,  0.0f, 0.0f,  1.0f },	// -Y
+	{  0.0f,  0.0f,  1.0f,  0.0f, 1.0f,  0.0f },	// +Z
+	{  0.0f,  0.0f, -1.0f,  0.0f, 1.0f,  0.0f },	// -Z
+};
+
+static float InverseRadius(const float radius)
+{
+	return 1.0f/fmaxf(radius, FLT_EPSILON);
+}
+
+static size_t FindLightIndex(Lights_t *lights, const uint32_t ID)
+{
+	if(lights!=NULL&&ID!=UINT32_MAX)
+	{
+		for(size_t i=0;i<List_GetCount(&lights->lights);i++)
+		{
+			if(((Light_t *)List_GetPointer(&lights->lights, i))->ID==ID)
+				return i;
+		}
+	}
+
+	return SIZE_MAX;
+}
+
+static Light_t *FindLight(Lights_t *lights, const uint32_t ID)
+{
+	const size_t index=FindLightIndex(lights, ID);
+
+	return (index==SIZE_MAX)?NULL:(Light_t *)List_GetPointer(&lights->lights, index);
+}
 
 uint32_t Lights_Add(Lights_t *lights, vec3 position, float radius, vec4 Kd)
 {
 	if(lights==NULL)
 		return UINT32_MAX;
 
-	// Pull the next ID from the global ID count
-	uint32_t ID=ID_Generate(lights->baseID);
+	const uint32_t ID=ID_Generate(lights->baseID);
+
+	if(ID==UINT32_MAX)
+		return UINT32_MAX;
 
 	Light_t light;
 
+	memset(&light, 0, sizeof(Light_t));
+
 	light.ID=ID;
+	light.shadowSlot=-1;
 	light.position=position;
-	light.radius=1.0f/radius;
+	light.radius=InverseRadius(radius);
 	light.Kd=Kd;
 
-	light.spotDirection=Vec4b(0.0f);
-	light.spotOuterCone=0.0f;
-	light.spotInnerCone=0.0f;
-	light.spotExponent=0.0f;
-
-	List_Add(&lights->lights, (void *)&light);
+	if(!List_Add(&lights->lights, &light))
+	{
+		ID_Remove(lights->baseID, ID);
+		return UINT32_MAX;
+	}
 
 	return ID;
 }
 
 void Lights_Del(Lights_t *lights, uint32_t ID)
 {
-	if(lights==NULL&&ID!=UINT32_MAX)
+	const size_t index=FindLightIndex(lights, ID);
+
+	if(index==SIZE_MAX)
 		return;
 
-	for(uint32_t i=0;i<List_GetCount(&lights->lights);i++)
-	{
-		Light_t *light=List_GetPointer(&lights->lights, i);
+	const Light_t *light=List_GetPointer(&lights->lights, index);
 
-		if(light->ID==ID)
-		{
-			List_Del(&lights->lights, i);
-			break;
-		}
-	}
+	if(light->shadowSlot>=0)
+		lights->shadowOwner[light->shadowSlot]=UINT32_MAX;
+
+	List_Del(&lights->lights, index);
+	ID_Remove(lights->baseID, ID);
 }
 
 void Lights_Update(Lights_t *lights, uint32_t ID, vec3 position, float radius, vec4 Kd)
 {
-	if(lights==NULL&&ID!=UINT32_MAX)
-		return;
+	Light_t *light=FindLight(lights, ID);
 
-	for(uint32_t i=0;i<List_GetCount(&lights->lights);i++)
+	if(light)
 	{
-		Light_t *light=List_GetPointer(&lights->lights, i);
-
-		if(light->ID==ID)
-		{
-			light->position=position;
-			light->radius=1.0f/radius;
-			light->Kd=Kd;
-
-			return;
-		}
+		light->position=position;
+		light->radius=InverseRadius(radius);
+		light->Kd=Kd;
 	}
 }
 
 void Lights_UpdatePosition(Lights_t *lights, uint32_t ID, vec3 position)
 {
-	if(lights==NULL&&ID!=UINT32_MAX)
-		return;
+	Light_t *light=FindLight(lights, ID);
 
-	for(uint32_t i=0;i<List_GetCount(&lights->lights);i++)
-	{
-		Light_t *light=List_GetPointer(&lights->lights, i);
-
-		if(light->ID==ID)
-		{
-			light->position=position;
-			return;
-		}
-	}
+	if(light)
+		light->position=position;
 }
 
 void Lights_UpdateRadius(Lights_t *lights, uint32_t ID, float radius)
 {
-	if(lights==NULL&&ID!=UINT32_MAX)
-		return;
+	Light_t *light=FindLight(lights, ID);
 
-	for(uint32_t i=0;i<List_GetCount(&lights->lights);i++)
-	{
-		Light_t *light=List_GetPointer(&lights->lights, i);
-
-		if(light->ID==ID)
-		{
-			light->radius=1.0f/radius;
-			return;
-		}
-	}
+	if(light)
+		light->radius=InverseRadius(radius);
 }
 
 void Lights_UpdateKd(Lights_t *lights, uint32_t ID, vec4 Kd)
 {
-	if(lights==NULL&&ID!=UINT32_MAX)
-		return;
+	Light_t *light=FindLight(lights, ID);
 
-	for(uint32_t i=0;i<List_GetCount(&lights->lights);i++)
-	{
-		Light_t *light=List_GetPointer(&lights->lights, i);
-
-		if(light->ID==ID)
-		{
-			light->Kd=Kd;
-			return;
-		}
-	}
+	if(light)
+		light->Kd=Kd;
 }
 
 void Lights_UpdateSpotlight(Lights_t *lights, uint32_t ID, vec3 direction, float outerCone, float innerCone, float exponent)
 {
-	if(lights==NULL&&ID!=UINT32_MAX)
-		return;
+	Light_t *light=FindLight(lights, ID);
 
-	for(uint32_t i=0;i<List_GetCount(&lights->lights);i++)
+	if(light)
 	{
-		Light_t *light=List_GetPointer(&lights->lights, i);
-
-		if(light->ID==ID)
-		{
-			light->spotDirection=Vec4_Vec3(direction, 0.0f);
-			light->spotOuterCone=outerCone;
-			light->spotInnerCone=innerCone;
-			light->spotExponent=exponent;
-			return;
-		}
+		light->spotDirection=Vec4_Vec3(direction, 0.0f);
+		light->spotOuterCone=outerCone;
+		light->spotInnerCone=innerCone;
+		light->spotExponent=exponent;
 	}
 }
 
-void Lights_UpdateSSBO(Lights_t *lights)
+bool Lights_SetShadow(Lights_t *lights, uint32_t ID, bool enable)
 {
-	static size_t oldSize=0;
+	Light_t *light=FindLight(lights, ID);
 
-	// If over allocated buffer size changed from last time, delete and recreate the buffer.
-	if(oldSize!=lights->lights.bufSize)
+	if(light==NULL)
+		return false;
+
+	if(enable)
 	{
-		oldSize=lights->lights.bufSize;
+		if(light->shadowSlot>=0)
+			return true;
 
-		if(lights->buffer.buffer&&lights->buffer.memory)
+		for(uint32_t i=0;i<lights->numShadows;i++)
 		{
-			vkDeviceWaitIdle(vkContext.device);
+			if(lights->shadowOwner[i]==UINT32_MAX)
+			{
+				lights->shadowOwner[i]=ID;
+				light->shadowSlot=(int32_t)i;
 
-			vkDestroyFramebuffer(vkContext.device, lights->shadowFrameBuffer, VK_NULL_HANDLE);
-			vkuDestroyImageBuffer(&vkContext, &lights->shadowDepth);
-
-			vkuDestroyBuffer(&vkContext, &lights->buffer);
-			vkuCreateHostBuffer(&vkContext, &lights->buffer, (uint32_t)lights->lights.bufSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-
-//			InitShadowCubeMap((uint32_t)(lights->lights.bufSize/lights->lights.stride));
+				return true;
+			}
 		}
+
+		// Every slot is taken
+		return false;
 	}
 
-	// Update buffer
-	if(lights->buffer.memory)
+	if(light->shadowSlot>=0)
 	{
-		if(lights->buffer.memory->mappedPointer!=NULL)
-			memcpy(lights->buffer.memory->mappedPointer, lights->lights.buffer, lights->lights.bufSize);
+		lights->shadowOwner[light->shadowSlot]=UINT32_MAX;
+		light->shadowSlot=-1;
 	}
-}
-
-bool Lights_Init(Lights_t *lights)
-{
-	ID_Init(lights->baseID);
-
-	List_Init(&lights->lights, sizeof(Light_t), 10, NULL);
-
-	vkuCreateHostBuffer(&vkContext, &lights->buffer, (uint32_t)lights->lights.bufSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
 	return true;
 }
 
-void Lights_Destroy(Lights_t *lights)
+static matrix ShadowProjection(const float zNear, const float zFar)
 {
-	// Delete storage buffer and free memory
-	vkuDestroyBuffer(&vkContext, &lights->buffer);
+	matrix projection=MatrixIdentity();
 
-	List_Destroy(&lights->lights);
+	projection.y.y=-1.0f;
+	projection.z.z=-zFar/(zFar-zNear);
+	projection.z.w=-1.0f;
+	projection.w.z=-(zFar*zNear)/(zFar-zNear);
+	projection.w.w=0.0f;
+
+	return projection;
 }
 
-#if 0
-// TODO: Old code for shadow map generation, need to update this still.
-void InitShadowCubeMap(Image_t *Image, uint32_t NumMaps)
+static bool EnsureBuffer(VkuBuffer_t *buffer, uint32_t *currentSize, uint32_t size)
 {
-	VkCommandBuffer CommandBuffer;
-	VkFence Fence;
+	if(size<=*currentSize)
+		return true;
 
-	vkuCreateImageBuffer(&Context, Image,
-		VK_IMAGE_TYPE_2D, ShadowColorFormat, 1, 6*NumMaps, ShadowCubeSize, ShadowCubeSize, 1,
-		VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
+	if(size<*currentSize*2)
+		size=*currentSize*2;
 
-	vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
+	vkuDestroyBuffer(&vkContext, buffer);
+	*currentSize=0;
+
+	if(!vkuCreateHostBuffer(&vkContext, buffer, size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT))
 	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=Context.CommandPool,
-		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount=1,
-	}, &CommandBuffer);
+		// Don't keep half of one
+		vkuDestroyBuffer(&vkContext, buffer);
+		return false;
+	}
 
-	vkBeginCommandBuffer(CommandBuffer, &(VkCommandBufferBeginInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-	});
+	*currentSize=size;
 
-	vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
+	return true;
+}
+
+void Lights_UpdateSSBO(Lights_t *lights, uint32_t frameIndex)
+{
+	if(lights==NULL||frameIndex>=FRAMES_IN_FLIGHT)
+		return;
+
+	const uint32_t count=(uint32_t)List_GetCount(&lights->lights);
+
+	if(!EnsureBuffer(&lights->buffer[frameIndex], &lights->bufferSize[frameIndex], LIGHTS_HEADER_SIZE+count*(uint32_t)sizeof(Light_t)))
+		return;
+
+	uint8_t *dst=(uint8_t *)lights->buffer[frameIndex].memory->mappedPointer;
+
+	if(dst!=NULL)
 	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.image=Image->Image,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
+		memset(dst, 0, LIGHTS_HEADER_SIZE);
+		memcpy(dst, &count, sizeof(count));
+
+		memcpy(dst+LIGHTS_HEADER_SIZE, List_GetBufferPointer(&lights->lights), count*sizeof(Light_t));
+	}
+
+	if(lights->numShadows)
+	{
+		for(size_t i=0;i<List_GetCount(&lights->lights);i++)
+		{
+			const Light_t *light=List_GetPointer(&lights->lights, i);
+
+			if(light->shadowSlot<0)
+				continue;
+
+			const float zFar=1.0f/light->radius;
+			const float zNear=fminf(fmaxf(zFar*0.01f, 0.01f), zFar*0.5f);
+			const matrix projection=ShadowProjection(zNear, zFar);
+
+			for(uint32_t face=0;face<6;face++)
+			{
+				const float *axes=faceAxes[face];
+				const matrix view=MatrixLookAt(light->position, Vec3_Addv(light->position, Vec3(axes[0], axes[1], axes[2])), Vec3(axes[3], axes[4], axes[5]));
+
+				lights->shadowMatrix[light->shadowSlot*6+face]=MatrixMult(view, projection);
+			}
+		}
+
+		if(lights->shadowBuffer[frameIndex].memory&&lights->shadowBuffer[frameIndex].memory->mappedPointer)
+			memcpy(lights->shadowBuffer[frameIndex].memory->mappedPointer, lights->shadowMatrix, sizeof(matrix)*lights->numShadows*6);
+	}
+}
+
+static bool CreateShadowMaps(Lights_t *lights, uint32_t numShadows, uint32_t shadowSize)
+{
+	const uint32_t numLayers=numShadows*6;
+
+	lights->numShadows=numShadows;
+	lights->shadowSize=shadowSize;
+
+	lights->shadowOwner=(uint32_t *)Zone_Malloc(zone, sizeof(uint32_t)*numShadows);
+	lights->shadowMatrix=(matrix *)Zone_Malloc(zone, sizeof(matrix)*numLayers);
+	lights->shadowView=(VkImageView *)Zone_Malloc(zone, sizeof(VkImageView)*numLayers);
+	lights->shadowFrameBuffer=(VkFramebuffer *)Zone_Malloc(zone, sizeof(VkFramebuffer)*numLayers);
+
+	if(!lights->shadowOwner||!lights->shadowMatrix||!lights->shadowView||!lights->shadowFrameBuffer)
+		return false;
+
+	for(uint32_t i=0;i<numShadows;i++)
+		lights->shadowOwner[i]=UINT32_MAX;
+
+	for(uint32_t i=0;i<numLayers;i++)
+		lights->shadowMatrix[i]=MatrixIdentity();
+
+	memset(lights->shadowView, 0, sizeof(VkImageView)*numLayers);
+	memset(lights->shadowFrameBuffer, 0, sizeof(VkFramebuffer)*numLayers);
+
+	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
+	{
+		uint32_t size=0;
+
+		if(!EnsureBuffer(&lights->shadowBuffer[i], &size, sizeof(matrix)*numLayers))
+			return false;
+	}
+
+	if(!vkuCreateImageBuffer(&vkContext, &lights->shadowDepth, VK_IMAGE_TYPE_2D, shadowDepthFormat, 1, numLayers, shadowSize, shadowSize, 1, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0))
+		return false;
+
+	vkCreateImageView(vkContext.device, &(VkImageViewCreateInfo)
+	{
+		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+		.image=lights->shadowDepth.image,
+		.viewType=VK_IMAGE_VIEW_TYPE_2D_ARRAY,
+		.format=shadowDepthFormat,
+		.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
+		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
 		.subresourceRange.baseMipLevel=0,
 		.subresourceRange.levelCount=1,
-		.subresourceRange.layerCount=6*NumMaps,
-		.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT|VK_ACCESS_TRANSFER_WRITE_BIT,
-		.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-		.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-	});
+		.subresourceRange.baseArrayLayer=0,
+		.subresourceRange.layerCount=numLayers,
+	}, NULL, &lights->shadowDepth.imageView);
 
-	vkEndCommandBuffer(CommandBuffer);
-		
-	// Create a fence for the queue submit
-	vkCreateFence(Context.Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &Fence);
+	VkCommandBuffer commandBuffer=vkuOneShotCommandBufferBegin(&vkContext);
+	for(uint32_t i=0;i<numLayers;i++)
+		vkuTransitionLayout(commandBuffer, lights->shadowDepth.image, 1, 0, 1, i, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkuOneShotCommandBufferEnd(&vkContext, commandBuffer);
 
-	// Submit commands to the queue
-	vkQueueSubmit(Context.Queue, 1, &(VkSubmitInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.commandBufferCount=1,
-		.pCommandBuffers=&CommandBuffer,
-	}, Fence);
-
-	// Wait for the queue submit to finish
-	vkWaitForFences(Context.Device, 1, &Fence, VK_TRUE, UINT64_MAX);
-
-	// Destroy fence
-	vkDestroyFence(Context.Device, Fence, VK_NULL_HANDLE);
-
-	vkFreeCommandBuffers(Context.Device, Context.CommandPool, 1, &CommandBuffer);
-
-	vkCreateSampler(Context.Device, &(VkSamplerCreateInfo)
+	// Need compare ops
+	vkCreateSampler(vkContext.device, &(VkSamplerCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-		.maxAnisotropy=1.0f,
 		.magFilter=VK_FILTER_LINEAR,
 		.minFilter=VK_FILTER_LINEAR,
 		.mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR,
@@ -269,403 +338,242 @@ void InitShadowCubeMap(Image_t *Image, uint32_t NumMaps)
 		.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.mipLodBias=0.0f,
-		.compareOp=VK_COMPARE_OP_NEVER,
+		.compareOp=VK_COMPARE_OP_LESS_OR_EQUAL,
+		.compareEnable=VK_TRUE,
 		.minLod=0.0f,
 		.maxLod=1.0f,
-		.maxAnisotropy=1.0,
+		.maxAnisotropy=1.0f,
 		.anisotropyEnable=VK_FALSE,
 		.borderColor=VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-	}, VK_NULL_HANDLE, &Image->Sampler);
+	}, VK_NULL_HANDLE, &lights->shadowDepth.sampler);
 
-	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.viewType=VK_IMAGE_VIEW_TYPE_CUBE_ARRAY,
-		.format=ShadowColorFormat,
-		.components.r={ VK_COMPONENT_SWIZZLE_R },
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.baseArrayLayer=0,
-		.subresourceRange.layerCount=6*NumMaps,
-		.subresourceRange.levelCount=1,
-		.image=Image->Image,
-	}, VK_NULL_HANDLE, &Image->View);
-}
-
-void InitShadowFramebuffer(void)
-{
-	VkCommandBuffer CommandBuffer;
-	VkFence Fence;
-
-	// Color
-	vkuCreateImageBuffer(&Context, &ShadowColor,
-		VK_IMAGE_TYPE_2D, ShadowColorFormat, 1, 1, ShadowCubeSize, ShadowCubeSize, 1,
-		VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		0);
-
-	// Depth
-	vkuCreateImageBuffer(&Context, &ShadowDepth,
-		VK_IMAGE_TYPE_2D, ShadowDepthFormat, 1, 1, ShadowCubeSize, ShadowCubeSize, 1,
-		VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		0);
-
-	vkAllocateCommandBuffers(Context.Device, &(VkCommandBufferAllocateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool=Context.CommandPool,
-		.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount=1,
-	}, &CommandBuffer);
-
-	vkBeginCommandBuffer(CommandBuffer, &(VkCommandBufferBeginInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-	});
-
-	vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.image=ShadowColor.Image,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.levelCount=1,
-		.subresourceRange.layerCount=1,
-		.srcAccessMask=0,
-		.dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-		.newLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-	});
-
-	vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-		.image=ShadowDepth.Image,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.levelCount=1,
-		.subresourceRange.layerCount=1,
-		.srcAccessMask=0,
-		.dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-		.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-		.newLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-	});
-
-	vkEndCommandBuffer(CommandBuffer);
-		
-	// Create a fence for the queue submit
-	vkCreateFence(Context.Device, &(VkFenceCreateInfo) {.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags=0 }, VK_NULL_HANDLE, &Fence);
-
-	// Submit commands to the queue
-	vkQueueSubmit(Context.Queue, 1, &(VkSubmitInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.commandBufferCount=1,
-		.pCommandBuffers=&CommandBuffer,
-	}, Fence);
-
-	// Wait for the queue submit to finish
-	vkWaitForFences(Context.Device, 1, &Fence, VK_TRUE, UINT64_MAX);
-
-	// Destroy fence
-	vkDestroyFence(Context.Device, Fence, VK_NULL_HANDLE);
-
-	vkFreeCommandBuffers(Context.Device, Context.CommandPool, 1, &CommandBuffer);
-
-	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.viewType=VK_IMAGE_VIEW_TYPE_2D,
-		.format=ShadowColorFormat,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.baseArrayLayer=0,
-		.subresourceRange.layerCount=1,
-		.subresourceRange.levelCount=1,
-		.image=ShadowColor.Image,
-	}, VK_NULL_HANDLE, &ShadowColor.View);
-
-	vkCreateImageView(Context.Device, &(VkImageViewCreateInfo)
-	{
-		.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.viewType=VK_IMAGE_VIEW_TYPE_2D,
-		.format=ShadowDepthFormat,
-		.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
-		.subresourceRange.baseMipLevel=0,
-		.subresourceRange.baseArrayLayer=0,
-		.subresourceRange.layerCount=1,
-		.subresourceRange.levelCount=1,
-		.image=ShadowDepth.Image,
-	}, VK_NULL_HANDLE, &ShadowDepth.View);
-
-	vkCreateRenderPass(Context.Device, &(VkRenderPassCreateInfo)
+	// Same depth only render pass the cascaded shadows use, a face is cleared, rendered into, then left readable
+	vkCreateRenderPass(vkContext.device, &(VkRenderPassCreateInfo)
 	{
 		.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-		.attachmentCount=2,
+		.attachmentCount=1,
 		.pAttachments=(VkAttachmentDescription[])
 		{
 			{
-				.format=ShadowColorFormat,
+				.format=shadowDepthFormat,
 				.samples=VK_SAMPLE_COUNT_1_BIT,
 				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
 				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
 				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			},
-			{
-				.format=ShadowDepthFormat,
-				.samples=VK_SAMPLE_COUNT_1_BIT,
-				.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR,
-				.storeOp=VK_ATTACHMENT_STORE_OP_STORE,
-				.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-				.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				.finalLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			},
 		},
 		.subpassCount=1,
 		.pSubpasses=&(VkSubpassDescription)
 		{
 			.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS,
-			.colorAttachmentCount=1,
-			.pColorAttachments=&(VkAttachmentReference)
-			{
-				.attachment=0,
-				.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			},
 			.pDepthStencilAttachment=&(VkAttachmentReference)
 			{
-				.attachment=1,
+				.attachment=0,
 				.layout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 			},
 		},
-	}, 0, &ShadowRenderPass);
+		.dependencyCount=2,
+		.pDependencies=(VkSubpassDependency[])
+		{
+			{
+				.srcSubpass=VK_SUBPASS_EXTERNAL,
+				.dstSubpass=0,
+				.srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+				.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
+			},
+			{
+				.srcSubpass=0,
+				.dstSubpass=VK_SUBPASS_EXTERNAL,
+				.srcStageMask=VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+				.dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				.srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+				.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
+				.dependencyFlags=VK_DEPENDENCY_BY_REGION_BIT,
+			},
+		}
+	}, 0, &lights->shadowRenderPass);
 
-	vkCreateFramebuffer(Context.Device, &(VkFramebufferCreateInfo)
+	// A view and framebuffer for every face, to render into one at a time
+	for(uint32_t i=0;i<numLayers;i++)
 	{
-		.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-		.renderPass=ShadowRenderPass,
-		.attachmentCount=2,
-		.pAttachments=(VkImageView[]) { ShadowColor.View, ShadowDepth.View },
-		.width=ShadowCubeSize,
-		.height=ShadowCubeSize,
-		.layers=1,
-	}, 0, &ShadowFrameBuffer);
+		vkCreateImageView(vkContext.device, &(VkImageViewCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.image=lights->shadowDepth.image,
+			.viewType=VK_IMAGE_VIEW_TYPE_2D,
+			.format=shadowDepthFormat,
+			.components={ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
+			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT,
+			.subresourceRange.baseMipLevel=0,
+			.subresourceRange.levelCount=1,
+			.subresourceRange.baseArrayLayer=i,
+			.subresourceRange.layerCount=1,
+		}, NULL, &lights->shadowView[i]);
+
+		vkCreateFramebuffer(vkContext.device, &(VkFramebufferCreateInfo)
+		{
+			.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+			.renderPass=lights->shadowRenderPass,
+			.attachmentCount=1,
+			.pAttachments=(VkImageView[]){ lights->shadowView[i] },
+			.width=shadowSize,
+			.height=shadowSize,
+			.layers=1,
+		}, 0, &lights->shadowFrameBuffer[i]);
+	}
+
+	return CreatePipeline(&vkContext, &lights->shadowPipeline, lights->shadowRenderPass, "assets/pipelines/shadow.pipeline");
 }
 
-bool InitShadowPipeline(void)
+bool Lights_Init(Lights_t *lights, uint32_t numShadows, uint32_t shadowSize)
 {
-	vkCreatePipelineLayout(Context.Device, &(VkPipelineLayoutCreateInfo)
+	if(lights==NULL)
+		return false;
+
+	memset(lights, 0, sizeof(Lights_t));
+
+	ID_Init(lights->baseID);
+
+	if(!List_Init(&lights->lights, sizeof(Light_t), 16, NULL))
+		return false;
+
+	// Room for a few lights to start, the buffers grow when they're needed
+	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 	{
-		.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.pushConstantRangeCount=1,
-		.pPushConstantRanges=&(VkPushConstantRange)
+		if(!EnsureBuffer(&lights->buffer[i], &lights->bufferSize[i], LIGHTS_HEADER_SIZE+16*sizeof(Light_t)))
 		{
-			.offset=0,
-			.size=sizeof(shadow_ubo),
-			.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
-		},		
-	}, 0, &ShadowPipelineLayout);
+			Lights_Destroy(lights);
+			return false;
+		}
+	}
 
-	vkuInitPipeline(&ShadowPipeline, &Context);
-
-	vkuPipeline_SetPipelineLayout(&ShadowPipeline, ShadowPipelineLayout);
-	vkuPipeline_SetRenderPass(&ShadowPipeline, ShadowRenderPass);
-
-	// Add in vertex shader
-	if(!vkuPipeline_AddStage(&ShadowPipeline, "./shaders/distance.vert.spv", VK_SHADER_STAGE_VERTEX_BIT))
+	if(numShadows&&!CreateShadowMaps(lights, numShadows, shadowSize))
+	{
+		Lights_Destroy(lights);
 		return false;
-
-	// Add in fragment shader
-	if(!vkuPipeline_AddStage(&ShadowPipeline, "./shaders/distance.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT))
-		return false;
-
-	// Set states that are different than defaults
-	ShadowPipeline.CullMode=VK_CULL_MODE_FRONT_BIT;
-	ShadowPipeline.DepthTest=VK_TRUE;
-
-	// Add vertex binding and attrib parameters
-	vkuPipeline_AddVertexBinding(&ShadowPipeline, 0, sizeof(float)*20, VK_VERTEX_INPUT_RATE_VERTEX);
-	vkuPipeline_AddVertexAttribute(&ShadowPipeline, 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-
-	// Assemble the pipeline
-	if(!vkuAssemblePipeline(&ShadowPipeline))
-		return false;
+	}
 
 	return true;
 }
 
-void ShadowUpdateCubemap(VkCommandBuffer CommandBuffer, Image_t Shadow, uint32_t i, vec4 Pos)
+void Lights_Destroy(Lights_t *lights)
 {
-	MatrixIdentity(Projection);
-	MatrixInfPerspective(90.0f, 1.0f, 0.01f, false, Projection);
+	if(lights==NULL)
+		return;
 
-	for(uint32_t face=0;face<6;face++)
+	vkDeviceWaitIdle(vkContext.device);
+
+	for(uint32_t i=0;i<FRAMES_IN_FLIGHT;i++)
 	{
-		switch(face)
+		vkuDestroyBuffer(&vkContext, &lights->buffer[i]);
+		vkuDestroyBuffer(&vkContext, &lights->shadowBuffer[i]);
+	}
+
+	if(lights->numShadows)
+	{
+		for(uint32_t i=0;i<lights->numShadows*6;i++)
 		{
-			case 0:
-				MatrixIdentity(ModelView);
-				MatrixLookAt(Pos, (vec3) { Pos[0]+1.0f, Pos[1]+0.0f, Pos[2]+0.0f }, (vec3) { 0.0f, -1.0f, 0.0f }, ModelView);
-				break;
-			case 1:
-				MatrixIdentity(ModelView);
-				MatrixLookAt(Pos, (vec3) { Pos[0]-1.0f, Pos[1]+0.0f, Pos[2]+0.0f }, (vec3) { 0.0f, -1.0f, 0.0f }, ModelView);
-				break;
-			case 2:
-				MatrixIdentity(ModelView);
-				MatrixLookAt(Pos, (vec3) { Pos[0]+0.0f, Pos[1]+1.0f, Pos[2]+0.0f }, (vec3) { 0.0f, 0.0f, 1.0f }, ModelView);
-				break;
-			case 3:
-				MatrixIdentity(ModelView);
-				MatrixLookAt(Pos, (vec3) { Pos[0]+0.0f, Pos[1]-1.0f, Pos[2]+0.0f }, (vec3) { 0.0f, 0.0f, -1.0f }, ModelView);
-				break;
-			case 4:
-				MatrixIdentity(ModelView);
-				MatrixLookAt(Pos, (vec3) { Pos[0]+0.0f, Pos[1]+0.0f, Pos[2]+1.0f }, (vec3) { 0.0f, -1.0f, 0.0f }, ModelView);
-				break;
-			case 5:
-				MatrixIdentity(ModelView);
-				MatrixLookAt(Pos, (vec3) { Pos[0]+0.0f, Pos[1]+0.0f, Pos[2]-1.0f }, (vec3) { 0.0f, -1.0f, 0.0f }, ModelView);
-				break;
+			if(lights->shadowView)
+				vkDestroyImageView(vkContext.device, lights->shadowView[i], VK_NULL_HANDLE);
+
+			if(lights->shadowFrameBuffer)
+				vkDestroyFramebuffer(vkContext.device, lights->shadowFrameBuffer[i], VK_NULL_HANDLE);
 		}
 
-		MatrixMult(ModelView, Projection, shadow_ubo.mvp);
+		vkuDestroyImageBuffer(&vkContext, &lights->shadowDepth);
 
-		Vec4_Setv(shadow_ubo.Light_Pos, Pos);
+		DestroyPipeline(&vkContext, &lights->shadowPipeline);
+		vkDestroyRenderPass(vkContext.device, lights->shadowRenderPass, VK_NULL_HANDLE);
 
-		vkCmdBeginRenderPass(CommandBuffer, &(VkRenderPassBeginInfo)
+		Zone_Free(zone, lights->shadowOwner);
+		Zone_Free(zone, lights->shadowMatrix);
+		Zone_Free(zone, lights->shadowView);
+		Zone_Free(zone, lights->shadowFrameBuffer);
+	}
+
+	if(lights->lights.buffer)
+		List_Destroy(&lights->lights);
+
+	memset(lights, 0, sizeof(Lights_t));
+}
+
+void Lights_UpdateShadowMaps(Lights_t *lights, VkCommandBuffer commandBuffer, const EntityList_t *entityList, uint32_t frameIndex, VkDescriptorPool descriptorPool)
+{
+	if(lights==NULL||lights->numShadows==0||frameIndex>=FRAMES_IN_FLIGHT)
+		return;
+
+	bool descriptorReady=false;
+
+	for(size_t i=0;i<List_GetCount(&lights->lights);i++)
+	{
+		const Light_t *light=List_GetPointer(&lights->lights, i);
+
+		if(light->shadowSlot<0)
+			continue;
+
+		// Skinned models need the bone palette, it's the same for every face so it's set up once, and only if something casts a shadow
+		if(!descriptorReady)
 		{
-			.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-			.renderPass=ShadowRenderPass,
-			.framebuffer=ShadowFrameBuffer,
-			.clearValueCount=2,
-			.pClearValues=(VkClearValue[]) { { 0.0f, 0.0f, 0.0f, 1.0f }, { 1.0f, 0 } },
-			.renderArea.offset=(VkOffset2D) { 0, 0 },
-			.renderArea.extent=(VkExtent2D)	{ ShadowCubeSize, ShadowCubeSize },
-		}, VK_SUBPASS_CONTENTS_INLINE);
+			vkuDescriptorSet_UpdateBindingBufferInfo(&lights->shadowPipeline.descriptorSet, 0, animationSystem.perFrame[frameIndex].paletteBuffer.buffer, 0, VK_WHOLE_SIZE);
+			vkuAllocateUpdateDescriptorSet(&lights->shadowPipeline.descriptorSet, descriptorPool);
 
-		vkCmdPushConstants(CommandBuffer, ShadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shadow_ubo), &shadow_ubo);
+			descriptorReady=true;
+		}
 
-		// Bind the pipeline descriptor, this sets the pipeline states (blend, depth/stencil tests, etc)
-		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, ShadowPipeline.Pipeline);
-
-		vkCmdSetViewport(CommandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)ShadowCubeSize, (float)ShadowCubeSize, 0.0f, 1.0f });
-		vkCmdSetScissor(CommandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { ShadowCubeSize, ShadowCubeSize } });
-
-		// Draw the models
-		for(uint32_t i=0;i<NUM_MODELS;i++)
+		for(uint32_t face=0;face<6;face++)
 		{
-			// Bind model data buffers and draw the triangles
-			for(int32_t j=0;j<Model[i].NumMesh;j++)
+			const uint32_t layer=light->shadowSlot*6+face;
+
+			vkCmdBeginRenderPass(commandBuffer, &(VkRenderPassBeginInfo)
 			{
-				vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &Model[i].Mesh[j].Buffer, &(VkDeviceSize) { 0 });
-				vkCmdBindIndexBuffer(CommandBuffer, Model[i].Mesh[j].IndexBuffer, 0, VK_INDEX_TYPE_UINT16);
-				vkCmdDrawIndexed(CommandBuffer, Model[i].Mesh[j].NumFace*3, 1, 0, 0, 0);
+				.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+				.renderPass=lights->shadowRenderPass,
+				.framebuffer=lights->shadowFrameBuffer[layer],
+				.clearValueCount=1,
+				.pClearValues=(VkClearValue[]){ {{{ 1.0f, 0 }}} },
+				.renderArea.offset=(VkOffset2D){ 0, 0 },
+				.renderArea.extent=(VkExtent2D){ lights->shadowSize, lights->shadowSize },
+			}, VK_SUBPASS_CONTENTS_INLINE);
+
+			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, lights->shadowPipeline.pipeline.pipeline);
+
+			vkCmdSetViewport(commandBuffer, 0, 1, &(VkViewport) { 0.0f, 0.0f, (float)lights->shadowSize, (float)lights->shadowSize, 0.0f, 1.0f });
+			vkCmdSetScissor(commandBuffer, 0, 1, &(VkRect2D) { { 0, 0 }, { lights->shadowSize, lights->shadowSize } });
+
+			vkCmdPushConstants(commandBuffer, lights->shadowPipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(matrix), &lights->shadowMatrix[layer]);
+
+			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, lights->shadowPipeline.pipelineLayout, 0, 1, &lights->shadowPipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
+
+			// Draw entity batches
+			for(uint32_t b=0;b<entityList->batchCount;b++)
+			{
+				const EntityBatch_t *batch=&entityList->batches[b];
+
+				if(batch->noRender)
+					continue;
+
+				const BModel_t *model=&AssetManager_GetAsset(assets, batch->modelID)->model;
+
+				vkCmdBindVertexBuffers(commandBuffer, 0, 1, &model->vertexBuffer.buffer, &(VkDeviceSize){0});
+
+				// Offset the instance buffer binding to the start of this batch
+				VkDeviceSize instanceOffset=sizeof(EntityInstance_t)*batch->instanceOffset;
+				vkCmdBindVertexBuffers(commandBuffer, 1, 1, &entityList->perFrame[frameIndex].instanceBuffer.buffer, &instanceOffset);
+
+				for(uint32_t m=0;m<model->numMesh;m++)
+				{
+					vkCmdBindIndexBuffer(commandBuffer, model->mesh[m].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+					vkCmdDrawIndexed(commandBuffer, model->mesh[m].numFace*3, batch->instanceCount, 0, 0, 0);
+				}
 			}
+
+			vkCmdEndRenderPass(commandBuffer);
 		}
-
-		vkCmdEndRenderPass(CommandBuffer);
-
-		// Change frame buffer image layout to source transfer
-		vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=ShadowColor.Image,
-			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.subresourceRange.baseMipLevel=0,
-			.subresourceRange.baseArrayLayer=0,
-			.subresourceRange.levelCount=1,
-			.subresourceRange.layerCount=1,
-			.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-			.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			.newLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		});
-
-		// Change cubemap texture image face to transfer destination
-		vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=Shadow.Image,
-			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.subresourceRange.baseMipLevel=0,
-			.subresourceRange.baseArrayLayer=6*i+face,
-			.subresourceRange.levelCount=1,
-			.subresourceRange.layerCount=1,
-			.srcAccessMask=VK_ACCESS_SHADER_READ_BIT,
-			.dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		});
-
-		// Copy image from framebuffer to cube face
-		vkCmdCopyImage(CommandBuffer, ShadowColor.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Shadow.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &(VkImageCopy)
-		{
-			.srcSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.srcSubresource.baseArrayLayer=0,
-			.srcSubresource.mipLevel=0,
-			.srcSubresource.layerCount=1,
-			.srcOffset={ 0, 0, 0 },
-			.dstSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.dstSubresource.baseArrayLayer=6*i+face,
-			.dstSubresource.mipLevel=0,
-			.dstSubresource.layerCount=1,
-			.dstOffset={ 0, 0, 0 },
-			.extent.width=ShadowCubeSize,
-			.extent.height=ShadowCubeSize,
-			.extent.depth=1,
-		});
-
-		// Change frame buffer image layout back to color arrachment
-		vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=ShadowColor.Image,
-			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.subresourceRange.baseMipLevel=0,
-			.subresourceRange.baseArrayLayer=0,
-			.subresourceRange.levelCount=1,
-			.subresourceRange.layerCount=1,
-			.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT,
-			.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-			.newLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		});
-
-		// Change cubemap texture image face back to shader read-only (for use in the main render shader)
-		vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &(VkImageMemoryBarrier)
-		{
-			.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
-			.image=Shadow.Image,
-			.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT,
-			.subresourceRange.baseMipLevel=0,
-			.subresourceRange.baseArrayLayer=6*i+face,
-			.subresourceRange.levelCount=1,
-			.subresourceRange.layerCount=1,
-			.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
-			.dstAccessMask=VK_ACCESS_SHADER_READ_BIT,
-			.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		});
 	}
 }
-#endif

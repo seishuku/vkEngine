@@ -28,6 +28,7 @@ set(PROJECT_SOURCES
 	"image/qoi.c"
 	"image/tga.c"
 	"input/input.c"
+	"lights/lights.c"
 	"math/frustum.c"
 	"math/math.c"
 	"math/matrix.c"

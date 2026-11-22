@@ -4,20 +4,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <float.h>
-#include "assetmanager.h"
 #include "audio/audio.h"
 #include "audio/music.h"
 #include "audio/sfx.h"
 #include "camera/camera.h"
 #include "console/console.h"
-#include "utils/entitylist.h"
 #include "font/font.h"
 #include "game/asteroids.h"
 #include "game/character.h"
 #include "game/enemy.h"
 #include "image/image.h"
 #include "input/input.h"
-#include "utils/loadingscreen.h"
+#include "lights/lights.h"
 #include "math/math.h"
 #include "model/banim.h"
 #include "model/bmodel.h"
@@ -40,13 +38,16 @@
 #include "system/threads.h"
 #include "ui/ui.h"
 #include "utils/animation.h"
-#include "utils/ik.h"
 #include "utils/bvh.h"
+#include "utils/entitylist.h"
 #include "utils/event.h"
+#include "utils/ik.h"
 #include "utils/list.h"
+#include "utils/loadingscreen.h"
 #include "utils/precorder.h"
 #include "vr/vr.h"
 #include "vulkan/vulkan.h"
+#include "assetmanager.h"
 
 #include "assembly.h"
 
@@ -96,6 +97,10 @@ VkuSwapchain_t swapchain;
 VkuImage_t colorImage[2];
 VkuImage_t depthImage[2];
 VkFramebuffer framebuffer[2];
+
+Lights_t lights;
+uint32_t lightTest=UINT32_MAX;
+uint32_t lightBall=UINT32_MAX;
 
 EntityList_t entityList;
 
@@ -1630,6 +1635,18 @@ static void PrintEnemyStats(const Enemy_t *enemy, float x, float y)
 	);
 }
 
+static vec3 GetBonePosition(const BModel_t *model, const BAnim_BoneFrame_t *boneFrame, const char *boneName)
+{
+	for(uint32_t b=0;b<model->numBone;b++)
+	{
+		if(strcmp(model->bone[b].name, boneName)==0)
+			return boneFrame[b].position;
+//		model->bone[b].orientation;
+	}
+
+	return Vec3b(0.0f);
+}
+
 // Render call from system main event loop
 void Render(void)
 {
@@ -1757,6 +1774,13 @@ void Render(void)
 		.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 	});
+
+	Lights_UpdatePosition(&lights, lightTest, Vec3_Addv(character.body.position, Vec3_Muls(character.facing, 2.0f)));
+	Lights_UpdateSpotlight(&lights, lightTest, character.facing, cosf(deg2rad(30.0f)), cosf(deg2rad(20.0f)), 0.0f);
+	Lights_UpdatePosition(&lights, lightBall, bodies[BODY_HANGING_BALL].position);
+
+	Lights_UpdateSSBO(&lights, index);
+	Lights_UpdateShadowMaps(&lights, perFrame[index].commandBuffer, &entityList, index, perFrame[index].descriptorPool);
 
 	// Update shadow depth map
 	ShadowUpdateMap(perFrame[index].commandBuffer, &entityList, index, perFrame[index].descriptorPool);
@@ -2079,6 +2103,12 @@ bool Init(void)
 	// Create skybox pipeline
 	CreateSkyboxPipeline();
 	LoadingScreenAdvance(&loadingScreen);
+
+	Lights_Init(&lights, 3, 128);
+	lightTest=Lights_Add(&lights, Vec3b(0.0f), 300.0f, Vec4(1.0f, 0.0f, 0.0f, 1.0f));
+	lightBall=Lights_Add(&lights, bodies[BODY_HANGING_BALL].position, bodies[BODY_HANGING_BALL].radius*8.0f, Vec4(5.0f, 0.0f, 5.0f, 1.0f));
+
+	Lights_SetShadow(&lights, lightTest, true);
 
 	GenerateWorld();
 
