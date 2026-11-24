@@ -11,6 +11,7 @@
 #define ANIM_MAX_ANIMATORS		512
 #define ANIM_MAX_BONE			128
 #define ANIM_MAX_PALETTE		(ANIM_MAX_ANIMATORS*32)
+#define ANIM_MAX_POSTPOSE_PROC	8
 
 // Crossfade time in seconds when the clip changes
 #define ANIM_BLEND_TIME			0.2f
@@ -41,8 +42,9 @@ struct Animator_s
 	void *onFinishUserData;
 	bool finished;
 
-	AnimatorPostPoseFunc_t postPose;
-	void *postPoseUserData;
+	uint32_t numPostPose;
+	AnimatorPostPoseFunc_t postPose[ANIM_MAX_POSTPOSE_PROC];
+	void *postPoseUserData[ANIM_MAX_POSTPOSE_PROC];
 
 	uint32_t paletteOffset;
 };
@@ -76,7 +78,9 @@ Animator_t *Animation_Get(AnimationSystem_t *system, uint32_t handle);
 void Animator_Play(Animator_t *animator, const BAnim_t *clip, bool loop);
 void Animator_Stop(Animator_t *animator);
 void Animator_SetOnFinish(Animator_t *animator, AnimatorCallback_t callback, void *userData);
-void Animator_SetPostPose(Animator_t *animator, AnimatorPostPoseFunc_t callback, void *userData);
+
+void Animator_AddPostPose(Animator_t *animator, AnimatorPostPoseFunc_t callback, void *userData);
+void Animator_ClearPostPose(Animator_t *animator);
 
 void Animation_Update(AnimationSystem_t *system, float dt, uint32_t frameIndex);
 

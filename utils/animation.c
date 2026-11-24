@@ -137,13 +137,27 @@ void Animator_SetOnFinish(Animator_t *animator, AnimatorCallback_t callback, voi
 	animator->onFinishUserData=userData;
 }
 
-void Animator_SetPostPose(Animator_t *animator, AnimatorPostPoseFunc_t callback, void *userData)
+void Animator_AddPostPose(Animator_t *animator, AnimatorPostPoseFunc_t callback, void *userData)
 {
 	if(!animator)
 		return;
 
-	animator->postPose=callback;
-	animator->postPoseUserData=userData;
+	if(animator->numPostPose>=ANIM_MAX_POSTPOSE_PROC)
+		return;
+
+	animator->postPose[animator->numPostPose]=callback;
+	animator->postPoseUserData[animator->numPostPose]=userData;
+	animator->numPostPose++;
+}
+
+void Animator_ClearPostPose(Animator_t *animator)
+{
+	if(!animator)
+		return;
+
+	memset(animator->postPose, 0, sizeof(animator->postPose));
+	memset(animator->postPoseUserData, 0, sizeof(animator->postPoseUserData));
+	animator->numPostPose=0;
 }
 
 static void BindPose(const BModel_t *model, BAnim_BoneFrame_t *out)
@@ -275,8 +289,11 @@ void Animation_Update(AnimationSystem_t *system, float dt, uint32_t frameIndex)
 		memcpy(animator->lastPose, system->pose, sizeof(BAnim_BoneFrame_t)*numBone);
 		animator->hasPose=true;
 
-		if(animator->postPose)
-			animator->postPose(animator, system->pose, dt, animator->postPoseUserData);
+		for(uint32_t i=0;i<animator->numPostPose;i++)
+		{
+			if(animator->postPose[i])
+				animator->postPose[i](animator, system->pose, dt, animator->postPoseUserData[i]);
+		}
 
 		for(uint32_t b=0;b<numBone;b++)
 		{

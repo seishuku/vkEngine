@@ -445,10 +445,10 @@ RigidBody_t bodies[BODY_COUNT] =
 		.position = { 23.f, -38.f, -12.f },
 		.velocity = { 0.0f, 0.0f, 0.0f },
 		.force = { 0.0f, 0.0f, 0.0f },
-		.mass = 0.001f, .invMass = 1000.f,
+		.mass = 0.01f, .invMass = 100.f,
 		.orientation = { 0.f, 0.f, 0.f, 1.f }, /* xyzw */
 		.angularVelocity = { 0.0f, 0.0f, 0.0f },
-		.inertia = 0.1f, .invInertia = 10.f,
+		.inertia = 0.01f, .invInertia = 100.f,
 		.restitution = 0.8f,
 		.friction = 0.5f,
 		.type = RIGIDBODY_SPHERE,

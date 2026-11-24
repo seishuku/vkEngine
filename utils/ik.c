@@ -298,10 +298,7 @@ void IK_Init(IK_t *ik, Animator_t *animator)
 	ik->weight=1.0f;
 
 	if(animator)
-	{
-		animator->postPose=PostPose;
-		animator->postPoseUserData=ik;
-	}
+		Animator_AddPostPose(animator, PostPose, ik);
 }
 
 static int32_t FindBone(const BModel_t *model, const char *name)

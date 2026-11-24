@@ -99,7 +99,8 @@ VkuImage_t depthImage[2];
 VkFramebuffer framebuffer[2];
 
 Lights_t lights;
-uint32_t lightTest=UINT32_MAX;
+uint32_t lightTest1=UINT32_MAX;
+uint32_t lightTest2=UINT32_MAX;
 uint32_t lightBall=UINT32_MAX;
 
 EntityList_t entityList;
@@ -347,6 +348,51 @@ static bool CharacterFootTarget(IK_t *ik, uint32_t chain, const vec3 chainTip, I
 	return true;
 }
 
+typedef struct
+{
+    const char *boneName;
+    matrix modelToWorld; // Refresh before Animation_Update each frame
+	vec4 modelOrientation;
+    vec3 position;
+	vec4 orientation;
+    bool found;
+} BoneQuery_t;
+
+static uint32_t numBoneQuery=2;
+static BoneQuery_t handBone[2];
+
+static void FindBonePosition(Animator_t *animator, BAnim_BoneFrame_t *pose, float dt, void *userData)
+{
+    (void)dt;
+    BoneQuery_t *query=userData;
+    const BModel_t *model=animator->model;
+    matrix world[ANIM_MAX_BONE];
+
+	for(uint32_t n=0;n<numBoneQuery;n++)
+	{
+		query[n].found=false;
+
+		for(uint32_t i=0;i<model->numBone;i++)
+		{
+			matrix local=MatrixMult(QuatToMatrix(pose[i].orientation), MatrixTranslatev(pose[i].position));
+			int32_t parent=model->bone[i].parent;
+
+			world[i]=parent>=0?MatrixMult(local, world[parent]):local;
+
+			if(strcmp(model->bone[i].name, query[n].boneName)==0)
+			{
+				matrix boneToWorld=MatrixMult(world[i], query[n].modelToWorld);
+
+				query[n].position=Matrix4x4MultVec3(Vec3b(0.0f), boneToWorld);
+				query[n].orientation=QuatMultiply(query[n].modelOrientation, MatrixToQuat(world[i]));
+				query[n].found=true;
+
+				break;
+			}
+		}
+	}
+}
+
 static void CharacterSetupIK(Animator_t *animator)
 {
 	static const char *legL[]={ "thigh_l", "calf_l", "foot_l" };
@@ -355,7 +401,12 @@ static void CharacterSetupIK(Animator_t *animator)
 	IK_Init(&characterIK, animator);
 	IK_AddChain(&characterIK, legL, 3, CharacterFootTarget, &character);
 	IK_AddChain(&characterIK, legR, 3, CharacterFootTarget, &character);
+
 	IK_SetBody(&characterIK, "pelvis", IK_BODY_LOWEST);
+
+	handBone[0].boneName="hand_l";
+	handBone[1].boneName="hand_r";
+	Animator_AddPostPose(animator, FindBonePosition, &handBone);
 }
 
 // Build up random data for skybox and asteroid field
@@ -1149,7 +1200,7 @@ void AttractorQuery(Entity_t *entity, void *userdata)
 	if(entity->body==&character.body)
 		Character_AddGravity(&character, gravity);
 	else
-		entity->body->force=Vec3_Addv(entity->body->force, Vec3_Muls(gravity, fTimeStep));
+		entity->body->force=Vec3_Addv(entity->body->force, Vec3_Muls(gravity, entity->body->mass));
 }
 
 // Ground speed that animation clip was authored for.
@@ -1595,6 +1646,11 @@ void Thread_Physics(void *arg)
 	if(enemyView>=0)
 		perFrame[index].view=MatrixLookAt(enemy[enemyView].body.position, Vec3_Addv(enemy[enemyView].body.position, enemy[enemyView].forward), enemy[enemyView].up);
 
+	handBone[0].modelToWorld=CharacterTransform(&character.body);
+	handBone[0].modelOrientation=character.body.orientation;
+	handBone[1].modelToWorld=CharacterTransform(&character.body);
+	handBone[1].modelOrientation=character.body.orientation;
+
 	Animation_Update(&animationSystem, fTimeStep, index);
 
 	physicsTime=(float)(GetClock()-startTime);
@@ -1633,18 +1689,6 @@ static void PrintEnemyStats(const Enemy_t *enemy, float x, float y)
 		enemy->camera->body.position.y,
 		enemy->camera->body.position.z
 	);
-}
-
-static vec3 GetBonePosition(const BModel_t *model, const BAnim_BoneFrame_t *boneFrame, const char *boneName)
-{
-	for(uint32_t b=0;b<model->numBone;b++)
-	{
-		if(strcmp(model->bone[b].name, boneName)==0)
-			return boneFrame[b].position;
-//		model->bone[b].orientation;
-	}
-
-	return Vec3b(0.0f);
 }
 
 // Render call from system main event loop
@@ -1775,8 +1819,20 @@ void Render(void)
 		.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 	});
 
-	Lights_UpdatePosition(&lights, lightTest, Vec3_Addv(character.body.position, Vec3_Muls(character.facing, 2.0f)));
-	Lights_UpdateSpotlight(&lights, lightTest, character.facing, cosf(deg2rad(30.0f)), cosf(deg2rad(20.0f)), 0.0f);
+	if(handBone[0].found)
+	{
+		vec3 lightDirection=QuatRotate(handBone[0].orientation, Vec3(0.0f, 0.0f, -1.0f));
+		Lights_UpdatePosition(&lights, lightTest1, Vec3_Addv(handBone[0].position, Vec3_Muls(lightDirection, 1.5f)));
+		Lights_UpdateSpotlight(&lights, lightTest1, lightDirection, cosf(deg2rad(50.0f)), cosf(deg2rad(20.0f)), 0.0f);
+	}
+
+	if(handBone[1].found)
+	{
+		const vec3 lightDirection=QuatRotate(handBone[1].orientation, Vec3(0.0f, 0.0f, -1.0f));
+		Lights_UpdatePosition(&lights, lightTest2, Vec3_Addv(handBone[1].position, Vec3_Muls(lightDirection, 1.5f)));
+		Lights_UpdateSpotlight(&lights, lightTest2, lightDirection, cosf(deg2rad(50.0f)), cosf(deg2rad(20.0f)), 0.0f);
+	}
+
 	Lights_UpdatePosition(&lights, lightBall, bodies[BODY_HANGING_BALL].position);
 
 	Lights_UpdateSSBO(&lights, index);
@@ -2105,10 +2161,13 @@ bool Init(void)
 	LoadingScreenAdvance(&loadingScreen);
 
 	Lights_Init(&lights, 3, 128);
-	lightTest=Lights_Add(&lights, Vec3b(0.0f), 300.0f, Vec4(1.0f, 0.0f, 0.0f, 1.0f));
+	lightTest1=Lights_Add(&lights, Vec3b(0.0f), 50.0f, Vec4(10.0f, 0.0f, 0.0f, 1.0f));
+	lightTest2=Lights_Add(&lights, Vec3b(0.0f), 50.0f, Vec4(0.0f, 0.0f, 10.0f, 1.0f));
 	lightBall=Lights_Add(&lights, bodies[BODY_HANGING_BALL].position, bodies[BODY_HANGING_BALL].radius*8.0f, Vec4(5.0f, 0.0f, 5.0f, 1.0f));
 
-	Lights_SetShadow(&lights, lightTest, true);
+	Lights_SetShadow(&lights, lightTest1, true);
+	Lights_SetShadow(&lights, lightTest2, true);
+	Lights_SetShadow(&lights, lightBall, true);
 
 	GenerateWorld();
 
@@ -2518,6 +2577,8 @@ void RecreateSwapchain(void)
 void Destroy(void)
 {
 	vkDeviceWaitIdle(vkContext.device);
+
+	Lights_Destroy(&lights);
 
 	PhysicsRecorder_Shutdown();
 
