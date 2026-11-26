@@ -34,14 +34,15 @@ static void ApplyConstraints(RigidBody_t *body, const float dt)
 	vec3 normal=Vec3_Subv(body->position, center);
 
 	float distanceSq=Vec3_LengthSq(normal);
-	const float maxRadiusMinusRadius = maxRadius - body->radius;
-	const float boundarySq = maxRadiusMinusRadius * maxRadiusMinusRadius;
+	const float maxRadiusMinusRadius=maxRadius-body->radius;
+	const float boundarySq=maxRadiusMinusRadius*maxRadiusMinusRadius;
 
-	if(distanceSq > boundarySq)
+	if(distanceSq>boundarySq)
 	{
 		const float distance=Vec3_Normalize(&normal);
-		const float penetration = distance + body->radius - maxRadius;
-		body->force=Vec3_Addv(body->force, Vec3_Muls(normal, -penetration * 100.0f)); // Arbitrary stiffness
+		const float penetration=distance+body->radius-maxRadius;
+
+		body->force=Vec3_Addv(body->force, Vec3_Muls(normal, -penetration*100.0f)); // Arbitrary stiffness
 	}
 
 	// Dampen velocity
@@ -50,6 +51,13 @@ static void ApplyConstraints(RigidBody_t *body, const float dt)
 
 	body->velocity=Vec3_Muls(body->velocity, decay);
 	body->angularVelocity=Vec3_Muls(body->angularVelocity, decay);
+
+	// Quiet velocities when near zero to actually zero
+	if(Vec3_LengthSq(body->velocity)<0.0001f)
+		body->velocity=Vec3b(0.0f);
+
+	if(Vec3_LengthSq(body->angularVelocity)<0.000001f)
+		body->angularVelocity=Vec3b(0.0f);
 }
 
 static vec4 IntegrateAngularVelocity(const vec4 q, const vec3 w, const float dt)

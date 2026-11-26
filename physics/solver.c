@@ -46,17 +46,27 @@ float PhysicsResolveCollision(RigidBody_t *a, RigidBody_t *b, ContactPoint_t con
 	const vec4 invOrientationA=QuatInverse(a->orientation);
 	const vec4 invOrientationB=QuatInverse(b->orientation);
 
-	// Transform torque to local space
-	vec3 localTorqueA=QuatRotate(invOrientationA, Vec3_Cross(r1, impulse));
-	vec3 localTorqueB=QuatRotate(invOrientationB, Vec3_Cross(r2, impulse));
+    // Angular velocity from local space torque arms
+	a->angularVelocity=Vec3_Subv(
+		a->angularVelocity,
+		Vec3_Muls(QuatRotate(invOrientationA, Vec3_Cross(r1, impulse)), a->invInertia)
+	);
+	b->angularVelocity=Vec3_Addv(
+		b->angularVelocity,
+		Vec3_Muls(QuatRotate(invOrientationB, Vec3_Cross(r2, impulse)), b->invInertia)
+	);
 
-    // Angular velocity
-	a->angularVelocity=Vec3_Subv(a->angularVelocity, Vec3_Muls(localTorqueA, a->invInertia));
-	b->angularVelocity=Vec3_Addv(b->angularVelocity, Vec3_Muls(localTorqueB, b->invInertia));
+	// Recalculate tangential motion after the normal impulse
+	const vec3 relativeVelAfterNormal=Vec3_Subv(
+		Vec3_Addv(b->velocity, Vec3_Cross(QuatRotate(b->orientation, b->angularVelocity), r2)),
+		Vec3_Addv(a->velocity, Vec3_Cross(QuatRotate(a->orientation, a->angularVelocity), r1))
+	);
 
-	// Calculate tangential velocities
-	vec3 tangentialVel=Vec3_Subv(relativeVel, Vec3_Muls(contact.normal, Vec3_Dot(relativeVel, contact.normal)));
-    Vec3_Normalize(&tangentialVel);
+	vec3 tangentialVel=Vec3_Subv(
+		relativeVelAfterNormal,
+		Vec3_Muls(contact.normal, Vec3_Dot(relativeVelAfterNormal, contact.normal))
+	);
+	Vec3_Normalize(&tangentialVel);
 
 	const vec3 d1T=Vec3_Cross(Vec3_Muls(Vec3_Cross(r1, tangentialVel), a->invInertia), r1);
 	const vec3 d2T=Vec3_Cross(Vec3_Muls(Vec3_Cross(r2, tangentialVel), b->invInertia), r2);
@@ -73,11 +83,14 @@ float PhysicsResolveCollision(RigidBody_t *a, RigidBody_t *b, ContactPoint_t con
 	b->velocity=Vec3_Addv(b->velocity, Vec3_Muls(impulseT, b->invMass));
 
 	// Angular frictional velocity
-	localTorqueA=QuatRotate(invOrientationA, Vec3_Cross(r1, impulseT));
-	localTorqueB=QuatRotate(invOrientationB, Vec3_Cross(r2, impulseT));
-
-	a->angularVelocity=Vec3_Subv(a->angularVelocity, Vec3_Muls(localTorqueA, a->invInertia));
-	b->angularVelocity=Vec3_Addv(b->angularVelocity, Vec3_Muls(localTorqueB, b->invInertia));
+	a->angularVelocity=Vec3_Subv(
+		a->angularVelocity,
+		Vec3_Muls(QuatRotate(invOrientationA, Vec3_Cross(r1, impulseT)), a->invInertia)
+	);
+	b->angularVelocity=Vec3_Addv(
+		b->angularVelocity,
+		Vec3_Muls(QuatRotate(invOrientationB, Vec3_Cross(r2, impulseT)), b->invInertia)
+	);
 
     return sqrtf(-relativeSpeed);
 }
