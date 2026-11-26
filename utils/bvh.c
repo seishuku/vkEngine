@@ -308,9 +308,51 @@ typedef struct
 	Entity_t *entity;
 } BVHRayQuery_t;
 
-static void RayQueryCallback(Entity_t *entity, void *userdata)
+typedef struct
 {
-	BVHRayQuery_t *query=(BVHRayQuery_t *)userdata;
+	int32_t nodeIndex;
+	float distance;
+} BVHRayStackObj_t;
+
+static bool RayAABBIntersect(const vec3 origin, const vec3 direction, const aabb bounds, const float maxDistance, float *distance)
+{
+	float nearDistance=0.0f;
+	float farDistance=maxDistance;
+
+	for(uint32_t axis=0;axis<3;axis++)
+	{
+		if(direction.v[axis]==0.0f)
+		{
+			if(origin.v[axis]<bounds.min.v[axis]||origin.v[axis]>bounds.max.v[axis])
+				return false;
+
+			continue;
+		}
+
+		const float inverseDirection=1.0f/direction.v[axis];
+		float t0=(bounds.min.v[axis]-origin.v[axis])*inverseDirection;
+		float t1=(bounds.max.v[axis]-origin.v[axis])*inverseDirection;
+
+		if(t0>t1)
+		{
+			const float temp=t0;
+			t0=t1;
+			t1=temp;
+		}
+
+		nearDistance=fmaxf(nearDistance, t0);
+		farDistance=fminf(farDistance, t1);
+
+		if(nearDistance>farDistance)
+			return false;
+	}
+
+	*distance=nearDistance;
+	return true;
+}
+
+static void RayQueryEntity(BVHRayQuery_t *query, Entity_t *entity)
+{
 	const RigidBody_t *body=entity->body;
 
 	if(!body||body==query->ignore||entity->objectType==ENTITYOBJECTTYPE_PROJECTILE)
@@ -345,18 +387,60 @@ static void RayQueryCallback(Entity_t *entity, void *userdata)
 
 bool BVH_Raycast(BVH_t *bvh, EntityList_t *entityList, vec3 origin, vec3 direction, float maxDistance, const RigidBody_t *ignore, BVHRayHit_t *hit)
 {
-	const vec3 end=Vec3_Addv(origin, Vec3_Muls(direction, maxDistance));
+	if(bvh->numNodes==0||entityList->entityCount==0||maxDistance<0.0f)
+		return false;
 
-	// Bounds of the ray segment, padded so grazing hits on flat boxes aren't lost
-	const aabb bounds=
-	{
-		Vec3_Subs(Vec3(fminf(origin.x, end.x), fminf(origin.y, end.y), fminf(origin.z, end.z)), 0.01f),
-		Vec3_Adds(Vec3(fmaxf(origin.x, end.x), fmaxf(origin.y, end.y), fmaxf(origin.z, end.z)), 0.01f)
-	};
+	BVHRayStackObj_t stack[QUERY_STACK_MAX];
+	int32_t stackTop=0;
+	float rootDistance;
+
+	if(!RayAABBIntersect(origin, direction, bvh->nodes[0].bounds, maxDistance, &rootDistance))
+		return false;
+
+	stack[stackTop++]=(BVHRayStackObj_t) { 0, rootDistance };
 
 	BVHRayQuery_t query={ origin, direction, maxDistance, ignore, NULL };
 
-	BVH_QueryAABB(bvh, entityList, bounds, RayQueryCallback, &query);
+	while(stackTop>0)
+	{
+		const BVHRayStackObj_t current=stack[--stackTop];
+
+		if(current.distance>query.best)
+			continue;
+
+		const BVHNode_t *node=&bvh->nodes[current.nodeIndex];
+
+		if(node->left==-1)
+		{
+			RayQueryEntity(&query, &entityList->entities[node->objectIndex]);
+			continue;
+		}
+
+		float leftDistance, rightDistance;
+		const bool hitLeft=RayAABBIntersect(origin, direction, bvh->nodes[node->left].bounds, query.best, &leftDistance);
+		const bool hitRight=RayAABBIntersect(origin, direction, bvh->nodes[node->right].bounds, query.best, &rightDistance);
+
+		if(hitLeft&&hitRight)
+		{
+			assert(stackTop+2<=QUERY_STACK_MAX&&"BVH raycast stack overflow");
+
+			if(leftDistance<=rightDistance)
+			{
+				stack[stackTop++]=(BVHRayStackObj_t) { node->right, rightDistance };
+				stack[stackTop++]=(BVHRayStackObj_t) { node->left, leftDistance };
+			}
+			else
+			{
+				stack[stackTop++]=(BVHRayStackObj_t) { node->left, leftDistance };
+				stack[stackTop++]=(BVHRayStackObj_t) { node->right, rightDistance };
+			}
+		}
+		else if(hitLeft||hitRight)
+		{
+			assert(stackTop+1<=QUERY_STACK_MAX&&"BVH raycast stack overflow");
+			stack[stackTop++]=(BVHRayStackObj_t) { hitLeft?node->left:node->right, hitLeft?leftDistance:rightDistance };
+		}
+	}
 
 	if(!query.entity)
 		return false;
