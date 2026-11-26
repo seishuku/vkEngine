@@ -1,10 +1,15 @@
 #include <string.h>
 #include "../camera/camera.h"
+#include "../ui/ui.h"
 #include "../perframe.h"
 #include "input.h"
 
 extern XruContext_t xrContext;
 extern Camera_t camera;
+
+extern UI_t UI;
+extern uint32_t leftThumbstickID;
+extern uint32_t rightThumbstickID;
 
 static vec3 lastLeftHandPosition={ 0 };
 static bool leftTriggerWasPressed=false;
