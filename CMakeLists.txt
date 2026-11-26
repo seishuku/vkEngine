@@ -3,7 +3,7 @@
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED True)
 
-project("vkEngine" LANGUAGES C VERSION 0.0.6)
+project("vkEngine" LANGUAGES C VERSION 0.0.7)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include("fetchDeps")
