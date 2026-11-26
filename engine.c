@@ -1824,14 +1824,14 @@ void Render(void)
 	{
 		vec3 lightDirection=QuatRotate(handBone[0].orientation, Vec3(0.0f, 0.0f, -1.0f));
 		Lights_UpdatePosition(&lights, lightTest1, Vec3_Addv(handBone[0].position, Vec3_Muls(lightDirection, 1.5f)));
-		Lights_UpdateSpotlight(&lights, lightTest1, lightDirection, cosf(deg2rad(50.0f)), cosf(deg2rad(20.0f)), 0.0f);
+		Lights_UpdateSpotlight(&lights, lightTest1, lightDirection, cosf(deg2rad(45.0f)), cosf(deg2rad(5.0f)), 4.0f);
 	}
 
 	if(handBone[1].found)
 	{
 		const vec3 lightDirection=QuatRotate(handBone[1].orientation, Vec3(0.0f, 0.0f, -1.0f));
 		Lights_UpdatePosition(&lights, lightTest2, Vec3_Addv(handBone[1].position, Vec3_Muls(lightDirection, 1.5f)));
-		Lights_UpdateSpotlight(&lights, lightTest2, lightDirection, cosf(deg2rad(50.0f)), cosf(deg2rad(20.0f)), 0.0f);
+		Lights_UpdateSpotlight(&lights, lightTest2, lightDirection, cosf(deg2rad(45.0f)), cosf(deg2rad(5.0f)), 4.0f);
 	}
 
 	Lights_UpdatePosition(&lights, lightBall, bodies[BODY_HANGING_BALL].position);
@@ -2161,14 +2161,16 @@ bool Init(void)
 	CreateSkyboxPipeline();
 	LoadingScreenAdvance(&loadingScreen);
 
-	Lights_Init(&lights, 3, 128);
-	lightTest1=Lights_Add(&lights, Vec3b(0.0f), 50.0f, Vec4(10.0f, 0.0f, 0.0f, 1.0f));
-	lightTest2=Lights_Add(&lights, Vec3b(0.0f), 50.0f, Vec4(0.0f, 0.0f, 10.0f, 1.0f));
-	lightBall=Lights_Add(&lights, bodies[BODY_HANGING_BALL].position, bodies[BODY_HANGING_BALL].radius*8.0f, Vec4(5.0f, 0.0f, 5.0f, 1.0f));
+	Lights_Init(&lights, 3, 512);
+	lightTest1=Lights_Add(&lights, Vec3b(0.0f), 100.0f, Vec4(1.0f, 0.0f, 0.0f, 1.0f));
+	lightTest2=Lights_Add(&lights, Vec3b(0.0f), 100.0f, Vec4(0.0f, 0.0f, 1.0f, 1.0f));
+	lightBall=Lights_Add(&lights, bodies[BODY_HANGING_BALL].position, bodies[BODY_HANGING_BALL].radius*8.0f, Vec4(1.0f, 0.0f, 1.0f, 1.0f));
 
 	Lights_SetShadow(&lights, lightTest1, true);
 	Lights_SetShadow(&lights, lightTest2, true);
-	Lights_SetShadow(&lights, lightBall, true);
+	Lights_SetShadow(&lights, lightBall, false);
+
+	Lights_SetShadow(&lights, Lights_Add(&lights, Vec3(0.0f, -25.0f, 0.0f), 100.0f, Vec4(10.0f, 10.0f, 1.0f, 1.0f)), true);
 
 	GenerateWorld();
 

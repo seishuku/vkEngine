@@ -4,6 +4,7 @@
 #include "../system/system.h"
 #include "../vulkan/vulkan.h"
 #include "../math/math.h"
+#include "../lights/lights.h"
 #include "../utils/postprocess.h"
 #include "../utils/pipeline.h"
 #include "../font/font.h"
@@ -16,6 +17,7 @@
 extern VkuContext_t vkContext;
 extern VkuSwapchain_t swapchain;
 extern XruContext_t xrContext;
+extern Lights_t lights;
 
 extern float fps, fTimeStep, audioTime, physicsTime;
 
@@ -221,6 +223,9 @@ void CompositeDraw(uint32_t imageIndex, uint32_t frameIndex, uint32_t eye)
 	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 2, depthImage[eye].sampler, depthImage[eye].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 3, shadowDepth.sampler, shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	vkuDescriptorSet_UpdateBindingBufferInfo(&compositePipeline.descriptorSet, 4, perFrame[frameIndex].mainUBOBuffer[eye].buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&compositePipeline.descriptorSet, 5, lights.buffer[frameIndex].buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingBufferInfo(&compositePipeline.descriptorSet, 6, lights.shadowBuffer[frameIndex].buffer, 0, VK_WHOLE_SIZE);
+	vkuDescriptorSet_UpdateBindingImageInfo(&compositePipeline.descriptorSet, 7, lights.shadowDepth.sampler, lights.shadowDepth.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	vkuAllocateUpdateDescriptorSet(&compositePipeline.descriptorSet, perFrame[frameIndex].descriptorPool);
 	vkCmdBindDescriptorSets(perFrame[frameIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipeline.pipelineLayout, 0, 1, &compositePipeline.descriptorSet.descriptorSet, 0, VK_NULL_HANDLE);
