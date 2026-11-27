@@ -44,7 +44,8 @@ function("buildAndroid")
 		Vulkan::Vulkan
 		OpenXR::openxr_loader
 		Vorbis::vorbisfile
-		stdc++
+		c++_static
+		c++abi
 		m
 		android
 		log
