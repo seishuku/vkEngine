@@ -44,6 +44,7 @@ function("buildAndroid")
 		Vulkan::Vulkan
 		OpenXR::openxr_loader
 		Vorbis::vorbisfile
+		stdc++
 		m
 		android
 		log
@@ -74,7 +75,8 @@ function("buildAndroid")
 	add_custom_command(
 		TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
 		COMMAND $<$<CONFIG:release>:${CMAKE_STRIP}> ARGS --strip-all $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
-		COMMAND $<$<CONFIG:release>:${CMAKE_STRIP}> ARGS --strip-all $<TARGET_FILE:OpenXR::openxr_loader>
+		# Don't strip symbols when building against static openxr_loader
+		#COMMAND $<$<CONFIG:release>:${CMAKE_STRIP}> ARGS --strip-all $<TARGET_FILE:OpenXR::openxr_loader>
 	)
 
 	# Build APK folder
@@ -84,7 +86,7 @@ function("buildAndroid")
 		# Copy app shared object
 		COMMAND ${CMAKE_COMMAND} -E make_directory ${APK_BUILD_DIR}/lib/arm64-v8a
 		COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${CMAKE_PROJECT_NAME}> ${APK_BUILD_DIR}/lib/arm64-v8a/lib${CMAKE_PROJECT_NAME}.so
-		COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:OpenXR::openxr_loader> ${APK_BUILD_DIR}/lib/arm64-v8a/
+		#COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:OpenXR::openxr_loader> ${APK_BUILD_DIR}/lib/arm64-v8a/
 
 		COMMAND ${CMAKE_COMMAND} -E make_directory ${APK_BUILD_DIR}/assets
 		COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/config.ini ${APK_BUILD_DIR}/assets/
