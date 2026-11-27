@@ -44,7 +44,7 @@ void *WavRead(const char *filename, WaveFormat_t *format, uint32_t *numSamples)
 		goto error;
 
 	// WAVE magic marker ("WAVE") should follow after the RIFF chunk
-	if(fread(&waveMagic, sizeof(uint32_t), 1, stream)!=1&&waveMagic!=WAVE_MAGIC)
+	if(fread(&waveMagic, sizeof(uint32_t), 1, stream)!=1||waveMagic!=WAVE_MAGIC)
 		goto error;
 
 	while(!(foundFormat&&foundData))

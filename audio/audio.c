@@ -60,7 +60,6 @@ static int16_t postConvole[2*(MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES)];
 // Streaming audio
 static struct
 {
-	uint32_t position;
 	int16_t buffer[MAX_STREAM_SAMPLES*2];
 
 	struct
@@ -209,7 +208,7 @@ static void Convolve(const int16_t *restrict input, int16_t *restrict output, co
 {
 	int16_t *outputPtr=output;
 
-	for(size_t i=0;i<length+kernelLength-1;i++)
+	for(size_t i=0;i<length;i++)
 	{
 		const int16_t *inputPtr=&input[i+kernelLength];
 		const int16_t *kernelPtr=kernel;
@@ -235,7 +234,8 @@ static void MixAudio(int16_t *restrict dst, const int16_t *restrict src, const s
 	if(volume==0)
 		return;
 
-	for(size_t i=0;i<length*2;i+=4)
+	size_t i=0;
+	for(;i+1<length;i+=2)
 	{
 		const int16_t src0=*src++, src1=*src++, src2=*src++, src3=*src++;
 		const int16_t dst0=dst[0], dst1=dst[1], dst2=dst[2], dst3=dst[3];
@@ -244,6 +244,15 @@ static void MixAudio(int16_t *restrict dst, const int16_t *restrict src, const s
 		*dst++=bitwiseClamp32(src1*volume+dst1, INT16_MIN, INT16_MAX);
 		*dst++=bitwiseClamp32(src2*volume+dst2, INT16_MIN, INT16_MAX);
 		*dst++=bitwiseClamp32(src3*volume+dst3, INT16_MIN, INT16_MAX);
+	}
+
+	if(i<length)
+	{
+		const int16_t srcL=*src++, srcR=*src;
+		const int16_t dstL=dst[0], dstR=dst[1];
+
+		dst[0]=bitwiseClamp32(srcL*volume+dstL, INT16_MIN, INT16_MAX);
+		dst[1]=bitwiseClamp32(srcR*volume+dstR, INT16_MIN, INT16_MAX);
 	}
 }
 
@@ -307,7 +316,7 @@ void Audio_FillBuffer(void *buffer, uint32_t length)
 		else if(toFill>=channel->sample->length)
 			toFill=channel->sample->length;
 
-		memset(preConvolve, 0, sizeof(int16_t)*(MAX_AUDIO_SAMPLES+MAX_HRIR_SAMPLES));
+		memset(preConvolve, 0, sizeof(preConvolve));
 		memcpy(preConvolve, &channel->sample->data[channel->position], sizeof(int16_t)*toFill);
 	
 		// Convolve the samples with the interpolated HRIR sample to produce a stereo sample to mix into the output buffer
@@ -332,8 +341,6 @@ void Audio_FillBuffer(void *buffer, uint32_t length)
 
 	DSP_Process(out, length);
 
-	size_t remainingData=min(MAX_STREAM_SAMPLES-streamBuffer.position, length);
-
 	for(uint32_t i=0;i<MAX_AUDIO_STREAMS;i++)
 	{
 		if(streamBuffer.stream[i].playing)
@@ -341,16 +348,12 @@ void Audio_FillBuffer(void *buffer, uint32_t length)
 			// If there's an assigned callback, call it to load more audio data
 			if(streamBuffer.stream[i].streamCallback)
 			{
-				streamBuffer.stream[i].streamCallback(&streamBuffer.buffer[streamBuffer.position], remainingData);
-				MixAudio(out, &streamBuffer.buffer[streamBuffer.position], remainingData, streamBuffer.stream[i].volume);
+				memset(streamBuffer.buffer, 0, sizeof(int16_t)*length*2);
+				streamBuffer.stream[i].streamCallback(streamBuffer.buffer, length);
+				MixAudio(out, streamBuffer.buffer, length, streamBuffer.stream[i].volume);
 			}
 		}
 	}
-
-	streamBuffer.position+=(uint32_t)remainingData;
-
-	if(streamBuffer.position>=MAX_STREAM_SAMPLES)
-		streamBuffer.position=0;
 
 	audioTime=(float)(GetClock()-startTime);
 }
@@ -394,7 +397,7 @@ void Audio_UpdateXYZPosition(uint32_t slot, vec3 position)
 
 void Audio_StopSample(uint32_t slot)
 {
-	if(slot>=MAX_CHANNELS)
+	if(slot>=MAX_CHANNELS||!channels[slot].sample)
 		return;
 
 	// Set the position to the end and allow the callback to resolve the removal
@@ -550,6 +553,8 @@ int Audio_Init(void)
 		return false;
 	}
 
+	DSP_AddEffect(DSP_Reverb);
+
 #ifdef ANDROID
 	if(!AudioAndroid_Init())
 #elif WIN32
@@ -582,24 +587,54 @@ void Audio_Destroy(void)
 	Zone_Free(zone, HRIRTriangleCentroids);
 }
 
-// Simple resample and conversion function to the audio engine's common format (44.1KHz/16bit).
+static int32_t FloatToPcm16(double value)
+{
+	if(value!=value)
+		return 0;
+
+	if(value>1.0)
+		value=1.0;
+	else if(value<-1.0)
+		value=-1.0;
+
+	return (int32_t)(value*INT16_MAX);
+}
+
+static int32_t ReadPcm24(const uint8_t *sample)
+{
+	uint32_t raw=(uint32_t)sample[0]|((uint32_t)sample[1]<<8)|((uint32_t)sample[2]<<16);
+	int32_t value=(raw&0x800000)?(int32_t)raw-0x1000000:(int32_t)raw;
+
+	return value>=0?value/256:(int32_t)(-((-(int64_t)value+255)/256));
+}
+
+// Simple resample and conversion function to the audio engine's common format (48KHz/16bit).
 // Based off of what id Software used in Quake, seems to work well enough.
 static int16_t *ConvertAndResample(const void *in, const uint32_t numSamples, const bool isFloat, const uint32_t sampleRate, const uint8_t bitsPerSample, const uint8_t channels)
 {
-	if(in==NULL)
+	if(in==NULL||sampleRate==0||(channels!=1&&channels!=2))
 		return NULL;
 
-	const float stepScale=(float)sampleRate/AUDIO_SAMPLE_RATE;
-	const uint32_t outCount=(uint32_t)(numSamples/stepScale);
+	if((isFloat&&(bitsPerSample!=32&&bitsPerSample!=64))||
+	   (!isFloat&&(bitsPerSample!=8&&bitsPerSample!=16&&bitsPerSample!=24&&bitsPerSample!=32)))
+		return NULL;
 
+	const uint64_t outCount64=(uint64_t)numSamples*AUDIO_SAMPLE_RATE/sampleRate;
+
+	if(outCount64==0||outCount64>UINT32_MAX||outCount64>SIZE_MAX/(sizeof(int16_t)*channels))
+		return NULL;
+
+	const size_t outCount=(size_t)outCount64;
+	const uint8_t *inputBytes=(const uint8_t *)in;
 	int16_t *out=(int16_t *)Zone_Malloc(zone, sizeof(int16_t)*outCount*channels);
 
 	if(out==NULL)
 		return NULL;
 
-	for(uint32_t i=0, sampleFrac=0;i<outCount;i++, sampleFrac+=(int32_t)(stepScale*256))
+	for(size_t i=0;i<outCount;i++)
 	{
-		const int32_t srcSample=sampleFrac>>8;
+		const uint32_t srcSample=(uint32_t)((uint64_t)i*sampleRate/AUDIO_SAMPLE_RATE);
+		const size_t frameOffset=(size_t)srcSample*channels;
 		int32_t sampleL=0, sampleR=0;
 
 		// Input conversion/resample
@@ -609,28 +644,30 @@ static int16_t *ConvertAndResample(const void *in, const uint32_t numSamples, co
 			{
 				if(channels==2)
 				{
-					sampleL=((int32_t *)in)[2*srcSample+0]>>16;
-					sampleR=((int32_t *)in)[2*srcSample+1]>>16;
+					sampleL=((int32_t *)in)[frameOffset+0]>>16;
+					sampleR=((int32_t *)in)[frameOffset+1]>>16;
 				}
 				else if(channels==1)
 					sampleL=((int32_t *)in)[srcSample]>>16;
 			}
 			else if(bitsPerSample==24) // 24bit signed integer PCM
 			{
+				const size_t sampleOffset=frameOffset*3;
+
 				if(channels==2)
 				{
-					sampleL=(((uint8_t *)in)[i*6+0]|(((uint8_t *)in)[i*6+1]<<8)|(((uint8_t *)in)[i*6+2]<<16))>>8;
-					sampleR=(((uint8_t *)in)[i*6+3]|(((uint8_t *)in)[i*6+4]<<8)|(((uint8_t *)in)[i*6+5]<<16))>>8;
+					sampleL=ReadPcm24(inputBytes+sampleOffset);
+					sampleR=ReadPcm24(inputBytes+sampleOffset+3);
 				}
 				else if(channels==1)
-					sampleL=(((uint8_t *)in)[i*3+0]|(((uint8_t *)in)[i*3+1]<<8)|(((uint8_t *)in)[i*3+2]<<16))>>8;
+					sampleL=ReadPcm24(inputBytes+sampleOffset);
 			}
 			else if(bitsPerSample==16) // 16bit signed integer PCM
 			{
 				if(channels==2)
 				{
-					sampleL=((int16_t *)in)[2*srcSample+0];
-					sampleR=((int16_t *)in)[2*srcSample+1];
+					sampleL=((int16_t *)in)[frameOffset+0];
+					sampleR=((int16_t *)in)[frameOffset+1];
 				}
 				else if(channels==1)
 					sampleL=((int16_t *)in)[srcSample];
@@ -639,11 +676,11 @@ static int16_t *ConvertAndResample(const void *in, const uint32_t numSamples, co
 			{
 				if(channels==2)
 				{
-					sampleL=(((int8_t *)in)[2*srcSample+0]-128)<<8;
-					sampleR=(((int8_t *)in)[2*srcSample+1]-128)<<8;
+					sampleL=((int32_t)inputBytes[frameOffset+0]-128)*256;
+					sampleR=((int32_t)inputBytes[frameOffset+1]-128)*256;
 				}
 				else if(channels==1)
-					sampleL=(((int8_t *)in)[srcSample]-128)<<8;
+					sampleL=((int32_t)inputBytes[srcSample]-128)*256;
 			}
 		}
 		else
@@ -652,21 +689,21 @@ static int16_t *ConvertAndResample(const void *in, const uint32_t numSamples, co
 			{
 				if(channels==2)
 				{
-					sampleL=(((double *)in)[2*srcSample+0]*INT16_MAX);
-					sampleR=(((double *)in)[2*srcSample+1]*INT16_MAX);
+					sampleL=FloatToPcm16(((double *)in)[frameOffset+0]);
+					sampleR=FloatToPcm16(((double *)in)[frameOffset+1]);
 				}
 				else
-					sampleL=(((double *)in)[srcSample]*INT16_MAX);
+					sampleL=FloatToPcm16(((double *)in)[srcSample]);
 			}
 			else if(bitsPerSample==32) // 32bit float
 			{
 				if(channels==2)
 				{
-					sampleL=(((float *)in)[2*srcSample+0]*INT16_MAX);
-					sampleR=(((float *)in)[2*srcSample+1]*INT16_MAX);
+					sampleL=FloatToPcm16(((float *)in)[frameOffset+0]);
+					sampleR=FloatToPcm16(((float *)in)[frameOffset+1]);
 				}
 				else
-					sampleL=(((float *)in)[srcSample]*INT16_MAX);
+					sampleL=FloatToPcm16(((float *)in)[srcSample]);
 			}
 		}
 
@@ -798,7 +835,7 @@ bool Audio_LoadStatic(const char *filename, Sample_t *sample)
 
 	sample->data=resampledAndConverted;
 
-	sample->length=(uint32_t)(numSamples/((float)sampleRate/AUDIO_SAMPLE_RATE));
+	sample->length=(uint32_t)((uint64_t)numSamples*AUDIO_SAMPLE_RATE/sampleRate);
 	sample->channels=(uint8_t)channels;
 
 	return true;
