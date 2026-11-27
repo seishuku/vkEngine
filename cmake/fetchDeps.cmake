@@ -7,7 +7,7 @@ function(fetchDeps)
 	find_program(GLSLC NAMES glslc HINTS Vulkan::glslc)
 
 	set(BUILD_WITH_SYSTEM_JSONCPP OFF CACHE BOOL "" FORCE)
-
+	set(DYNAMIC_LOADER OFF CACHE BOOL "" FORCE)
 	message(STATUS "${PROJECT_NAME}: Fetching OpenXR...")
 	add_subdirectory(deps/OpenXR-SDK EXCLUDE_FROM_ALL)
 

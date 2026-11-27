@@ -37,6 +37,7 @@ function("buildLinux")
 		OpenXR::openxr_loader
 		Vorbis::vorbisfile
 		PipeWire::PipeWire
+		stdc++
 		m
 	)
 
