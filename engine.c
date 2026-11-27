@@ -1281,11 +1281,17 @@ static void UpdatePhysicsEmitters(const float dt, const bool integrateBodies)
 				}
 			}
 		}
-		else if(physicsEmitter->emitterID!=UINT32_MAX)
+		else
 		{
-			ParticleSystem_DeleteEmitter(&particleSystem, physicsEmitter->emitterID);
-			EntityList_Remove(&entityList, physicsEmitter->entityID);
+			if(physicsEmitter->emitterID!=UINT32_MAX)
+				ParticleSystem_DeleteEmitter(&particleSystem, physicsEmitter->emitterID);
+
+			if(physicsEmitter->entityID!=UINT32_MAX)
+				EntityList_Remove(&entityList, physicsEmitter->entityID);
+
 			physicsEmitter->emitterID=UINT32_MAX;
+			physicsEmitter->entityID=UINT32_MAX;
+			physicsEmitter->life=-1.0f;
 		}
 	}
 }
@@ -2221,6 +2227,7 @@ bool Init(void)
 	for(uint32_t i=0;i<MAX_EMITTERS;i++)
 	{
 		emitters[i].emitterID=UINT32_MAX;	// No assigned particle emitterID
+		emitters[i].entityID=UINT32_MAX;	// No assigned entity ID
 		emitters[i].life=-1.0f;		// No life
 
 		const float radius=1.0f;

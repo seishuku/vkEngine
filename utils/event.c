@@ -68,6 +68,23 @@ void emitterCallback(uint32_t index, uint32_t numParticles, Particle_t *particle
 // This is basically the same as an emitter callback, but done manually by working on the particle array directly.
 void FireParticleEmitter(vec3 position, vec3 direction)
 {
+	uint32_t slot=MAX_EMITTERS;
+
+	for(uint32_t i=0;i<MAX_EMITTERS;i++)
+	{
+		if(emitters[i].life<0.0f)
+		{
+			slot=i;
+			break;
+		}
+	}
+
+	if(slot==MAX_EMITTERS)
+	{
+		DBGPRINTF(DEBUG_WARNING, "No free physics emitter slot.\n");
+		return;
+	}
+
 	// Create a new particle emitter
 	vec3 randVec=Vec3(RandFloat(), RandFloat(), RandFloat());
 	Vec3_Normalize(&randVec);
@@ -76,30 +93,29 @@ void FireParticleEmitter(vec3 position, vec3 direction)
 	// Fire the emitter camera radius units away from Position in the direction of Direction, blend in some of the direction for particle vs emitter velocity for particle tails.
 	uint32_t ID=ParticleSystem_AddEmitter(&particleSystem, position, Vec3_Muls(direction, 75.0f), Vec3b(0.0f), randVec, 5.0f, 500, PARTICLE_EMITTER_CONTINOUS, emitterCallback);
 
-	// Emitter list full?
 	if(ID==UINT32_MAX)
-		return;
-
-	// Search for first dead particle emitter
-	for(uint32_t i=0;i<MAX_EMITTERS;i++)
 	{
-		// When found, assign the new emitter ID to that particle, set position/direction/life and break out
-		if(emitters[i].life<0.0f)
-		{
-			emitters[i].emitterID=ID;
-			emitters[i].body.position=position;
-
-			Vec3_Normalize(&direction);
-
-			emitters[i].body.velocity=Vec3_Muls(direction, 100.0f);
-			emitters[i].life=15.0f;
-
-			// Add particle emitter to physics list
-			emitters[i].entityID=EntityList_Add(&entityList, &emitters[i].body, true, 0, 0, 0, ENTITYOBJECTTYPE_PROJECTILE, NULL);
-
-			break;
-		}
+		DBGPRINTF(DEBUG_WARNING, "Failed to add particle emitter.\n");
+		return;
 	}
+
+	RigidBody_t *body=&emitters[slot].body;
+	body->position=position;
+
+	Vec3_Normalize(&direction);
+
+	body->velocity=Vec3_Muls(direction, 100.0f);
+
+	uint32_t entityID=EntityList_Add(&entityList, body, true, 0, 0, 0, ENTITYOBJECTTYPE_PROJECTILE, NULL);
+	if(entityID==UINT32_MAX)
+	{
+		ParticleSystem_DeleteEmitter(&particleSystem, ID);
+		return;
+	}
+
+	emitters[slot].emitterID=ID;
+	emitters[slot].entityID=entityID;
+	emitters[slot].life=15.0f;
 
 	// Finally, play the audio SFX
 	Audio_PlaySample(&AssetManager_GetAsset(assets, RandRange(SOUND_PEW1, SOUND_PEW3))->sound, false, 1.0f, position);

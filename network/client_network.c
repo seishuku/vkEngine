@@ -72,7 +72,7 @@ static Camera_t     remotePlayers[NET_MAX_CLIENTS];
 static bool         remotePlayerActive[NET_MAX_CLIENTS];
 
 // Spawn visual only particle emitter
-void FireParticleEmitterVisualOnly(vec3 position, vec3 direction)
+static void FireParticleEmitterVisualOnly(vec3 position, vec3 direction, uint32_t slot)
 {
 	// Create a new particle emitter
 	vec3 randVec=Vec3(RandFloat(), RandFloat(), RandFloat());
@@ -86,22 +86,12 @@ void FireParticleEmitterVisualOnly(vec3 position, vec3 direction)
 	if(ID==UINT32_MAX)
 		return;
 
-	// Search for first dead particle emitter
-	for(uint32_t i=0;i<MAX_EMITTERS;i++)
-	{
-		// When found, assign the new emitter ID to that particle, set position/direction/life and break out
-		if(emitters[i].life<0.0f)
-		{
-			emitters[i].emitterID=ID;
-			emitters[i].body.position=position;
+	emitters[slot].emitterID=ID;
+	emitters[slot].body.position=position;
 
-			Vec3_Normalize(&direction);
+	Vec3_Normalize(&direction);
 
-			emitters[i].body.velocity=Vec3_Muls(direction, 100.0f);
-			emitters[i].life=15.0f;
-			break;
-		}
-	}
+	emitters[slot].body.velocity=Vec3_Muls(direction, 100.0f);
 
 	// Finally, play the audio SFX
 	Audio_PlaySample(&AssetManager_GetAsset(assets, RandRange(SOUND_PEW1, SOUND_PEW3))->sound, false, 1.0f, position);
@@ -194,7 +184,7 @@ static void SpawnEntity(uint32_t netID, EntityObjectType_e objectType, uint32_t 
             // Find a free emitter slot
             for(uint32_t i=0;i<MAX_EMITTERS;i++)
             {
-                if(emitters[i].life>0.0f)
+                if(emitters[i].life>=0.0f)
                     continue;
 
                 // Set up the physics body
@@ -205,14 +195,17 @@ static void SpawnEntity(uint32_t netID, EntityObjectType_e objectType, uint32_t 
 
                 // Add physics entity - purely local ID, no server ID fixup
                 uint32_t localID=EntityList_Add(&entityList, &emitters[i].body, true, 0, 0, 0, ENTITYOBJECTTYPE_PROJECTILE, NULL);
+                if(localID==UINT32_MAX)
+                    break;
 
                 emitters[i].entityID=localID;
+                emitters[i].life=15.0f;
                 NetMap_Set(netID, localID);
 
                 // Visual only - no entity add
                 vec3 dir=velocity;
                 Vec3_Normalize(&dir);
-                FireParticleEmitterVisualOnly(position, dir);
+                FireParticleEmitterVisualOnly(position, dir, i);
 
                 break;
             }
@@ -330,7 +323,8 @@ static void HandleEvent(uint8_t **pBuffer)
                 {
                     if(emitters[i].entityID==localID)
                     {
-                        emitters[i].life=0.0f;
+                        emitters[i].life=-1.0f;
+                        emitters[i].entityID=UINT32_MAX;
                         break;
                     }
                 }
