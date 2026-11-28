@@ -1212,6 +1212,20 @@ void AttractorQuery(Entity_t *entity, void *userdata)
 		entity->body->force=Vec3_Addv(entity->body->force, Vec3_Muls(gravity, entity->body->mass));
 }
 
+void AnimationPlayFootstep(Animator_t *animator, void *userData)
+{
+	(void)animator;
+	(void)userData;
+	SFX_PlayFootstep(character.body.position, false);
+}
+
+void AnimationPlayRunFootstep(Animator_t *animator, void *userData)
+{
+	(void)animator;
+	(void)userData;
+	SFX_PlayFootstep(character.body.position, true);
+}
+
 // Ground speed that animation clip was authored for.
 #define CROUCH_WALK_CLIP_SPEED 0.98f
 #define WALK_CLIP_SPEED 0.98f
@@ -1237,7 +1251,36 @@ static void CharacterAnimate(void)
 		[CHARACTER_STATE_WALK]=ANIMATION_TEST_WALK,
 	};
 
-	Animator_Play(animator, &AssetManager_GetAsset(assets, clipIndex[character.state])->animation, true);
+	const BAnim_t *clip=&AssetManager_GetAsset(assets, clipIndex[character.state])->animation;
+	const bool clipChanged=animator->clip!=clip||!animator->playing;
+
+	Animator_Play(animator, clip, true);
+
+	if(clipChanged)
+	{
+		Animator_ClearOnFrame(animator);
+
+		switch(character.state)
+		{
+			case CHARACTER_STATE_WALK:
+				Animator_AddOnFrame(animator, 5, AnimationPlayFootstep, NULL);
+				Animator_AddOnFrame(animator, 25, AnimationPlayFootstep, NULL);
+				break;
+
+			case CHARACTER_STATE_CROUCH_WALK:
+				Animator_AddOnFrame(animator, 1, AnimationPlayFootstep, NULL);
+				Animator_AddOnFrame(animator, 33, AnimationPlayFootstep, NULL);
+				break;
+
+			case CHARACTER_STATE_RUN:
+				Animator_AddOnFrame(animator, 1, AnimationPlayRunFootstep, NULL);
+				Animator_AddOnFrame(animator, 12, AnimationPlayRunFootstep, NULL);
+				break;
+
+			default:
+				break;
+		}
+	}
 
 	if(character.state==CHARACTER_STATE_WALK)
 		animator->speed=character.speed/(WALK_CLIP_SPEED*WORLD_SCALE);
