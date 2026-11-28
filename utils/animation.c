@@ -137,6 +137,29 @@ void Animator_SetOnFinish(Animator_t *animator, AnimatorCallback_t callback, voi
 	animator->onFinishUserData=userData;
 }
 
+void Animator_AddOnFrame(Animator_t *animator, uint32_t frame, AnimatorCallback_t callback, void *userData)
+{
+	if(!animator)
+		return;
+
+	if(animator->numOnFrameEvent>=ANIM_MAX_FRAME_EVENT)
+		return;
+
+	animator->onFrameEvent[animator->numOnFrameEvent].frame=frame;
+	animator->onFrameEvent[animator->numOnFrameEvent].callback=callback;
+	animator->onFrameEvent[animator->numOnFrameEvent].userData=userData;
+	animator->numOnFrameEvent++;
+}
+
+void Animator_ClearOnFrame(Animator_t *animator)
+{
+	if(!animator)
+		return;
+
+	memset(animator->onFrameEvent, 0, sizeof(animator->onFrameEvent));
+	animator->numOnFrameEvent=0;
+}
+
 void Animator_AddPostPose(Animator_t *animator, AnimatorPostPoseFunc_t callback, void *userData)
 {
 	if(!animator)
@@ -145,8 +168,8 @@ void Animator_AddPostPose(Animator_t *animator, AnimatorPostPoseFunc_t callback,
 	if(animator->numPostPose>=ANIM_MAX_POSTPOSE_PROC)
 		return;
 
-	animator->postPose[animator->numPostPose]=callback;
-	animator->postPoseUserData[animator->numPostPose]=userData;
+	animator->postPose[animator->numPostPose].callback=callback;
+	animator->postPose[animator->numPostPose].userData=userData;
 	animator->numPostPose++;
 }
 
@@ -156,7 +179,6 @@ void Animator_ClearPostPose(Animator_t *animator)
 		return;
 
 	memset(animator->postPose, 0, sizeof(animator->postPose));
-	memset(animator->postPoseUserData, 0, sizeof(animator->postPoseUserData));
 	animator->numPostPose=0;
 }
 
@@ -197,6 +219,43 @@ static void SamplePose(const BAnim_t *clip, float time, bool loop, uint32_t numB
 	}
 }
 
+static void DispatchFrameEvents(Animator_t *animator, const BAnim_t *clip, const float fromTime, const float toTime)
+{
+	const int64_t fromFrame=(int64_t)floorf(fromTime*clip->frameRate);
+	const int64_t toFrame=(int64_t)floorf(toTime*clip->frameRate);
+	const int64_t numFrame=clip->numFrame;
+
+	if(toFrame>fromFrame)
+	{
+		for(int64_t frame=fromFrame+1;frame<=toFrame;frame++)
+		{
+			const uint32_t clipFrame=(uint32_t)(frame%numFrame);
+
+			for(uint32_t i=0;i<animator->numOnFrameEvent;i++)
+			{
+				if(animator->onFrameEvent[i].frame==clipFrame&&animator->onFrameEvent[i].callback)
+					animator->onFrameEvent[i].callback(animator, animator->onFrameEvent[i].userData);
+			}
+		}
+	}
+	else if(toFrame<fromFrame)
+	{
+		for(int64_t frame=fromFrame-1;frame>=toFrame;frame--)
+		{
+			int64_t wrappedFrame=frame%numFrame;
+
+			if(wrappedFrame<0)
+				wrappedFrame+=numFrame;
+
+			for(uint32_t i=0;i<animator->numOnFrameEvent;i++)
+			{
+				if(animator->onFrameEvent[i].frame==(uint32_t)wrappedFrame&&animator->onFrameEvent[i].callback)
+					animator->onFrameEvent[i].callback(animator, animator->onFrameEvent[i].userData);
+			}
+		}
+	}
+}
+
 static void AdvanceTime(Animator_t *animator, float dt)
 {
 	const BAnim_t *clip=animator->clip;
@@ -204,10 +263,13 @@ static void AdvanceTime(Animator_t *animator, float dt)
 	if(!animator->playing||!clip||clip->numFrame==0||clip->frameRate<=0.0f)
 		return;
 
+	const float prevTime=animator->time;
 	float time=animator->time+dt*animator->speed;
 
 	if(animator->loop)
 	{
+		DispatchFrameEvents(animator, clip, prevTime, time);
+
 		const float length=(float)clip->numFrame/clip->frameRate;
 		const float wraps=floorf(time/length);
 
@@ -222,15 +284,21 @@ static void AdvanceTime(Animator_t *animator, float dt)
 
 		if(time>=end)
 		{
+			DispatchFrameEvents(animator, clip, prevTime, end);
 			time=end;
 			animator->playing=false;
 			animator->finished=true;
 		}
 		else if(time<0.0f)
 		{
+			DispatchFrameEvents(animator, clip, prevTime, 0.0f);
 			time=0.0f;
 			animator->playing=false;
 			animator->finished=true;
+		}
+		else
+		{
+			DispatchFrameEvents(animator, clip, prevTime, time);
 		}
 	}
 
@@ -291,8 +359,8 @@ void Animation_Update(AnimationSystem_t *system, float dt, uint32_t frameIndex)
 
 		for(uint32_t i=0;i<animator->numPostPose;i++)
 		{
-			if(animator->postPose[i])
-				animator->postPose[i](animator, system->pose, dt, animator->postPoseUserData[i]);
+			if(animator->postPose[i].callback)
+				animator->postPose[i].callback(animator, system->pose, dt, animator->postPose[i].userData);
 		}
 
 		for(uint32_t b=0;b<numBone;b++)
